@@ -85,6 +85,14 @@ export function AppSidebar() {
           {!collapsed && <span>Configurações</span>}
         </Link>
         <button
+          onClick={async () => { await signOut(); navigate("/login"); }}
+          className="sidebar-item sidebar-item-inactive w-full text-destructive"
+          title={collapsed ? "Sair" : undefined}
+        >
+          <LogOut className="w-5 h-5 flex-shrink-0" />
+          {!collapsed && <span>Sair</span>}
+        </button>
+        <button
           onClick={() => setCollapsed(!collapsed)}
           className="sidebar-item sidebar-item-inactive w-full"
         >
