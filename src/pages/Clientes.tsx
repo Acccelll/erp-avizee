@@ -34,8 +34,8 @@ interface Cliente {
   created_at: string;
 }
 
-const emptyCliente = {
-  tipo_pessoa: "F" as const, nome_razao_social: "", nome_fantasia: "", cpf_cnpj: "",
+const emptyCliente: Record<string, any> = {
+  tipo_pessoa: "F", nome_razao_social: "", nome_fantasia: "", cpf_cnpj: "",
   email: "", telefone: "", celular: "", prazo_padrao: 30, limite_credito: 0,
   logradouro: "", numero: "", bairro: "", cidade: "", uf: "", cep: "", observacoes: "",
 };
