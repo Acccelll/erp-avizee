@@ -8,6 +8,7 @@ interface UseCrudOptions {
   orderBy?: string;
   ascending?: boolean;
   filter?: { column: string; value: any }[];
+  hasAtivo?: boolean;
 }
 
 export function useSupabaseCrud<T extends Record<string, any>>({
@@ -16,16 +17,18 @@ export function useSupabaseCrud<T extends Record<string, any>>({
   orderBy = "created_at",
   ascending = false,
   filter = [],
+  hasAtivo = true,
 }: UseCrudOptions) {
   const [data, setData] = useState<T[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
-    let query = (supabase.from(table) as any).select(select).order(orderBy, { ascending });
+    let query = (supabase as any).from(table).select(select).order(orderBy, { ascending });
 
-    // Default: only show active records
-    query = query.eq("ativo", true);
+    if (hasAtivo) {
+      query = query.eq("ativo", true);
+    }
 
     for (const f of filter) {
       query = query.eq(f.column, f.value);
@@ -38,14 +41,14 @@ export function useSupabaseCrud<T extends Record<string, any>>({
       setData(result || []);
     }
     setLoading(false);
-  }, [table, select, orderBy, ascending, JSON.stringify(filter)]);
+  }, [table, select, orderBy, ascending, JSON.stringify(filter), hasAtivo]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
   const create = async (record: Partial<T>) => {
-    const { data: result, error } = await (supabase.from(table) as any).insert(record).select().single();
+    const { data: result, error } = await (supabase as any).from(table).insert(record).select().single();
     if (error) {
       toast.error(`Erro ao criar: ${error.message}`);
       throw error;
@@ -56,7 +59,7 @@ export function useSupabaseCrud<T extends Record<string, any>>({
   };
 
   const update = async (id: string, record: Partial<T>) => {
-    const { data: result, error } = await (supabase.from(table) as any).update(record).eq("id", id).select().single();
+    const { data: result, error } = await (supabase as any).from(table).update(record).eq("id", id).select().single();
     if (error) {
       toast.error(`Erro ao atualizar: ${error.message}`);
       throw error;
@@ -67,11 +70,11 @@ export function useSupabaseCrud<T extends Record<string, any>>({
   };
 
   const remove = async (id: string, soft = true) => {
-    if (soft) {
-      const { error } = await (supabase.from(table) as any).update({ ativo: false }).eq("id", id);
+    if (soft && hasAtivo) {
+      const { error } = await (supabase as any).from(table).update({ ativo: false }).eq("id", id);
       if (error) { toast.error(`Erro ao remover: ${error.message}`); throw error; }
     } else {
-      const { error } = await (supabase.from(table) as any).delete().eq("id", id);
+      const { error } = await (supabase as any).from(table).delete().eq("id", id);
       if (error) { toast.error(`Erro ao remover: ${error.message}`); throw error; }
     }
     toast.success("Registro removido com sucesso!");
@@ -79,7 +82,7 @@ export function useSupabaseCrud<T extends Record<string, any>>({
   };
 
   const duplicate = async (item: T) => {
-    const copy = { ...item };
+    const copy = { ...item } as any;
     delete copy.id;
     delete copy.created_at;
     delete copy.updated_at;
