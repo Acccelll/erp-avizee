@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   LayoutDashboard,
   Package,
@@ -33,6 +34,8 @@ const menuItems = [
 export function AppSidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
+  const { signOut, profile } = useAuth();
 
   return (
     <aside
@@ -81,6 +84,14 @@ export function AppSidebar() {
           <Settings className="w-5 h-5 flex-shrink-0" />
           {!collapsed && <span>Configurações</span>}
         </Link>
+        <button
+          onClick={async () => { await signOut(); navigate("/login"); }}
+          className="sidebar-item sidebar-item-inactive w-full text-destructive"
+          title={collapsed ? "Sair" : undefined}
+        >
+          <LogOut className="w-5 h-5 flex-shrink-0" />
+          {!collapsed && <span>Sair</span>}
+        </button>
         <button
           onClick={() => setCollapsed(!collapsed)}
           className="sidebar-item sidebar-item-inactive w-full"
