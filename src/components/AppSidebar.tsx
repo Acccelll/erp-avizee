@@ -34,6 +34,8 @@ const menuItems = [
 export function AppSidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
+  const { signOut, profile } = useAuth();
 
   return (
     <aside
