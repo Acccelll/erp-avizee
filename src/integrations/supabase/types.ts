@@ -14,16 +14,907 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      auditoria_logs: {
+        Row: {
+          acao: string
+          created_at: string
+          dados_anteriores: Json | null
+          dados_novos: Json | null
+          id: string
+          ip_address: string | null
+          registro_id: string | null
+          tabela: string
+          usuario_id: string | null
+        }
+        Insert: {
+          acao: string
+          created_at?: string
+          dados_anteriores?: Json | null
+          dados_novos?: Json | null
+          id?: string
+          ip_address?: string | null
+          registro_id?: string | null
+          tabela: string
+          usuario_id?: string | null
+        }
+        Update: {
+          acao?: string
+          created_at?: string
+          dados_anteriores?: Json | null
+          dados_novos?: Json | null
+          id?: string
+          ip_address?: string | null
+          registro_id?: string | null
+          tabela?: string
+          usuario_id?: string | null
+        }
+        Relationships: []
+      }
+      caixa_movimentos: {
+        Row: {
+          created_at: string
+          descricao: string
+          id: string
+          referencia_id: string | null
+          referencia_tipo: string | null
+          saldo_anterior: number
+          saldo_atual: number
+          tipo: Database["public"]["Enums"]["tipo_caixa"]
+          usuario_id: string | null
+          valor: number
+        }
+        Insert: {
+          created_at?: string
+          descricao: string
+          id?: string
+          referencia_id?: string | null
+          referencia_tipo?: string | null
+          saldo_anterior?: number
+          saldo_atual?: number
+          tipo: Database["public"]["Enums"]["tipo_caixa"]
+          usuario_id?: string | null
+          valor: number
+        }
+        Update: {
+          created_at?: string
+          descricao?: string
+          id?: string
+          referencia_id?: string | null
+          referencia_tipo?: string | null
+          saldo_anterior?: number
+          saldo_atual?: number
+          tipo?: Database["public"]["Enums"]["tipo_caixa"]
+          usuario_id?: string | null
+          valor?: number
+        }
+        Relationships: []
+      }
+      clientes: {
+        Row: {
+          ativo: boolean
+          bairro: string | null
+          celular: string | null
+          cep: string | null
+          cidade: string | null
+          complemento: string | null
+          cpf_cnpj: string | null
+          created_at: string
+          email: string | null
+          id: string
+          inscricao_estadual: string | null
+          inscricao_municipal: string | null
+          limite_credito: number | null
+          logradouro: string | null
+          nome_fantasia: string | null
+          nome_razao_social: string
+          numero: string | null
+          observacoes: string | null
+          prazo_padrao: number | null
+          telefone: string | null
+          tipo_pessoa: Database["public"]["Enums"]["tipo_pessoa"]
+          uf: string | null
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          bairro?: string | null
+          celular?: string | null
+          cep?: string | null
+          cidade?: string | null
+          complemento?: string | null
+          cpf_cnpj?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          inscricao_estadual?: string | null
+          inscricao_municipal?: string | null
+          limite_credito?: number | null
+          logradouro?: string | null
+          nome_fantasia?: string | null
+          nome_razao_social: string
+          numero?: string | null
+          observacoes?: string | null
+          prazo_padrao?: number | null
+          telefone?: string | null
+          tipo_pessoa?: Database["public"]["Enums"]["tipo_pessoa"]
+          uf?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          bairro?: string | null
+          celular?: string | null
+          cep?: string | null
+          cidade?: string | null
+          complemento?: string | null
+          cpf_cnpj?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          inscricao_estadual?: string | null
+          inscricao_municipal?: string | null
+          limite_credito?: number | null
+          logradouro?: string | null
+          nome_fantasia?: string | null
+          nome_razao_social?: string
+          numero?: string | null
+          observacoes?: string | null
+          prazo_padrao?: number | null
+          telefone?: string | null
+          tipo_pessoa?: Database["public"]["Enums"]["tipo_pessoa"]
+          uf?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      compras: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          data_compra: string
+          data_entrega: string | null
+          fornecedor_id: string | null
+          id: string
+          numero: string
+          observacoes: string | null
+          status: Database["public"]["Enums"]["status_pedido"]
+          updated_at: string
+          usuario_id: string | null
+          valor_total: number | null
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          data_compra?: string
+          data_entrega?: string | null
+          fornecedor_id?: string | null
+          id?: string
+          numero: string
+          observacoes?: string | null
+          status?: Database["public"]["Enums"]["status_pedido"]
+          updated_at?: string
+          usuario_id?: string | null
+          valor_total?: number | null
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          data_compra?: string
+          data_entrega?: string | null
+          fornecedor_id?: string | null
+          id?: string
+          numero?: string
+          observacoes?: string | null
+          status?: Database["public"]["Enums"]["status_pedido"]
+          updated_at?: string
+          usuario_id?: string | null
+          valor_total?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "compras_fornecedor_id_fkey"
+            columns: ["fornecedor_id"]
+            isOneToOne: false
+            referencedRelation: "fornecedores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      compras_itens: {
+        Row: {
+          compra_id: string
+          created_at: string
+          id: string
+          produto_id: string
+          quantidade: number
+          valor_total: number
+          valor_unitario: number
+        }
+        Insert: {
+          compra_id: string
+          created_at?: string
+          id?: string
+          produto_id: string
+          quantidade: number
+          valor_total: number
+          valor_unitario: number
+        }
+        Update: {
+          compra_id?: string
+          created_at?: string
+          id?: string
+          produto_id?: string
+          quantidade?: number
+          valor_total?: number
+          valor_unitario?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "compras_itens_compra_id_fkey"
+            columns: ["compra_id"]
+            isOneToOne: false
+            referencedRelation: "compras"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "compras_itens_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      estoque_movimentos: {
+        Row: {
+          created_at: string
+          documento_id: string | null
+          documento_tipo: string | null
+          id: string
+          motivo: string | null
+          produto_id: string
+          quantidade: number
+          saldo_anterior: number
+          saldo_atual: number
+          tipo: Database["public"]["Enums"]["tipo_movimento_estoque"]
+          usuario_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          documento_id?: string | null
+          documento_tipo?: string | null
+          id?: string
+          motivo?: string | null
+          produto_id: string
+          quantidade: number
+          saldo_anterior?: number
+          saldo_atual?: number
+          tipo: Database["public"]["Enums"]["tipo_movimento_estoque"]
+          usuario_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          documento_id?: string | null
+          documento_tipo?: string | null
+          id?: string
+          motivo?: string | null
+          produto_id?: string
+          quantidade?: number
+          saldo_anterior?: number
+          saldo_atual?: number
+          tipo?: Database["public"]["Enums"]["tipo_movimento_estoque"]
+          usuario_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "estoque_movimentos_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      financeiro_lancamentos: {
+        Row: {
+          ativo: boolean
+          cliente_id: string | null
+          created_at: string
+          data_pagamento: string | null
+          data_vencimento: string
+          descricao: string
+          fornecedor_id: string | null
+          id: string
+          nota_fiscal_id: string | null
+          observacoes: string | null
+          status: Database["public"]["Enums"]["status_financeiro"]
+          tipo: Database["public"]["Enums"]["tipo_financeiro"]
+          updated_at: string
+          usuario_id: string | null
+          valor: number
+        }
+        Insert: {
+          ativo?: boolean
+          cliente_id?: string | null
+          created_at?: string
+          data_pagamento?: string | null
+          data_vencimento: string
+          descricao: string
+          fornecedor_id?: string | null
+          id?: string
+          nota_fiscal_id?: string | null
+          observacoes?: string | null
+          status?: Database["public"]["Enums"]["status_financeiro"]
+          tipo: Database["public"]["Enums"]["tipo_financeiro"]
+          updated_at?: string
+          usuario_id?: string | null
+          valor: number
+        }
+        Update: {
+          ativo?: boolean
+          cliente_id?: string | null
+          created_at?: string
+          data_pagamento?: string | null
+          data_vencimento?: string
+          descricao?: string
+          fornecedor_id?: string | null
+          id?: string
+          nota_fiscal_id?: string | null
+          observacoes?: string | null
+          status?: Database["public"]["Enums"]["status_financeiro"]
+          tipo?: Database["public"]["Enums"]["tipo_financeiro"]
+          updated_at?: string
+          usuario_id?: string | null
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "financeiro_lancamentos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "financeiro_lancamentos_fornecedor_id_fkey"
+            columns: ["fornecedor_id"]
+            isOneToOne: false
+            referencedRelation: "fornecedores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "financeiro_lancamentos_nota_fiscal_id_fkey"
+            columns: ["nota_fiscal_id"]
+            isOneToOne: false
+            referencedRelation: "notas_fiscais"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fornecedores: {
+        Row: {
+          ativo: boolean
+          bairro: string | null
+          celular: string | null
+          cep: string | null
+          cidade: string | null
+          complemento: string | null
+          cpf_cnpj: string | null
+          created_at: string
+          email: string | null
+          id: string
+          inscricao_estadual: string | null
+          logradouro: string | null
+          nome_fantasia: string | null
+          nome_razao_social: string
+          numero: string | null
+          observacoes: string | null
+          prazo_padrao: number | null
+          telefone: string | null
+          tipo_pessoa: Database["public"]["Enums"]["tipo_pessoa"]
+          uf: string | null
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          bairro?: string | null
+          celular?: string | null
+          cep?: string | null
+          cidade?: string | null
+          complemento?: string | null
+          cpf_cnpj?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          inscricao_estadual?: string | null
+          logradouro?: string | null
+          nome_fantasia?: string | null
+          nome_razao_social: string
+          numero?: string | null
+          observacoes?: string | null
+          prazo_padrao?: number | null
+          telefone?: string | null
+          tipo_pessoa?: Database["public"]["Enums"]["tipo_pessoa"]
+          uf?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          bairro?: string | null
+          celular?: string | null
+          cep?: string | null
+          cidade?: string | null
+          complemento?: string | null
+          cpf_cnpj?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          inscricao_estadual?: string | null
+          logradouro?: string | null
+          nome_fantasia?: string | null
+          nome_razao_social?: string
+          numero?: string | null
+          observacoes?: string | null
+          prazo_padrao?: number | null
+          telefone?: string | null
+          tipo_pessoa?: Database["public"]["Enums"]["tipo_pessoa"]
+          uf?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      grupos_produto: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          descricao: string | null
+          id: string
+          nome: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      notas_fiscais: {
+        Row: {
+          ativo: boolean
+          chave_acesso: string | null
+          cliente_id: string | null
+          created_at: string
+          data_emissao: string
+          data_recebimento: string | null
+          fornecedor_id: string | null
+          gera_financeiro: boolean | null
+          id: string
+          movimenta_estoque: boolean | null
+          numero: string
+          observacoes: string | null
+          serie: string | null
+          status: Database["public"]["Enums"]["status_nota_fiscal"]
+          tipo: Database["public"]["Enums"]["tipo_nota_fiscal"]
+          updated_at: string
+          usuario_id: string | null
+          valor_total: number
+        }
+        Insert: {
+          ativo?: boolean
+          chave_acesso?: string | null
+          cliente_id?: string | null
+          created_at?: string
+          data_emissao?: string
+          data_recebimento?: string | null
+          fornecedor_id?: string | null
+          gera_financeiro?: boolean | null
+          id?: string
+          movimenta_estoque?: boolean | null
+          numero: string
+          observacoes?: string | null
+          serie?: string | null
+          status?: Database["public"]["Enums"]["status_nota_fiscal"]
+          tipo: Database["public"]["Enums"]["tipo_nota_fiscal"]
+          updated_at?: string
+          usuario_id?: string | null
+          valor_total?: number
+        }
+        Update: {
+          ativo?: boolean
+          chave_acesso?: string | null
+          cliente_id?: string | null
+          created_at?: string
+          data_emissao?: string
+          data_recebimento?: string | null
+          fornecedor_id?: string | null
+          gera_financeiro?: boolean | null
+          id?: string
+          movimenta_estoque?: boolean | null
+          numero?: string
+          observacoes?: string | null
+          serie?: string | null
+          status?: Database["public"]["Enums"]["status_nota_fiscal"]
+          tipo?: Database["public"]["Enums"]["tipo_nota_fiscal"]
+          updated_at?: string
+          usuario_id?: string | null
+          valor_total?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notas_fiscais_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notas_fiscais_fornecedor_id_fkey"
+            columns: ["fornecedor_id"]
+            isOneToOne: false
+            referencedRelation: "fornecedores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notas_fiscais_itens: {
+        Row: {
+          cfop: string | null
+          created_at: string
+          cst: string | null
+          id: string
+          nota_fiscal_id: string
+          produto_id: string
+          quantidade: number
+          valor_unitario: number
+        }
+        Insert: {
+          cfop?: string | null
+          created_at?: string
+          cst?: string | null
+          id?: string
+          nota_fiscal_id: string
+          produto_id: string
+          quantidade: number
+          valor_unitario: number
+        }
+        Update: {
+          cfop?: string | null
+          created_at?: string
+          cst?: string | null
+          id?: string
+          nota_fiscal_id?: string
+          produto_id?: string
+          quantidade?: number
+          valor_unitario?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notas_fiscais_itens_nota_fiscal_id_fkey"
+            columns: ["nota_fiscal_id"]
+            isOneToOne: false
+            referencedRelation: "notas_fiscais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notas_fiscais_itens_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      orcamentos: {
+        Row: {
+          ativo: boolean
+          cliente_id: string | null
+          created_at: string
+          data_orcamento: string
+          id: string
+          numero: string
+          observacoes: string | null
+          status: Database["public"]["Enums"]["status_pedido"]
+          updated_at: string
+          usuario_id: string | null
+          validade: string | null
+          valor_total: number | null
+        }
+        Insert: {
+          ativo?: boolean
+          cliente_id?: string | null
+          created_at?: string
+          data_orcamento?: string
+          id?: string
+          numero: string
+          observacoes?: string | null
+          status?: Database["public"]["Enums"]["status_pedido"]
+          updated_at?: string
+          usuario_id?: string | null
+          validade?: string | null
+          valor_total?: number | null
+        }
+        Update: {
+          ativo?: boolean
+          cliente_id?: string | null
+          created_at?: string
+          data_orcamento?: string
+          id?: string
+          numero?: string
+          observacoes?: string | null
+          status?: Database["public"]["Enums"]["status_pedido"]
+          updated_at?: string
+          usuario_id?: string | null
+          validade?: string | null
+          valor_total?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orcamentos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      orcamentos_itens: {
+        Row: {
+          created_at: string
+          id: string
+          orcamento_id: string
+          produto_id: string
+          quantidade: number
+          valor_total: number
+          valor_unitario: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          orcamento_id: string
+          produto_id: string
+          quantidade: number
+          valor_total: number
+          valor_unitario: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          orcamento_id?: string
+          produto_id?: string
+          quantidade?: number
+          valor_total?: number
+          valor_unitario?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orcamentos_itens_orcamento_id_fkey"
+            columns: ["orcamento_id"]
+            isOneToOne: false
+            referencedRelation: "orcamentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orcamentos_itens_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      produtos: {
+        Row: {
+          ativo: boolean
+          cfop_padrao: string | null
+          codigo_interno: string | null
+          created_at: string
+          cst: string | null
+          descricao: string | null
+          estoque_atual: number | null
+          estoque_minimo: number | null
+          grupo_id: string | null
+          id: string
+          ncm: string | null
+          nome: string
+          peso: number | null
+          preco_custo: number | null
+          preco_venda: number
+          sku: string | null
+          unidade_medida: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          cfop_padrao?: string | null
+          codigo_interno?: string | null
+          created_at?: string
+          cst?: string | null
+          descricao?: string | null
+          estoque_atual?: number | null
+          estoque_minimo?: number | null
+          grupo_id?: string | null
+          id?: string
+          ncm?: string | null
+          nome: string
+          peso?: number | null
+          preco_custo?: number | null
+          preco_venda?: number
+          sku?: string | null
+          unidade_medida?: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          cfop_padrao?: string | null
+          codigo_interno?: string | null
+          created_at?: string
+          cst?: string | null
+          descricao?: string | null
+          estoque_atual?: number | null
+          estoque_minimo?: number | null
+          grupo_id?: string | null
+          id?: string
+          ncm?: string | null
+          nome?: string
+          peso?: number | null
+          preco_custo?: number | null
+          preco_venda?: number
+          sku?: string | null
+          unidade_medida?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "produtos_grupo_id_fkey"
+            columns: ["grupo_id"]
+            isOneToOne: false
+            referencedRelation: "grupos_produto"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      produtos_fornecedores: {
+        Row: {
+          created_at: string
+          fornecedor_id: string
+          id: string
+          lead_time_dias: number | null
+          preco_compra: number | null
+          produto_id: string
+          referencia_fornecedor: string | null
+        }
+        Insert: {
+          created_at?: string
+          fornecedor_id: string
+          id?: string
+          lead_time_dias?: number | null
+          preco_compra?: number | null
+          produto_id: string
+          referencia_fornecedor?: string | null
+        }
+        Update: {
+          created_at?: string
+          fornecedor_id?: string
+          id?: string
+          lead_time_dias?: number | null
+          preco_compra?: number | null
+          produto_id?: string
+          referencia_fornecedor?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "produtos_fornecedores_fornecedor_id_fkey"
+            columns: ["fornecedor_id"]
+            isOneToOne: false
+            referencedRelation: "fornecedores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "produtos_fornecedores_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          ativo: boolean
+          avatar_url: string | null
+          cargo: string | null
+          created_at: string
+          email: string | null
+          id: string
+          nome: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          avatar_url?: string | null
+          cargo?: string | null
+          created_at?: string
+          email?: string | null
+          id: string
+          nome?: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          avatar_url?: string | null
+          cargo?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          nome?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      generate_sequence: {
+        Args: { prefix: string; table_name: string }
+        Returns: string
+      }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "vendedor" | "financeiro" | "estoquista"
+      status_financeiro: "aberto" | "pago" | "vencido" | "cancelado"
+      status_nota_fiscal: "pendente" | "confirmada" | "cancelada"
+      status_pedido: "rascunho" | "confirmado" | "cancelado" | "faturado"
+      tipo_caixa:
+        | "abertura"
+        | "suprimento"
+        | "sangria"
+        | "fechamento"
+        | "venda"
+        | "pagamento"
+      tipo_endereco: "comercial" | "entrega" | "cobranca"
+      tipo_financeiro: "pagar" | "receber"
+      tipo_movimento_estoque: "entrada" | "saida" | "ajuste"
+      tipo_nota_fiscal: "entrada" | "saida"
+      tipo_pessoa: "F" | "J"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +1041,24 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "vendedor", "financeiro", "estoquista"],
+      status_financeiro: ["aberto", "pago", "vencido", "cancelado"],
+      status_nota_fiscal: ["pendente", "confirmada", "cancelada"],
+      status_pedido: ["rascunho", "confirmado", "cancelado", "faturado"],
+      tipo_caixa: [
+        "abertura",
+        "suprimento",
+        "sangria",
+        "fechamento",
+        "venda",
+        "pagamento",
+      ],
+      tipo_endereco: ["comercial", "entrega", "cobranca"],
+      tipo_financeiro: ["pagar", "receber"],
+      tipo_movimento_estoque: ["entrada", "saida", "ajuste"],
+      tipo_nota_fiscal: ["entrada", "saida"],
+      tipo_pessoa: ["F", "J"],
+    },
   },
 } as const
