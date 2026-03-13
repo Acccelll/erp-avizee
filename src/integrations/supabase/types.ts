@@ -89,6 +89,47 @@ export type Database = {
         }
         Relationships: []
       }
+      cliente_registros_comunicacao: {
+        Row: {
+          assunto: string | null
+          canal: string | null
+          cliente_id: string
+          created_at: string
+          data_hora: string
+          descricao: string | null
+          id: string
+          usuario_id: string | null
+        }
+        Insert: {
+          assunto?: string | null
+          canal?: string | null
+          cliente_id: string
+          created_at?: string
+          data_hora?: string
+          descricao?: string | null
+          id?: string
+          usuario_id?: string | null
+        }
+        Update: {
+          assunto?: string | null
+          canal?: string | null
+          cliente_id?: string
+          created_at?: string
+          data_hora?: string
+          descricao?: string | null
+          id?: string
+          usuario_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cliente_registros_comunicacao_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clientes: {
         Row: {
           ativo: boolean
@@ -97,6 +138,7 @@ export type Database = {
           cep: string | null
           cidade: string | null
           complemento: string | null
+          contato: string | null
           cpf_cnpj: string | null
           created_at: string
           email: string | null
@@ -109,6 +151,7 @@ export type Database = {
           nome_razao_social: string
           numero: string | null
           observacoes: string | null
+          pais: string | null
           prazo_padrao: number | null
           telefone: string | null
           tipo_pessoa: Database["public"]["Enums"]["tipo_pessoa"]
@@ -122,6 +165,7 @@ export type Database = {
           cep?: string | null
           cidade?: string | null
           complemento?: string | null
+          contato?: string | null
           cpf_cnpj?: string | null
           created_at?: string
           email?: string | null
@@ -134,6 +178,7 @@ export type Database = {
           nome_razao_social: string
           numero?: string | null
           observacoes?: string | null
+          pais?: string | null
           prazo_padrao?: number | null
           telefone?: string | null
           tipo_pessoa?: Database["public"]["Enums"]["tipo_pessoa"]
@@ -147,6 +192,7 @@ export type Database = {
           cep?: string | null
           cidade?: string | null
           complemento?: string | null
+          contato?: string | null
           cpf_cnpj?: string | null
           created_at?: string
           email?: string | null
@@ -159,6 +205,7 @@ export type Database = {
           nome_razao_social?: string
           numero?: string | null
           observacoes?: string | null
+          pais?: string | null
           prazo_padrao?: number | null
           telefone?: string | null
           tipo_pessoa?: Database["public"]["Enums"]["tipo_pessoa"]
@@ -173,13 +220,18 @@ export type Database = {
           created_at: string
           data_compra: string
           data_entrega: string | null
+          data_entrega_prevista: string | null
+          data_entrega_real: string | null
           fornecedor_id: string | null
+          frete_valor: number | null
           id: string
+          impostos_valor: number | null
           numero: string
           observacoes: string | null
           status: Database["public"]["Enums"]["status_pedido"]
           updated_at: string
           usuario_id: string | null
+          valor_produtos: number | null
           valor_total: number | null
         }
         Insert: {
@@ -187,13 +239,18 @@ export type Database = {
           created_at?: string
           data_compra?: string
           data_entrega?: string | null
+          data_entrega_prevista?: string | null
+          data_entrega_real?: string | null
           fornecedor_id?: string | null
+          frete_valor?: number | null
           id?: string
+          impostos_valor?: number | null
           numero: string
           observacoes?: string | null
           status?: Database["public"]["Enums"]["status_pedido"]
           updated_at?: string
           usuario_id?: string | null
+          valor_produtos?: number | null
           valor_total?: number | null
         }
         Update: {
@@ -201,13 +258,18 @@ export type Database = {
           created_at?: string
           data_compra?: string
           data_entrega?: string | null
+          data_entrega_prevista?: string | null
+          data_entrega_real?: string | null
           fornecedor_id?: string | null
+          frete_valor?: number | null
           id?: string
+          impostos_valor?: number | null
           numero?: string
           observacoes?: string | null
           status?: Database["public"]["Enums"]["status_pedido"]
           updated_at?: string
           usuario_id?: string | null
+          valor_produtos?: number | null
           valor_total?: number | null
         }
         Relationships: [
@@ -318,11 +380,14 @@ export type Database = {
       financeiro_lancamentos: {
         Row: {
           ativo: boolean
+          banco: string | null
+          cartao: string | null
           cliente_id: string | null
           created_at: string
           data_pagamento: string | null
           data_vencimento: string
           descricao: string
+          forma_pagamento: string | null
           fornecedor_id: string | null
           id: string
           nota_fiscal_id: string | null
@@ -335,11 +400,14 @@ export type Database = {
         }
         Insert: {
           ativo?: boolean
+          banco?: string | null
+          cartao?: string | null
           cliente_id?: string | null
           created_at?: string
           data_pagamento?: string | null
           data_vencimento: string
           descricao: string
+          forma_pagamento?: string | null
           fornecedor_id?: string | null
           id?: string
           nota_fiscal_id?: string | null
@@ -352,11 +420,14 @@ export type Database = {
         }
         Update: {
           ativo?: boolean
+          banco?: string | null
+          cartao?: string | null
           cliente_id?: string | null
           created_at?: string
           data_pagamento?: string | null
           data_vencimento?: string
           descricao?: string
+          forma_pagamento?: string | null
           fornecedor_id?: string | null
           id?: string
           nota_fiscal_id?: string | null
@@ -399,6 +470,7 @@ export type Database = {
           cep: string | null
           cidade: string | null
           complemento: string | null
+          contato: string | null
           cpf_cnpj: string | null
           created_at: string
           email: string | null
@@ -409,6 +481,7 @@ export type Database = {
           nome_razao_social: string
           numero: string | null
           observacoes: string | null
+          pais: string | null
           prazo_padrao: number | null
           telefone: string | null
           tipo_pessoa: Database["public"]["Enums"]["tipo_pessoa"]
@@ -422,6 +495,7 @@ export type Database = {
           cep?: string | null
           cidade?: string | null
           complemento?: string | null
+          contato?: string | null
           cpf_cnpj?: string | null
           created_at?: string
           email?: string | null
@@ -432,6 +506,7 @@ export type Database = {
           nome_razao_social: string
           numero?: string | null
           observacoes?: string | null
+          pais?: string | null
           prazo_padrao?: number | null
           telefone?: string | null
           tipo_pessoa?: Database["public"]["Enums"]["tipo_pessoa"]
@@ -445,6 +520,7 @@ export type Database = {
           cep?: string | null
           cidade?: string | null
           complemento?: string | null
+          contato?: string | null
           cpf_cnpj?: string | null
           created_at?: string
           email?: string | null
@@ -455,6 +531,7 @@ export type Database = {
           nome_razao_social?: string
           numero?: string | null
           observacoes?: string | null
+          pais?: string | null
           prazo_padrao?: number | null
           telefone?: string | null
           tipo_pessoa?: Database["public"]["Enums"]["tipo_pessoa"]
@@ -495,9 +572,11 @@ export type Database = {
           ativo: boolean
           chave_acesso: string | null
           cliente_id: string | null
+          condicao_pagamento: string | null
           created_at: string
           data_emissao: string
           data_recebimento: string | null
+          forma_pagamento: string | null
           fornecedor_id: string | null
           gera_financeiro: boolean | null
           id: string
@@ -515,9 +594,11 @@ export type Database = {
           ativo?: boolean
           chave_acesso?: string | null
           cliente_id?: string | null
+          condicao_pagamento?: string | null
           created_at?: string
           data_emissao?: string
           data_recebimento?: string | null
+          forma_pagamento?: string | null
           fornecedor_id?: string | null
           gera_financeiro?: boolean | null
           id?: string
@@ -535,9 +616,11 @@ export type Database = {
           ativo?: boolean
           chave_acesso?: string | null
           cliente_id?: string | null
+          condicao_pagamento?: string | null
           created_at?: string
           data_emissao?: string
           data_recebimento?: string | null
+          forma_pagamento?: string | null
           fornecedor_id?: string | null
           gera_financeiro?: boolean | null
           id?: string
@@ -620,44 +703,86 @@ export type Database = {
         Row: {
           ativo: boolean
           cliente_id: string | null
+          cliente_snapshot: Json | null
           created_at: string
           data_orcamento: string
+          desconto: number | null
+          frete_tipo: string | null
+          frete_valor: number | null
           id: string
+          imposto_ipi: number | null
+          imposto_st: number | null
+          modalidade: string | null
           numero: string
           observacoes: string | null
+          outras_despesas: number | null
+          pagamento: string | null
+          peso_total: number | null
+          prazo_entrega: string | null
+          prazo_pagamento: string | null
+          quantidade_total: number | null
           status: Database["public"]["Enums"]["status_pedido"]
           updated_at: string
           usuario_id: string | null
           validade: string | null
           valor_total: number | null
+          vendedor_id: string | null
         }
         Insert: {
           ativo?: boolean
           cliente_id?: string | null
+          cliente_snapshot?: Json | null
           created_at?: string
           data_orcamento?: string
+          desconto?: number | null
+          frete_tipo?: string | null
+          frete_valor?: number | null
           id?: string
+          imposto_ipi?: number | null
+          imposto_st?: number | null
+          modalidade?: string | null
           numero: string
           observacoes?: string | null
+          outras_despesas?: number | null
+          pagamento?: string | null
+          peso_total?: number | null
+          prazo_entrega?: string | null
+          prazo_pagamento?: string | null
+          quantidade_total?: number | null
           status?: Database["public"]["Enums"]["status_pedido"]
           updated_at?: string
           usuario_id?: string | null
           validade?: string | null
           valor_total?: number | null
+          vendedor_id?: string | null
         }
         Update: {
           ativo?: boolean
           cliente_id?: string | null
+          cliente_snapshot?: Json | null
           created_at?: string
           data_orcamento?: string
+          desconto?: number | null
+          frete_tipo?: string | null
+          frete_valor?: number | null
           id?: string
+          imposto_ipi?: number | null
+          imposto_st?: number | null
+          modalidade?: string | null
           numero?: string
           observacoes?: string | null
+          outras_despesas?: number | null
+          pagamento?: string | null
+          peso_total?: number | null
+          prazo_entrega?: string | null
+          prazo_pagamento?: string | null
+          quantidade_total?: number | null
           status?: Database["public"]["Enums"]["status_pedido"]
           updated_at?: string
           usuario_id?: string | null
           validade?: string | null
           valor_total?: number | null
+          vendedor_id?: string | null
         }
         Relationships: [
           {
@@ -671,31 +796,49 @@ export type Database = {
       }
       orcamentos_itens: {
         Row: {
+          codigo_snapshot: string | null
           created_at: string
+          descricao_snapshot: string | null
           id: string
           orcamento_id: string
+          peso_total: number | null
+          peso_unitario: number | null
           produto_id: string
           quantidade: number
+          unidade: string | null
           valor_total: number
           valor_unitario: number
+          variacao: string | null
         }
         Insert: {
+          codigo_snapshot?: string | null
           created_at?: string
+          descricao_snapshot?: string | null
           id?: string
           orcamento_id: string
+          peso_total?: number | null
+          peso_unitario?: number | null
           produto_id: string
           quantidade: number
+          unidade?: string | null
           valor_total: number
           valor_unitario: number
+          variacao?: string | null
         }
         Update: {
+          codigo_snapshot?: string | null
           created_at?: string
+          descricao_snapshot?: string | null
           id?: string
           orcamento_id?: string
+          peso_total?: number | null
+          peso_unitario?: number | null
           produto_id?: string
           quantidade?: number
+          unidade?: string | null
           valor_total?: number
           valor_unitario?: number
+          variacao?: string | null
         }
         Relationships: [
           {
@@ -714,6 +857,51 @@ export type Database = {
           },
         ]
       }
+      produto_composicoes: {
+        Row: {
+          created_at: string
+          id: string
+          ordem: number | null
+          produto_filho_id: string
+          produto_pai_id: string
+          quantidade: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          ordem?: number | null
+          produto_filho_id: string
+          produto_pai_id: string
+          quantidade?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          ordem?: number | null
+          produto_filho_id?: string
+          produto_pai_id?: string
+          quantidade?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "produto_composicoes_produto_filho_id_fkey"
+            columns: ["produto_filho_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "produto_composicoes_produto_pai_id_fkey"
+            columns: ["produto_pai_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       produtos: {
         Row: {
           ativo: boolean
@@ -722,6 +910,7 @@ export type Database = {
           created_at: string
           cst: string | null
           descricao: string | null
+          eh_composto: boolean | null
           estoque_atual: number | null
           estoque_minimo: number | null
           grupo_id: string | null
@@ -742,6 +931,7 @@ export type Database = {
           created_at?: string
           cst?: string | null
           descricao?: string | null
+          eh_composto?: boolean | null
           estoque_atual?: number | null
           estoque_minimo?: number | null
           grupo_id?: string | null
@@ -762,6 +952,7 @@ export type Database = {
           created_at?: string
           cst?: string | null
           descricao?: string | null
+          eh_composto?: boolean | null
           estoque_atual?: number | null
           estoque_minimo?: number | null
           grupo_id?: string | null
