@@ -11,6 +11,7 @@ import Clientes from "./pages/Clientes";
 import Fornecedores from "./pages/Fornecedores";
 import Compras from "./pages/Compras";
 import Orcamentos from "./pages/Orcamentos";
+import OrcamentoForm from "./pages/OrcamentoForm";
 import Estoque from "./pages/Estoque";
 import Fiscal from "./pages/Fiscal";
 import Financeiro from "./pages/Financeiro";
