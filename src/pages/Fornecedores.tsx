@@ -9,19 +9,23 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { MaskedInput } from "@/components/ui/MaskedInput";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 interface Fornecedor {
   id: string; tipo_pessoa: string; nome_razao_social: string; nome_fantasia: string;
-  cpf_cnpj: string; email: string; telefone: string; celular: string; prazo_padrao: number;
-  logradouro: string; numero: string; bairro: string; cidade: string; uf: string; cep: string;
+  cpf_cnpj: string; inscricao_estadual: string; email: string; telefone: string; celular: string;
+  contato: string; prazo_padrao: number; logradouro: string; numero: string; complemento: string;
+  bairro: string; cidade: string; uf: string; cep: string; pais: string;
   observacoes: string; ativo: boolean; created_at: string;
 }
 
-const emptyForm = {
+const emptyForm: Record<string, any> = {
   tipo_pessoa: "J", nome_razao_social: "", nome_fantasia: "", cpf_cnpj: "",
-  email: "", telefone: "", celular: "", prazo_padrao: 30,
-  logradouro: "", numero: "", bairro: "", cidade: "", uf: "", cep: "", observacoes: "",
+  inscricao_estadual: "", email: "", telefone: "", celular: "", contato: "",
+  prazo_padrao: 30, logradouro: "", numero: "", complemento: "",
+  bairro: "", cidade: "", uf: "", cep: "", pais: "Brasil", observacoes: "",
 };
 
 const Fornecedores = () => {
@@ -32,15 +36,28 @@ const Fornecedores = () => {
   const [mode, setMode] = useState<"create" | "edit">("create");
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [comprasHist, setComprasHist] = useState<any[]>([]);
 
-  const openCreate = () => { setMode("create"); setForm(emptyForm); setSelected(null); setModalOpen(true); };
+  const openCreate = () => { setMode("create"); setForm({...emptyForm}); setSelected(null); setModalOpen(true); };
   const openEdit = (f: Fornecedor) => {
     setMode("edit"); setSelected(f);
-    setForm({ tipo_pessoa: f.tipo_pessoa || "J", nome_razao_social: f.nome_razao_social, nome_fantasia: f.nome_fantasia || "",
-      cpf_cnpj: f.cpf_cnpj || "", email: f.email || "", telefone: f.telefone || "", celular: f.celular || "",
+    setForm({
+      tipo_pessoa: f.tipo_pessoa || "J", nome_razao_social: f.nome_razao_social, nome_fantasia: f.nome_fantasia || "",
+      cpf_cnpj: f.cpf_cnpj || "", inscricao_estadual: f.inscricao_estadual || "",
+      email: f.email || "", telefone: f.telefone || "", celular: f.celular || "", contato: f.contato || "",
       prazo_padrao: f.prazo_padrao || 30, logradouro: f.logradouro || "", numero: f.numero || "",
-      bairro: f.bairro || "", cidade: f.cidade || "", uf: f.uf || "", cep: f.cep || "", observacoes: f.observacoes || "" });
+      complemento: f.complemento || "", bairro: f.bairro || "", cidade: f.cidade || "",
+      uf: f.uf || "", cep: f.cep || "", pais: f.pais || "Brasil", observacoes: f.observacoes || "",
+    });
     setModalOpen(true);
+  };
+
+  const openView = async (f: Fornecedor) => {
+    setSelected(f); setDrawerOpen(true);
+    const { data: compras } = await (supabase as any).from("compras")
+      .select("numero, data_compra, valor_total, status, data_entrega_prevista, data_entrega_real")
+      .eq("fornecedor_id", f.id).eq("ativo", true).order("data_compra", { ascending: false }).limit(20);
+    setComprasHist(compras || []);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -55,12 +72,27 @@ const Fornecedores = () => {
     setSaving(false);
   };
 
+  // Compute delivery stats from history
+  const deliveryStats = (() => {
+    const delivered = comprasHist.filter((c: any) => c.data_entrega_real && c.data_entrega_prevista);
+    if (delivered.length === 0) return { prazoMedio: 0, atrasoMedio: 0 };
+    let totalDias = 0, totalAtraso = 0;
+    delivered.forEach((c: any) => {
+      const prev = new Date(c.data_entrega_prevista).getTime();
+      const real = new Date(c.data_entrega_real).getTime();
+      const compra = new Date(c.data_compra).getTime();
+      totalDias += (real - compra) / (1000 * 60 * 60 * 24);
+      totalAtraso += Math.max(0, (real - prev) / (1000 * 60 * 60 * 24));
+    });
+    return { prazoMedio: Math.round(totalDias / delivered.length), atrasoMedio: Math.round(totalAtraso / delivered.length) };
+  })();
+
   const columns = [
     { key: "nome_razao_social", label: "Razão Social" },
-    { key: "cpf_cnpj", label: "CNPJ", render: (f: Fornecedor) => <span className="mono text-xs">{f.cpf_cnpj || "—"}</span> },
+    { key: "cpf_cnpj", label: "CNPJ", render: (f: Fornecedor) => <span className="font-mono text-xs">{f.cpf_cnpj || "—"}</span> },
     { key: "email", label: "E-mail" },
     { key: "telefone", label: "Telefone" },
-    { key: "prazo_padrao", label: "Prazo", render: (f: Fornecedor) => `${f.prazo_padrao || 30} dias` },
+    { key: "cidade", label: "Cidade", render: (f: Fornecedor) => f.cidade ? `${f.cidade}/${f.uf}` : "—" },
     { key: "ativo", label: "Status", render: (f: Fornecedor) => <StatusBadge status={f.ativo ? "Ativo" : "Inativo"} /> },
   ];
 
@@ -68,29 +100,36 @@ const Fornecedores = () => {
     <AppLayout>
       <ModulePage title="Fornecedores" subtitle="Cadastro e gestão de fornecedores" addLabel="Novo Fornecedor" onAdd={openCreate} count={data.length}>
         <DataTable columns={columns} data={data} loading={loading}
-          onView={(f) => { setSelected(f); setDrawerOpen(true); }}
-          onEdit={openEdit} onDelete={(f) => remove(f.id)} onDuplicate={(f) => duplicate(f)} />
+          onView={openView} onEdit={openEdit} onDelete={(f) => remove(f.id)} onDuplicate={(f) => duplicate(f)} />
       </ModulePage>
 
       <FormModal open={modalOpen} onClose={() => setModalOpen(false)} title={mode === "create" ? "Novo Fornecedor" : "Editar Fornecedor"} size="lg">
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             <div className="col-span-2 space-y-2"><Label>Razão Social *</Label><Input value={form.nome_razao_social} onChange={(e) => setForm({ ...form, nome_razao_social: e.target.value })} required /></div>
             <div className="space-y-2"><Label>Nome Fantasia</Label><Input value={form.nome_fantasia} onChange={(e) => setForm({ ...form, nome_fantasia: e.target.value })} /></div>
-            <div className="space-y-2"><Label>CNPJ</Label><Input value={form.cpf_cnpj} onChange={(e) => setForm({ ...form, cpf_cnpj: e.target.value })} /></div>
+            <div className="space-y-2"><Label>CNPJ</Label>
+              <MaskedInput mask="cnpj" value={form.cpf_cnpj} onChange={(v) => setForm({ ...form, cpf_cnpj: v })} />
+            </div>
+            <div className="space-y-2"><Label>I.E.</Label><Input value={form.inscricao_estadual} onChange={(e) => setForm({ ...form, inscricao_estadual: e.target.value })} /></div>
             <div className="space-y-2"><Label>E-mail</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
-            <div className="space-y-2"><Label>Telefone</Label><Input value={form.telefone} onChange={(e) => setForm({ ...form, telefone: e.target.value })} /></div>
-            <div className="space-y-2"><Label>Celular</Label><Input value={form.celular} onChange={(e) => setForm({ ...form, celular: e.target.value })} /></div>
-            <div className="space-y-2"><Label>Prazo (dias)</Label><Input type="number" value={form.prazo_padrao} onChange={(e) => setForm({ ...form, prazo_padrao: Number(e.target.value) })} /></div>
+            <div className="space-y-2"><Label>Telefone</Label>
+              <MaskedInput mask="telefone" value={form.telefone} onChange={(v) => setForm({ ...form, telefone: v })} />
+            </div>
+            <div className="space-y-2"><Label>Celular</Label>
+              <MaskedInput mask="celular" value={form.celular} onChange={(v) => setForm({ ...form, celular: v })} />
+            </div>
+            <div className="space-y-2"><Label>Contato</Label><Input value={form.contato} onChange={(e) => setForm({ ...form, contato: e.target.value })} /></div>
           </div>
-          <h3 className="font-semibold text-sm pt-2">Endereço</h3>
-          <div className="grid grid-cols-2 gap-4">
+          <h3 className="font-semibold text-sm pt-2 border-t">Endereço</h3>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <div className="space-y-2"><Label>CEP</Label><MaskedInput mask="cep" value={form.cep} onChange={(v) => setForm({ ...form, cep: v })} /></div>
             <div className="col-span-2 space-y-2"><Label>Logradouro</Label><Input value={form.logradouro} onChange={(e) => setForm({ ...form, logradouro: e.target.value })} /></div>
             <div className="space-y-2"><Label>Número</Label><Input value={form.numero} onChange={(e) => setForm({ ...form, numero: e.target.value })} /></div>
+            <div className="space-y-2"><Label>Complemento</Label><Input value={form.complemento} onChange={(e) => setForm({ ...form, complemento: e.target.value })} /></div>
             <div className="space-y-2"><Label>Bairro</Label><Input value={form.bairro} onChange={(e) => setForm({ ...form, bairro: e.target.value })} /></div>
             <div className="space-y-2"><Label>Cidade</Label><Input value={form.cidade} onChange={(e) => setForm({ ...form, cidade: e.target.value })} /></div>
             <div className="space-y-2"><Label>UF</Label><Input maxLength={2} value={form.uf} onChange={(e) => setForm({ ...form, uf: e.target.value.toUpperCase() })} /></div>
-            <div className="space-y-2"><Label>CEP</Label><Input value={form.cep} onChange={(e) => setForm({ ...form, cep: e.target.value })} /></div>
           </div>
           <div className="space-y-2"><Label>Observações</Label><Textarea value={form.observacoes} onChange={(e) => setForm({ ...form, observacoes: e.target.value })} /></div>
           <div className="flex justify-end gap-2">
@@ -102,17 +141,53 @@ const Fornecedores = () => {
 
       <ViewDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} title="Detalhes do Fornecedor">
         {selected && (
-          <div className="space-y-3">
+          <div className="space-y-4">
             <div><span className="text-xs text-muted-foreground">Razão Social</span><p className="font-medium">{selected.nome_razao_social}</p></div>
-            <div><span className="text-xs text-muted-foreground">CNPJ</span><p className="mono text-sm">{selected.cpf_cnpj || "—"}</p></div>
-            <div><span className="text-xs text-muted-foreground">E-mail</span><p>{selected.email || "—"}</p></div>
+            <div className="grid grid-cols-2 gap-4">
+              <div><span className="text-xs text-muted-foreground">CNPJ</span><p className="font-mono text-sm">{selected.cpf_cnpj || "—"}</p></div>
+              <div><span className="text-xs text-muted-foreground">I.E.</span><p>{selected.inscricao_estadual || "—"}</p></div>
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <div><span className="text-xs text-muted-foreground">Telefone</span><p>{selected.telefone || "—"}</p></div>
-              <div><span className="text-xs text-muted-foreground">Prazo</span><p>{selected.prazo_padrao} dias</p></div>
+              <div><span className="text-xs text-muted-foreground">E-mail</span><p>{selected.email || "—"}</p></div>
             </div>
-            {selected.logradouro && (
-              <div><span className="text-xs text-muted-foreground">Endereço</span><p>{selected.logradouro}, {selected.numero} - {selected.bairro}, {selected.cidade}/{selected.uf}</p></div>
+
+            {/* Delivery Stats */}
+            {comprasHist.length > 0 && (
+              <div className="grid grid-cols-2 gap-3 border-t pt-4">
+                <div className="bg-accent/50 rounded-lg p-3 text-center">
+                  <p className="text-xs text-muted-foreground">Prazo Médio Entrega</p>
+                  <p className="text-lg font-bold font-mono">{deliveryStats.prazoMedio} dias</p>
+                </div>
+                <div className="bg-accent/50 rounded-lg p-3 text-center">
+                  <p className="text-xs text-muted-foreground">Atraso Médio</p>
+                  <p className={`text-lg font-bold font-mono ${deliveryStats.atrasoMedio > 0 ? "text-destructive" : "text-success"}`}>{deliveryStats.atrasoMedio} dias</p>
+                </div>
+              </div>
             )}
+
+            {/* Histórico Compras */}
+            <div className="border-t pt-4">
+              <h4 className="font-semibold text-sm mb-3">Histórico de Compras ({comprasHist.length})</h4>
+              {comprasHist.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Nenhuma compra registrada</p>
+              ) : (
+                <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                  {comprasHist.map((c: any, idx: number) => (
+                    <div key={idx} className="flex items-center justify-between py-2 border-b last:border-b-0 text-sm">
+                      <div>
+                        <span className="font-mono text-xs text-primary font-medium">{c.numero}</span>
+                        <span className="text-xs text-muted-foreground ml-2">{new Date(c.data_compra).toLocaleDateString("pt-BR")}</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="font-mono font-semibold">R$ {Number(c.valor_total || 0).toFixed(2)}</span>
+                        <StatusBadge status={c.status} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
       </ViewDrawer>
