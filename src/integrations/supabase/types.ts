@@ -327,6 +327,60 @@ export type Database = {
           },
         ]
       }
+      empresa_config: {
+        Row: {
+          bairro: string | null
+          cep: string | null
+          cidade: string | null
+          cnpj: string | null
+          created_at: string | null
+          email: string | null
+          id: string
+          inscricao_estadual: string | null
+          logo_url: string | null
+          logradouro: string | null
+          nome_fantasia: string
+          razao_social: string
+          telefone: string | null
+          uf: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          bairro?: string | null
+          cep?: string | null
+          cidade?: string | null
+          cnpj?: string | null
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          inscricao_estadual?: string | null
+          logo_url?: string | null
+          logradouro?: string | null
+          nome_fantasia?: string
+          razao_social?: string
+          telefone?: string | null
+          uf?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          bairro?: string | null
+          cep?: string | null
+          cidade?: string | null
+          cnpj?: string | null
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          inscricao_estadual?: string | null
+          logo_url?: string | null
+          logradouro?: string | null
+          nome_fantasia?: string
+          razao_social?: string
+          telefone?: string | null
+          uf?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       estoque_movimentos: {
         Row: {
           created_at: string
@@ -387,11 +441,14 @@ export type Database = {
           data_pagamento: string | null
           data_vencimento: string
           descricao: string
+          documento_fiscal_id: string | null
           forma_pagamento: string | null
           fornecedor_id: string | null
           id: string
           nota_fiscal_id: string | null
           observacoes: string | null
+          parcela_numero: number | null
+          parcela_total: number | null
           status: Database["public"]["Enums"]["status_financeiro"]
           tipo: Database["public"]["Enums"]["tipo_financeiro"]
           updated_at: string
@@ -407,11 +464,14 @@ export type Database = {
           data_pagamento?: string | null
           data_vencimento: string
           descricao: string
+          documento_fiscal_id?: string | null
           forma_pagamento?: string | null
           fornecedor_id?: string | null
           id?: string
           nota_fiscal_id?: string | null
           observacoes?: string | null
+          parcela_numero?: number | null
+          parcela_total?: number | null
           status?: Database["public"]["Enums"]["status_financeiro"]
           tipo: Database["public"]["Enums"]["tipo_financeiro"]
           updated_at?: string
@@ -427,11 +487,14 @@ export type Database = {
           data_pagamento?: string | null
           data_vencimento?: string
           descricao?: string
+          documento_fiscal_id?: string | null
           forma_pagamento?: string | null
           fornecedor_id?: string | null
           id?: string
           nota_fiscal_id?: string | null
           observacoes?: string | null
+          parcela_numero?: number | null
+          parcela_total?: number | null
           status?: Database["public"]["Enums"]["status_financeiro"]
           tipo?: Database["public"]["Enums"]["tipo_financeiro"]
           updated_at?: string
@@ -444,6 +507,13 @@ export type Database = {
             columns: ["cliente_id"]
             isOneToOne: false
             referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "financeiro_lancamentos_documento_fiscal_id_fkey"
+            columns: ["documento_fiscal_id"]
+            isOneToOne: false
+            referencedRelation: "notas_fiscais"
             referencedColumns: ["id"]
           },
           {
