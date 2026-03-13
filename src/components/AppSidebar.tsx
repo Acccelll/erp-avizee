@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import logoAvizee from "@/assets/logoavizee.png";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   LayoutDashboard,
@@ -45,14 +46,9 @@ export function AppSidebar() {
     >
       {/* Logo */}
       <div className="flex items-center gap-3 px-4 h-16 border-b border-border">
-        <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center flex-shrink-0">
-          <span className="text-primary-foreground font-bold text-sm">A</span>
-        </div>
+        <img src={logoAvizee} alt="AviZee" className={`flex-shrink-0 transition-all duration-300 ${collapsed ? "h-8 w-8 object-contain" : "h-9"}`} />
         {!collapsed && (
-          <div className="overflow-hidden">
-            <h1 className="text-foreground font-bold text-lg leading-tight tracking-tight">AVIZEE</h1>
-            <p className="text-[10px] text-muted-foreground tracking-widest uppercase">ERP</p>
-          </div>
+          <p className="text-[10px] text-muted-foreground tracking-widest uppercase">ERP</p>
         )}
       </div>
 

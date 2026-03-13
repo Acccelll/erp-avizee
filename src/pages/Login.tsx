@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { LogIn, Eye, EyeOff } from "lucide-react";
+import logoAvizee from "@/assets/logoavizee.png";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -31,9 +32,7 @@ export default function Login() {
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="w-14 h-14 rounded-xl erp-gradient flex items-center justify-center mx-auto mb-4">
-            <span className="text-primary-foreground font-bold text-xl">A</span>
-          </div>
+          <img src={logoAvizee} alt="AviZee" className="h-14 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-foreground">AviZee ERP</h1>
           <p className="text-muted-foreground text-sm mt-1">Acesse sua conta para continuar</p>
         </div>

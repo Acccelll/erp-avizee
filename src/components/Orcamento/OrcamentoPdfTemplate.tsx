@@ -72,7 +72,7 @@ export const OrcamentoPdfTemplate = forwardRef<HTMLDivElement, Props>(({
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", borderBottom: "2px solid #690500", paddingBottom: "8px", marginBottom: "12px" }}>
         <div>
-          <div style={{ fontSize: "18px", fontWeight: 700, color: "#690500", letterSpacing: "2px" }}>AVIZEE</div>
+          <img src="/images/logoavizee.png" alt="AviZee" style={{ height: "36px", marginBottom: "4px" }} />
           <div style={{ fontSize: "9px", color: "#666", marginTop: "2px" }}>AVIZEE EQUIPAMENTOS LTDA</div>
           <div style={{ fontSize: "8px", color: "#888", lineHeight: 1.5 }}>
             RUA ADA CAROLINE SCARANO, 259 - JOAO ARANHA<br />
