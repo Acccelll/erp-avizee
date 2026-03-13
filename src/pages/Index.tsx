@@ -12,7 +12,7 @@ import {
   FileText,
   AlertTriangle,
 } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 
 const revenueData = [
   { mes: "Jan", vendas: 45000, compras: 32000 },
@@ -24,10 +24,10 @@ const revenueData = [
 ];
 
 const stockByGroup = [
-  { name: "Eletrônicos", value: 340, color: "hsl(200, 65%, 28%)" },
-  { name: "Acessórios", value: 210, color: "hsl(38, 92%, 55%)" },
-  { name: "Peças", value: 180, color: "hsl(152, 60%, 40%)" },
-  { name: "Outros", value: 95, color: "hsl(215, 15%, 60%)" },
+  { name: "Eletrônicos", value: 340, color: "hsl(2, 100%, 21%)" },
+  { name: "Acessórios", value: 210, color: "hsl(21, 63%, 44%)" },
+  { name: "Peças", value: 180, color: "hsl(160, 60%, 36%)" },
+  { name: "Outros", value: 95, color: "hsl(220, 9%, 46%)" },
 ];
 
 const recentActivities = [
@@ -85,19 +85,19 @@ const Dashboard = () => {
           <h3 className="font-semibold text-foreground mb-4">Vendas vs Compras</h3>
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={revenueData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(214, 20%, 90%)" />
-              <XAxis dataKey="mes" tick={{ fontSize: 12, fill: "hsl(215, 10%, 50%)" }} />
-              <YAxis tick={{ fontSize: 12, fill: "hsl(215, 10%, 50%)" }} />
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(40, 33%, 90%)" />
+              <XAxis dataKey="mes" tick={{ fontSize: 12, fill: "hsl(220, 9%, 46%)" }} />
+              <YAxis tick={{ fontSize: 12, fill: "hsl(220, 9%, 46%)" }} />
               <Tooltip
                 contentStyle={{
                   background: "hsl(0, 0%, 100%)",
-                  border: "1px solid hsl(214, 20%, 90%)",
+                  border: "1px solid hsl(40, 33%, 90%)",
                   borderRadius: "8px",
                   fontSize: 12,
                 }}
               />
-              <Bar dataKey="vendas" fill="hsl(200, 65%, 28%)" radius={[4, 4, 0, 0]} name="Vendas" />
-              <Bar dataKey="compras" fill="hsl(38, 92%, 55%)" radius={[4, 4, 0, 0]} name="Compras" />
+              <Bar dataKey="vendas" fill="hsl(2, 100%, 21%)" radius={[4, 4, 0, 0]} name="Vendas" />
+              <Bar dataKey="compras" fill="hsl(21, 63%, 44%)" radius={[4, 4, 0, 0]} name="Compras" />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -143,7 +143,7 @@ const Dashboard = () => {
         <div className="space-y-3">
           {recentActivities.map((activity, idx) => (
             <div key={idx} className="flex items-center gap-3 py-2 border-b last:border-b-0">
-              <div className="p-2 rounded-lg bg-muted">
+              <div className="p-2 rounded-lg bg-accent">
                 <activity.icon className="w-4 h-4 text-muted-foreground" />
               </div>
               <div className="flex-1">
