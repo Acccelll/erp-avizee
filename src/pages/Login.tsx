@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { LogIn, Eye, EyeOff } from "lucide-react";
+import logoAvizee from "@/assets/logoavizee.png";
 
 export default function Login() {
   const [email, setEmail] = useState("");
