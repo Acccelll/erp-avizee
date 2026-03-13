@@ -33,7 +33,7 @@ export default function Login() {
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <img src={logoAvizee} alt="AviZee" className="h-14 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-foreground">AviZee ERP</h1>
+          <h1 className="text-2xl font-bold text-foreground">Sistema AviZee</h1>
           <p className="text-muted-foreground text-sm mt-1">Acesse sua conta para continuar</p>
         </div>
 
@@ -64,6 +64,6 @@ export default function Login() {
           </p>
         </form>
       </div>
-    </div>
-  );
+    </div>);
+
 }
