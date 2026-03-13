@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import logoAvizee from "@/assets/logoavizee.png";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   LayoutDashboard,
