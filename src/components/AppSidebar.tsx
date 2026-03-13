@@ -39,19 +39,19 @@ export function AppSidebar() {
 
   return (
     <aside
-      className={`fixed top-0 left-0 h-screen bg-sidebar flex flex-col border-r border-sidebar-border transition-all duration-300 z-50 ${
+      className={`fixed top-0 left-0 h-screen bg-card flex flex-col border-r border-border transition-all duration-300 z-50 ${
         collapsed ? "w-[68px]" : "w-[250px]"
       }`}
     >
       {/* Logo */}
-      <div className="flex items-center gap-3 px-4 h-16 border-b border-sidebar-border">
-        <div className="w-8 h-8 rounded-lg erp-gradient flex items-center justify-center flex-shrink-0">
-          <span className="text-sidebar-primary-foreground font-bold text-sm">A</span>
+      <div className="flex items-center gap-3 px-4 h-16 border-b border-border">
+        <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center flex-shrink-0">
+          <span className="text-primary-foreground font-bold text-sm">A</span>
         </div>
         {!collapsed && (
           <div className="overflow-hidden">
-            <h1 className="text-sidebar-accent-foreground font-bold text-lg leading-tight">AviZee</h1>
-            <p className="text-[10px] text-sidebar-muted tracking-widest uppercase">ERP System</p>
+            <h1 className="text-foreground font-bold text-lg leading-tight tracking-tight">AVIZEE</h1>
+            <p className="text-[10px] text-muted-foreground tracking-widest uppercase">ERP</p>
           </div>
         )}
       </div>
@@ -75,7 +75,7 @@ export function AppSidebar() {
       </nav>
 
       {/* Footer */}
-      <div className="px-2 py-3 border-t border-sidebar-border space-y-0.5">
+      <div className="px-2 py-3 border-t border-border space-y-0.5">
         <Link
           to="/configuracoes"
           className="sidebar-item sidebar-item-inactive"
