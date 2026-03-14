@@ -109,13 +109,22 @@ const Financeiro = () => {
   return (
     <AppLayout>
       <ModulePage title="Financeiro" subtitle="Contas a pagar e receber" addLabel="Novo Lançamento" onAdd={openCreate} count={filteredData.length}>
-        {/* Filter bar */}
-        <div className="flex gap-2 mb-4">
-          {["todos", "aberto", "pago", "vencido", "cancelado"].map(s => (
-            <Button key={s} size="sm" variant={filterStatus === s ? "default" : "outline"} onClick={() => setFilterStatus(s)} className="capitalize">
-              {s === "todos" ? "Todos" : s}
-            </Button>
-          ))}
+        {/* Filter bars */}
+        <div className="flex flex-wrap gap-2 mb-4">
+          <div className="flex gap-1 mr-4">
+            {["todos", "receber", "pagar"].map(t => (
+              <Button key={t} size="sm" variant={filterTipo === t ? "default" : "outline"} onClick={() => setFilterTipo(t)} className="capitalize">
+                {t === "todos" ? "Todos" : t === "receber" ? "A Receber" : "A Pagar"}
+              </Button>
+            ))}
+          </div>
+          <div className="flex gap-1">
+            {["todos", "aberto", "pago", "vencido", "cancelado"].map(s => (
+              <Button key={s} size="sm" variant={filterStatus === s ? "default" : "outline"} onClick={() => setFilterStatus(s)} className="capitalize">
+                {s === "todos" ? "Todos" : s}
+              </Button>
+            ))}
+          </div>
         </div>
         <DataTable columns={columns} data={filteredData} loading={loading}
           onView={(l) => { setSelected(l); setDrawerOpen(true); }}
