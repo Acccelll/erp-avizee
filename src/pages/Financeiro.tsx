@@ -210,7 +210,7 @@ const Financeiro = () => {
             </div>
             <div><span className="text-xs text-muted-foreground">Descrição</span><p className="font-medium">{selected.descricao}</p></div>
             <div className="grid grid-cols-2 gap-4">
-              <div><span className="text-xs text-muted-foreground">Valor</span><p className="font-semibold font-mono">R$ {Number(selected.valor).toFixed(2)}</p></div>
+              <div><span className="text-xs text-muted-foreground">Valor</span><p className="font-semibold mono">{formatCurrency(Number(selected.valor))}</p></div>
               <div><span className="text-xs text-muted-foreground">Vencimento</span><p>{new Date(selected.data_vencimento).toLocaleDateString("pt-BR")}</p></div>
             </div>
             {selected.data_pagamento && (
