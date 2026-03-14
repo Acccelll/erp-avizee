@@ -95,7 +95,7 @@ export default function OrcamentoForm() {
         }
       } else {
         const { count } = await (supabase as any).from("orcamentos").select("*", { count: "exact", head: true });
-        setNumero(`ORC${String((count || 0) + 1).padStart(6, "0")}`);
+        setNumero(`COT${String((count || 0) + 1).padStart(6, "0")}`);
       }
     };
     loadData();
