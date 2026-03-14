@@ -161,7 +161,7 @@ export default function OrcamentoForm() {
     if (!id) { toast.error("Salve o orçamento antes de duplicar"); return; }
     try {
       const { count } = await (supabase as any).from("orcamentos").select("*", { count: "exact", head: true });
-      const newNumero = `ORC${String((count || 0) + 1).padStart(6, "0")}`;
+      const newNumero = `COT${String((count || 0) + 1).padStart(6, "0")}`;
       const payload = {
         numero: newNumero, data_orcamento: new Date().toISOString().split("T")[0], status: "rascunho",
         cliente_id: clienteId || null, validade: null, observacoes, desconto, imposto_st: impostoSt,
