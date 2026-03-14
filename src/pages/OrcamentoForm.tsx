@@ -233,11 +233,11 @@ export default function OrcamentoForm() {
     <AppLayout>
       <div className="mb-6">
         <div className="flex items-center gap-3 mb-2">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/orcamentos")}>
+          <Button variant="ghost" size="icon" onClick={() => navigate("/cotacoes")}>
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <div>
-            <h1 className="page-title">{isEdit ? "Editar Orçamento" : "Novo Orçamento"}</h1>
+            <h1 className="page-title">{isEdit ? "Editar Cotação" : "Nova Cotação"}</h1>
             <p className="text-muted-foreground text-sm mt-0.5">Criação e emissão de proposta comercial</p>
           </div>
         </div>
