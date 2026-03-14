@@ -9,6 +9,7 @@ import {
   Truck,
   ShoppingCart,
   FileText,
+  ClipboardList,
   Warehouse,
   Receipt,
   DollarSign,
