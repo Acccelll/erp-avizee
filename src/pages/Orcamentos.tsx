@@ -209,7 +209,7 @@ const Orcamentos = () => {
 
       <ConfirmDialog
         open={!!convertingId}
-        onCancel={() => setConvertingId(null)}
+        onClose={() => setConvertingId(null)}
         onConfirm={() => convertingOrc && handleConvertToOV(convertingOrc)}
         title="Converter em Ordem de Venda"
         description={`Deseja converter a cotação ${convertingOrc?.numero} em uma Ordem de Venda? A cotação será marcada como "Convertida".`}
