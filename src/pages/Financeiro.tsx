@@ -96,7 +96,7 @@ const Financeiro = () => {
     { key: "tipo", label: "Tipo", render: (l: Lancamento) => l.tipo === "receber" ? "A Receber" : "A Pagar" },
     { key: "descricao", label: "Descrição" },
     { key: "parceiro", label: "Parceiro", render: (l: Lancamento) => l.tipo === "receber" ? (l as any).clientes?.nome_razao_social || "—" : (l as any).fornecedores?.nome_razao_social || "—" },
-    { key: "valor", label: "Valor", render: (l: Lancamento) => <span className="font-semibold font-mono">R$ {Number(l.valor).toFixed(2)}</span> },
+    { key: "valor", label: "Valor", render: (l: Lancamento) => <span className="font-semibold mono">{formatCurrency(Number(l.valor))}</span> },
     { key: "data_vencimento", label: "Vencimento", render: (l: Lancamento) => {
       const d = new Date(l.data_vencimento);
       const isOverdue = l.status === "aberto" && d < new Date();
