@@ -42,7 +42,14 @@ const Financeiro = () => {
   const [mode, setMode] = useState<"create" | "edit">("create");
   const [form, setForm] = useState({...emptyForm});
   const [saving, setSaving] = useState(false);
+  const [searchParams] = useSearchParams();
+  const tipoParam = searchParams.get("tipo"); // "pagar" or "receber"
   const [filterStatus, setFilterStatus] = useState("todos");
+  const [filterTipo, setFilterTipo] = useState<string>(tipoParam || "todos");
+
+  useEffect(() => {
+    if (tipoParam) setFilterTipo(tipoParam);
+  }, [tipoParam]);
 
   const openCreate = () => { setMode("create"); setForm({...emptyForm}); setModalOpen(true); };
   const openEdit = (l: Lancamento) => {
