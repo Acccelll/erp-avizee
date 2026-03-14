@@ -95,7 +95,7 @@ export default function OrcamentoForm() {
         }
       } else {
         const { count } = await (supabase as any).from("orcamentos").select("*", { count: "exact", head: true });
-        setNumero(`ORC${String((count || 0) + 1).padStart(6, "0")}`);
+        setNumero(`COT${String((count || 0) + 1).padStart(6, "0")}`);
       }
     };
     loadData();
@@ -149,8 +149,8 @@ export default function OrcamentoForm() {
         if (itemsPayload.length > 0) await (supabase as any).from("orcamentos_itens").insert(itemsPayload);
       }
 
-      toast.success("Orçamento salvo com sucesso!");
-      if (!isEdit && orcId) navigate(`/orcamentos/${orcId}`, { replace: true });
+      toast.success("Cotação salva com sucesso!");
+      if (!isEdit && orcId) navigate(`/cotacoes/${orcId}`, { replace: true });
     } catch (err: any) {
       toast.error(`Erro ao salvar: ${err.message}`);
     }
@@ -161,7 +161,7 @@ export default function OrcamentoForm() {
     if (!id) { toast.error("Salve o orçamento antes de duplicar"); return; }
     try {
       const { count } = await (supabase as any).from("orcamentos").select("*", { count: "exact", head: true });
-      const newNumero = `ORC${String((count || 0) + 1).padStart(6, "0")}`;
+      const newNumero = `COT${String((count || 0) + 1).padStart(6, "0")}`;
       const payload = {
         numero: newNumero, data_orcamento: new Date().toISOString().split("T")[0], status: "rascunho",
         cliente_id: clienteId || null, validade: null, observacoes, desconto, imposto_st: impostoSt,
@@ -184,7 +184,7 @@ export default function OrcamentoForm() {
       }
 
       toast.success(`Duplicado: ${newNumero}`);
-      navigate(`/orcamentos/${newOrc.id}`, { replace: true });
+      navigate(`/cotacoes/${newOrc.id}`, { replace: true });
     } catch (err: any) {
       toast.error(`Erro: ${err.message}`);
     }
@@ -233,11 +233,11 @@ export default function OrcamentoForm() {
     <AppLayout>
       <div className="mb-6">
         <div className="flex items-center gap-3 mb-2">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/orcamentos")}>
+          <Button variant="ghost" size="icon" onClick={() => navigate("/cotacoes")}>
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <div>
-            <h1 className="page-title">{isEdit ? "Editar Orçamento" : "Novo Orçamento"}</h1>
+            <h1 className="page-title">{isEdit ? "Editar Cotação" : "Nova Cotação"}</h1>
             <p className="text-muted-foreground text-sm mt-0.5">Criação e emissão de proposta comercial</p>
           </div>
         </div>
@@ -253,18 +253,19 @@ export default function OrcamentoForm() {
         <div className="lg:col-span-8 space-y-5">
           {/* Dados do Orçamento */}
           <div className="bg-card rounded-xl border shadow-soft p-5">
-            <h3 className="font-semibold text-foreground mb-4">Dados do Orçamento</h3>
+            <h3 className="font-semibold text-foreground mb-4">Dados da Cotação</h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="space-y-1.5"><Label className="text-xs">Nº Orçamento</Label><Input value={numero} onChange={(e) => setNumero(e.target.value)} className="font-mono" /></div>
+              <div className="space-y-1.5"><Label className="text-xs">Nº Cotação</Label><Input value={numero} onChange={(e) => setNumero(e.target.value)} className="font-mono" /></div>
               <div className="space-y-1.5"><Label className="text-xs">Data</Label><Input type="date" value={dataOrcamento} onChange={(e) => setDataOrcamento(e.target.value)} /></div>
               <div className="space-y-1.5"><Label className="text-xs">Status</Label>
                 <Select value={status} onValueChange={setStatus}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="rascunho">Rascunho</SelectItem>
-                    <SelectItem value="confirmado">Confirmado</SelectItem>
-                    <SelectItem value="faturado">Faturado</SelectItem>
-                    <SelectItem value="cancelado">Cancelado</SelectItem>
+                    <SelectItem value="confirmado">Confirmada</SelectItem>
+                    <SelectItem value="aprovado">Aprovada</SelectItem>
+                    <SelectItem value="convertido">Convertida</SelectItem>
+                    <SelectItem value="cancelado">Cancelada</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
