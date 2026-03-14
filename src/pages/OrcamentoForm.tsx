@@ -184,7 +184,7 @@ export default function OrcamentoForm() {
       }
 
       toast.success(`Duplicado: ${newNumero}`);
-      navigate(`/orcamentos/${newOrc.id}`, { replace: true });
+      navigate(`/cotacoes/${newOrc.id}`, { replace: true });
     } catch (err: any) {
       toast.error(`Erro: ${err.message}`);
     }
