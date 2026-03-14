@@ -86,7 +86,11 @@ const Financeiro = () => {
     setSaving(false);
   };
 
-  const filteredData = filterStatus === "todos" ? data : data.filter(l => l.status === filterStatus);
+  const filteredData = data.filter(l => {
+    if (filterStatus !== "todos" && l.status !== filterStatus) return false;
+    if (filterTipo !== "todos" && l.tipo !== filterTipo) return false;
+    return true;
+  });
 
   const columns = [
     { key: "tipo", label: "Tipo", render: (l: Lancamento) => l.tipo === "receber" ? "A Receber" : "A Pagar" },
