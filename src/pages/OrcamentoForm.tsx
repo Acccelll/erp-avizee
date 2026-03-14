@@ -149,8 +149,8 @@ export default function OrcamentoForm() {
         if (itemsPayload.length > 0) await (supabase as any).from("orcamentos_itens").insert(itemsPayload);
       }
 
-      toast.success("Orçamento salvo com sucesso!");
-      if (!isEdit && orcId) navigate(`/orcamentos/${orcId}`, { replace: true });
+      toast.success("Cotação salva com sucesso!");
+      if (!isEdit && orcId) navigate(`/cotacoes/${orcId}`, { replace: true });
     } catch (err: any) {
       toast.error(`Erro ao salvar: ${err.message}`);
     }
