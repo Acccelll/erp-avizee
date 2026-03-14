@@ -253,18 +253,19 @@ export default function OrcamentoForm() {
         <div className="lg:col-span-8 space-y-5">
           {/* Dados do Orçamento */}
           <div className="bg-card rounded-xl border shadow-soft p-5">
-            <h3 className="font-semibold text-foreground mb-4">Dados do Orçamento</h3>
+            <h3 className="font-semibold text-foreground mb-4">Dados da Cotação</h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="space-y-1.5"><Label className="text-xs">Nº Orçamento</Label><Input value={numero} onChange={(e) => setNumero(e.target.value)} className="font-mono" /></div>
+              <div className="space-y-1.5"><Label className="text-xs">Nº Cotação</Label><Input value={numero} onChange={(e) => setNumero(e.target.value)} className="font-mono" /></div>
               <div className="space-y-1.5"><Label className="text-xs">Data</Label><Input type="date" value={dataOrcamento} onChange={(e) => setDataOrcamento(e.target.value)} /></div>
               <div className="space-y-1.5"><Label className="text-xs">Status</Label>
                 <Select value={status} onValueChange={setStatus}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="rascunho">Rascunho</SelectItem>
-                    <SelectItem value="confirmado">Confirmado</SelectItem>
-                    <SelectItem value="faturado">Faturado</SelectItem>
-                    <SelectItem value="cancelado">Cancelado</SelectItem>
+                    <SelectItem value="confirmado">Confirmada</SelectItem>
+                    <SelectItem value="aprovado">Aprovada</SelectItem>
+                    <SelectItem value="convertido">Convertida</SelectItem>
+                    <SelectItem value="cancelado">Cancelada</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
