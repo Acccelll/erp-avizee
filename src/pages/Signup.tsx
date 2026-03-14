@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { UserPlus } from "lucide-react";
+import logoAvizee from "@/assets/logoavizee.png";
 
 export default function Signup() {
   const [nome, setNome] = useState("");
