@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { AppLayout } from "@/components/AppLayout";
 import { ModulePage } from "@/components/ModulePage";
 import { DataTable, StatusBadge } from "@/components/DataTable";
@@ -11,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
+import { formatCurrency } from "@/lib/format";
 
 interface Lancamento {
   id: string; tipo: string; descricao: string; valor: number;
@@ -40,7 +42,14 @@ const Financeiro = () => {
   const [mode, setMode] = useState<"create" | "edit">("create");
   const [form, setForm] = useState({...emptyForm});
   const [saving, setSaving] = useState(false);
+  const [searchParams] = useSearchParams();
+  const tipoParam = searchParams.get("tipo"); // "pagar" or "receber"
   const [filterStatus, setFilterStatus] = useState("todos");
+  const [filterTipo, setFilterTipo] = useState<string>(tipoParam || "todos");
+
+  useEffect(() => {
+    if (tipoParam) setFilterTipo(tipoParam);
+  }, [tipoParam]);
 
   const openCreate = () => { setMode("create"); setForm({...emptyForm}); setModalOpen(true); };
   const openEdit = (l: Lancamento) => {
@@ -77,13 +86,17 @@ const Financeiro = () => {
     setSaving(false);
   };
 
-  const filteredData = filterStatus === "todos" ? data : data.filter(l => l.status === filterStatus);
+  const filteredData = data.filter(l => {
+    if (filterStatus !== "todos" && l.status !== filterStatus) return false;
+    if (filterTipo !== "todos" && l.tipo !== filterTipo) return false;
+    return true;
+  });
 
   const columns = [
     { key: "tipo", label: "Tipo", render: (l: Lancamento) => l.tipo === "receber" ? "A Receber" : "A Pagar" },
     { key: "descricao", label: "Descrição" },
     { key: "parceiro", label: "Parceiro", render: (l: Lancamento) => l.tipo === "receber" ? (l as any).clientes?.nome_razao_social || "—" : (l as any).fornecedores?.nome_razao_social || "—" },
-    { key: "valor", label: "Valor", render: (l: Lancamento) => <span className="font-semibold font-mono">R$ {Number(l.valor).toFixed(2)}</span> },
+    { key: "valor", label: "Valor", render: (l: Lancamento) => <span className="font-semibold mono">{formatCurrency(Number(l.valor))}</span> },
     { key: "data_vencimento", label: "Vencimento", render: (l: Lancamento) => {
       const d = new Date(l.data_vencimento);
       const isOverdue = l.status === "aberto" && d < new Date();
@@ -96,13 +109,22 @@ const Financeiro = () => {
   return (
     <AppLayout>
       <ModulePage title="Financeiro" subtitle="Contas a pagar e receber" addLabel="Novo Lançamento" onAdd={openCreate} count={filteredData.length}>
-        {/* Filter bar */}
-        <div className="flex gap-2 mb-4">
-          {["todos", "aberto", "pago", "vencido", "cancelado"].map(s => (
-            <Button key={s} size="sm" variant={filterStatus === s ? "default" : "outline"} onClick={() => setFilterStatus(s)} className="capitalize">
-              {s === "todos" ? "Todos" : s}
-            </Button>
-          ))}
+        {/* Filter bars */}
+        <div className="flex flex-wrap gap-2 mb-4">
+          <div className="flex gap-1 mr-4">
+            {["todos", "receber", "pagar"].map(t => (
+              <Button key={t} size="sm" variant={filterTipo === t ? "default" : "outline"} onClick={() => setFilterTipo(t)} className="capitalize">
+                {t === "todos" ? "Todos" : t === "receber" ? "A Receber" : "A Pagar"}
+              </Button>
+            ))}
+          </div>
+          <div className="flex gap-1">
+            {["todos", "aberto", "pago", "vencido", "cancelado"].map(s => (
+              <Button key={s} size="sm" variant={filterStatus === s ? "default" : "outline"} onClick={() => setFilterStatus(s)} className="capitalize">
+                {s === "todos" ? "Todos" : s}
+              </Button>
+            ))}
+          </div>
         </div>
         <DataTable columns={columns} data={filteredData} loading={loading}
           onView={(l) => { setSelected(l); setDrawerOpen(true); }}
@@ -188,7 +210,7 @@ const Financeiro = () => {
             </div>
             <div><span className="text-xs text-muted-foreground">Descrição</span><p className="font-medium">{selected.descricao}</p></div>
             <div className="grid grid-cols-2 gap-4">
-              <div><span className="text-xs text-muted-foreground">Valor</span><p className="font-semibold font-mono">R$ {Number(selected.valor).toFixed(2)}</p></div>
+              <div><span className="text-xs text-muted-foreground">Valor</span><p className="font-semibold mono">{formatCurrency(Number(selected.valor))}</p></div>
               <div><span className="text-xs text-muted-foreground">Vencimento</span><p>{new Date(selected.data_vencimento).toLocaleDateString("pt-BR")}</p></div>
             </div>
             {selected.data_pagamento && (
