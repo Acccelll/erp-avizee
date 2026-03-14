@@ -740,6 +740,7 @@ export type Database = {
           movimenta_estoque: boolean | null
           numero: string
           observacoes: string | null
+          ordem_venda_id: string | null
           serie: string | null
           status: Database["public"]["Enums"]["status_nota_fiscal"]
           tipo: Database["public"]["Enums"]["tipo_nota_fiscal"]
@@ -762,6 +763,7 @@ export type Database = {
           movimenta_estoque?: boolean | null
           numero: string
           observacoes?: string | null
+          ordem_venda_id?: string | null
           serie?: string | null
           status?: Database["public"]["Enums"]["status_nota_fiscal"]
           tipo: Database["public"]["Enums"]["tipo_nota_fiscal"]
@@ -784,6 +786,7 @@ export type Database = {
           movimenta_estoque?: boolean | null
           numero?: string
           observacoes?: string | null
+          ordem_venda_id?: string | null
           serie?: string | null
           status?: Database["public"]["Enums"]["status_nota_fiscal"]
           tipo?: Database["public"]["Enums"]["tipo_nota_fiscal"]
@@ -804,6 +807,13 @@ export type Database = {
             columns: ["fornecedor_id"]
             isOneToOne: false
             referencedRelation: "fornecedores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notas_fiscais_ordem_venda_id_fkey"
+            columns: ["ordem_venda_id"]
+            isOneToOne: false
+            referencedRelation: "ordens_venda"
             referencedColumns: ["id"]
           },
         ]
@@ -1007,6 +1017,147 @@ export type Database = {
           },
           {
             foreignKeyName: "orcamentos_itens_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ordens_venda: {
+        Row: {
+          ativo: boolean
+          cliente_id: string | null
+          cotacao_id: string | null
+          created_at: string
+          data_aprovacao: string | null
+          data_emissao: string
+          data_prometida_despacho: string | null
+          id: string
+          numero: string
+          observacoes: string | null
+          prazo_despacho_dias: number | null
+          status: Database["public"]["Enums"]["status_ordem_venda"]
+          status_faturamento: Database["public"]["Enums"]["status_faturamento"]
+          updated_at: string
+          usuario_id: string | null
+          valor_total: number | null
+          vendedor_id: string | null
+        }
+        Insert: {
+          ativo?: boolean
+          cliente_id?: string | null
+          cotacao_id?: string | null
+          created_at?: string
+          data_aprovacao?: string | null
+          data_emissao?: string
+          data_prometida_despacho?: string | null
+          id?: string
+          numero: string
+          observacoes?: string | null
+          prazo_despacho_dias?: number | null
+          status?: Database["public"]["Enums"]["status_ordem_venda"]
+          status_faturamento?: Database["public"]["Enums"]["status_faturamento"]
+          updated_at?: string
+          usuario_id?: string | null
+          valor_total?: number | null
+          vendedor_id?: string | null
+        }
+        Update: {
+          ativo?: boolean
+          cliente_id?: string | null
+          cotacao_id?: string | null
+          created_at?: string
+          data_aprovacao?: string | null
+          data_emissao?: string
+          data_prometida_despacho?: string | null
+          id?: string
+          numero?: string
+          observacoes?: string | null
+          prazo_despacho_dias?: number | null
+          status?: Database["public"]["Enums"]["status_ordem_venda"]
+          status_faturamento?: Database["public"]["Enums"]["status_faturamento"]
+          updated_at?: string
+          usuario_id?: string | null
+          valor_total?: number | null
+          vendedor_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ordens_venda_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ordens_venda_cotacao_id_fkey"
+            columns: ["cotacao_id"]
+            isOneToOne: false
+            referencedRelation: "orcamentos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ordens_venda_itens: {
+        Row: {
+          codigo_snapshot: string | null
+          created_at: string
+          descricao_snapshot: string | null
+          id: string
+          ordem_venda_id: string
+          peso_total: number | null
+          peso_unitario: number | null
+          produto_id: string
+          quantidade: number
+          quantidade_faturada: number | null
+          unidade: string | null
+          valor_total: number
+          valor_unitario: number
+          variacao: string | null
+        }
+        Insert: {
+          codigo_snapshot?: string | null
+          created_at?: string
+          descricao_snapshot?: string | null
+          id?: string
+          ordem_venda_id: string
+          peso_total?: number | null
+          peso_unitario?: number | null
+          produto_id: string
+          quantidade: number
+          quantidade_faturada?: number | null
+          unidade?: string | null
+          valor_total: number
+          valor_unitario: number
+          variacao?: string | null
+        }
+        Update: {
+          codigo_snapshot?: string | null
+          created_at?: string
+          descricao_snapshot?: string | null
+          id?: string
+          ordem_venda_id?: string
+          peso_total?: number | null
+          peso_unitario?: number | null
+          produto_id?: string
+          quantidade?: number
+          quantidade_faturada?: number | null
+          unidade?: string | null
+          valor_total?: number
+          valor_unitario?: number
+          variacao?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ordens_venda_itens_ordem_venda_id_fkey"
+            columns: ["ordem_venda_id"]
+            isOneToOne: false
+            referencedRelation: "ordens_venda"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ordens_venda_itens_produto_id_fkey"
             columns: ["produto_id"]
             isOneToOne: false
             referencedRelation: "produtos"
@@ -1297,9 +1448,17 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "vendedor" | "financeiro" | "estoquista"
+      status_faturamento: "aguardando" | "parcial" | "total"
       status_financeiro: "aberto" | "pago" | "vencido" | "cancelado"
       status_nota_fiscal: "pendente" | "confirmada" | "cancelada"
-      status_pedido: "rascunho" | "confirmado" | "cancelado" | "faturado"
+      status_ordem_venda: "pendente" | "aprovada" | "em_separacao" | "cancelada"
+      status_pedido:
+        | "rascunho"
+        | "confirmado"
+        | "cancelado"
+        | "faturado"
+        | "aprovado"
+        | "convertido"
       tipo_caixa:
         | "abertura"
         | "suprimento"
@@ -1440,9 +1599,18 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "vendedor", "financeiro", "estoquista"],
+      status_faturamento: ["aguardando", "parcial", "total"],
       status_financeiro: ["aberto", "pago", "vencido", "cancelado"],
       status_nota_fiscal: ["pendente", "confirmada", "cancelada"],
-      status_pedido: ["rascunho", "confirmado", "cancelado", "faturado"],
+      status_ordem_venda: ["pendente", "aprovada", "em_separacao", "cancelada"],
+      status_pedido: [
+        "rascunho",
+        "confirmado",
+        "cancelado",
+        "faturado",
+        "aprovado",
+        "convertido",
+      ],
       tipo_caixa: [
         "abertura",
         "suprimento",
