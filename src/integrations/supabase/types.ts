@@ -50,6 +50,33 @@ export type Database = {
         }
         Relationships: []
       }
+      bancos: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          id: string
+          nome: string
+          tipo: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          nome: string
+          tipo?: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          nome?: string
+          tipo?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       caixa_movimentos: {
         Row: {
           created_at: string
@@ -327,6 +354,53 @@ export type Database = {
           },
         ]
       }
+      contas_bancarias: {
+        Row: {
+          agencia: string | null
+          ativo: boolean
+          banco_id: string
+          conta: string | null
+          created_at: string
+          descricao: string
+          id: string
+          saldo_atual: number | null
+          titular: string | null
+          updated_at: string
+        }
+        Insert: {
+          agencia?: string | null
+          ativo?: boolean
+          banco_id: string
+          conta?: string | null
+          created_at?: string
+          descricao: string
+          id?: string
+          saldo_atual?: number | null
+          titular?: string | null
+          updated_at?: string
+        }
+        Update: {
+          agencia?: string | null
+          ativo?: boolean
+          banco_id?: string
+          conta?: string | null
+          created_at?: string
+          descricao?: string
+          id?: string
+          saldo_atual?: number | null
+          titular?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contas_bancarias_banco_id_fkey"
+            columns: ["banco_id"]
+            isOneToOne: false
+            referencedRelation: "bancos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       email_send_log: {
         Row: {
           created_at: string
@@ -524,6 +598,7 @@ export type Database = {
           banco: string | null
           cartao: string | null
           cliente_id: string | null
+          conta_bancaria_id: string | null
           created_at: string
           data_pagamento: string | null
           data_vencimento: string
@@ -547,6 +622,7 @@ export type Database = {
           banco?: string | null
           cartao?: string | null
           cliente_id?: string | null
+          conta_bancaria_id?: string | null
           created_at?: string
           data_pagamento?: string | null
           data_vencimento: string
@@ -570,6 +646,7 @@ export type Database = {
           banco?: string | null
           cartao?: string | null
           cliente_id?: string | null
+          conta_bancaria_id?: string | null
           created_at?: string
           data_pagamento?: string | null
           data_vencimento?: string
@@ -594,6 +671,13 @@ export type Database = {
             columns: ["cliente_id"]
             isOneToOne: false
             referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "financeiro_lancamentos_conta_bancaria_id_fkey"
+            columns: ["conta_bancaria_id"]
+            isOneToOne: false
+            referencedRelation: "contas_bancarias"
             referencedColumns: ["id"]
           },
           {
