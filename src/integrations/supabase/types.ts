@@ -161,6 +161,7 @@ export type Database = {
         Row: {
           ativo: boolean
           bairro: string | null
+          caixa_postal: string | null
           celular: string | null
           cep: string | null
           cidade: string | null
@@ -169,6 +170,7 @@ export type Database = {
           cpf_cnpj: string | null
           created_at: string
           email: string | null
+          grupo_economico_id: string | null
           id: string
           inscricao_estadual: string | null
           inscricao_municipal: string | null
@@ -182,12 +184,14 @@ export type Database = {
           prazo_padrao: number | null
           telefone: string | null
           tipo_pessoa: Database["public"]["Enums"]["tipo_pessoa"]
+          tipo_relacao_grupo: string | null
           uf: string | null
           updated_at: string
         }
         Insert: {
           ativo?: boolean
           bairro?: string | null
+          caixa_postal?: string | null
           celular?: string | null
           cep?: string | null
           cidade?: string | null
@@ -196,6 +200,7 @@ export type Database = {
           cpf_cnpj?: string | null
           created_at?: string
           email?: string | null
+          grupo_economico_id?: string | null
           id?: string
           inscricao_estadual?: string | null
           inscricao_municipal?: string | null
@@ -209,12 +214,14 @@ export type Database = {
           prazo_padrao?: number | null
           telefone?: string | null
           tipo_pessoa?: Database["public"]["Enums"]["tipo_pessoa"]
+          tipo_relacao_grupo?: string | null
           uf?: string | null
           updated_at?: string
         }
         Update: {
           ativo?: boolean
           bairro?: string | null
+          caixa_postal?: string | null
           celular?: string | null
           cep?: string | null
           cidade?: string | null
@@ -223,6 +230,7 @@ export type Database = {
           cpf_cnpj?: string | null
           created_at?: string
           email?: string | null
+          grupo_economico_id?: string | null
           id?: string
           inscricao_estadual?: string | null
           inscricao_municipal?: string | null
@@ -236,10 +244,19 @@ export type Database = {
           prazo_padrao?: number | null
           telefone?: string | null
           tipo_pessoa?: Database["public"]["Enums"]["tipo_pessoa"]
+          tipo_relacao_grupo?: string | null
           uf?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "clientes_grupo_economico_id_fkey"
+            columns: ["grupo_economico_id"]
+            isOneToOne: false
+            referencedRelation: "grupos_economicos"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       compras: {
         Row: {
@@ -780,6 +797,44 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      grupos_economicos: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          empresa_matriz_id: string | null
+          id: string
+          nome: string
+          observacoes: string | null
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          empresa_matriz_id?: string | null
+          id?: string
+          nome: string
+          observacoes?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          empresa_matriz_id?: string | null
+          id?: string
+          nome?: string
+          observacoes?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "grupos_economicos_empresa_matriz_id_fkey"
+            columns: ["empresa_matriz_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       grupos_produto: {
         Row: {

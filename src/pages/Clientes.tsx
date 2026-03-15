@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AppLayout } from "@/components/AppLayout";
 import { ModulePage } from "@/components/ModulePage";
 import { DataTable, StatusBadge } from "@/components/DataTable";
@@ -14,7 +14,7 @@ import { MaskedInput } from "@/components/ui/MaskedInput";
 import { TimelineList } from "@/components/ui/TimelineList";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { MessageSquare, Plus } from "lucide-react";
+import { MessageSquare, Plus, Building2, Clock, DollarSign } from "lucide-react";
 
 interface Cliente {
   id: string; tipo_pessoa: string; nome_razao_social: string; nome_fantasia: string;
@@ -22,6 +22,11 @@ interface Cliente {
   contato: string; prazo_padrao: number; limite_credito: number;
   logradouro: string; numero: string; complemento: string; bairro: string; cidade: string;
   uf: string; cep: string; pais: string; observacoes: string; ativo: boolean; created_at: string;
+  grupo_economico_id: string | null; tipo_relacao_grupo: string | null; caixa_postal: string | null;
+}
+
+interface GrupoEconomico {
+  id: string; nome: string;
 }
 
 const emptyCliente: Record<string, any> = {
@@ -29,8 +34,15 @@ const emptyCliente: Record<string, any> = {
   inscricao_estadual: "", email: "", telefone: "", celular: "", contato: "",
   prazo_padrao: 30, limite_credito: 0,
   logradouro: "", numero: "", complemento: "", bairro: "", cidade: "", uf: "", cep: "", pais: "Brasil",
-  observacoes: "",
+  observacoes: "", grupo_economico_id: "", tipo_relacao_grupo: "independente", caixa_postal: "",
 };
+
+const relacaoOptions = [
+  { value: "independente", label: "Independente" },
+  { value: "matriz", label: "Matriz" },
+  { value: "filial", label: "Filial" },
+  { value: "coligada", label: "Coligada" },
+];
 
 const Clientes = () => {
   const { data, loading, create, update, remove, duplicate } = useSupabaseCrud<Cliente>({ table: "clientes" });
@@ -43,6 +55,14 @@ const Clientes = () => {
   const [comRecords, setComRecords] = useState<any[]>([]);
   const [comOpen, setComOpen] = useState(false);
   const [comForm, setComForm] = useState({ canal: "", assunto: "", descricao: "" });
+  const [grupos, setGrupos] = useState<GrupoEconomico[]>([]);
+  const [empresasGrupo, setEmpresasGrupo] = useState<any[]>([]);
+  const [pmv, setPmv] = useState<number | null>(null);
+  const [pmvTitulos, setPmvTitulos] = useState<any[]>([]);
+
+  useEffect(() => {
+    (supabase as any).from("grupos_economicos").select("id, nome").eq("ativo", true).order("nome").then(({ data: g }: any) => setGrupos(g || []));
+  }, []);
 
   const openCreate = () => { setMode("create"); setForm({...emptyCliente}); setSelected(null); setModalOpen(true); };
   const openEdit = (c: Cliente) => {
@@ -55,24 +75,61 @@ const Clientes = () => {
       logradouro: c.logradouro || "", numero: c.numero || "", complemento: c.complemento || "",
       bairro: c.bairro || "", cidade: c.cidade || "", uf: c.uf || "", cep: c.cep || "",
       pais: c.pais || "Brasil", observacoes: c.observacoes || "",
+      grupo_economico_id: c.grupo_economico_id || "", tipo_relacao_grupo: c.tipo_relacao_grupo || "independente",
+      caixa_postal: c.caixa_postal || "",
     });
     setModalOpen(true);
   };
 
   const openView = async (c: Cliente) => {
     setSelected(c); setDrawerOpen(true);
+    // Communication records
     const { data: records } = await (supabase as any).from("cliente_registros_comunicacao")
       .select("*").eq("cliente_id", c.id).order("data_hora", { ascending: false });
     setComRecords(records || []);
+
+    // Related companies from same grupo econômico
+    if (c.grupo_economico_id) {
+      const { data: emp } = await (supabase as any).from("clientes")
+        .select("id, nome_razao_social, nome_fantasia, cpf_cnpj, tipo_relacao_grupo, cidade, uf")
+        .eq("grupo_economico_id", c.grupo_economico_id).eq("ativo", true).neq("id", c.id);
+      setEmpresasGrupo(emp || []);
+    } else {
+      setEmpresasGrupo([]);
+    }
+
+    // PMV calculation - average days between due date and payment date for paid invoices
+    const { data: titulos } = await (supabase as any).from("financeiro_lancamentos")
+      .select("id, descricao, data_vencimento, data_pagamento, valor, status")
+      .eq("cliente_id", c.id).eq("tipo", "receber").eq("ativo", true)
+      .not("data_pagamento", "is", null)
+      .order("data_pagamento", { ascending: false }).limit(50);
+
+    setPmvTitulos(titulos || []);
+    if (titulos && titulos.length > 0) {
+      const totalDias = titulos.reduce((acc: number, t: any) => {
+        const venc = new Date(t.data_vencimento);
+        const pag = new Date(t.data_pagamento);
+        return acc + Math.round((pag.getTime() - venc.getTime()) / (1000 * 60 * 60 * 24));
+      }, 0);
+      setPmv(Math.round(totalDias / titulos.length));
+    } else {
+      setPmv(null);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.nome_razao_social) { toast.error("Nome/Razão Social é obrigatório"); return; }
     setSaving(true);
+    const payload = {
+      ...form,
+      grupo_economico_id: form.grupo_economico_id || null,
+      caixa_postal: form.caixa_postal || null,
+    };
     try {
-      if (mode === "create") await create(form);
-      else if (selected) await update(selected.id, form);
+      if (mode === "create") await create(payload);
+      else if (selected) await update(selected.id, payload);
       setModalOpen(false);
     } catch {}
     setSaving(false);
@@ -91,6 +148,13 @@ const Clientes = () => {
     setComOpen(false);
   };
 
+  const grupoNome = (id: string | null) => {
+    if (!id) return "—";
+    return grupos.find(g => g.id === id)?.nome || "—";
+  };
+
+  const relacaoLabel: Record<string, string> = { matriz: "Matriz", filial: "Filial", coligada: "Coligada", independente: "Independente" };
+
   const columns = [
     { key: "nome_razao_social", label: "Nome / Razão Social" },
     { key: "tipo_pessoa", label: "Tipo", render: (c: Cliente) => c.tipo_pessoa === "F" ? "PF" : "PJ" },
@@ -98,6 +162,7 @@ const Clientes = () => {
     { key: "email", label: "E-mail" },
     { key: "telefone", label: "Telefone" },
     { key: "cidade", label: "Cidade", render: (c: Cliente) => c.cidade ? `${c.cidade}/${c.uf}` : "—" },
+    { key: "grupo", label: "Grupo Econômico", render: (c: Cliente) => grupoNome(c.grupo_economico_id) },
     { key: "ativo", label: "Status", render: (c: Cliente) => <StatusBadge status={c.ativo ? "Ativo" : "Inativo"} /> },
   ];
 
@@ -134,6 +199,29 @@ const Clientes = () => {
             <div className="space-y-2"><Label>Prazo (dias)</Label><Input type="number" value={form.prazo_padrao} onChange={(e) => setForm({ ...form, prazo_padrao: Number(e.target.value) })} /></div>
             <div className="space-y-2"><Label>Limite Crédito</Label><Input type="number" step="0.01" value={form.limite_credito} onChange={(e) => setForm({ ...form, limite_credito: Number(e.target.value) })} /></div>
           </div>
+
+          {/* Grupo Econômico */}
+          <h3 className="font-semibold text-sm pt-2 border-t flex items-center gap-2"><Building2 className="w-4 h-4" /> Grupo Econômico</h3>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2"><Label>Grupo</Label>
+              <Select value={form.grupo_economico_id} onValueChange={(v) => setForm({ ...form, grupo_economico_id: v })}>
+                <SelectTrigger><SelectValue placeholder="Nenhum" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Nenhum</SelectItem>
+                  {grupos.map(g => <SelectItem key={g.id} value={g.id}>{g.nome}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2"><Label>Tipo de Relação</Label>
+              <Select value={form.tipo_relacao_grupo} onValueChange={(v) => setForm({ ...form, tipo_relacao_grupo: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {relacaoOptions.map(r => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
           <h3 className="font-semibold text-sm pt-2 border-t">Endereço</h3>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             <div className="space-y-2"><Label>CEP</Label>
@@ -146,6 +234,7 @@ const Clientes = () => {
             <div className="space-y-2"><Label>Cidade</Label><Input value={form.cidade} onChange={(e) => setForm({ ...form, cidade: e.target.value })} /></div>
             <div className="space-y-2"><Label>UF</Label><Input maxLength={2} value={form.uf} onChange={(e) => setForm({ ...form, uf: e.target.value.toUpperCase() })} /></div>
             <div className="space-y-2"><Label>País</Label><Input value={form.pais} onChange={(e) => setForm({ ...form, pais: e.target.value })} /></div>
+            <div className="space-y-2"><Label>Caixa Postal</Label><Input value={form.caixa_postal} onChange={(e) => setForm({ ...form, caixa_postal: e.target.value })} placeholder="Ex: CP 1234" /></div>
           </div>
           <div className="space-y-2"><Label>Observações</Label><Textarea value={form.observacoes} onChange={(e) => setForm({ ...form, observacoes: e.target.value })} /></div>
           <div className="flex justify-end gap-2">
@@ -176,6 +265,58 @@ const Clientes = () => {
               <div><span className="text-xs text-muted-foreground">Endereço</span>
                 <p>{selected.logradouro}, {selected.numero}{selected.complemento ? ` - ${selected.complemento}` : ""}<br/>
                 {selected.bairro} - {selected.cidade}/{selected.uf} - CEP {selected.cep}</p>
+              </div>
+            )}
+            {selected.caixa_postal && (
+              <div><span className="text-xs text-muted-foreground">Caixa Postal</span><p>{selected.caixa_postal}</p></div>
+            )}
+
+            {/* Grupo Econômico */}
+            {selected.grupo_economico_id && (
+              <div className="bg-muted/30 rounded-lg p-3">
+                <span className="text-xs text-muted-foreground flex items-center gap-1"><Building2 className="w-3 h-3" /> Grupo Econômico</span>
+                <p className="font-medium">{grupoNome(selected.grupo_economico_id)}</p>
+                <p className="text-xs text-muted-foreground">{relacaoLabel[selected.tipo_relacao_grupo || "independente"]}</p>
+              </div>
+            )}
+
+            {/* PMV Card */}
+            <div className="bg-muted/30 rounded-lg p-3">
+              <span className="text-xs text-muted-foreground flex items-center gap-1"><Clock className="w-3 h-3" /> PMV — Prazo Médio de Vencimento</span>
+              {pmv !== null ? (
+                <div>
+                  <p className="text-2xl font-bold mt-1">
+                    {pmv > 0 ? `+${pmv}` : pmv} <span className="text-sm font-normal text-muted-foreground">dias</span>
+                  </p>
+                  <p className="text-xs text-muted-foreground">Baseado em {pmvTitulos.length} título(s) pago(s)</p>
+                  {pmv > 0 && <p className="text-xs text-warning mt-1">Cliente paga em média {pmv} dias após o vencimento</p>}
+                  {pmv < 0 && <p className="text-xs text-success mt-1">Cliente paga em média {Math.abs(pmv)} dias antes do vencimento</p>}
+                  {pmv === 0 && <p className="text-xs text-success mt-1">Cliente paga no vencimento</p>}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground mt-1">Sem títulos pagos para cálculo</p>
+              )}
+            </div>
+
+            {/* Empresas Relacionadas */}
+            {selected.grupo_economico_id && empresasGrupo.length > 0 && (
+              <div className="border-t pt-4">
+                <h4 className="font-semibold text-sm flex items-center gap-2 mb-3">
+                  <Building2 className="w-4 h-4" /> Empresas Relacionadas ({empresasGrupo.length})
+                </h4>
+                <div className="space-y-2">
+                  {empresasGrupo.map((emp: any) => (
+                    <div key={emp.id} className="bg-muted/30 rounded-lg p-3 flex items-center justify-between">
+                      <div>
+                        <p className="font-medium text-sm">{emp.nome_razao_social}</p>
+                        <p className="text-xs text-muted-foreground">{emp.cpf_cnpj || "—"} • {emp.cidade ? `${emp.cidade}/${emp.uf}` : "—"}</p>
+                      </div>
+                      <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                        {relacaoLabel[emp.tipo_relacao_grupo || "independente"]}
+                      </span>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
