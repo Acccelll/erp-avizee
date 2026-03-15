@@ -14,6 +14,7 @@ import {
   Receipt,
   DollarSign,
   Landmark,
+  TrendingUp,
   ChevronLeft,
   ChevronRight,
   Settings,
@@ -31,6 +32,8 @@ const menuItems = [
   { icon: Warehouse, label: "Estoque", path: "/estoque" },
   { icon: Receipt, label: "Fiscal", path: "/fiscal" },
   { icon: DollarSign, label: "Financeiro", path: "/financeiro" },
+  { icon: Landmark, label: "Contas Bancárias", path: "/contas-bancarias" },
+  { icon: TrendingUp, label: "Fluxo de Caixa", path: "/fluxo-caixa" },
   { icon: Landmark, label: "Caixa", path: "/caixa" },
 ];
 

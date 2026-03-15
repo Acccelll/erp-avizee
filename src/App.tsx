@@ -17,6 +17,8 @@ import Estoque from "./pages/Estoque";
 import Fiscal from "./pages/Fiscal";
 import Financeiro from "./pages/Financeiro";
 import Caixa from "./pages/Caixa";
+import ContasBancarias from "./pages/ContasBancarias";
+import FluxoCaixa from "./pages/FluxoCaixa";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import ForgotPassword from "./pages/ForgotPassword";
@@ -52,6 +54,8 @@ const App = () => (
             <Route path="/estoque" element={<ProtectedRoute><Estoque /></ProtectedRoute>} />
             <Route path="/fiscal" element={<ProtectedRoute><Fiscal /></ProtectedRoute>} />
             <Route path="/financeiro" element={<ProtectedRoute><Financeiro /></ProtectedRoute>} />
+            <Route path="/contas-bancarias" element={<ProtectedRoute><ContasBancarias /></ProtectedRoute>} />
+            <Route path="/fluxo-caixa" element={<ProtectedRoute><FluxoCaixa /></ProtectedRoute>} />
             <Route path="/caixa" element={<ProtectedRoute><Caixa /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
