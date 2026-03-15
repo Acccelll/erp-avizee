@@ -17,6 +17,8 @@ import Estoque from "./pages/Estoque";
 import Fiscal from "./pages/Fiscal";
 import Financeiro from "./pages/Financeiro";
 import Caixa from "./pages/Caixa";
+import ContasBancarias from "./pages/ContasBancarias";
+import FluxoCaixa from "./pages/FluxoCaixa";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import ForgotPassword from "./pages/ForgotPassword";
