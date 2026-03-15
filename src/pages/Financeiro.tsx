@@ -20,11 +20,12 @@ interface Lancamento {
   data_vencimento: string; data_pagamento: string; status: string;
   forma_pagamento: string; banco: string; cartao: string;
   cliente_id: string; fornecedor_id: string; nota_fiscal_id: string;
-  conta_bancaria_id: string;
+  conta_bancaria_id: string; conta_contabil_id: string;
   parcela_numero: number; parcela_total: number;
   observacoes: string; ativo: boolean;
   clientes?: { nome_razao_social: string }; fornecedores?: { nome_razao_social: string };
   contas_bancarias?: { descricao: string; bancos?: { nome: string } };
+  contas_contabeis?: { codigo: string; descricao: string };
 }
 
 interface ContaBancaria {
@@ -36,7 +37,7 @@ interface ContaBancaria {
 const emptyForm: Record<string, any> = {
   tipo: "receber", descricao: "", valor: 0, data_vencimento: new Date().toISOString().split("T")[0],
   data_pagamento: "", status: "aberto", forma_pagamento: "", banco: "", cartao: "",
-  cliente_id: "", fornecedor_id: "", conta_bancaria_id: "", observacoes: "",
+  cliente_id: "", fornecedor_id: "", conta_bancaria_id: "", conta_contabil_id: "", observacoes: "",
 };
 
 const Financeiro = () => {
@@ -48,6 +49,7 @@ const Financeiro = () => {
   const fornecedoresCrud = useSupabaseCrud<any>({ table: "fornecedores" });
 
   const [contasBancarias, setContasBancarias] = useState<ContaBancaria[]>([]);
+  const [contasContabeis, setContasContabeis] = useState<any[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selected, setSelected] = useState<Lancamento | null>(null);
@@ -63,11 +65,15 @@ const Financeiro = () => {
   useEffect(() => { if (tipoParam) setFilterTipo(tipoParam); }, [tipoParam]);
 
   useEffect(() => {
-    const loadContas = async () => {
-      const { data } = await (supabase as any).from("contas_bancarias").select("*, bancos(nome)").eq("ativo", true);
-      setContasBancarias(data || []);
+    const load = async () => {
+      const [{ data: contas }, { data: contabeis }] = await Promise.all([
+        (supabase as any).from("contas_bancarias").select("*, bancos(nome)").eq("ativo", true),
+        (supabase as any).from("contas_contabeis").select("id, codigo, descricao").eq("ativo", true).eq("aceita_lancamento", true).order("codigo"),
+      ]);
+      setContasBancarias(contas || []);
+      setContasContabeis(contabeis || []);
     };
-    loadContas();
+    load();
   }, []);
 
   const openCreate = () => { setMode("create"); setForm({ ...emptyForm }); setModalOpen(true); };
@@ -78,7 +84,8 @@ const Financeiro = () => {
       data_pagamento: l.data_pagamento || "", status: l.status,
       forma_pagamento: l.forma_pagamento || "", banco: l.banco || "", cartao: l.cartao || "",
       cliente_id: l.cliente_id || "", fornecedor_id: l.fornecedor_id || "",
-      conta_bancaria_id: l.conta_bancaria_id || "", observacoes: l.observacoes || "",
+      conta_bancaria_id: l.conta_bancaria_id || "", conta_contabil_id: l.conta_contabil_id || "",
+      observacoes: l.observacoes || "",
     });
     setModalOpen(true);
   };
@@ -98,6 +105,7 @@ const Financeiro = () => {
         cliente_id: form.cliente_id || null,
         fornecedor_id: form.fornecedor_id || null,
         conta_bancaria_id: form.conta_bancaria_id || null,
+        conta_contabil_id: form.conta_contabil_id || null,
         data_pagamento: form.data_pagamento || null,
       };
       if (mode === "create") await create(payload);
@@ -248,6 +256,22 @@ const Financeiro = () => {
               </div>
             )}
           </div>
+
+          {/* Conta Contábil */}
+          {contasContabeis.length > 0 && (
+            <div className="space-y-2">
+              <Label>Conta Contábil (opcional)</Label>
+              <Select value={form.conta_contabil_id || "none"} onValueChange={(v) => setForm({ ...form, conta_contabil_id: v === "none" ? "" : v })}>
+                <SelectTrigger><SelectValue placeholder="Vincular conta contábil..." /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Nenhuma</SelectItem>
+                  {contasContabeis.map((c: any) => (
+                    <SelectItem key={c.id} value={c.id}>{c.codigo} - {c.descricao}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {form.status === "pago" && (!form.data_pagamento || !form.forma_pagamento || !form.conta_bancaria_id) && (
             <div className="bg-warning/10 border border-warning/30 rounded-lg p-3 text-sm text-warning">
