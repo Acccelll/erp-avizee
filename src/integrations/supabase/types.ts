@@ -418,6 +418,50 @@ export type Database = {
           },
         ]
       }
+      contas_contabeis: {
+        Row: {
+          aceita_lancamento: boolean
+          ativo: boolean
+          codigo: string
+          conta_pai_id: string | null
+          created_at: string
+          descricao: string
+          id: string
+          natureza: string
+          updated_at: string
+        }
+        Insert: {
+          aceita_lancamento?: boolean
+          ativo?: boolean
+          codigo: string
+          conta_pai_id?: string | null
+          created_at?: string
+          descricao: string
+          id?: string
+          natureza?: string
+          updated_at?: string
+        }
+        Update: {
+          aceita_lancamento?: boolean
+          ativo?: boolean
+          codigo?: string
+          conta_pai_id?: string | null
+          created_at?: string
+          descricao?: string
+          id?: string
+          natureza?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contas_contabeis_conta_pai_id_fkey"
+            columns: ["conta_pai_id"]
+            isOneToOne: false
+            referencedRelation: "contas_contabeis"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       email_send_log: {
         Row: {
           created_at: string
@@ -616,6 +660,7 @@ export type Database = {
           cartao: string | null
           cliente_id: string | null
           conta_bancaria_id: string | null
+          conta_contabil_id: string | null
           created_at: string
           data_pagamento: string | null
           data_vencimento: string
@@ -640,6 +685,7 @@ export type Database = {
           cartao?: string | null
           cliente_id?: string | null
           conta_bancaria_id?: string | null
+          conta_contabil_id?: string | null
           created_at?: string
           data_pagamento?: string | null
           data_vencimento: string
@@ -664,6 +710,7 @@ export type Database = {
           cartao?: string | null
           cliente_id?: string | null
           conta_bancaria_id?: string | null
+          conta_contabil_id?: string | null
           created_at?: string
           data_pagamento?: string | null
           data_vencimento?: string
@@ -695,6 +742,13 @@ export type Database = {
             columns: ["conta_bancaria_id"]
             isOneToOne: false
             referencedRelation: "contas_bancarias"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "financeiro_lancamentos_conta_contabil_id_fkey"
+            columns: ["conta_contabil_id"]
+            isOneToOne: false
+            referencedRelation: "contas_contabeis"
             referencedColumns: ["id"]
           },
           {
@@ -839,6 +893,7 @@ export type Database = {
       grupos_produto: {
         Row: {
           ativo: boolean
+          conta_contabil_id: string | null
           created_at: string
           descricao: string | null
           id: string
@@ -847,6 +902,7 @@ export type Database = {
         }
         Insert: {
           ativo?: boolean
+          conta_contabil_id?: string | null
           created_at?: string
           descricao?: string | null
           id?: string
@@ -855,13 +911,22 @@ export type Database = {
         }
         Update: {
           ativo?: boolean
+          conta_contabil_id?: string | null
           created_at?: string
           descricao?: string | null
           id?: string
           nome?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "grupos_produto_conta_contabil_id_fkey"
+            columns: ["conta_contabil_id"]
+            isOneToOne: false
+            referencedRelation: "contas_contabeis"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       notas_fiscais: {
         Row: {
@@ -869,6 +934,7 @@ export type Database = {
           chave_acesso: string | null
           cliente_id: string | null
           condicao_pagamento: string | null
+          conta_contabil_id: string | null
           created_at: string
           data_emissao: string
           data_recebimento: string | null
@@ -892,6 +958,7 @@ export type Database = {
           chave_acesso?: string | null
           cliente_id?: string | null
           condicao_pagamento?: string | null
+          conta_contabil_id?: string | null
           created_at?: string
           data_emissao?: string
           data_recebimento?: string | null
@@ -915,6 +982,7 @@ export type Database = {
           chave_acesso?: string | null
           cliente_id?: string | null
           condicao_pagamento?: string | null
+          conta_contabil_id?: string | null
           created_at?: string
           data_emissao?: string
           data_recebimento?: string | null
@@ -939,6 +1007,13 @@ export type Database = {
             columns: ["cliente_id"]
             isOneToOne: false
             referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notas_fiscais_conta_contabil_id_fkey"
+            columns: ["conta_contabil_id"]
+            isOneToOne: false
+            referencedRelation: "contas_contabeis"
             referencedColumns: ["id"]
           },
           {
