@@ -16,6 +16,7 @@ import {
   DollarSign,
   Landmark,
   TrendingUp,
+  BookOpen,
   ChevronLeft,
   ChevronRight,
   Settings,
@@ -37,6 +38,7 @@ const menuItems = [
   { icon: Landmark, label: "Contas Bancárias", path: "/contas-bancarias" },
   { icon: TrendingUp, label: "Fluxo de Caixa", path: "/fluxo-caixa" },
   { icon: Landmark, label: "Caixa", path: "/caixa" },
+  { icon: BookOpen, label: "Plano de Contas", path: "/contas-contabeis-plano" },
 ];
 
 export function AppSidebar() {
