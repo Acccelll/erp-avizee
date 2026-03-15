@@ -10,6 +10,7 @@ import {
   ShoppingCart,
   FileText,
   ClipboardList,
+  Building2,
   Warehouse,
   Receipt,
   DollarSign,
