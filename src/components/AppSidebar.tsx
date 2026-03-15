@@ -16,6 +16,7 @@ import {
   DollarSign,
   Landmark,
   TrendingUp,
+  BookOpen,
   ChevronLeft,
   ChevronRight,
   Settings,
