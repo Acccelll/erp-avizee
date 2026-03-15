@@ -25,6 +25,7 @@ const menuItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/" },
   { icon: Package, label: "Produtos", path: "/produtos" },
   { icon: Users, label: "Clientes", path: "/clientes" },
+  { icon: Building2, label: "Grupos Econômicos", path: "/grupos-economicos" },
   { icon: Truck, label: "Fornecedores", path: "/fornecedores" },
   { icon: ShoppingCart, label: "Compras", path: "/compras" },
   { icon: FileText, label: "Cotações", path: "/cotacoes" },
