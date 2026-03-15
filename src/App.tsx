@@ -20,6 +20,7 @@ import Financeiro from "./pages/Financeiro";
 import Caixa from "./pages/Caixa";
 import ContasBancarias from "./pages/ContasBancarias";
 import FluxoCaixa from "./pages/FluxoCaixa";
+import ContasContabeis from "./pages/ContasContabeis";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import ForgotPassword from "./pages/ForgotPassword";
