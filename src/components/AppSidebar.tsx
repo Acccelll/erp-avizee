@@ -14,6 +14,7 @@ import {
   Receipt,
   DollarSign,
   Landmark,
+  TrendingUp,
   ChevronLeft,
   ChevronRight,
   Settings,
