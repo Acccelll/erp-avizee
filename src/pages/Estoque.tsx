@@ -14,8 +14,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { formatNumber, formatDate } from "@/lib/format";
-import { Calendar, Package, AlertTriangle } from "lucide-react";
+import { formatNumber, formatDate, formatCurrency } from "@/lib/format";
+import { Calendar, Package, AlertTriangle, Lock } from "lucide-react";
 
 interface Movimento {
   id: string; produto_id: string; tipo: string; quantidade: number;
@@ -56,6 +56,15 @@ const Estoque = () => {
 
   // Low stock
   const [abaixoMinimo, setAbaixoMinimo] = useState<any[]>([]);
+
+  // Fechamento mensal
+  const [mesFechamento, setMesFechamento] = useState(() => {
+    const d = new Date();
+    d.setMonth(d.getMonth() - 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  });
+  const [fechamentoData, setFechamentoData] = useState<any[]>([]);
+  const [loadingFechamento, setLoadingFechamento] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -222,6 +231,7 @@ const Estoque = () => {
           <TabsList>
             <TabsTrigger value="movimentacoes">Movimentações</TabsTrigger>
             <TabsTrigger value="posicao">Posição por Data</TabsTrigger>
+            <TabsTrigger value="fechamento">Fechamento Mensal</TabsTrigger>
           </TabsList>
 
           <TabsContent value="movimentacoes" className="space-y-4">
@@ -273,6 +283,88 @@ const Estoque = () => {
                 <CardContent className="py-12 text-center text-muted-foreground">
                   <Package className="w-10 h-10 mx-auto mb-2 opacity-50" />
                   <p className="text-sm">Selecione uma data e clique em "Consultar Posição" para ver o saldo de estoque na data.</p>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          <TabsContent value="fechamento" className="space-y-4">
+            <div className="flex items-end gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs flex items-center gap-1"><Lock className="w-3 h-3" /> Mês de Referência</Label>
+                <Input type="month" value={mesFechamento} onChange={e => setMesFechamento(e.target.value)} className="h-9 w-44" />
+              </div>
+              <Button size="sm" onClick={async () => {
+                setLoadingFechamento(true);
+                try {
+                  const [year, month] = mesFechamento.split("-").map(Number);
+                  const lastDay = new Date(year, month, 0).getDate();
+                  const dataCorte = `${mesFechamento}-${String(lastDay).padStart(2, "0")}T23:59:59.999Z`;
+
+                  const { data: produtos } = await (supabase as any).from("produtos")
+                    .select("id, nome, sku, estoque_atual, estoque_minimo, preco_custo")
+                    .eq("ativo", true).order("nome");
+
+                  const allMovs = data.filter(m => m.created_at <= dataCorte)
+                    .sort((a, b) => a.created_at.localeCompare(b.created_at));
+
+                  const result = (produtos || []).map((p: any) => {
+                    const prodMovs = allMovs.filter(m => m.produto_id === p.id);
+                    const saldo = prodMovs.length > 0 ? prodMovs[prodMovs.length - 1].saldo_atual : 0;
+                    const valorUnit = Number(p.preco_custo || 0);
+                    return {
+                      id: p.id, nome: p.nome, sku: p.sku || "",
+                      saldo, valorUnit, valorTotal: saldo * valorUnit,
+                      estoque_minimo: p.estoque_minimo || 0,
+                    };
+                  }).filter((p: any) => p.saldo !== 0 || Number(p.valorUnit) > 0);
+
+                  setFechamentoData(result);
+                } catch (err) { console.error(err); }
+                setLoadingFechamento(false);
+              }} disabled={loadingFechamento}>
+                {loadingFechamento ? "Processando..." : "Gerar Fechamento"}
+              </Button>
+            </div>
+
+            {fechamentoData.length > 0 ? (
+              <>
+                <div className="bg-accent/50 rounded-lg p-4 flex flex-wrap gap-6">
+                  <div>
+                    <span className="text-xs text-muted-foreground">Itens</span>
+                    <p className="font-bold mono">{formatNumber(fechamentoData.length)}</p>
+                  </div>
+                  <div>
+                    <span className="text-xs text-muted-foreground">Qtd Total</span>
+                    <p className="font-bold mono">{formatNumber(fechamentoData.reduce((s, p) => s + p.saldo, 0))}</p>
+                  </div>
+                  <div>
+                    <span className="text-xs text-muted-foreground">Valor Total (custo)</span>
+                    <p className="font-bold mono">{formatCurrency(fechamentoData.reduce((s, p) => s + p.valorTotal, 0))}</p>
+                  </div>
+                </div>
+                <DataTable
+                  columns={[
+                    { key: "sku", label: "SKU", render: (p: any) => <span className="font-mono text-xs text-primary">{p.sku || "—"}</span> },
+                    { key: "nome", label: "Produto" },
+                    { key: "saldo", label: "Saldo", render: (p: any) => <span className="font-mono font-semibold">{formatNumber(p.saldo)}</span> },
+                    { key: "valorUnit", label: "Custo Unit.", render: (p: any) => <span className="font-mono text-sm">{formatCurrency(p.valorUnit)}</span> },
+                    { key: "valorTotal", label: "Valor Total", render: (p: any) => <span className="font-mono font-semibold">{formatCurrency(p.valorTotal)}</span> },
+                    { key: "status", label: "Status", render: (p: any) => (
+                      p.estoque_minimo > 0 && p.saldo <= p.estoque_minimo
+                        ? <span className="text-destructive text-xs font-medium flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> Abaixo mín.</span>
+                        : <span className="text-xs text-muted-foreground">OK</span>
+                    )},
+                  ]}
+                  data={fechamentoData}
+                  loading={loadingFechamento}
+                />
+              </>
+            ) : (
+              <Card>
+                <CardContent className="py-12 text-center text-muted-foreground">
+                  <Lock className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">Selecione o mês e clique em "Gerar Fechamento" para obter a posição de estoque no último dia do mês.</p>
                 </CardContent>
               </Card>
             )}
