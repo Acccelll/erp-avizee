@@ -231,6 +231,7 @@ const Estoque = () => {
           <TabsList>
             <TabsTrigger value="movimentacoes">Movimentações</TabsTrigger>
             <TabsTrigger value="posicao">Posição por Data</TabsTrigger>
+            <TabsTrigger value="fechamento">Fechamento Mensal</TabsTrigger>
           </TabsList>
 
           <TabsContent value="movimentacoes" className="space-y-4">
