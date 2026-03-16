@@ -6,10 +6,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { formatCurrency, formatNumber, formatDate, daysSince } from "@/lib/format";
 import {
   Package, Users, TrendingUp, DollarSign,
-  FileText, AlertTriangle, Truck, ClipboardList, Warehouse
+  FileText, AlertTriangle, Truck, ClipboardList, Warehouse, Clock
 } from "lucide-react";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
-import { Badge } from "@/components/ui/badge";
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -22,7 +21,7 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [recentOrcamentos, setRecentOrcamentos] = useState<any[]>([]);
   const [recentCompras, setRecentCompras] = useState<any[]>([]);
-  const [backlogPedidos, setBacklogPedidos] = useState<any[]>([]);
+  const [backlogOVs, setBacklogOVs] = useState<any[]>([]);
   const [comprasAguardando, setComprasAguardando] = useState<any[]>([]);
   const [estoqueBaixo, setEstoqueBaixo] = useState<any[]>([]);
 
@@ -53,9 +52,14 @@ const Dashboard = () => {
         (supabase as any).from("financeiro_lancamentos").select("valor").eq("status", "vencido").eq("ativo", true),
         (supabase as any).from("orcamentos").select("id, numero, valor_total, status, data_orcamento, clientes(nome_razao_social)").eq("ativo", true).order("created_at", { ascending: false }).limit(5),
         (supabase as any).from("compras").select("numero, valor_total, status, data_compra, fornecedores(nome_razao_social)").eq("ativo", true).order("created_at", { ascending: false }).limit(5),
-        // Backlog: orçamentos confirmados (aguardando faturamento)
-        (supabase as any).from("orcamentos").select("id, numero, valor_total, data_orcamento, clientes(nome_razao_social)").eq("ativo", true).eq("status", "confirmado").order("data_orcamento", { ascending: true }).limit(10),
-        // Compras aguardando chegada (confirmadas sem data_entrega_real)
+        // Backlog: OVs aprovadas/em_separacao com faturamento pendente
+        (supabase as any).from("ordens_venda")
+          .select("id, numero, valor_total, data_emissao, data_prometida_despacho, prazo_despacho_dias, status, status_faturamento, clientes(nome_razao_social)")
+          .eq("ativo", true)
+          .in("status", ["aprovada", "em_separacao"])
+          .in("status_faturamento", ["aguardando", "parcial"])
+          .order("data_emissao", { ascending: true }).limit(15),
+        // Compras aguardando chegada
         (supabase as any).from("compras").select("id, numero, valor_total, data_compra, data_entrega_prevista, fornecedores(nome_razao_social)").eq("ativo", true).eq("status", "confirmado").is("data_entrega_real", null).order("data_entrega_prevista", { ascending: true }).limit(10),
         // Produtos com estoque abaixo do mínimo
         (supabase as any).from("produtos").select("id, nome, codigo_interno, estoque_atual, estoque_minimo, unidade_medida").eq("ativo", true).not("estoque_minimo", "is", null).limit(100),
@@ -72,9 +76,8 @@ const Dashboard = () => {
       });
       setRecentOrcamentos(orcRecent || []);
       setRecentCompras(compRecent || []);
-      setBacklogPedidos(backlog || []);
+      setBacklogOVs(backlog || []);
       setComprasAguardando(compAguardando || []);
-      // Filter products where estoque_atual <= estoque_minimo
       setEstoqueBaixo(
         (estMin || []).filter((p: any) => p.estoque_minimo > 0 && (p.estoque_atual ?? 0) <= p.estoque_minimo)
       );
@@ -82,6 +85,22 @@ const Dashboard = () => {
     };
     load();
   }, []);
+
+  const calcDiasDespacho = (ov: any) => {
+    if (ov.data_prometida_despacho) {
+      const hoje = new Date();
+      const prometida = new Date(ov.data_prometida_despacho);
+      const diff = Math.ceil((prometida.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24));
+      return diff;
+    }
+    return null;
+  };
+
+  const faturamentoLabel: Record<string, string> = {
+    aguardando: "Aguardando",
+    parcial: "Parcial",
+    total: "Total",
+  };
 
   const cards = [
     {
@@ -142,19 +161,19 @@ const Dashboard = () => {
 
       {/* Alert Cards Row */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        {/* Backlog - Pedidos confirmados aguardando faturamento */}
+        {/* Backlog - OVs aprovadas aguardando faturamento */}
         <div
           className="stat-card cursor-pointer border-l-4 border-l-warning"
-          onClick={() => navigate("/orcamentos")}
+          onClick={() => navigate("/ordens-venda")}
         >
           <div className="flex items-start justify-between">
             <div>
               <p className="text-sm text-muted-foreground font-medium">Aguardando Faturamento</p>
-              <p className="text-2xl font-bold mt-1 mono">{formatNumber(backlogPedidos.length)}</p>
+              <p className="text-2xl font-bold mt-1 mono">{formatNumber(backlogOVs.length)}</p>
               <p className="text-xs mt-1 text-muted-foreground">
-                {backlogPedidos.length > 0
-                  ? `Total: ${formatCurrency(backlogPedidos.reduce((s, o) => s + Number(o.valor_total || 0), 0))}`
-                  : "Nenhum pedido pendente"}
+                {backlogOVs.length > 0
+                  ? `Total: ${formatCurrency(backlogOVs.reduce((s, o) => s + Number(o.valor_total || 0), 0))}`
+                  : "Nenhuma OV pendente"}
               </p>
             </div>
             <div className="p-3 rounded-lg bg-warning/10">
@@ -206,35 +225,56 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* Backlog Detail + Estoque Baixo Detail */}
-      {(backlogPedidos.length > 0 || estoqueBaixo.length > 0) && (
+      {/* Backlog OV Detail + Estoque Baixo Detail */}
+      {(backlogOVs.length > 0 || estoqueBaixo.length > 0) && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-          {/* Backlog detail */}
-          {backlogPedidos.length > 0 && (
+          {/* OV Backlog detail */}
+          {backlogOVs.length > 0 && (
             <div className="bg-card rounded-xl border p-5">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="font-semibold text-foreground flex items-center gap-2">
                   <ClipboardList className="w-4 h-4 text-warning" />
-                  Pedidos Aguardando Faturamento
+                  OVs Aguardando Faturamento
                 </h3>
+                <button onClick={() => navigate("/ordens-venda")} className="text-xs text-primary hover:underline">Ver todas →</button>
               </div>
-              <div className="space-y-2 max-h-[200px] overflow-y-auto">
-                {backlogPedidos.map((o: any) => (
-                  <div
-                    key={o.id}
-                    className="flex items-center justify-between py-2 px-2 border-b last:border-b-0 hover:bg-muted/20 rounded cursor-pointer"
-                    onClick={() => navigate(`/orcamentos/${o.id}`)}
-                  >
-                    <div>
-                      <p className="text-sm font-medium mono">{o.numero}</p>
-                      <p className="text-xs text-muted-foreground">{o.clientes?.nome_razao_social || "—"}</p>
+              <div className="space-y-2 max-h-[260px] overflow-y-auto">
+                {backlogOVs.map((ov: any) => {
+                  const diasDespacho = calcDiasDespacho(ov);
+                  return (
+                    <div
+                      key={ov.id}
+                      className="flex items-center justify-between py-2 px-2 border-b last:border-b-0 hover:bg-muted/20 rounded cursor-pointer"
+                      onClick={() => navigate("/ordens-venda")}
+                    >
+                      <div>
+                        <p className="text-sm font-medium mono">{ov.numero}</p>
+                        <p className="text-xs text-muted-foreground">{ov.clientes?.nome_razao_social || "—"}</p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                            ov.status_faturamento === "parcial" ? "bg-warning/15 text-warning" : "bg-muted text-muted-foreground"
+                          }`}>
+                            {faturamentoLabel[ov.status_faturamento] || ov.status_faturamento}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-semibold mono">{formatCurrency(Number(ov.valor_total || 0))}</p>
+                        {diasDespacho !== null && (
+                          <p className={`text-xs font-medium flex items-center justify-end gap-1 ${
+                            diasDespacho < 0 ? "text-destructive" : diasDespacho <= 3 ? "text-warning" : "text-muted-foreground"
+                          }`}>
+                            <Clock className="w-3 h-3" />
+                            {diasDespacho < 0 ? `${Math.abs(diasDespacho)}d atrasado` : `${diasDespacho}d p/ despacho`}
+                          </p>
+                        )}
+                        {diasDespacho === null && (
+                          <p className="text-xs text-muted-foreground">{daysSince(ov.data_emissao)} dias</p>
+                        )}
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-sm font-semibold mono">{formatCurrency(Number(o.valor_total || 0))}</p>
-                      <p className="text-xs text-warning font-medium">{daysSince(o.data_orcamento)} dias</p>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
@@ -248,7 +288,7 @@ const Dashboard = () => {
                   Produtos Abaixo do Estoque Mínimo
                 </h3>
               </div>
-              <div className="space-y-2 max-h-[200px] overflow-y-auto">
+              <div className="space-y-2 max-h-[260px] overflow-y-auto">
                 {estoqueBaixo.slice(0, 10).map((p: any) => (
                   <div
                     key={p.id}
