@@ -57,6 +57,15 @@ const Estoque = () => {
   // Low stock
   const [abaixoMinimo, setAbaixoMinimo] = useState<any[]>([]);
 
+  // Fechamento mensal
+  const [mesFechamento, setMesFechamento] = useState(() => {
+    const d = new Date();
+    d.setMonth(d.getMonth() - 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  });
+  const [fechamentoData, setFechamentoData] = useState<any[]>([]);
+  const [loadingFechamento, setLoadingFechamento] = useState(false);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.produto_id || !form.quantidade) { toast.error("Produto e quantidade são obrigatórios"); return; }
