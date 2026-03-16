@@ -197,11 +197,11 @@
     @apply text-xs font-medium tracking-wide text-muted-foreground;
   }
 
-  .tracking-tight-montserrat {
+  .tracking-tight-inter {
     letter-spacing: -0.02em;
   }
 
-  .tracking-wide-montserrat {
+  .tracking-wide-inter {
     letter-spacing: 0.03em;
   }
 }
