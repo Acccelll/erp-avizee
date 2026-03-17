@@ -1,0 +1,210 @@
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { AppLayout } from "@/components/AppLayout";
+import { ModulePage } from "@/components/ModulePage";
+import { DataTable, StatusBadge } from "@/components/DataTable";
+import { ViewDrawer } from "@/components/ViewDrawer";
+import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { formatCurrency, formatDate, daysSince } from "@/lib/format";
+import { CheckCircle, Package, FileText } from "lucide-react";
+
+interface OrdemVenda {
+  id: string;
+  numero: string;
+  data_emissao: string;
+  cliente_id: string;
+  cotacao_id: string;
+  status: string;
+  status_faturamento: string;
+  data_aprovacao: string;
+  data_prometida_despacho: string;
+  prazo_despacho_dias: number;
+  valor_total: number;
+  observacoes: string;
+  ativo: boolean;
+  clientes?: { nome_razao_social: string };
+  orcamentos?: { numero: string };
+}
+
+const statusComercialLabels: Record<string, string> = {
+  pendente: "Pendente",
+  aprovada: "Aprovada",
+  em_separacao: "Em Separação",
+  cancelada: "Cancelada",
+};
+
+const statusFaturamentoLabels: Record<string, string> = {
+  aguardando: "Aguardando",
+  parcial: "Parcial",
+  total: "Faturado",
+};
+
+const statusFaturamentoColors: Record<string, string> = {
+  aguardando: "bg-warning/10 text-warning border-warning/30",
+  parcial: "bg-info/10 text-info border-info/30",
+  total: "bg-success/10 text-success border-success/30",
+};
+
+const OrdensVenda = () => {
+  const navigate = useNavigate();
+  const { data, loading, remove, fetchData } = useSupabaseCrud<OrdemVenda>({
+    table: "ordens_venda",
+    select: "*, clientes(nome_razao_social), orcamentos(numero)",
+  });
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [selected, setSelected] = useState<OrdemVenda | null>(null);
+  const [ovItems, setOvItems] = useState<any[]>([]);
+  const [loadingItems, setLoadingItems] = useState(false);
+
+  const handleView = async (ov: OrdemVenda) => {
+    setSelected(ov);
+    setDrawerOpen(true);
+    setLoadingItems(true);
+    const { data: items } = await (supabase as any)
+      .from("ordens_venda_itens")
+      .select("*, produtos(nome)")
+      .eq("ordem_venda_id", ov.id);
+    setOvItems(items || []);
+    setLoadingItems(false);
+  };
+
+  const handleApprove = async (ov: OrdemVenda) => {
+    try {
+      await (supabase as any).from("ordens_venda").update({
+        status: "aprovada",
+        data_aprovacao: new Date().toISOString().split("T")[0],
+      }).eq("id", ov.id);
+      toast.success(`OV ${ov.numero} aprovada!`);
+      fetchData();
+    } catch (err: any) {
+      toast.error(`Erro: ${err.message}`);
+    }
+  };
+
+  const columns = [
+    { key: "numero", label: "Nº OV", render: (o: OrdemVenda) => <span className="mono text-xs font-medium text-primary">{o.numero}</span> },
+    { key: "cotacao", label: "Cotação", render: (o: OrdemVenda) => o.orcamentos?.numero ? <span className="mono text-xs">{o.orcamentos.numero}</span> : "—" },
+    { key: "cliente", label: "Cliente", render: (o: OrdemVenda) => o.clientes?.nome_razao_social || "—" },
+    { key: "data_emissao", label: "Emissão", render: (o: OrdemVenda) => formatDate(o.data_emissao) },
+    { key: "valor_total", label: "Total", render: (o: OrdemVenda) => <span className="font-semibold mono">{formatCurrency(Number(o.valor_total || 0))}</span> },
+    { key: "status", label: "Status", render: (o: OrdemVenda) => <StatusBadge status={o.status} label={statusComercialLabels[o.status]} /> },
+    {
+      key: "faturamento", label: "Faturamento", render: (o: OrdemVenda) => (
+        <Badge variant="outline" className={`text-xs ${statusFaturamentoColors[o.status_faturamento] || ""}`}>
+          {statusFaturamentoLabels[o.status_faturamento] || o.status_faturamento}
+        </Badge>
+      ),
+    },
+    {
+      key: "dias", label: "Dias", render: (o: OrdemVenda) => {
+        const dias = daysSince(o.data_emissao);
+        return <span className={`mono text-xs ${dias > 7 ? "text-destructive font-bold" : "text-muted-foreground"}`}>{dias}d</span>;
+      },
+    },
+    {
+      key: "acoes_ov", label: "Ações", render: (o: OrdemVenda) => (
+        <div className="flex gap-1">
+          {o.status === "pendente" && (
+            <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={(e) => { e.stopPropagation(); handleApprove(o); }}>
+              <CheckCircle className="w-3 h-3" /> Aprovar
+            </Button>
+          )}
+        </div>
+      ),
+    },
+  ];
+
+  return (
+    <AppLayout>
+      <ModulePage
+        title="Ordens de Venda"
+        subtitle="Gestão de pedidos comerciais e faturamento"
+        count={data.length}
+      >
+        <DataTable
+          columns={columns}
+          data={data}
+          loading={loading}
+          onView={handleView}
+          onDelete={(o) => remove(o.id)}
+        />
+      </ModulePage>
+
+      <ViewDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} title="Detalhes da Ordem de Venda">
+        {selected && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div><span className="text-xs text-muted-foreground">Nº OV</span><p className="font-medium mono">{selected.numero}</p></div>
+              <div><span className="text-xs text-muted-foreground">Cotação Origem</span><p className="mono text-sm">{selected.orcamentos?.numero || "—"}</p></div>
+            </div>
+            <div><span className="text-xs text-muted-foreground">Cliente</span><p>{selected.clientes?.nome_razao_social || "—"}</p></div>
+            <div className="grid grid-cols-2 gap-4">
+              <div><span className="text-xs text-muted-foreground">Emissão</span><p>{formatDate(selected.data_emissao)}</p></div>
+              <div><span className="text-xs text-muted-foreground">Aprovação</span><p>{selected.data_aprovacao ? formatDate(selected.data_aprovacao) : "—"}</p></div>
+            </div>
+            <div><span className="text-xs text-muted-foreground">Valor Total</span><p className="font-semibold mono text-lg">{formatCurrency(Number(selected.valor_total || 0))}</p></div>
+            <div className="grid grid-cols-2 gap-4">
+              <div><span className="text-xs text-muted-foreground">Status Comercial</span><StatusBadge status={selected.status} label={statusComercialLabels[selected.status]} /></div>
+              <div>
+                <span className="text-xs text-muted-foreground">Faturamento</span>
+                <Badge variant="outline" className={`mt-1 ${statusFaturamentoColors[selected.status_faturamento] || ""}`}>
+                  {statusFaturamentoLabels[selected.status_faturamento] || selected.status_faturamento}
+                </Badge>
+              </div>
+            </div>
+
+            {/* Items */}
+            <div className="pt-2">
+              <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
+                <Package className="w-4 h-4" /> Itens
+              </h4>
+              {loadingItems ? (
+                <div className="flex justify-center py-4"><div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" /></div>
+              ) : ovItems.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Nenhum item</p>
+              ) : (
+                <div className="space-y-2">
+                  {ovItems.map((item: any) => (
+                    <div key={item.id} className="flex justify-between items-center py-2 px-3 bg-accent/20 rounded-lg text-sm">
+                      <div>
+                        <p className="font-medium">{item.descricao_snapshot || item.produtos?.nome || "—"}</p>
+                        <p className="text-xs text-muted-foreground mono">{item.codigo_snapshot || "—"} • {item.quantidade} {item.unidade}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-semibold mono">{formatCurrency(Number(item.valor_total || 0))}</p>
+                        <p className="text-xs text-muted-foreground">
+                          Fat.: {item.quantidade_faturada || 0}/{item.quantidade}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {selected.observacoes && (
+              <div className="pt-2">
+                <span className="text-xs text-muted-foreground">Observações</span>
+                <p className="text-sm mt-1">{selected.observacoes}</p>
+              </div>
+            )}
+
+            <div className="pt-2 space-y-2">
+              {selected.status === "pendente" && (
+                <Button onClick={() => { setDrawerOpen(false); handleApprove(selected); }} className="w-full gap-2">
+                  <CheckCircle className="w-4 h-4" /> Aprovar OV
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+      </ViewDrawer>
+    </AppLayout>
+  );
+};
+
+export default OrdensVenda;
