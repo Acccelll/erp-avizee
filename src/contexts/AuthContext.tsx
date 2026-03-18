@@ -27,6 +27,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<any>(null);
 
   useEffect(() => {
+    // Set up listener FIRST, then get initial session
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
@@ -35,9 +36,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         setProfile(null);
       }
-      setLoading(false);
+      // Don't set loading here — let getSession handle initial load
     });
 
+    // getSession restores from storage and is the source of truth for initial state
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
