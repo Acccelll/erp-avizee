@@ -149,7 +149,7 @@ export default function Relatorios() {
                   {(resultado.chartData || []).slice(0, 6).map((item) => (
                     <div key={`${item.name}-${item.value}`} className="rounded-lg border p-3">
                       <p className="text-sm font-medium">{item.name}</p>
-                      <p className="text-sm text-muted-foreground">{formatCellValue(item.value, 'valor')}</p>
+                      <p className="text-sm text-muted-foreground">{formatCellValue(item.value, 'valor') as React.ReactNode}</p>
                     </div>
                   ))}
                   {!resultado.chartData?.length && (

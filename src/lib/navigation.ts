@@ -253,8 +253,10 @@ const baseRouteLabels: Record<string, string> = {
   '/configuracoes': 'Configurações',
 };
 
-export const flatNavItems = [
-  dashboardItem,
+export type FlatNavItem = NavLeafItem & { section: string; subgroup: string };
+
+export const flatNavItems: FlatNavItem[] = [
+  { ...dashboardItem, section: '', subgroup: '' },
   ...navSections.flatMap((section) =>
     section.items.flatMap((group) =>
       group.items.map((item) => ({
