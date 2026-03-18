@@ -17,10 +17,7 @@ export default function Signup() {
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (password.length < 6) {
-      toast.error("A senha deve ter pelo menos 6 caracteres");
-      return;
-    }
+    if (password.length < 6) { toast.error("A senha deve ter pelo menos 6 caracteres"); return; }
     setLoading(true);
     const { error } = await supabase.auth.signUp({
       email,
@@ -44,12 +41,8 @@ export default function Signup() {
             <span className="text-success text-2xl">✓</span>
           </div>
           <h2 className="text-xl font-bold mb-2">Verifique seu e-mail</h2>
-          <p className="text-muted-foreground text-sm mb-4">
-            Enviamos um link de confirmação para <strong>{email}</strong>. Clique no link para ativar sua conta.
-          </p>
-          <Link to="/login">
-            <Button variant="outline">Voltar ao Login</Button>
-          </Link>
+          <p className="text-muted-foreground text-sm mb-4">Enviamos um link de confirmação para <strong>{email}</strong>. Clique no link para ativar sua conta.</p>
+          <Link to="/login"><Button variant="outline">Voltar ao Login</Button></Link>
         </div>
       </div>
     );
@@ -71,25 +64,11 @@ export default function Signup() {
           </div>
           <div className="space-y-2">
             <Label htmlFor="email">E-mail</Label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="seu@email.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
+            <Input id="email" type="email" placeholder="seu@email.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
           </div>
           <div className="space-y-2">
             <Label htmlFor="password">Senha</Label>
-            <Input
-              id="password"
-              type="password"
-              placeholder="Mínimo 6 caracteres"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
+            <Input id="password" type="password" placeholder="Mínimo 6 caracteres" value={password} onChange={(e) => setPassword(e.target.value)} required />
           </div>
           <Button type="submit" className="w-full gap-2" disabled={loading}>
             <UserPlus className="w-4 h-4" />
@@ -97,9 +76,7 @@ export default function Signup() {
           </Button>
           <p className="text-center text-sm text-muted-foreground">
             Já tem conta?{" "}
-            <Link to="/login" className="text-primary hover:underline font-medium">
-              Fazer login
-            </Link>
+            <Link to="/login" className="text-primary hover:underline font-medium">Fazer login</Link>
           </p>
         </form>
       </div>
