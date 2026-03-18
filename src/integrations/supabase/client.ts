@@ -14,7 +14,7 @@ export const supabaseConfigError = !SUPABASE_URL
 
 export const isSupabaseConfigured = !supabaseConfigError;
 
-const FALLBACK_URL = "https://vhwhxvsfkossbrfbeawa.supabase.co";
+const FALLBACK_URL = "https://placeholder.supabase.co";
 const FALLBACK_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJwbGFjZWhvbGRlciIsInJlZiI6InBsYWNlaG9sZGVyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MDAwMDAwMDAsImV4cCI6MjcwMDAwMDAwMH0.placeholder-signature";
 
