@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AppLayout } from "@/components/AppLayout";
 import { ModulePage } from "@/components/ModulePage";
 import { DataTable, StatusBadge } from "@/components/DataTable";
@@ -59,6 +59,9 @@ const Clientes = () => {
   const [empresasGrupo, setEmpresasGrupo] = useState<any[]>([]);
   const [pmv, setPmv] = useState<number | null>(null);
   const [pmvTitulos, setPmvTitulos] = useState<any[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [tipoFilter, setTipoFilter] = useState<"todos" | "F" | "J">("todos");
+  const [grupoFilter, setGrupoFilter] = useState<"todos" | "com_grupo" | "sem_grupo">("todos");
 
   useEffect(() => {
     (supabase as any).from("grupos_economicos").select("id, nome").eq("ativo", true).order("nome").then(({ data: g }: any) => setGrupos(g || []));
@@ -155,6 +158,24 @@ const Clientes = () => {
 
   const relacaoLabel: Record<string, string> = { matriz: "Matriz", filial: "Filial", coligada: "Coligada", independente: "Independente" };
 
+  const filteredData = useMemo(() => {
+    const query = searchTerm.trim().toLowerCase();
+
+    return data.filter((cliente) => {
+      if (tipoFilter !== "todos" && cliente.tipo_pessoa !== tipoFilter) return false;
+      if (grupoFilter === "com_grupo" && !cliente.grupo_economico_id) return false;
+      if (grupoFilter === "sem_grupo" && cliente.grupo_economico_id) return false;
+      if (!query) return true;
+
+      const haystack = [cliente.nome_razao_social, cliente.nome_fantasia, cliente.cpf_cnpj, cliente.email, cliente.cidade, cliente.uf, cliente.telefone, cliente.contato]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      return haystack.includes(query);
+    });
+  }, [data, grupoFilter, searchTerm, tipoFilter]);
+
   const columns = [
     { key: "nome_razao_social", label: "Nome / Razão Social" },
     { key: "tipo_pessoa", label: "Tipo", render: (c: Cliente) => c.tipo_pessoa === "F" ? "PF" : "PJ" },
@@ -168,8 +189,11 @@ const Clientes = () => {
 
   return (
     <AppLayout>
-      <ModulePage title="Clientes" subtitle="Cadastro e gestão de clientes" addLabel="Novo Cliente" onAdd={openCreate} count={data.length}>
-        <DataTable columns={columns} data={data} loading={loading}
+      <ModulePage title="Clientes" subtitle="Cadastro e gestão de clientes" addLabel="Novo Cliente" onAdd={openCreate} count={filteredData.length}
+        searchValue={searchTerm} onSearchChange={setSearchTerm} searchPlaceholder="Buscar por nome, CNPJ, e-mail ou cidade..."
+        filters={<><Select value={tipoFilter} onValueChange={(v: any) => setTipoFilter(v)}><SelectTrigger className="h-9 w-[170px]"><SelectValue placeholder="Tipo" /></SelectTrigger><SelectContent><SelectItem value="todos">Todos os tipos</SelectItem><SelectItem value="J">Pessoa jurídica</SelectItem><SelectItem value="F">Pessoa física</SelectItem></SelectContent></Select><Select value={grupoFilter} onValueChange={(v: any) => setGrupoFilter(v)}><SelectTrigger className="h-9 w-[190px]"><SelectValue placeholder="Grupo econômico" /></SelectTrigger><SelectContent><SelectItem value="todos">Todos os grupos</SelectItem><SelectItem value="com_grupo">Com grupo econômico</SelectItem><SelectItem value="sem_grupo">Sem grupo econômico</SelectItem></SelectContent></Select></>}
+      >
+        <DataTable columns={columns} data={filteredData} loading={loading}
           onView={openView} onEdit={openEdit} onDelete={(c) => remove(c.id)} onDuplicate={(c) => duplicate(c)} />
       </ModulePage>
 

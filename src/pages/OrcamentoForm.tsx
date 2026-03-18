@@ -16,6 +16,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ArrowLeft, Save, Eye, FileText, Copy } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 
@@ -37,6 +38,7 @@ export default function OrcamentoForm() {
   const navigate = useNavigate();
   const pdfRef = useRef<HTMLDivElement>(null);
   const isEdit = !!id;
+  const isMobile = useIsMobile();
 
   const [saving, setSaving] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -231,25 +233,45 @@ export default function OrcamentoForm() {
 
   return (
     <AppLayout>
-      <div className="mb-6">
-        <div className="flex items-center gap-3 mb-2">
+      <div className="mb-6 space-y-3">
+        <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => navigate("/cotacoes")}>
             <ArrowLeft className="w-5 h-5" />
           </Button>
-          <div>
-            <h1 className="page-title">{isEdit ? "Editar Cotação" : "Nova Cotação"}</h1>
+          <div className="min-w-0">
+            <h1 className="page-title text-xl md:text-2xl">{isEdit ? "Editar Cotação" : "Nova Cotação"}</h1>
             <p className="text-muted-foreground text-sm mt-0.5">Criação e emissão de proposta comercial</p>
           </div>
         </div>
-        <div className="flex items-center gap-2 ml-12 flex-wrap">
+        <div className="hidden items-center gap-2 md:ml-12 md:flex md:flex-wrap">
           <Button onClick={handleSave} disabled={saving} className="gap-2"><Save className="w-4 h-4" />{saving ? "Salvando..." : "Salvar Rascunho"}</Button>
           <Button variant="outline" onClick={() => setPreviewOpen(true)} className="gap-2"><Eye className="w-4 h-4" />Visualizar</Button>
           <Button variant="secondary" onClick={handleGeneratePdf} className="gap-2"><FileText className="w-4 h-4" />Gerar PDF</Button>
           {isEdit && <Button variant="outline" onClick={handleDuplicate} className="gap-2"><Copy className="w-4 h-4" />Duplicar</Button>}
         </div>
+        {isMobile && (
+          <div className="grid grid-cols-2 gap-3 rounded-2xl border bg-card p-4 shadow-sm">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Cotação</p>
+              <p className="mt-1 font-mono text-sm font-semibold">{numero || '—'}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Total</p>
+              <p className="mt-1 text-base font-semibold">{valorTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Cliente</p>
+              <p className="mt-1 truncate text-sm">{clienteSnapshot.nome_razao_social || 'Selecione um cliente'}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Itens</p>
+              <p className="mt-1 text-sm">{items.filter(i => i.produto_id).length} item(ns)</p>
+            </div>
+          </div>
+        )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
         <div className="lg:col-span-8 space-y-5">
           {/* Dados do Orçamento */}
           <div className="bg-card rounded-xl border shadow-soft p-5">
@@ -328,7 +350,7 @@ export default function OrcamentoForm() {
           </div>
         </div>
 
-        <div className="lg:col-span-4">
+        <div className="hidden lg:col-span-4 lg:block">
           <OrcamentoSidebarSummary
             status={status} numero={numero} clienteNome={clienteSnapshot.nome_razao_social}
             qtdItens={items.filter(i => i.produto_id).length} totalProdutos={totalProdutos}
@@ -338,6 +360,36 @@ export default function OrcamentoForm() {
           />
         </div>
       </div>
+
+
+        {isMobile && (
+          <div className="rounded-2xl border bg-card p-4 shadow-sm lg:hidden">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Resumo</p>
+                <p className="mt-1 text-sm font-semibold">{clienteSnapshot.nome_razao_social || 'Sem cliente selecionado'}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Total</p>
+                <p className="mt-1 text-base font-semibold">{valorTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+              </div>
+            </div>
+            <div className="mt-3 grid grid-cols-3 gap-2 rounded-xl bg-accent/40 p-3 text-center text-xs">
+              <div>
+                <p className="font-semibold text-muted-foreground">Itens</p>
+                <p className="mt-1 text-sm font-semibold text-foreground">{items.filter(i => i.produto_id).length}</p>
+              </div>
+              <div>
+                <p className="font-semibold text-muted-foreground">Qtd.</p>
+                <p className="mt-1 text-sm font-semibold text-foreground">{quantidadeTotal}</p>
+              </div>
+              <div>
+                <p className="font-semibold text-muted-foreground">Peso</p>
+                <p className="mt-1 text-sm font-semibold text-foreground">{pesoTotal.toFixed(2)} kg</p>
+              </div>
+            </div>
+          </div>
+        )}
 
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
         <DialogContent className="max-w-4xl max-h-[95vh] overflow-y-auto p-0">
@@ -361,6 +413,19 @@ export default function OrcamentoForm() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {isMobile && (
+        <div className="fixed inset-x-0 bottom-[4.9rem] z-30 border-t border-border bg-background/95 px-3 py-3 backdrop-blur md:hidden">
+          <div className="grid grid-cols-3 gap-2">
+            <Button variant="outline" onClick={() => setPreviewOpen(true)} className="h-11 rounded-xl text-xs">Preview</Button>
+            <Button variant="secondary" onClick={handleGeneratePdf} className="h-11 rounded-xl text-xs">PDF</Button>
+            <Button onClick={handleSave} disabled={saving} className="h-11 rounded-xl text-xs">
+              {saving ? 'Salvando...' : 'Salvar'}
+            </Button>
+          </div>
+        </div>
+      )}
+
     </AppLayout>
   );
 }

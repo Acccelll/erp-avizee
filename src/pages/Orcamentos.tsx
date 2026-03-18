@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AppLayout } from "@/components/AppLayout";
 import { ModulePage } from "@/components/ModulePage";
@@ -6,6 +6,7 @@ import { DataTable, StatusBadge } from "@/components/DataTable";
 import { ViewDrawer } from "@/components/ViewDrawer";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Copy, ArrowRightCircle, CheckCircle } from "lucide-react";
@@ -25,6 +26,8 @@ const Orcamentos = () => {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selected, setSelected] = useState<Orcamento | null>(null);
   const [convertingId, setConvertingId] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("todos");
 
   const handleDuplicate = async (orc: Orcamento) => {
     try {
@@ -125,6 +128,22 @@ const Orcamentos = () => {
     }
   };
 
+  const filteredData = useMemo(() => {
+    const query = searchTerm.trim().toLowerCase();
+
+    return data.filter((orc) => {
+      if (statusFilter !== "todos" && orc.status !== statusFilter) return false;
+      if (!query) return true;
+
+      const haystack = [orc.numero, orc.clientes?.nome_razao_social, orc.observacoes]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      return haystack.includes(query);
+    });
+  }, [data, searchTerm, statusFilter]);
+
   const statusLabels: Record<string, string> = {
     rascunho: "Rascunho", confirmado: "Confirmada", aprovado: "Aprovada",
     convertido: "Convertida", cancelado: "Cancelada", faturado: "Faturada",
@@ -156,6 +175,7 @@ const Orcamentos = () => {
   ];
 
   const convertingOrc = data.find(o => o.id === convertingId);
+  const statusOptions = ["todos", "rascunho", "confirmado", "aprovado", "convertido", "cancelado", "faturado"];
 
   return (
     <AppLayout>
@@ -164,9 +184,13 @@ const Orcamentos = () => {
         subtitle="Criação e emissão de propostas comerciais"
         addLabel="Nova Cotação"
         onAdd={() => navigate("/cotacoes/novo")}
-        count={data.length}
+        count={filteredData.length}
+        searchValue={searchTerm}
+        onSearchChange={setSearchTerm}
+        searchPlaceholder="Buscar por número da cotação ou cliente..."
+        filters={<Select value={statusFilter} onValueChange={setStatusFilter}><SelectTrigger className="h-9 w-[190px]"><SelectValue placeholder="Status" /></SelectTrigger><SelectContent>{statusOptions.map((status) => (<SelectItem key={status} value={status}>{status === "todos" ? "Todos os status" : statusLabels[status] || status}</SelectItem>))}</SelectContent></Select>}
       >
-        <DataTable columns={columns} data={data} loading={loading}
+        <DataTable columns={columns} data={filteredData} loading={loading}
           onView={(o) => { setSelected(o); setDrawerOpen(true); }}
           onEdit={(o) => navigate(`/cotacoes/${o.id}`)}
           onDelete={(o) => remove(o.id)}

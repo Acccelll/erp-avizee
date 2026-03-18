@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AppLayout } from "@/components/AppLayout";
 import { ModulePage } from "@/components/ModulePage";
@@ -7,6 +7,7 @@ import { ViewDrawer } from "@/components/ViewDrawer";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatCurrency, formatDate, daysSince } from "@/lib/format";
@@ -59,6 +60,9 @@ const OrdensVenda = () => {
   const [selected, setSelected] = useState<OrdemVenda | null>(null);
   const [ovItems, setOvItems] = useState<any[]>([]);
   const [loadingItems, setLoadingItems] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("todos");
+  const [faturamentoFilter, setFaturamentoFilter] = useState<string>("todos");
 
   const handleView = async (ov: OrdemVenda) => {
     setSelected(ov);
@@ -84,6 +88,23 @@ const OrdensVenda = () => {
       toast.error(`Erro: ${err.message}`);
     }
   };
+
+  const filteredData = useMemo(() => {
+    const query = searchTerm.trim().toLowerCase();
+
+    return data.filter((ov) => {
+      if (statusFilter !== "todos" && ov.status !== statusFilter) return false;
+      if (faturamentoFilter !== "todos" && ov.status_faturamento !== faturamentoFilter) return false;
+      if (!query) return true;
+
+      const haystack = [ov.numero, ov.clientes?.nome_razao_social, ov.orcamentos?.numero, ov.observacoes]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      return haystack.includes(query);
+    });
+  }, [data, faturamentoFilter, searchTerm, statusFilter]);
 
   const columns = [
     { key: "numero", label: "Nº OV", render: (o: OrdemVenda) => <span className="mono text-xs font-medium text-primary">{o.numero}</span> },
@@ -123,11 +144,15 @@ const OrdensVenda = () => {
       <ModulePage
         title="Ordens de Venda"
         subtitle="Gestão de pedidos comerciais e faturamento"
-        count={data.length}
+        count={filteredData.length}
+        searchValue={searchTerm}
+        onSearchChange={setSearchTerm}
+        searchPlaceholder="Buscar por OV, cliente ou cotação..."
+        filters={<><Select value={statusFilter} onValueChange={setStatusFilter}><SelectTrigger className="h-9 w-[180px]"><SelectValue placeholder="Status comercial" /></SelectTrigger><SelectContent><SelectItem value="todos">Todos os status</SelectItem>{Object.entries(statusComercialLabels).map(([value, label]) => (<SelectItem key={value} value={value}>{label}</SelectItem>))}</SelectContent></Select><Select value={faturamentoFilter} onValueChange={setFaturamentoFilter}><SelectTrigger className="h-9 w-[190px]"><SelectValue placeholder="Faturamento" /></SelectTrigger><SelectContent><SelectItem value="todos">Todo faturamento</SelectItem>{Object.entries(statusFaturamentoLabels).map(([value, label]) => (<SelectItem key={value} value={value}>{label}</SelectItem>))}</SelectContent></Select></>}
       >
         <DataTable
           columns={columns}
-          data={data}
+          data={filteredData}
           loading={loading}
           onView={handleView}
           onDelete={(o) => remove(o.id)}

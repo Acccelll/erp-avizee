@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
 import { AppLayout } from "@/components/AppLayout";
 import { ModulePage } from "@/components/ModulePage";
 import { DataTable, StatusBadge } from "@/components/DataTable";
@@ -10,11 +11,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { formatNumber, formatDate, formatCurrency } from "@/lib/format";
+import { formatNumber, formatCurrency } from "@/lib/format";
 import { Calendar, Package, AlertTriangle, Lock } from "lucide-react";
 
 interface Movimento {
@@ -34,7 +35,7 @@ interface PosicaoEstoque {
 }
 
 const Estoque = () => {
-  const { data, loading, create, fetchData } = useSupabaseCrud<Movimento>({
+  const { data, loading, create } = useSupabaseCrud<Movimento>({
     table: "estoque_movimentos", select: "*, produtos(nome, sku)", hasAtivo: false,
   });
   const produtosCrud = useSupabaseCrud<any>({ table: "produtos" });
@@ -44,6 +45,13 @@ const Estoque = () => {
   const [form, setForm] = useState({ produto_id: "", tipo: "entrada", quantidade: 0, motivo: "" });
   const [saving, setSaving] = useState(false);
   const [filterTipo, setFilterTipo] = useState("todos");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const viewParam = searchParams.get("view") || "movimentacoes";
+  const [activeTab, setActiveTab] = useState(viewParam);
+
+  useEffect(() => {
+    if (viewParam !== activeTab) setActiveTab(viewParam);
+  }, [activeTab, viewParam]);
 
   // Date filters
   const [dataInicio, setDataInicio] = useState("");
@@ -177,7 +185,7 @@ const Estoque = () => {
       <div><span className="font-medium">{(m as any).produtos?.nome || "—"}</span><br/><span className="text-xs text-muted-foreground font-mono">{(m as any).produtos?.sku}</span></div>
     )},
     { key: "tipo", label: "Tipo", render: (m: Movimento) => (
-      <StatusBadge status={m.tipo === "entrada" ? "Confirmado" : m.tipo === "saida" ? "Cancelado" : "Pendente"} />
+      <StatusBadge status={m.tipo === "entrada" ? "confirmado" : m.tipo === "saida" ? "cancelado" : "pendente"} label={m.tipo === "entrada" ? "Entrada" : m.tipo === "saida" ? "Saída" : "Ajuste"} />
     )},
     { key: "quantidade", label: "Qtd", render: (m: Movimento) => (
       <span className={`font-mono font-semibold ${m.tipo === "saida" ? "text-destructive" : "text-success"}`}>{m.tipo === "saida" ? "-" : "+"}{m.quantidade}</span>
@@ -204,9 +212,26 @@ const Estoque = () => {
     )},
   ];
 
+  const subtitleMap: Record<string, string> = {
+    movimentacoes: "Entradas, saídas e ajustes com rastreabilidade por origem.",
+    posicao: "Consulta de posição histórica do estoque por data de referência.",
+    fechamento: "Fechamento mensal do estoque com visão de quantidade e custo.",
+  };
+
+  const displayCount = activeTab === "movimentacoes" ? filteredData.length : activeTab === "posicao" ? posicaoData.length : fechamentoData.length;
+
+  const handleTabChange = (nextTab: string) => {
+    setActiveTab(nextTab);
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      next.set("view", nextTab);
+      return next;
+    });
+  };
+
   return (
     <AppLayout>
-      <ModulePage title="Estoque" subtitle="Movimentações e rastreabilidade" addLabel="Nova Movimentação" onAdd={() => setModalOpen(true)} count={filteredData.length}>
+      <ModulePage title="Estoque" subtitle={subtitleMap[activeTab] || subtitleMap.movimentacoes} addLabel="Nova Movimentação" onAdd={() => setModalOpen(true)} count={displayCount}>
 
         {/* Alert: Low Stock */}
         {abaixoMinimo.length > 0 && (
@@ -227,7 +252,7 @@ const Estoque = () => {
           </Card>
         )}
 
-        <Tabs defaultValue="movimentacoes" className="space-y-4">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
           <TabsList>
             <TabsTrigger value="movimentacoes">Movimentações</TabsTrigger>
             <TabsTrigger value="posicao">Posição por Data</TabsTrigger>

@@ -1,34 +1,19 @@
-# .github/workflows/ci.yml
 name: CI
 
 on:
   push:
     branches:
       - main
-      - develop
-      - "feat/**"
+      - feat/**
+      - fix/**
   pull_request:
-    branches:
-      - main
-      - develop
-  workflow_dispatch:
-
-permissions:
-  contents: read
-
-concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
 
 jobs:
   test-and-build:
-    name: Test and Build
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -40,7 +25,7 @@ jobs:
         run: npm install
 
       - name: Run tests
-        run: npm run test -- --run
+        run: npm run test
 
-      - name: Build
+      - name: Build project
         run: npm run build

@@ -1,0 +1,301 @@
+import {
+  BarChart3,
+  Building2,
+  ClipboardList,
+  DollarSign,
+  FileSearch,
+  FileText,
+  Landmark,
+  LayoutDashboard,
+  LucideIcon,
+  Package,
+  Receipt,
+  Settings,
+  ShoppingCart,
+  Truck,
+  Users,
+  Wallet,
+  Warehouse,
+} from 'lucide-react';
+
+export interface NavLeafItem {
+  title: string;
+  path: string;
+  keywords?: string[];
+}
+
+export interface NavSubgroup {
+  title: string;
+  items: NavLeafItem[];
+}
+
+export interface NavSection {
+  key: string;
+  title: string;
+  icon: LucideIcon;
+  items: NavSubgroup[];
+}
+
+export interface QuickAction {
+  id: string;
+  title: string;
+  description: string;
+  path: string;
+  shortcut?: string;
+}
+
+export interface MobileBottomTab {
+  key: string;
+  title: string;
+  icon: LucideIcon;
+  path?: string;
+}
+
+export const dashboardItem: NavLeafItem = {
+  title: 'Dashboard',
+  path: '/',
+  keywords: ['inicio', 'painel', 'visao geral'],
+};
+
+export const quickActions: QuickAction[] = [
+  {
+    id: 'nova-cotacao',
+    title: 'Nova Cotação',
+    description: 'Criar proposta comercial',
+    path: '/cotacoes/novo',
+    shortcut: '⌘N',
+  },
+  {
+    id: 'novo-cliente',
+    title: 'Novo Cliente',
+    description: 'Cadastrar cliente rapidamente',
+    path: '/clientes',
+  },
+  {
+    id: 'novo-produto',
+    title: 'Novo Produto',
+    description: 'Abrir cadastro de produto',
+    path: '/produtos',
+  },
+  {
+    id: 'abrir-financeiro',
+    title: 'Contas a Receber',
+    description: 'Ir para o financeiro filtrado',
+    path: '/financeiro?tipo=receber',
+  },
+];
+
+export const navSections: NavSection[] = [
+  {
+    key: 'operacional',
+    title: 'Operacional',
+    icon: Package,
+    items: [
+      {
+        title: 'Vendas',
+        items: [
+          { title: 'Cotações', path: '/cotacoes', keywords: ['orcamentos', 'propostas'] },
+          { title: 'Pedidos', path: '/pedidos', keywords: ['pipeline', 'pedidos comerciais'] },
+          { title: 'Ordens de Venda', path: '/ordens-venda', keywords: ['ov', 'backlog'] },
+        ],
+      },
+      {
+        title: 'Compras',
+        items: [
+          { title: 'Cotações de Compra', path: '/compras?view=cotacoes', keywords: ['compra', 'solicitacoes', 'negociacao'] },
+          { title: 'Pedidos de Compra', path: '/compras', keywords: ['compras', 'fornecedores'] },
+        ],
+      },
+      {
+        title: 'Estoque',
+        items: [
+          { title: 'Produtos', path: '/produtos', keywords: ['cadastro de produtos'] },
+          { title: 'Movimentações', path: '/estoque?view=movimentacoes', keywords: ['entradas', 'saidas', 'inventario'] },
+        ],
+      },
+    ],
+  },
+  {
+    key: 'cadastros',
+    title: 'Cadastros',
+    icon: Users,
+    items: [
+      {
+        title: 'Base cadastral',
+        items: [
+          { title: 'Clientes', path: '/clientes' },
+          { title: 'Fornecedores', path: '/fornecedores' },
+          { title: 'Grupos Econômicos', path: '/grupos-economicos', keywords: ['matriz', 'filiais'] },
+          { title: 'Produtos', path: '/produtos', keywords: ['sku', 'catalogo'] },
+        ],
+      },
+    ],
+  },
+  {
+    key: 'financeiro',
+    title: 'Financeiro',
+    icon: DollarSign,
+    items: [
+      {
+        title: 'Execução financeira',
+        items: [
+          { title: 'Contas a Pagar', path: '/financeiro?tipo=pagar', keywords: ['cp', 'despesas'] },
+          { title: 'Contas a Receber', path: '/financeiro?tipo=receber', keywords: ['cr', 'recebimentos'] },
+          { title: 'Contas Bancárias', path: '/contas-bancarias', keywords: ['bancos', 'inter', 'c6', 'recargapay'] },
+          { title: 'Fluxo de Caixa', path: '/fluxo-caixa' },
+          { title: 'Caixa', path: '/caixa' },
+          { title: 'Plano de Contas', path: '/contas-contabeis-plano', keywords: ['contabil', 'contas contabeis'] },
+        ],
+      },
+    ],
+  },
+  {
+    key: 'fiscal',
+    title: 'Fiscal',
+    icon: Receipt,
+    items: [
+      {
+        title: 'Documentos fiscais',
+        items: [
+          { title: 'Notas de Entrada', path: '/fiscal?tipo=entrada' },
+          { title: 'Notas de Saída', path: '/fiscal?tipo=saida' },
+          { title: 'Consultar NF-e', path: '/fiscal?view=consulta', keywords: ['sefaz', 'chave', 'nfe'] },
+        ],
+      },
+    ],
+  },
+  {
+    key: 'relatorios',
+    title: 'Relatórios',
+    icon: BarChart3,
+    items: [
+      {
+        title: 'Análises',
+        items: [
+          { title: 'Vendas', path: '/relatorios?tipo=vendas' },
+          { title: 'Estoque', path: '/relatorios?tipo=estoque' },
+          { title: 'Financeiro', path: '/relatorios?tipo=financeiro' },
+          { title: 'Compras por Fornecedor', path: '/relatorios?tipo=compras' },
+          { title: 'Fluxo de Caixa', path: '/relatorios?tipo=fluxo_caixa' },
+        ],
+      },
+    ],
+  },
+  {
+    key: 'administracao',
+    title: 'Administração',
+    icon: Settings,
+    items: [
+      {
+        title: 'Parâmetros',
+        items: [
+          { title: 'Usuários', path: '/configuracoes?tab=usuarios' },
+          { title: 'Permissões', path: '/configuracoes?tab=usuarios' },
+          { title: 'Empresa', path: '/configuracoes?tab=geral' },
+          { title: 'E-mails', path: '/configuracoes?tab=email' },
+          { title: 'Aparência', path: '/configuracoes?tab=aparencia' },
+        ],
+      },
+    ],
+  },
+];
+
+export const mobileBottomTabs: MobileBottomTab[] = [
+  { key: 'inicio', title: 'Início', icon: LayoutDashboard, path: '/' },
+  { key: 'operacional', title: 'Operações', icon: Package, path: '/cotacoes' },
+  { key: 'cadastros', title: 'Cadastros', icon: Users, path: '/clientes' },
+  { key: 'financeiro', title: 'Financeiro', icon: DollarSign, path: '/financeiro?tipo=receber' },
+];
+
+export const mobileMenuSections = navSections.filter((section) => ['fiscal', 'relatorios', 'administracao'].includes(section.key));
+
+export const headerIcons: Record<string, LucideIcon> = {
+  '/': LayoutDashboard,
+  '/cotacoes': FileText,
+  '/orcamentos': FileText,
+  '/pedidos': ClipboardList,
+  '/ordens-venda': ShoppingCart,
+  '/compras': ShoppingCart,
+  '/produtos': Package,
+  '/estoque': Warehouse,
+  '/clientes': Users,
+  '/fornecedores': Truck,
+  '/grupos-economicos': Building2,
+  '/financeiro': Wallet,
+  '/contas-bancarias': Landmark,
+  '/fluxo-caixa': DollarSign,
+  '/caixa': DollarSign,
+  '/contas-contabeis-plano': FileSearch,
+  '/fiscal': Receipt,
+  '/relatorios': BarChart3,
+  '/configuracoes': Settings,
+};
+
+const baseRouteLabels: Record<string, string> = {
+  '/': 'Dashboard',
+  '/cotacoes': 'Cotações',
+  '/orcamentos': 'Cotações',
+  '/pedidos': 'Pedidos',
+  '/ordens-venda': 'Ordens de Venda',
+  '/compras': 'Compras',
+  '/produtos': 'Produtos',
+  '/estoque': 'Estoque',
+  '/clientes': 'Clientes',
+  '/fornecedores': 'Fornecedores',
+  '/grupos-economicos': 'Grupos Econômicos',
+  '/financeiro': 'Financeiro',
+  '/contas-bancarias': 'Contas Bancárias',
+  '/fluxo-caixa': 'Fluxo de Caixa',
+  '/caixa': 'Caixa',
+  '/contas-contabeis-plano': 'Plano de Contas',
+  '/fiscal': 'Fiscal',
+  '/relatorios': 'Relatórios',
+  '/configuracoes': 'Configurações',
+};
+
+export const flatNavItems = [
+  dashboardItem,
+  ...navSections.flatMap((section) =>
+    section.items.flatMap((group) =>
+      group.items.map((item) => ({
+        ...item,
+        section: section.title,
+        subgroup: group.title,
+      })),
+    ),
+  ),
+];
+
+export function isPathActive(currentPath: string, targetPath: string) {
+  const cleanTarget = targetPath.split('?')[0];
+  if (cleanTarget === '/') return currentPath === '/';
+  return currentPath === cleanTarget || currentPath.startsWith(`${cleanTarget}/`);
+}
+
+export function getRouteLabel(pathname: string) {
+  if (baseRouteLabels[pathname]) return baseRouteLabels[pathname];
+
+  const exactMatch = flatNavItems.find((item) => item.path === pathname);
+  if (exactMatch) return exactMatch.title;
+
+  const match = flatNavItems.find((item) => item.path.split('?')[0] === pathname);
+  if (match) return match.title;
+
+  if (pathname.startsWith('/orcamentos/')) return 'Cotação';
+  if (pathname.startsWith('/cotacoes/')) return 'Cotação';
+  if (pathname.startsWith('/clientes/')) return 'Cliente';
+  if (pathname.startsWith('/produtos/')) return 'Produto';
+  if (pathname.startsWith('/fiscal')) return 'Fiscal';
+  return 'ERP AviZee';
+}
+
+export function getNavSectionKey(currentRoute: string) {
+  if (currentRoute === '/' || currentRoute.startsWith('/?')) return 'inicio';
+
+  const pathname = currentRoute.split('?')[0];
+  const section = navSections.find((entry) =>
+    entry.items.some((group) => group.items.some((item) => pathname === item.path.split('?')[0] || pathname.startsWith(`${item.path.split('?')[0]}/`))),
+  );
+
+  return section?.key ?? 'menu';
+}

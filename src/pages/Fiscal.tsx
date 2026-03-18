@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { AppLayout } from "@/components/AppLayout";
 import { ModulePage } from "@/components/ModulePage";
 import { DataTable, StatusBadge } from "@/components/DataTable";
@@ -52,6 +53,8 @@ const Fiscal = () => {
   const [saving, setSaving] = useState(false);
   const [parcelas, setParcelas] = useState(1);
   const [viewItems, setViewItems] = useState<any[]>([]);
+  const [searchParams] = useSearchParams();
+  const [consultaSearch, setConsultaSearch] = useState("");
 
   const valorProdutos = items.reduce((s, i) => s + (i.valor_total || 0), 0);
 
@@ -248,6 +251,34 @@ const Fiscal = () => {
     setSaving(false);
   };
 
+
+  const tipoParam = searchParams.get("tipo");
+  const viewParam = searchParams.get("view");
+  const filteredData = useMemo(() => {
+    const query = consultaSearch.trim().toLowerCase();
+
+    return data.filter((n) => {
+      if (tipoParam && n.tipo !== tipoParam) return false;
+      if (viewParam !== "consulta" || !query) return true;
+
+      const parceiro = n.tipo === "entrada" ? n.fornecedores?.nome_razao_social : n.clientes?.nome_razao_social;
+      const haystack = [n.numero, n.serie, n.chave_acesso, parceiro, n.ordens_venda?.numero]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      return haystack.includes(query);
+    });
+  }, [consultaSearch, data, tipoParam, viewParam]);
+
+  const fiscalSubtitle = viewParam === "consulta"
+    ? "Consulta rápida de documentos fiscais e chaves de acesso"
+    : tipoParam === "entrada"
+      ? "Notas fiscais de entrada e documentos de recebimento"
+      : tipoParam === "saida"
+        ? "Notas fiscais de saída e faturamento"
+        : "Notas fiscais, faturas e documentos";
+
   const columns = [
     { key: "tipo", label: "Tipo", render: (n: NotaFiscal) => n.tipo === "entrada" ? "Entrada" : "Saída" },
     { key: "numero", label: "Número", render: (n: NotaFiscal) => <span className="font-mono text-xs font-medium text-primary">{n.numero}</span> },
@@ -265,8 +296,12 @@ const Fiscal = () => {
 
   return (
     <AppLayout>
-      <ModulePage title="Fiscal" subtitle="Notas fiscais, faturas e documentos" addLabel="Nova NF" onAdd={openCreate} count={data.length}>
-        <DataTable columns={columns} data={data} loading={loading}
+      <ModulePage title="Fiscal" subtitle={fiscalSubtitle} addLabel="Nova NF" onAdd={openCreate} count={filteredData.length}
+        searchValue={viewParam === "consulta" ? consultaSearch : undefined}
+        onSearchChange={viewParam === "consulta" ? setConsultaSearch : undefined}
+        searchPlaceholder="Buscar por número, chave ou parceiro..."
+      >
+        <DataTable columns={columns} data={filteredData} loading={loading}
           onView={openView} onEdit={openEdit} onDelete={(n) => remove(n.id)} />
       </ModulePage>
 

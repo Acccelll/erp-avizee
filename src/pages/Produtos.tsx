@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AppLayout } from "@/components/AppLayout";
 import { ModulePage } from "@/components/ModulePage";
 import { DataTable, StatusBadge } from "@/components/DataTable";
@@ -52,6 +52,9 @@ const Produtos = () => {
   // Composition editing state
   const [editComposicao, setEditComposicao] = useState<ComposicaoItem[]>([]);
   const [margemLucro, setMargemLucro] = useState(0);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [tipoFilter, setTipoFilter] = useState<"todos" | "simples" | "composto">("todos");
+  const [estoqueFilter, setEstoqueFilter] = useState<"todos" | "baixo" | "ok">("todos");
 
   // All products for composition picker (exclude self)
   const produtosDisponiveis = data.filter(p => !selected || p.id !== selected.id);
@@ -207,6 +210,29 @@ const Produtos = () => {
     toast.success(`Custo recalculado: ${formatCurrency(custo)}`);
   };
 
+  const filteredData = useMemo(() => {
+    const query = searchTerm.trim().toLowerCase();
+
+    return data.filter((p) => {
+      const isComposto = Boolean(p.eh_composto);
+      const baixoEstoque = Number(p.estoque_minimo || 0) > 0 && Number(p.estoque_atual || 0) <= Number(p.estoque_minimo || 0);
+
+      if (tipoFilter === "composto" && !isComposto) return false;
+      if (tipoFilter === "simples" && isComposto) return false;
+      if (estoqueFilter === "baixo" && !baixoEstoque) return false;
+      if (estoqueFilter === "ok" && baixoEstoque) return false;
+
+      if (!query) return true;
+
+      const haystack = [p.nome, p.sku, p.codigo_interno, p.descricao, p.ncm]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      return haystack.includes(query);
+    });
+  }, [data, estoqueFilter, searchTerm, tipoFilter]);
+
   const columns = [
     { key: "sku", label: "SKU", render: (p: Produto) => <span className="font-mono text-xs font-medium text-primary">{p.sku || "—"}</span> },
     { key: "nome", label: "Nome" },
@@ -227,8 +253,11 @@ const Produtos = () => {
 
   return (
     <AppLayout>
-      <ModulePage title="Produtos" subtitle="Cadastro e gestão de produtos" addLabel="Novo Produto" onAdd={openCreate} count={data.length}>
-        <DataTable columns={columns} data={data} loading={loading}
+      <ModulePage title="Produtos" subtitle="Cadastro e gestão de produtos" addLabel="Novo Produto" onAdd={openCreate} count={filteredData.length}
+        searchValue={searchTerm} onSearchChange={setSearchTerm} searchPlaceholder="Buscar por nome, SKU ou código..."
+        filters={<><Select value={tipoFilter} onValueChange={(v: any) => setTipoFilter(v)}><SelectTrigger className="h-9 w-[170px]"><SelectValue placeholder="Tipo" /></SelectTrigger><SelectContent><SelectItem value="todos">Todos os tipos</SelectItem><SelectItem value="simples">Somente simples</SelectItem><SelectItem value="composto">Somente compostos</SelectItem></SelectContent></Select><Select value={estoqueFilter} onValueChange={(v: any) => setEstoqueFilter(v)}><SelectTrigger className="h-9 w-[190px]"><SelectValue placeholder="Estoque" /></SelectTrigger><SelectContent><SelectItem value="todos">Todo o estoque</SelectItem><SelectItem value="baixo">Abaixo do mínimo</SelectItem><SelectItem value="ok">Estoque normal</SelectItem></SelectContent></Select></>}
+      >
+        <DataTable columns={columns} data={filteredData} loading={loading}
           onView={openView} onEdit={openEdit} onDelete={(p) => remove(p.id)} onDuplicate={(p) => duplicate(p)} />
       </ModulePage>
 

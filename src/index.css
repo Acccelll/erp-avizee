@@ -205,3 +205,22 @@
     letter-spacing: 0.03em;
   }
 }
+
+
+@media (max-width: 767px) {
+  body {
+    font-size: 14px;
+  }
+
+  button, [role="button"], a {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .page-title {
+    @apply text-xl;
+  }
+
+  .stat-card {
+    @apply p-4;
+  }
+}

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { AppLayout } from "@/components/AppLayout";
 import { ModulePage } from "@/components/ModulePage";
 import { DataTable, StatusBadge } from "@/components/DataTable";
@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MaskedInput } from "@/components/ui/MaskedInput";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -37,6 +38,8 @@ const Fornecedores = () => {
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [comprasHist, setComprasHist] = useState<any[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [tipoFilter, setTipoFilter] = useState<"todos" | "F" | "J">("todos");
 
   const openCreate = () => { setMode("create"); setForm({...emptyForm}); setSelected(null); setModalOpen(true); };
   const openEdit = (f: Fornecedor) => {
@@ -87,6 +90,22 @@ const Fornecedores = () => {
     return { prazoMedio: Math.round(totalDias / delivered.length), atrasoMedio: Math.round(totalAtraso / delivered.length) };
   })();
 
+  const filteredData = useMemo(() => {
+    const query = searchTerm.trim().toLowerCase();
+
+    return data.filter((fornecedor) => {
+      if (tipoFilter !== "todos" && fornecedor.tipo_pessoa !== tipoFilter) return false;
+      if (!query) return true;
+
+      const haystack = [fornecedor.nome_razao_social, fornecedor.nome_fantasia, fornecedor.cpf_cnpj, fornecedor.email, fornecedor.cidade, fornecedor.uf, fornecedor.telefone, fornecedor.contato]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      return haystack.includes(query);
+    });
+  }, [data, searchTerm, tipoFilter]);
+
   const columns = [
     { key: "nome_razao_social", label: "Razão Social" },
     { key: "cpf_cnpj", label: "CNPJ", render: (f: Fornecedor) => <span className="font-mono text-xs">{f.cpf_cnpj || "—"}</span> },
@@ -98,8 +117,11 @@ const Fornecedores = () => {
 
   return (
     <AppLayout>
-      <ModulePage title="Fornecedores" subtitle="Cadastro e gestão de fornecedores" addLabel="Novo Fornecedor" onAdd={openCreate} count={data.length}>
-        <DataTable columns={columns} data={data} loading={loading}
+      <ModulePage title="Fornecedores" subtitle="Cadastro e gestão de fornecedores" addLabel="Novo Fornecedor" onAdd={openCreate} count={filteredData.length}
+        searchValue={searchTerm} onSearchChange={setSearchTerm} searchPlaceholder="Buscar por razão social, CNPJ ou cidade..."
+        filters={<Select value={tipoFilter} onValueChange={(v: any) => setTipoFilter(v)}><SelectTrigger className="h-9 w-[170px]"><SelectValue placeholder="Tipo" /></SelectTrigger><SelectContent><SelectItem value="todos">Todos os tipos</SelectItem><SelectItem value="J">Pessoa jurídica</SelectItem><SelectItem value="F">Pessoa física</SelectItem></SelectContent></Select>}
+      >
+        <DataTable columns={columns} data={filteredData} loading={loading}
           onView={openView} onEdit={openEdit} onDelete={(f) => remove(f.id)} onDuplicate={(f) => duplicate(f)} />
       </ModulePage>
 

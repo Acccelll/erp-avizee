@@ -115,8 +115,21 @@ const Financeiro = () => {
     setSaving(false);
   };
 
-  const filteredData = data.filter(l => {
-    if (filterStatus !== "todos" && l.status !== filterStatus) return false;
+  const getEffectiveStatus = (lancamento: Lancamento) => {
+    const status = (lancamento.status || "").toLowerCase();
+    if (status === "aberto" && lancamento.data_vencimento) {
+      const hoje = new Date();
+      hoje.setHours(0, 0, 0, 0);
+      const vencimento = new Date(lancamento.data_vencimento);
+      vencimento.setHours(0, 0, 0, 0);
+      if (vencimento < hoje) return "vencido";
+    }
+    return status || "aberto";
+  };
+
+  const filteredData = data.filter((l) => {
+    const effectiveStatus = getEffectiveStatus(l);
+    if (filterStatus !== "todos" && effectiveStatus !== filterStatus) return false;
     if (filterTipo !== "todos" && l.tipo !== filterTipo) return false;
     if (filterBanco !== "todos" && l.conta_bancaria_id !== filterBanco) return false;
     return true;
@@ -139,7 +152,7 @@ const Financeiro = () => {
       return <span className="text-xs">{l.contas_bancarias.bancos?.nome} - {l.contas_bancarias.descricao}</span>;
     }},
     { key: "forma_pagamento", label: "Forma", render: (l: Lancamento) => l.forma_pagamento || "—" },
-    { key: "status", label: "Status", render: (l: Lancamento) => <StatusBadge status={l.status} /> },
+    { key: "status", label: "Status", render: (l: Lancamento) => <StatusBadge status={getEffectiveStatus(l)} /> },
   ];
 
   return (
