@@ -89,7 +89,7 @@ export default function Login() {
               Esqueceu a senha?
             </Link>
           </div>
-          <Button type="submit" className="w-full gap-2" disabled={loading || !isSupabaseConfigured}>
+          <Button type="submit" className="w-full gap-2" disabled={loading} || !isSupabaseConfigured}>
             <LogIn className="w-4 h-4" />
             {loading ? "Entrando..." : "Entrar"}
           </Button>
