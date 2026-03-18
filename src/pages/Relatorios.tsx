@@ -131,7 +131,7 @@ export default function Relatorios() {
             <Card>
               <CardHeader>
                 <CardTitle>Resumo visual</CardTitle>
-                <CardDescription>{resultado.chartTitle || 'Tendência resumida do relatório selecionado.'}</CardDescription>
+                <CardDescription>{'Tendência resumida do relatório selecionado.'}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="h-64">
