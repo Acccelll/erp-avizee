@@ -219,7 +219,7 @@ export function exportarCsv(title: string, rows: Record<string, unknown>[]) {
 function formatCsvValue(value: unknown) {
   if (typeof value === "number") return value.toString().replace(".", ",");
   if (value == null) return "";
-  return `"${String(value).replaceAll('"', '""')}"`;
+  return `"${String(value).split('"').join('""')}"`;
 }
 
 export function formatCellValue(value: unknown, key: string) {

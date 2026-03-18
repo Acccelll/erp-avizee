@@ -56,7 +56,7 @@ export default function Relatorios() {
     return Object.keys(resultado.rows[0]).map((key) => ({
       key,
       label: key.replace(/([A-Z])/g, ' $1').replace(/^./, (char) => char.toUpperCase()),
-      render: (item: Record<string, unknown>) => formatCellValue(item[key], key),
+      render: (item: Record<string, unknown>): React.ReactNode => formatCellValue(item[key], key) as React.ReactNode,
     }));
   }, [resultado.rows]);
 
@@ -131,7 +131,7 @@ export default function Relatorios() {
             <Card>
               <CardHeader>
                 <CardTitle>Resumo visual</CardTitle>
-                <CardDescription>{resultado.chartTitle || 'Tendência resumida do relatório selecionado.'}</CardDescription>
+                <CardDescription>{'Tendência resumida do relatório selecionado.'}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="h-64">
@@ -149,7 +149,7 @@ export default function Relatorios() {
                   {(resultado.chartData || []).slice(0, 6).map((item) => (
                     <div key={`${item.name}-${item.value}`} className="rounded-lg border p-3">
                       <p className="text-sm font-medium">{item.name}</p>
-                      <p className="text-sm text-muted-foreground">{formatCellValue(item.value, 'valor')}</p>
+                      <p className="text-sm text-muted-foreground">{formatCellValue(item.value, 'valor') as React.ReactNode}</p>
                     </div>
                   ))}
                   {!resultado.chartData?.length && (
