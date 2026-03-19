@@ -2,9 +2,10 @@ import { Button } from '@/components/ui/button';
 import { Calendar } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-export type Period = '7d' | '15d' | '30d' | '90d' | 'year';
+export type Period = '7d' | '15d' | '30d' | '90d' | 'year' | 'hoje' | 'vencidos';
 
 const periods: { value: Period; label: string }[] = [
+  { value: 'hoje', label: 'Hoje' },
   { value: '7d', label: '7 dias' },
   { value: '15d', label: '15 dias' },
   { value: '30d', label: '30 dias' },
@@ -12,16 +13,28 @@ const periods: { value: Period; label: string }[] = [
   { value: 'year', label: 'Este ano' },
 ];
 
+/** Extended version with overdue option for financial contexts */
+export const financialPeriods: { value: Period; label: string }[] = [
+  { value: 'hoje', label: 'Hoje' },
+  { value: '7d', label: '7 dias' },
+  { value: '15d', label: '15 dias' },
+  { value: '30d', label: '30 dias' },
+  { value: '90d', label: '90 dias' },
+  { value: 'vencidos', label: 'Vencidos' },
+];
+
 interface PeriodFilterProps {
   value: Period;
   onChange: (period: Period) => void;
+  options?: { value: Period; label: string }[];
 }
 
-export function PeriodFilter({ value, onChange }: PeriodFilterProps) {
+export function PeriodFilter({ value, onChange, options }: PeriodFilterProps) {
+  const items = options || periods;
   return (
     <div className="flex items-center gap-2 flex-wrap">
       <Calendar className="h-4 w-4 text-muted-foreground" />
-      {periods.map((p) => (
+      {items.map((p) => (
         <Button
           key={p.value}
           variant={value === p.value ? 'default' : 'outline'}
