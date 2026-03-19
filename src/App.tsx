@@ -26,6 +26,7 @@ import Login from "./pages/Login";
 import Pedidos from "./pages/Pedidos";
 import Relatorios from "./pages/Relatorios";
 import Configuracoes from "./pages/Configuracoes";
+import Administracao from "./pages/Administracao";
 import Auditoria from "./pages/Auditoria";
 import Perfil from "./pages/Perfil";
 import Signup from "./pages/Signup";
