@@ -136,8 +136,7 @@ export const navSections: NavSection[] = [
       {
         title: 'Execução financeira',
         items: [
-          { title: 'Contas a Pagar', path: '/financeiro?tipo=pagar', keywords: ['cp', 'despesas'] },
-          { title: 'Contas a Receber', path: '/financeiro?tipo=receber', keywords: ['cr', 'recebimentos'] },
+          { title: 'Contas a Pagar/Receber', path: '/financeiro', keywords: ['cp', 'cr', 'despesas', 'recebimentos'] },
           { title: 'Caixa', path: '/caixa' },
           { title: 'Fluxo de Caixa', path: '/fluxo-caixa' },
           { title: 'Contas Bancárias', path: '/contas-bancarias', keywords: ['bancos'] },

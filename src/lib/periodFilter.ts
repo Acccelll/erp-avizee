@@ -9,6 +9,9 @@ export function periodToDateFrom(period: Period): string {
   let d: Date;
 
   switch (period) {
+    case 'hoje':
+      d = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      break;
     case '7d':
       d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7);
       break;
@@ -24,13 +27,27 @@ export function periodToDateFrom(period: Period): string {
     case 'year':
       d = new Date(now.getFullYear(), 0, 1);
       break;
+    case 'vencidos':
+      // For overdue, we return a very old date so all records are included
+      d = new Date(2000, 0, 1);
+      break;
     default:
       d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30);
   }
 
-  // Return YYYY-MM-DD format for correct comparison with Supabase date columns
   const yyyy = d.getFullYear();
   const mm = String(d.getMonth() + 1).padStart(2, '0');
   const dd = String(d.getDate()).padStart(2, '0');
   return `${yyyy}-${mm}-${dd}`;
+}
+
+export function periodToDateTo(period: Period): string | null {
+  if (period === 'hoje') {
+    const now = new Date();
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const dd = String(now.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  }
+  return null;
 }
