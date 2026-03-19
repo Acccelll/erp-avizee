@@ -26,6 +26,7 @@ import Login from "./pages/Login";
 import Pedidos from "./pages/Pedidos";
 import Relatorios from "./pages/Relatorios";
 import Configuracoes from "./pages/Configuracoes";
+import Administracao from "./pages/Administracao";
 import Auditoria from "./pages/Auditoria";
 import Perfil from "./pages/Perfil";
 import Signup from "./pages/Signup";
@@ -76,7 +77,8 @@ const App = () => (
             <Route path="/fluxo-caixa" element={<ProtectedRoute><FluxoCaixa /></ProtectedRoute>} />
             <Route path="/caixa" element={<ProtectedRoute><Caixa /></ProtectedRoute>} />
             <Route path="/relatorios" element={<ProtectedRoute><Relatorios /></ProtectedRoute>} />
-            <Route path="/configuracoes" element={<AdminRoute><Configuracoes /></AdminRoute>} />
+            <Route path="/configuracoes" element={<ProtectedRoute><Configuracoes /></ProtectedRoute>} />
+            <Route path="/administracao" element={<AdminRoute><Administracao /></AdminRoute>} />
             <Route path="/auditoria" element={<AdminRoute><Auditoria /></AdminRoute>} />
             <Route path="/perfil" element={<ProtectedRoute><Perfil /></ProtectedRoute>} />
             <Route path="/contas-contabeis-plano" element={<ProtectedRoute><ContasContabeis /></ProtectedRoute>} />

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, Moon, Plus, Search, Sun, User } from 'lucide-react';
+import { ArrowLeft, Moon, Plus, Search, Settings, Sun, User } from 'lucide-react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTheme } from 'next-themes';
 import { Button } from '@/components/ui/button';
@@ -124,6 +124,9 @@ export function AppHeader({ onOpenMobileMenu: _onOpenMobileMenu, searchRequest =
                     <DropdownMenuItem onClick={() => navigate('/perfil')}>
                       <User className="mr-2 h-4 w-4" /> Meu perfil
                     </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => navigate('/configuracoes')}>
+                      <Settings className="mr-2 h-4 w-4" /> Configurações
+                    </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
                       {theme === 'dark' ? <Sun className="mr-2 h-4 w-4" /> : <Moon className="mr-2 h-4 w-4" />}
                       Tema {theme === 'dark' ? 'claro' : 'escuro'}
@@ -205,6 +208,10 @@ export function AppHeader({ onOpenMobileMenu: _onOpenMobileMenu, searchRequest =
                   <DropdownMenuItem onClick={() => navigate('/perfil')}>
                     <User className="mr-2 h-4 w-4" />
                     Meu perfil
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/configuracoes')}>
+                    <Settings className="mr-2 h-4 w-4" />
+                    Configurações
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
                     {theme === 'dark' ? <Sun className="mr-2 h-4 w-4" /> : <Moon className="mr-2 h-4 w-4" />}

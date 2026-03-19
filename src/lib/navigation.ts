@@ -181,17 +181,16 @@ export const navSections: NavSection[] = [
   {
     key: 'administracao',
     title: 'Administração',
-    icon: Settings,
+    icon: Shield,
     items: [
       {
         title: 'Gestão do sistema',
         items: [
-          { title: 'Empresa', path: '/configuracoes?tab=geral' },
-          { title: 'Usuários', path: '/configuracoes?tab=usuarios' },
-          { title: 'E-mails', path: '/configuracoes?tab=email' },
-          { title: 'Parâmetros Fiscais', path: '/configuracoes?tab=fiscal' },
-          { title: 'Parâmetros Financeiros', path: '/configuracoes?tab=financeiro' },
-          { title: 'Aparência', path: '/configuracoes?tab=aparencia' },
+          { title: 'Empresa', path: '/administracao?tab=empresa' },
+          { title: 'Usuários', path: '/administracao?tab=usuarios' },
+          { title: 'E-mails', path: '/administracao?tab=email' },
+          { title: 'Parâmetros Fiscais', path: '/administracao?tab=fiscal' },
+          { title: 'Parâmetros Financeiros', path: '/administracao?tab=financeiro' },
           { title: 'Auditoria', path: '/auditoria', keywords: ['logs', 'historico', 'rastreabilidade'] },
         ],
       },
@@ -233,6 +232,7 @@ export const headerIcons: Record<string, LucideIcon> = {
   '/fiscal': Receipt,
   '/relatorios': BarChart3,
   '/configuracoes': Settings,
+  '/administracao': Shield,
   '/auditoria': Shield,
   '/perfil': User,
 };
@@ -260,6 +260,7 @@ const baseRouteLabels: Record<string, string> = {
   '/fiscal': 'Fiscal',
   '/relatorios': 'Relatórios',
   '/configuracoes': 'Configurações',
+  '/administracao': 'Administração',
   '/auditoria': 'Auditoria',
   '/perfil': 'Meu Perfil',
 };
