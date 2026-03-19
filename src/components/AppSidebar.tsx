@@ -32,6 +32,7 @@ export function AppSidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMo
   // Auto-open sections that have active items
   const [manualSections, setManualSections] = useState<Record<string, boolean>>({});
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const activeSectionKeys = useMemo(
     () =>
       navSections
