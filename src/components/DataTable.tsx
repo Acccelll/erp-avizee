@@ -103,7 +103,7 @@ export function DataTable<T extends Record<string, any>>({
   }, [pagedData, selectedIds, onSelectionChange]);
 
   const renderActions = (item: T) => (
-    <div className="flex flex-wrap items-center justify-end gap-1">
+    <div className="flex items-center justify-end gap-1 flex-nowrap">
       {onView && (
         <Tooltip><TooltipTrigger asChild>
           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); onView(item); }}>
