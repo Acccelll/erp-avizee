@@ -71,13 +71,13 @@ const ContasBancarias = () => {
       }
       setModalOpen(false);
       fetchData();
-    } catch (err: any) { toast.error(err.message); }
+    } catch (err: any) { console.error('[contas-bancarias]', err); toast.error("Erro ao salvar conta bancária. Tente novamente."); }
     setSaving(false);
   };
 
   const handleDelete = async (c: ContaBancaria) => {
     const { error } = await (supabase as any).from("contas_bancarias").update({ ativo: false }).eq("id", c.id);
-    if (error) { toast.error(error.message); return; }
+    if (error) { console.error('[contas-bancarias]', error); toast.error("Erro ao remover conta. Tente novamente."); return; }
     toast.success("Conta removida!");
     fetchData();
   };

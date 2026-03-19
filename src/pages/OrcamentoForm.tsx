@@ -154,7 +154,8 @@ export default function OrcamentoForm() {
       toast.success("Cotação salva com sucesso!");
       if (!isEdit && orcId) navigate(`/cotacoes/${orcId}`, { replace: true });
     } catch (err: any) {
-      toast.error(`Erro ao salvar: ${err.message}`);
+      console.error('[orcamento]', err);
+      toast.error("Erro ao salvar cotação. Tente novamente.");
     }
     setSaving(false);
   };
@@ -188,7 +189,8 @@ export default function OrcamentoForm() {
       toast.success(`Duplicado: ${newNumero}`);
       navigate(`/cotacoes/${newOrc.id}`, { replace: true });
     } catch (err: any) {
-      toast.error(`Erro: ${err.message}`);
+      console.error('[orcamento] duplicar:', err);
+      toast.error("Erro ao duplicar cotação. Tente novamente.");
     }
   };
 

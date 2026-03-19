@@ -216,7 +216,8 @@ export default function Configuracoes() {
       toast.success(`Configurações de ${tabLabels[activeTab] || 'configuração'} salvas com sucesso.`);
     } catch (error: any) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
-      toast.error(`Não foi possível salvar no banco: ${error.message}. Backup mantido no navegador.`);
+      console.error('[config] Erro ao salvar:', error);
+      toast.error("Não foi possível salvar as configurações. Backup mantido no navegador.");
     } finally {
       setSaving(false);
     }

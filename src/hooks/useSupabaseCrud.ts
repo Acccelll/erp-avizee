@@ -36,7 +36,8 @@ export function useSupabaseCrud<T extends Record<string, any>>({
 
     const { data: result, error } = await query;
     if (error) {
-      toast.error(`Erro ao carregar ${table}: ${error.message}`);
+      console.error(`[crud] Erro ao carregar ${table}:`, error);
+      toast.error("Erro ao carregar dados. Tente novamente.");
     } else {
       setData(result || []);
     }
@@ -50,7 +51,8 @@ export function useSupabaseCrud<T extends Record<string, any>>({
   const create = async (record: Partial<T>) => {
     const { data: result, error } = await (supabase as any).from(table).insert(record).select().single();
     if (error) {
-      toast.error(`Erro ao criar: ${error.message}`);
+      console.error(`[crud] Erro ao criar em ${table}:`, error);
+      toast.error("Erro ao criar registro. Tente novamente.");
       throw error;
     }
     toast.success("Registro criado com sucesso!");
@@ -61,7 +63,8 @@ export function useSupabaseCrud<T extends Record<string, any>>({
   const update = async (id: string, record: Partial<T>) => {
     const { data: result, error } = await (supabase as any).from(table).update(record).eq("id", id).select().single();
     if (error) {
-      toast.error(`Erro ao atualizar: ${error.message}`);
+      console.error(`[crud] Erro ao atualizar em ${table}:`, error);
+      toast.error("Erro ao atualizar registro. Tente novamente.");
       throw error;
     }
     toast.success("Registro atualizado com sucesso!");
@@ -72,10 +75,10 @@ export function useSupabaseCrud<T extends Record<string, any>>({
   const remove = async (id: string, soft = true) => {
     if (soft && hasAtivo) {
       const { error } = await (supabase as any).from(table).update({ ativo: false }).eq("id", id);
-      if (error) { toast.error(`Erro ao remover: ${error.message}`); throw error; }
+      if (error) { console.error(`[crud] Erro ao remover de ${table}:`, error); toast.error("Erro ao remover registro. Tente novamente."); throw error; }
     } else {
       const { error } = await (supabase as any).from(table).delete().eq("id", id);
-      if (error) { toast.error(`Erro ao remover: ${error.message}`); throw error; }
+      if (error) { console.error(`[crud] Erro ao remover de ${table}:`, error); toast.error("Erro ao remover registro. Tente novamente."); throw error; }
     }
     toast.success("Registro removido com sucesso!");
     fetchData();

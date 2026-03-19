@@ -40,7 +40,8 @@ export default function Relatorios() {
       const report = await carregarRelatorio(tipo, { dataInicio, dataFim });
       setResultado(report);
     } catch (error: any) {
-      toast.error(`Não foi possível carregar o relatório: ${error.message}`);
+      console.error('[relatorios]', error);
+      toast.error("Não foi possível carregar o relatório. Tente novamente.");
     } finally {
       setLoading(false);
     }

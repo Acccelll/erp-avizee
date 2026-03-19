@@ -23,7 +23,7 @@ export default function ForgotPassword() {
     const { error: err } = await supabase.auth.resetPasswordForEmail(email.trim(), {
       redirectTo: `${window.location.origin}/reset-password`,
     });
-    if (err) toast.error(err.message);
+    if (err) { console.error('[forgot-password]', err); toast.error("Erro ao enviar e-mail de recuperação. Tente novamente."); }
     else setSent(true);
     setLoading(false);
   };

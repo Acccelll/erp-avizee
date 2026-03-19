@@ -65,7 +65,8 @@ const Orcamentos = () => {
       fetchData();
       navigate(`/cotacoes/${newOrc.id}`);
     } catch (err: any) {
-      toast.error(`Erro ao duplicar: ${err.message}`);
+      console.error('[orcamentos] duplicar:', err);
+      toast.error("Erro ao duplicar cotação. Tente novamente.");
     }
   };
 
@@ -75,7 +76,8 @@ const Orcamentos = () => {
       toast.success(`Cotação ${orc.numero} aprovada!`);
       fetchData();
     } catch (err: any) {
-      toast.error(`Erro: ${err.message}`);
+      console.error('[orcamentos] aprovar:', err);
+      toast.error("Erro ao aprovar cotação. Tente novamente.");
     }
   };
 
@@ -122,7 +124,8 @@ const Orcamentos = () => {
       fetchData();
       navigate(`/ordens-venda`);
     } catch (err: any) {
-      toast.error(`Erro ao converter: ${err.message}`);
+      console.error('[orcamentos] converter:', err);
+      toast.error("Erro ao converter cotação. Tente novamente.");
     } finally {
       setConvertingId(null);
     }
