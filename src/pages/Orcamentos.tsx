@@ -76,7 +76,8 @@ const Orcamentos = () => {
       toast.success(`Cotação ${orc.numero} aprovada!`);
       fetchData();
     } catch (err: any) {
-      toast.error(`Erro: ${err.message}`);
+      console.error('[orcamentos] aprovar:', err);
+      toast.error("Erro ao aprovar cotação. Tente novamente.");
     }
   };
 
