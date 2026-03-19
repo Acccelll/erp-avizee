@@ -10,8 +10,10 @@ import {
   Package,
   Receipt,
   Settings,
+  Shield,
   ShoppingCart,
   Truck,
+  User,
   Users,
   Wallet,
   Warehouse,
@@ -184,11 +186,12 @@ export const navSections: NavSection[] = [
       {
         title: 'Configurações',
         items: [
-          { title: 'Usuários', path: '/configuracoes?tab=usuarios' },
-          { title: 'Permissões', path: '/configuracoes?tab=usuarios' },
           { title: 'Empresa', path: '/configuracoes?tab=geral' },
+          { title: 'Usuários', path: '/configuracoes?tab=usuarios' },
           { title: 'E-mails', path: '/configuracoes?tab=email' },
           { title: 'Aparência', path: '/configuracoes?tab=aparencia' },
+          { title: 'Auditoria', path: '/auditoria', keywords: ['logs', 'historico', 'rastreabilidade'] },
+          { title: 'Meu Perfil', path: '/perfil', keywords: ['conta', 'senha'] },
         ],
       },
     ],
@@ -229,6 +232,8 @@ export const headerIcons: Record<string, LucideIcon> = {
   '/fiscal': Receipt,
   '/relatorios': BarChart3,
   '/configuracoes': Settings,
+  '/auditoria': Shield,
+  '/perfil': User,
 };
 
 const baseRouteLabels: Record<string, string> = {
@@ -254,6 +259,8 @@ const baseRouteLabels: Record<string, string> = {
   '/fiscal': 'Fiscal',
   '/relatorios': 'Relatórios',
   '/configuracoes': 'Configurações',
+  '/auditoria': 'Auditoria',
+  '/perfil': 'Meu Perfil',
 };
 
 export type FlatNavItem = NavLeafItem & { section: string; subgroup: string };

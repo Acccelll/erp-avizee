@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      app_configuracoes: {
+        Row: {
+          chave: string
+          created_at: string
+          descricao: string | null
+          id: string
+          updated_at: string
+          valor: Json | null
+        }
+        Insert: {
+          chave: string
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          updated_at?: string
+          valor?: Json | null
+        }
+        Update: {
+          chave?: string
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          updated_at?: string
+          valor?: Json | null
+        }
+        Relationships: []
+      }
       auditoria_logs: {
         Row: {
           acao: string

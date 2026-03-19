@@ -26,6 +26,8 @@ import Login from "./pages/Login";
 import Pedidos from "./pages/Pedidos";
 import Relatorios from "./pages/Relatorios";
 import Configuracoes from "./pages/Configuracoes";
+import Auditoria from "./pages/Auditoria";
+import Perfil from "./pages/Perfil";
 import Signup from "./pages/Signup";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
@@ -75,6 +77,8 @@ const App = () => (
             <Route path="/caixa" element={<ProtectedRoute><Caixa /></ProtectedRoute>} />
             <Route path="/relatorios" element={<ProtectedRoute><Relatorios /></ProtectedRoute>} />
             <Route path="/configuracoes" element={<AdminRoute><Configuracoes /></AdminRoute>} />
+            <Route path="/auditoria" element={<AdminRoute><Auditoria /></AdminRoute>} />
+            <Route path="/perfil" element={<ProtectedRoute><Perfil /></ProtectedRoute>} />
             <Route path="/contas-contabeis-plano" element={<ProtectedRoute><ContasContabeis /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
