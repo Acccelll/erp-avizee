@@ -65,7 +65,8 @@ const Orcamentos = () => {
       fetchData();
       navigate(`/cotacoes/${newOrc.id}`);
     } catch (err: any) {
-      toast.error(`Erro ao duplicar: ${err.message}`);
+      console.error('[orcamentos] duplicar:', err);
+      toast.error("Erro ao duplicar cotação. Tente novamente.");
     }
   };
 
