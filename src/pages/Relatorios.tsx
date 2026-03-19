@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { DataTable } from '@/components/DataTable';
-import { BarChart3, Package, Wallet, ShoppingCart, TrendingUp, Truck, Download, Printer, RefreshCcw, Hash, AlertTriangle, DollarSign } from 'lucide-react';
+import { BarChart3, Package, Wallet, ShoppingCart, TrendingUp, Truck, Download, Printer, RefreshCcw, Hash, AlertTriangle, DollarSign, FileText } from 'lucide-react';
 import { ResponsiveContainer, BarChart, XAxis, YAxis, Tooltip, Bar, PieChart, Pie, Cell, Legend } from 'recharts';
 import { carregarRelatorio, exportarCsv, formatCellValue, type RelatorioResultado, type TipoRelatorio } from '@/services/relatorios.service';
 import { formatCurrency, formatNumber } from '@/lib/format';
@@ -97,6 +97,80 @@ export default function Relatorios() {
     toast.success('Exportação CSV iniciada.');
   };
 
+  const handleExportPdf = () => {
+    import('jspdf').then(async ({ default: jsPDF }) => {
+      const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const margin = 14;
+      let y = 20;
+
+      // Header
+      doc.setFontSize(16);
+      doc.setFont('helvetica', 'bold');
+      doc.text(resultado.title || 'Relatório', margin, y);
+      y += 7;
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.text(resultado.subtitle || '', margin, y);
+      y += 4;
+      const periodoText = dataInicio || dataFim
+        ? `Período: ${dataInicio || '—'} a ${dataFim || '—'}`
+        : `Gerado em: ${new Date().toLocaleDateString('pt-BR')}`;
+      doc.text(periodoText, margin, y);
+      y += 8;
+
+      // Table
+      const rows = resultado.rows as Record<string, unknown>[];
+      if (rows.length > 0) {
+        const keys = Object.keys(rows[0]);
+        const colWidth = (pageWidth - margin * 2) / keys.length;
+
+        // Header row
+        doc.setFillColor(105, 5, 0); // bordô
+        doc.rect(margin, y, pageWidth - margin * 2, 7, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(7);
+        doc.setFont('helvetica', 'bold');
+        keys.forEach((key, i) => {
+          const label = key.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase());
+          doc.text(label, margin + i * colWidth + 2, y + 5);
+        });
+        y += 7;
+
+        // Data rows
+        doc.setTextColor(0, 0, 0);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7);
+
+        const maxRows = Math.min(rows.length, 200);
+        for (let r = 0; r < maxRows; r++) {
+          if (y > doc.internal.pageSize.getHeight() - 20) {
+            doc.addPage();
+            y = 15;
+          }
+          if (r % 2 === 0) {
+            doc.setFillColor(245, 245, 240);
+            doc.rect(margin, y, pageWidth - margin * 2, 6, 'F');
+          }
+          keys.forEach((key, i) => {
+            const val = String(formatCellValue(rows[r][key], key) ?? '');
+            doc.text(val.substring(0, 30), margin + i * colWidth + 2, y + 4);
+          });
+          y += 6;
+        }
+
+        // Totals
+        y += 4;
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8);
+        doc.text(`Total de registros: ${rows.length}`, margin, y);
+      }
+
+      doc.save(`${resultado.title || 'relatorio'}.pdf`);
+      toast.success('PDF gerado com sucesso!');
+    });
+  };
+
   return (
     <AppLayout>
       <ModulePage title="Relatórios" subtitle="Análises gerenciais, exportações e visão consolidada por módulo.">
@@ -146,7 +220,7 @@ export default function Relatorios() {
                 </div>
                 <div className="flex flex-wrap gap-2 ml-auto">
                   <Button variant="outline" size="sm" onClick={loadData} className="gap-1.5"><RefreshCcw className="h-3.5 w-3.5" />Atualizar</Button>
-                  <Button variant="outline" size="sm" onClick={() => window.print()} className="gap-1.5"><Printer className="h-3.5 w-3.5" />Imprimir</Button>
+                  <Button variant="outline" size="sm" onClick={handleExportPdf} className="gap-1.5"><FileText className="h-3.5 w-3.5" />PDF</Button>
                   <Button size="sm" onClick={handleExportCsv} className="gap-1.5"><Download className="h-3.5 w-3.5" />CSV</Button>
                 </div>
               </div>
@@ -161,7 +235,9 @@ export default function Relatorios() {
                 <CardDescription>{resultado.subtitle}</CardDescription>
               </CardHeader>
               <CardContent className="p-0">
-                <DataTable columns={columns} data={resultado.rows as Record<string, unknown>[]} loading={loading} />
+                <DataTable columns={columns} data={resultado.rows as Record<string, unknown>[]} loading={loading}
+                  emptyMessage={`Nenhum registro encontrado para ${reportCards.find(r => r.type === tipo)?.title || 'este relatório'} no período selecionado.`}
+                />
               </CardContent>
             </Card>
 
