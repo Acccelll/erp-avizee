@@ -71,7 +71,7 @@ const ContasBancarias = () => {
       }
       setModalOpen(false);
       fetchData();
-    } catch (err: any) { toast.error(err.message); }
+    } catch (err: any) { console.error('[contas-bancarias]', err); toast.error("Erro ao salvar conta bancária. Tente novamente."); }
     setSaving(false);
   };
 
