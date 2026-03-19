@@ -31,7 +31,7 @@ const defaultConfig = {
   usuarios: {
     permitirCadastro: false,
     exigir2fa: false,
-    perfilPadrao: 'operador',
+    perfilPadrao: 'vendedor',
   },
   email: {
     remetenteNome: 'ERP AviZee',
