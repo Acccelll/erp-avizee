@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { User, Session } from "@supabase/supabase-js";
-import { isSupabaseConfigured, supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase/client";
 
 interface AuthContextType {
   user: User | null;
@@ -27,14 +27,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<any>(null);
 
   useEffect(() => {
-    if (!isSupabaseConfigured) {
-      setLoading(false);
-      setUser(null);
-      setSession(null);
-      setProfile(null);
-      return;
-    }
-
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
@@ -57,12 +49,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const fetchProfile = async (userId: string) => {
-    const { data } = await supabase.from("profiles").select("*").eq("id", userId).single();
-    if (data) setProfile(data);
+    try {
+      const { data } = await supabase.from("profiles").select("*").eq("id", userId).single();
+      if (data) setProfile(data);
+    } catch {
+      // Profile fetch failed silently
+    }
   };
 
   const signOut = async () => {
-    if (!isSupabaseConfigured) return;
     await supabase.auth.signOut();
     setUser(null);
     setSession(null);

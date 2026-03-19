@@ -1,13 +1,12 @@
 import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { isSupabaseConfigured, supabase, supabaseConfigError } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
-import { AlertTriangle, LogIn, Eye, EyeOff, Mail, Lock } from "lucide-react";
+import { LogIn, Eye, EyeOff, Mail, Lock } from "lucide-react";
 import logoAvizee from "@/assets/logoavizee.png";
 
 export default function Login() {
@@ -39,23 +38,22 @@ export default function Login() {
     e.preventDefault();
     if (!validate()) return;
 
-    if (!isSupabaseConfigured) {
-      toast.error(supabaseConfigError || "Configuração do backend ausente.");
-      return;
-    }
-
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
-    if (error) {
-      const msg = error.message === "Invalid login credentials"
-        ? "E-mail ou senha inválidos. Verifique suas credenciais."
-        : error.message === "Email not confirmed"
-        ? "Confirme seu e-mail antes de fazer login. Verifique sua caixa de entrada."
-        : error.message;
-      toast.error(msg);
-    } else {
-      toast.success("Login realizado com sucesso!");
-      navigate("/", { replace: true });
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+      if (error) {
+        const msg = error.message === "Invalid login credentials"
+          ? "E-mail ou senha inválidos. Verifique suas credenciais."
+          : error.message === "Email not confirmed"
+          ? "Confirme seu e-mail antes de fazer login. Verifique sua caixa de entrada."
+          : error.message;
+        toast.error(msg);
+      } else {
+        toast.success("Login realizado com sucesso!");
+        navigate("/", { replace: true });
+      }
+    } catch {
+      toast.error("Erro de conexão com o servidor. Tente novamente.");
     }
     setLoading(false);
   };
@@ -76,13 +74,6 @@ export default function Login() {
           <h1 className="text-2xl font-bold text-foreground tracking-tight">Bem-vindo ao AviZee</h1>
           <p className="text-muted-foreground text-sm mt-1">Acesse sua conta para continuar</p>
         </div>
-
-        {!isSupabaseConfigured && (
-          <Alert variant="destructive" className="mb-4">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>{supabaseConfigError}</AlertDescription>
-          </Alert>
-        )}
 
         <form onSubmit={handleLogin} className="bg-card border rounded-xl p-6 space-y-4 shadow-sm">
           <div className="space-y-2">
@@ -135,7 +126,7 @@ export default function Login() {
             </Link>
           </div>
 
-          <Button type="submit" className="w-full gap-2" disabled={loading || !isSupabaseConfigured}>
+          <Button type="submit" className="w-full gap-2" disabled={loading}>
             <LogIn className="w-4 h-4" />
             {loading ? "Entrando..." : "Entrar"}
           </Button>
