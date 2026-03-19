@@ -121,7 +121,7 @@ export function AppHeader({ onOpenMobileMenu: _onOpenMobileMenu, searchRequest =
                   <DropdownMenuContent align="end" className="w-56">
                     <DropdownMenuLabel>Minha conta</DropdownMenuLabel>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => navigate('/configuracoes?tab=usuarios')}>
+                    <DropdownMenuItem onClick={() => navigate('/perfil')}>
                       <User className="mr-2 h-4 w-4" /> Meu perfil
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
@@ -202,7 +202,7 @@ export function AppHeader({ onOpenMobileMenu: _onOpenMobileMenu, searchRequest =
                 <DropdownMenuContent align="end" className="w-56">
                   <DropdownMenuLabel>Minha conta</DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => navigate('/configuracoes?tab=usuarios')}>
+                  <DropdownMenuItem onClick={() => navigate('/perfil')}>
                     <User className="mr-2 h-4 w-4" />
                     Meu perfil
                   </DropdownMenuItem>

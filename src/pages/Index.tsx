@@ -6,6 +6,7 @@ import { PeriodFilter, Period } from "@/components/dashboard/PeriodFilter";
 import { AlertCards } from "@/components/dashboard/AlertCards";
 import { BacklogDetail } from "@/components/dashboard/BacklogDetail";
 import { EstoqueBaixoDetail } from "@/components/dashboard/EstoqueBaixoDetail";
+import { ComprasConfirmadasDetail } from "@/components/dashboard/ComprasConfirmadasDetail";
 import { RecentOrcamentos } from "@/components/dashboard/RecentOrcamentos";
 import { RecentCompras } from "@/components/dashboard/RecentCompras";
 import { SummaryPie } from "@/components/dashboard/SummaryPie";
@@ -164,10 +165,11 @@ const Dashboard = () => {
         estoqueBaixoCount={estoqueBaixo.length}
       />
 
-      {(backlogOVs.length > 0 || estoqueBaixo.length > 0) && (
+      {(backlogOVs.length > 0 || estoqueBaixo.length > 0 || comprasAguardando.length > 0) && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
           <BacklogDetail items={backlogOVs} />
-          <EstoqueBaixoDetail items={estoqueBaixo} />
+          <ComprasConfirmadasDetail items={comprasAguardando} />
+          {estoqueBaixo.length > 0 && <EstoqueBaixoDetail items={estoqueBaixo} />}
         </div>
       )}
 
