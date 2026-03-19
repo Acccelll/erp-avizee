@@ -85,7 +85,8 @@ const OrdensVenda = () => {
       toast.success(`OV ${ov.numero} aprovada!`);
       fetchData();
     } catch (err: any) {
-      toast.error(`Erro: ${err.message}`);
+      console.error('[ordens-venda]', err);
+      toast.error("Erro ao aprovar ordem de venda. Tente novamente.");
     }
   };
 

@@ -77,7 +77,7 @@ const ContasBancarias = () => {
 
   const handleDelete = async (c: ContaBancaria) => {
     const { error } = await (supabase as any).from("contas_bancarias").update({ ativo: false }).eq("id", c.id);
-    if (error) { toast.error(error.message); return; }
+    if (error) { console.error('[contas-bancarias]', error); toast.error("Erro ao remover conta. Tente novamente."); return; }
     toast.success("Conta removida!");
     fetchData();
   };

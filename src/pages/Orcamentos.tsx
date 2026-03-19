@@ -124,7 +124,8 @@ const Orcamentos = () => {
       fetchData();
       navigate(`/ordens-venda`);
     } catch (err: any) {
-      toast.error(`Erro ao converter: ${err.message}`);
+      console.error('[orcamentos] converter:', err);
+      toast.error("Erro ao converter cotação. Tente novamente.");
     } finally {
       setConvertingId(null);
     }

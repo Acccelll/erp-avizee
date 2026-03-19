@@ -38,7 +38,8 @@ export default function Signup() {
       options: { data: { nome: nome.trim() }, emailRedirectTo: window.location.origin },
     });
     if (error) {
-      toast.error(error.message);
+      console.error('[signup]', error);
+      toast.error("Erro ao criar conta. Tente novamente.");
     } else {
       setSuccess(true);
       toast.success("Conta criada! Verifique seu e-mail para confirmar.");

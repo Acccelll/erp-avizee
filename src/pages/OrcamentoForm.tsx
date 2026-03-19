@@ -189,7 +189,8 @@ export default function OrcamentoForm() {
       toast.success(`Duplicado: ${newNumero}`);
       navigate(`/cotacoes/${newOrc.id}`, { replace: true });
     } catch (err: any) {
-      toast.error(`Erro: ${err.message}`);
+      console.error('[orcamento] duplicar:', err);
+      toast.error("Erro ao duplicar cotação. Tente novamente.");
     }
   };
 

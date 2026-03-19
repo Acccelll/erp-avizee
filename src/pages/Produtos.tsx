@@ -191,7 +191,7 @@ const Produtos = () => {
             ordem: i + 1,
           }));
           const { error } = await (supabase as any).from("produto_composicoes").insert(rows);
-          if (error) toast.error("Erro ao salvar composição: " + error.message);
+          if (error) { console.error('[produtos] composição:', error); toast.error("Erro ao salvar composição. Tente novamente."); }
         }
       }
 

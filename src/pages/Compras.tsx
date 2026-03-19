@@ -190,7 +190,8 @@ const Compras = () => {
       setModalOpen(false);
       fetchData();
     } catch (err: any) {
-      toast.error(`Erro: ${err.message}`);
+      console.error('[compras]', err);
+      toast.error("Erro ao salvar. Tente novamente.");
     }
     setSaving(false);
   };
