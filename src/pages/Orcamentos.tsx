@@ -3,13 +3,14 @@ import { useNavigate } from "react-router-dom";
 import { AppLayout } from "@/components/AppLayout";
 import { ModulePage } from "@/components/ModulePage";
 import { DataTable, StatusBadge } from "@/components/DataTable";
+import { SummaryCard } from "@/components/SummaryCard";
 import { ViewDrawer } from "@/components/ViewDrawer";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Copy, ArrowRightCircle, CheckCircle } from "lucide-react";
+import { Copy, ArrowRightCircle, CheckCircle, FileText, DollarSign, Clock, BarChart3 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 
@@ -20,6 +21,11 @@ interface Orcamento {
   ativo: boolean; clientes?: { nome_razao_social: string };
 }
 
+const statusLabels: Record<string, string> = {
+  rascunho: "Rascunho", confirmado: "Confirmada", aprovado: "Aprovada",
+  convertido: "Convertida", cancelado: "Cancelada", faturado: "Faturada",
+};
+
 const Orcamentos = () => {
   const navigate = useNavigate();
   const { data, loading, remove, fetchData } = useSupabaseCrud<Orcamento>({ table: "orcamentos", select: "*, clientes(nome_razao_social)" });
@@ -29,12 +35,21 @@ const Orcamentos = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("todos");
 
+  // KPIs
+  const kpis = useMemo(() => {
+    const total = data.length;
+    const totalValue = data.reduce((s, o) => s + Number(o.valor_total || 0), 0);
+    const approved = data.filter(o => o.status === "aprovado").length;
+    const converted = data.filter(o => o.status === "convertido").length;
+    const conversionRate = total > 0 ? ((converted / total) * 100).toFixed(1) : "0";
+    return { total, totalValue, approved, conversionRate };
+  }, [data]);
+
   const handleDuplicate = async (orc: Orcamento) => {
     try {
       const { data: items } = await (supabase as any).from("orcamentos_itens").select("*").eq("orcamento_id", orc.id);
       const { count } = await (supabase as any).from("orcamentos").select("*", { count: "exact", head: true });
       const newNumero = `COT${String((count || 0) + 1).padStart(6, "0")}`;
-
       const { data: newOrc, error } = await (supabase as any).from("orcamentos").insert({
         numero: newNumero, data_orcamento: new Date().toISOString().split("T")[0],
         status: "rascunho", cliente_id: orc.cliente_id, validade: null,
@@ -47,9 +62,7 @@ const Orcamentos = () => {
         frete_tipo: (orc as any).frete_tipo, modalidade: (orc as any).modalidade,
         cliente_snapshot: (orc as any).cliente_snapshot,
       }).select().single();
-
       if (error) throw error;
-
       if (items && items.length > 0 && newOrc) {
         const newItems = items.map((i: any) => ({
           orcamento_id: newOrc.id, produto_id: i.produto_id,
@@ -60,13 +73,12 @@ const Orcamentos = () => {
         }));
         await (supabase as any).from("orcamentos_itens").insert(newItems);
       }
-
       toast.success(`Cotação duplicada: ${newNumero}`);
       fetchData();
       navigate(`/cotacoes/${newOrc.id}`);
     } catch (err: any) {
       console.error('[orcamentos] duplicar:', err);
-      toast.error("Erro ao duplicar cotação. Tente novamente.");
+      toast.error("Erro ao duplicar cotação.");
     }
   };
 
@@ -77,34 +89,22 @@ const Orcamentos = () => {
       fetchData();
     } catch (err: any) {
       console.error('[orcamentos] aprovar:', err);
-      toast.error("Erro ao aprovar cotação. Tente novamente.");
+      toast.error("Erro ao aprovar cotação.");
     }
   };
 
   const handleConvertToOV = async (orc: Orcamento) => {
     try {
-      // Load cotação items
       const { data: items } = await (supabase as any).from("orcamentos_itens").select("*").eq("orcamento_id", orc.id);
-
-      // Generate OV number
       const { count } = await (supabase as any).from("ordens_venda").select("*", { count: "exact", head: true });
       const ovNumero = `OV${String((count || 0) + 1).padStart(6, "0")}`;
-
-      // Create Ordem de Venda
       const { data: newOV, error } = await (supabase as any).from("ordens_venda").insert({
-        numero: ovNumero,
-        data_emissao: new Date().toISOString().split("T")[0],
-        cliente_id: orc.cliente_id,
-        cotacao_id: orc.id,
-        status: "pendente",
-        status_faturamento: "aguardando",
-        valor_total: orc.valor_total,
-        observacoes: orc.observacoes,
+        numero: ovNumero, data_emissao: new Date().toISOString().split("T")[0],
+        cliente_id: orc.cliente_id, cotacao_id: orc.id,
+        status: "pendente", status_faturamento: "aguardando",
+        valor_total: orc.valor_total, observacoes: orc.observacoes,
       }).select().single();
-
       if (error) throw error;
-
-      // Copy items to OV
       if (items && items.length > 0 && newOV) {
         const ovItems = items.map((i: any) => ({
           ordem_venda_id: newOV.id, produto_id: i.produto_id,
@@ -116,16 +116,13 @@ const Orcamentos = () => {
         }));
         await (supabase as any).from("ordens_venda_itens").insert(ovItems);
       }
-
-      // Update cotação status to convertido
       await (supabase as any).from("orcamentos").update({ status: "convertido" }).eq("id", orc.id);
-
-      toast.success(`Ordem de Venda ${ovNumero} criada a partir da cotação ${orc.numero}!`);
+      toast.success(`Ordem de Venda ${ovNumero} criada!`);
       fetchData();
       navigate(`/ordens-venda`);
     } catch (err: any) {
       console.error('[orcamentos] converter:', err);
-      toast.error("Erro ao converter cotação. Tente novamente.");
+      toast.error("Erro ao converter cotação.");
     } finally {
       setConvertingId(null);
     }
@@ -133,24 +130,12 @@ const Orcamentos = () => {
 
   const filteredData = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
-
     return data.filter((orc) => {
       if (statusFilter !== "todos" && orc.status !== statusFilter) return false;
       if (!query) return true;
-
-      const haystack = [orc.numero, orc.clientes?.nome_razao_social, orc.observacoes]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-
-      return haystack.includes(query);
+      return [orc.numero, orc.clientes?.nome_razao_social, orc.observacoes].filter(Boolean).join(" ").toLowerCase().includes(query);
     });
   }, [data, searchTerm, statusFilter]);
-
-  const statusLabels: Record<string, string> = {
-    rascunho: "Rascunho", confirmado: "Confirmada", aprovado: "Aprovada",
-    convertido: "Convertida", cancelado: "Cancelada", faturado: "Faturada",
-  };
 
   const columns = [
     { key: "numero", label: "Nº", render: (o: Orcamento) => <span className="mono text-xs font-medium text-primary">{o.numero}</span> },
@@ -160,7 +145,7 @@ const Orcamentos = () => {
     { key: "valor_total", label: "Total", render: (o: Orcamento) => <span className="font-semibold mono">{formatCurrency(Number(o.valor_total || 0))}</span> },
     { key: "status", label: "Status", render: (o: Orcamento) => <StatusBadge status={o.status} label={statusLabels[o.status]} /> },
     {
-      key: "acoes_comercial", label: "Ações", render: (o: Orcamento) => (
+      key: "acoes_comercial", label: "Ações", sortable: false, render: (o: Orcamento) => (
         <div className="flex gap-1">
           {(o.status === "rascunho" || o.status === "confirmado") && (
             <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={(e) => { e.stopPropagation(); handleApprove(o); }}>
@@ -193,6 +178,14 @@ const Orcamentos = () => {
         searchPlaceholder="Buscar por número da cotação ou cliente..."
         filters={<Select value={statusFilter} onValueChange={setStatusFilter}><SelectTrigger className="h-9 w-[190px]"><SelectValue placeholder="Status" /></SelectTrigger><SelectContent>{statusOptions.map((status) => (<SelectItem key={status} value={status}>{status === "todos" ? "Todos os status" : statusLabels[status] || status}</SelectItem>))}</SelectContent></Select>}
       >
+        {/* KPI Cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <SummaryCard title="Total de Cotações" value={String(kpis.total)} icon={FileText} variationType="neutral" variation="registros" />
+          <SummaryCard title="Valor Total" value={formatCurrency(kpis.totalValue)} icon={DollarSign} variationType="neutral" variation="acumulado" />
+          <SummaryCard title="Aprovadas" value={String(kpis.approved)} icon={Clock} variationType="positive" variation="aguardando OV" />
+          <SummaryCard title="Taxa de Conversão" value={`${kpis.conversionRate}%`} icon={BarChart3} variationType="positive" variation="cotações → OV" />
+        </div>
+
         <DataTable columns={columns} data={filteredData} loading={loading}
           onView={(o) => { setSelected(o); setDrawerOpen(true); }}
           onEdit={(o) => navigate(`/cotacoes/${o.id}`)}
@@ -213,9 +206,7 @@ const Orcamentos = () => {
             <div><span className="text-xs text-muted-foreground">Valor Total</span><p className="font-semibold mono text-lg">{formatCurrency(Number(selected.valor_total || 0))}</p></div>
             <div><span className="text-xs text-muted-foreground">Status</span><StatusBadge status={selected.status} label={statusLabels[selected.status]} /></div>
             <div className="pt-2 space-y-2">
-              <Button onClick={() => { setDrawerOpen(false); navigate(`/cotacoes/${selected.id}`); }} className="w-full gap-2">
-                Abrir Cotação
-              </Button>
+              <Button onClick={() => { setDrawerOpen(false); navigate(`/cotacoes/${selected.id}`); }} className="w-full gap-2">Abrir Cotação</Button>
               {(selected.status === "rascunho" || selected.status === "confirmado") && (
                 <Button variant="secondary" onClick={() => { setDrawerOpen(false); handleApprove(selected); }} className="w-full gap-2">
                   <CheckCircle className="w-4 h-4" /> Aprovar Cotação

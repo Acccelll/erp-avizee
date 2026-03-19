@@ -10,6 +10,7 @@ import { RecentOrcamentos } from "@/components/dashboard/RecentOrcamentos";
 import { RecentCompras } from "@/components/dashboard/RecentCompras";
 import { SummaryPie } from "@/components/dashboard/SummaryPie";
 import { supabase } from "@/integrations/supabase/client";
+import { periodToDateFrom } from "@/lib/periodFilter";
 import { formatCurrency, formatNumber } from "@/lib/format";
 import { Package, Users, TrendingUp, DollarSign } from "lucide-react";
 
@@ -31,6 +32,9 @@ const Dashboard = () => {
 
   useEffect(() => {
     const load = async () => {
+      setLoading(true);
+      const dateFrom = periodToDateFrom(period);
+
       const [
         { count: produtos },
         { count: clientes },
@@ -49,13 +53,13 @@ const Dashboard = () => {
         (supabase as any).from("produtos").select("*", { count: "exact", head: true }).eq("ativo", true),
         (supabase as any).from("clientes").select("*", { count: "exact", head: true }).eq("ativo", true),
         (supabase as any).from("fornecedores").select("*", { count: "exact", head: true }).eq("ativo", true),
-        (supabase as any).from("orcamentos").select("*", { count: "exact", head: true }).eq("ativo", true),
-        (supabase as any).from("compras").select("*", { count: "exact", head: true }).eq("ativo", true),
-        (supabase as any).from("financeiro_lancamentos").select("valor").eq("tipo", "receber").eq("status", "aberto").eq("ativo", true),
-        (supabase as any).from("financeiro_lancamentos").select("valor").eq("tipo", "pagar").eq("status", "aberto").eq("ativo", true),
+        (supabase as any).from("orcamentos").select("*", { count: "exact", head: true }).eq("ativo", true).gte("data_orcamento", dateFrom),
+        (supabase as any).from("compras").select("*", { count: "exact", head: true }).eq("ativo", true).gte("data_compra", dateFrom),
+        (supabase as any).from("financeiro_lancamentos").select("valor").eq("tipo", "receber").eq("status", "aberto").eq("ativo", true).gte("data_vencimento", dateFrom),
+        (supabase as any).from("financeiro_lancamentos").select("valor").eq("tipo", "pagar").eq("status", "aberto").eq("ativo", true).gte("data_vencimento", dateFrom),
         (supabase as any).from("financeiro_lancamentos").select("valor").eq("status", "vencido").eq("ativo", true),
-        (supabase as any).from("orcamentos").select("id, numero, valor_total, status, data_orcamento, clientes(nome_razao_social)").eq("ativo", true).order("created_at", { ascending: false }).limit(5),
-        (supabase as any).from("compras").select("numero, valor_total, status, data_compra, fornecedores(nome_razao_social)").eq("ativo", true).order("created_at", { ascending: false }).limit(5),
+        (supabase as any).from("orcamentos").select("id, numero, valor_total, status, data_orcamento, clientes(nome_razao_social)").eq("ativo", true).gte("data_orcamento", dateFrom).order("created_at", { ascending: false }).limit(5),
+        (supabase as any).from("compras").select("numero, valor_total, status, data_compra, fornecedores(nome_razao_social)").eq("ativo", true).gte("data_compra", dateFrom).order("created_at", { ascending: false }).limit(5),
         (supabase as any).from("ordens_venda")
           .select("id, numero, valor_total, data_emissao, data_prometida_despacho, prazo_despacho_dias, status, status_faturamento, clientes(nome_razao_social)")
           .eq("ativo", true)
@@ -85,7 +89,7 @@ const Dashboard = () => {
       setLoading(false);
     };
     load();
-  }, []);
+  }, [period]);
 
   const kpiCards = [
     {
@@ -130,7 +134,6 @@ const Dashboard = () => {
 
   return (
     <AppLayout>
-      {/* Header with period filter */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div>
           <h1 className="page-title">Dashboard</h1>
@@ -139,7 +142,6 @@ const Dashboard = () => {
         <PeriodFilter value={period} onChange={setPeriod} />
       </div>
 
-      {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {kpiCards.map((c) => (
           <SummaryCard
@@ -154,7 +156,6 @@ const Dashboard = () => {
         ))}
       </div>
 
-      {/* Alert Cards */}
       <AlertCards
         backlogCount={backlogOVs.length}
         backlogTotal={backlogOVs.reduce((s, o) => s + Number(o.valor_total || 0), 0)}
@@ -163,7 +164,6 @@ const Dashboard = () => {
         estoqueBaixoCount={estoqueBaixo.length}
       />
 
-      {/* Backlog & Estoque Detail */}
       {(backlogOVs.length > 0 || estoqueBaixo.length > 0) && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
           <BacklogDetail items={backlogOVs} />
@@ -171,13 +171,11 @@ const Dashboard = () => {
         </div>
       )}
 
-      {/* Recent Orcamentos + Summary Pie */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
         <RecentOrcamentos items={recentOrcamentos} loading={loading} />
         <SummaryPie data={stockPie} />
       </div>
 
-      {/* Recent Compras */}
       <RecentCompras items={recentCompras} loading={loading} />
     </AppLayout>
   );

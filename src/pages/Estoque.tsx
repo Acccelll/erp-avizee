@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { AppLayout } from "@/components/AppLayout";
 import { ModulePage } from "@/components/ModulePage";
 import { DataTable, StatusBadge } from "@/components/DataTable";
+import { SummaryCard } from "@/components/SummaryCard";
 import { FormModal } from "@/components/FormModal";
 import { ViewDrawer } from "@/components/ViewDrawer";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
@@ -16,7 +17,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatNumber, formatCurrency } from "@/lib/format";
-import { Calendar, Package, AlertTriangle, Lock } from "lucide-react";
+import { Calendar, Package, AlertTriangle, Lock, ArrowUpCircle, ArrowDownCircle, RotateCcw, TrendingDown } from "lucide-react";
 
 interface Movimento {
   id: string; produto_id: string; tipo: string; quantidade: number;
@@ -53,19 +54,12 @@ const Estoque = () => {
     if (viewParam !== activeTab) setActiveTab(viewParam);
   }, [activeTab, viewParam]);
 
-  // Date filters
   const [dataInicio, setDataInicio] = useState("");
   const [dataFim, setDataFim] = useState("");
-
-  // Position by date
   const [dataReferencia, setDataReferencia] = useState(new Date().toISOString().split("T")[0]);
   const [posicaoData, setPosicaoData] = useState<PosicaoEstoque[]>([]);
   const [loadingPosicao, setLoadingPosicao] = useState(false);
-
-  // Low stock
   const [abaixoMinimo, setAbaixoMinimo] = useState<any[]>([]);
-
-  // Fechamento mensal
   const [mesFechamento, setMesFechamento] = useState(() => {
     const d = new Date();
     d.setMonth(d.getMonth() - 1);
@@ -73,6 +67,19 @@ const Estoque = () => {
   });
   const [fechamentoData, setFechamentoData] = useState<any[]>([]);
   const [loadingFechamento, setLoadingFechamento] = useState(false);
+
+  // KPI stats
+  const kpis = (() => {
+    const entradas = data.filter(m => m.tipo === "entrada");
+    const saidas = data.filter(m => m.tipo === "saida");
+    const ajustes = data.filter(m => m.tipo === "ajuste");
+    return {
+      totalEntradas: entradas.reduce((s, m) => s + Number(m.quantidade), 0),
+      totalSaidas: saidas.reduce((s, m) => s + Number(m.quantidade), 0),
+      totalAjustes: ajustes.length,
+      abaixoMinimo: abaixoMinimo.length,
+    };
+  })();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -93,7 +100,6 @@ const Estoque = () => {
     setSaving(false);
   };
 
-  // Filter by date range and type
   const filteredData = data.filter(m => {
     if (filterTipo !== "todos" && m.tipo !== filterTipo) return false;
     if (dataInicio && m.created_at < dataInicio) return false;
@@ -101,72 +107,28 @@ const Estoque = () => {
     return true;
   });
 
-  // Load stock position at reference date
   const loadPosicao = useCallback(async () => {
     setLoadingPosicao(true);
     try {
-      // Get all products
       const { data: produtos } = await (supabase as any).from("produtos")
-        .select("id, nome, sku, estoque_atual, estoque_minimo")
-        .eq("ativo", true).order("nome");
-
-      // Get all movements up to the reference date
+        .select("id, nome, sku, estoque_atual, estoque_minimo").eq("ativo", true).order("nome");
       const refEnd = dataReferencia + "T23:59:59.999Z";
-      const { data: movimentos } = await (supabase as any).from("estoque_movimentos")
-        .select("produto_id, tipo, quantidade")
-        .lte("created_at", refEnd)
-        .order("created_at");
+      const allMovs = data.filter(m => m.created_at <= refEnd).sort((a, b) => a.created_at.localeCompare(b.created_at));
 
-      // Calculate balance per product at the reference date
-      const saldoMap: Record<string, number> = {};
-      (movimentos || []).forEach((m: any) => {
-        if (!saldoMap[m.produto_id]) saldoMap[m.produto_id] = 0;
-        if (m.tipo === "entrada") saldoMap[m.produto_id] += Number(m.quantidade);
-        else if (m.tipo === "saida") saldoMap[m.produto_id] -= Number(m.quantidade);
-        else if (m.tipo === "ajuste") {
-          // For adjustments, use the last saldo_atual
-        }
-      });
-
-      // For adjustments, get the last movement's saldo_atual per product
-      const { data: lastAjustes } = await (supabase as any).from("estoque_movimentos")
-        .select("produto_id, saldo_atual, created_at")
-        .eq("tipo", "ajuste")
-        .lte("created_at", refEnd)
-        .order("created_at", { ascending: false });
-
-      // Build position - use last known saldo_atual from movements
       const posicao: PosicaoEstoque[] = (produtos || []).map((p: any) => {
-        // Get last movement for this product before ref date
-        const prodMovs = (movimentos || []).filter((m: any) => m.produto_id === p.id);
-        // Simple approach: replay movements
-        let saldo = 0;
-        // Check if there are any movements
-        const allMovs = data.filter(m => m.produto_id === p.id && m.created_at <= refEnd)
-          .sort((a, b) => a.created_at.localeCompare(b.created_at));
-
-        if (allMovs.length > 0) {
-          saldo = allMovs[allMovs.length - 1].saldo_atual;
-        }
-
+        const prodMovs = allMovs.filter(m => m.produto_id === p.id);
+        const saldo = prodMovs.length > 0 ? prodMovs[prodMovs.length - 1].saldo_atual : 0;
         return {
-          produto_id: p.id,
-          nome: p.nome,
-          sku: p.sku || "",
-          estoque_atual: p.estoque_atual || 0,
-          estoque_minimo: p.estoque_minimo || 0,
+          produto_id: p.id, nome: p.nome, sku: p.sku || "",
+          estoque_atual: p.estoque_atual || 0, estoque_minimo: p.estoque_minimo || 0,
           saldo_na_data: saldo,
         };
       }).filter((p: PosicaoEstoque) => p.saldo_na_data !== 0 || p.estoque_atual !== 0);
-
       setPosicaoData(posicao);
-    } catch (err) {
-      console.error(err);
-    }
+    } catch (err) { console.error(err); }
     setLoadingPosicao(false);
   }, [dataReferencia, data]);
 
-  // Load low stock products
   useEffect(() => {
     const low = produtosCrud.data.filter((p: any) =>
       p.ativo && p.estoque_minimo > 0 && Number(p.estoque_atual || 0) <= Number(p.estoque_minimo)
@@ -203,7 +165,7 @@ const Estoque = () => {
     { key: "estoque_atual", label: "Saldo Atual", render: (p: PosicaoEstoque) => <span className="font-mono">{formatNumber(p.estoque_atual)}</span> },
     { key: "diff", label: "Diferença", render: (p: PosicaoEstoque) => {
       const diff = p.estoque_atual - p.saldo_na_data;
-      return <span className={`font-mono ${diff > 0 ? "text-green-600" : diff < 0 ? "text-destructive" : ""}`}>{diff > 0 ? "+" : ""}{formatNumber(diff)}</span>;
+      return <span className={`font-mono ${diff > 0 ? "text-success" : diff < 0 ? "text-destructive" : ""}`}>{diff > 0 ? "+" : ""}{formatNumber(diff)}</span>;
     }},
     { key: "status", label: "Status", render: (p: PosicaoEstoque) => (
       p.estoque_minimo > 0 && p.saldo_na_data <= p.estoque_minimo
@@ -233,7 +195,14 @@ const Estoque = () => {
     <AppLayout>
       <ModulePage title="Estoque" subtitle={subtitleMap[activeTab] || subtitleMap.movimentacoes} addLabel="Nova Movimentação" onAdd={() => setModalOpen(true)} count={displayCount}>
 
-        {/* Alert: Low Stock */}
+        {/* KPI Cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <SummaryCard title="Entradas" value={formatNumber(kpis.totalEntradas)} icon={ArrowUpCircle} variationType="positive" variation="total acumulado" />
+          <SummaryCard title="Saídas" value={formatNumber(kpis.totalSaidas)} icon={ArrowDownCircle} variationType="negative" variation="total acumulado" />
+          <SummaryCard title="Ajustes" value={formatNumber(kpis.totalAjustes)} icon={RotateCcw} variationType="neutral" variation="registros" />
+          <SummaryCard title="Abaixo do Mínimo" value={formatNumber(kpis.abaixoMinimo)} icon={TrendingDown} variationType={kpis.abaixoMinimo > 0 ? "negative" : "positive"} variant={kpis.abaixoMinimo > 0 ? "danger" : undefined} variation="produtos" />
+        </div>
+
         {abaixoMinimo.length > 0 && (
           <Card className="mb-4 border-destructive/50 bg-destructive/5">
             <CardContent className="py-3 px-4">
@@ -260,7 +229,6 @@ const Estoque = () => {
           </TabsList>
 
           <TabsContent value="movimentacoes" className="space-y-4">
-            {/* Type + Date Filters */}
             <div className="flex flex-wrap items-end gap-3">
               <div className="flex gap-1">
                 {["todos", "entrada", "saida", "ajuste"].map(t => (
@@ -285,7 +253,6 @@ const Estoque = () => {
                 )}
               </div>
             </div>
-
             <DataTable columns={columns} data={filteredData} loading={loading}
               onView={(m) => { setSelected(m); setDrawerOpen(true); }} />
           </TabsContent>
@@ -300,7 +267,6 @@ const Estoque = () => {
                 {loadingPosicao ? "Consultando..." : "Consultar Posição"}
               </Button>
             </div>
-
             {posicaoData.length > 0 ? (
               <DataTable columns={posicaoColumns} data={posicaoData} loading={loadingPosicao} />
             ) : (
@@ -325,25 +291,15 @@ const Estoque = () => {
                   const [year, month] = mesFechamento.split("-").map(Number);
                   const lastDay = new Date(year, month, 0).getDate();
                   const dataCorte = `${mesFechamento}-${String(lastDay).padStart(2, "0")}T23:59:59.999Z`;
-
                   const { data: produtos } = await (supabase as any).from("produtos")
-                    .select("id, nome, sku, estoque_atual, estoque_minimo, preco_custo")
-                    .eq("ativo", true).order("nome");
-
-                  const allMovs = data.filter(m => m.created_at <= dataCorte)
-                    .sort((a, b) => a.created_at.localeCompare(b.created_at));
-
+                    .select("id, nome, sku, estoque_atual, estoque_minimo, preco_custo").eq("ativo", true).order("nome");
+                  const allMovs = data.filter(m => m.created_at <= dataCorte).sort((a, b) => a.created_at.localeCompare(b.created_at));
                   const result = (produtos || []).map((p: any) => {
                     const prodMovs = allMovs.filter(m => m.produto_id === p.id);
                     const saldo = prodMovs.length > 0 ? prodMovs[prodMovs.length - 1].saldo_atual : 0;
                     const valorUnit = Number(p.preco_custo || 0);
-                    return {
-                      id: p.id, nome: p.nome, sku: p.sku || "",
-                      saldo, valorUnit, valorTotal: saldo * valorUnit,
-                      estoque_minimo: p.estoque_minimo || 0,
-                    };
+                    return { id: p.id, nome: p.nome, sku: p.sku || "", saldo, valorUnit, valorTotal: saldo * valorUnit, estoque_minimo: p.estoque_minimo || 0 };
                   }).filter((p: any) => p.saldo !== 0 || Number(p.valorUnit) > 0);
-
                   setFechamentoData(result);
                 } catch (err) { console.error(err); }
                 setLoadingFechamento(false);
@@ -351,7 +307,6 @@ const Estoque = () => {
                 {loadingFechamento ? "Processando..." : "Gerar Fechamento"}
               </Button>
             </div>
-
             {fechamentoData.length > 0 ? (
               <>
                 <div className="bg-accent/50 rounded-lg p-4 flex flex-wrap gap-6">

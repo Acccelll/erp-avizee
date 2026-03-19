@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { AppLayout } from "@/components/AppLayout";
 import { ModulePage } from "@/components/ModulePage";
 import { DataTable, StatusBadge } from "@/components/DataTable";
+import { SummaryCard } from "@/components/SummaryCard";
 import { ViewDrawer } from "@/components/ViewDrawer";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
 import { Button } from "@/components/ui/button";
@@ -10,40 +11,25 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { formatCurrency, formatDate, daysSince } from "@/lib/format";
-import { CheckCircle, Package, FileText } from "lucide-react";
+import { formatCurrency, formatDate, daysSince, formatNumber } from "@/lib/format";
+import { CheckCircle, Package, FileText, DollarSign, Clock, Truck } from "lucide-react";
 
 interface OrdemVenda {
-  id: string;
-  numero: string;
-  data_emissao: string;
-  cliente_id: string;
-  cotacao_id: string;
-  status: string;
-  status_faturamento: string;
-  data_aprovacao: string;
-  data_prometida_despacho: string;
-  prazo_despacho_dias: number;
-  valor_total: number;
-  observacoes: string;
+  id: string; numero: string; data_emissao: string; cliente_id: string;
+  cotacao_id: string; status: string; status_faturamento: string;
+  data_aprovacao: string; data_prometida_despacho: string;
+  prazo_despacho_dias: number; valor_total: number; observacoes: string;
   ativo: boolean;
   clientes?: { nome_razao_social: string };
   orcamentos?: { numero: string };
 }
 
 const statusComercialLabels: Record<string, string> = {
-  pendente: "Pendente",
-  aprovada: "Aprovada",
-  em_separacao: "Em Separação",
-  cancelada: "Cancelada",
+  pendente: "Pendente", aprovada: "Aprovada", em_separacao: "Em Separação", cancelada: "Cancelada",
 };
-
 const statusFaturamentoLabels: Record<string, string> = {
-  aguardando: "Aguardando",
-  parcial: "Parcial",
-  total: "Faturado",
+  aguardando: "Aguardando", parcial: "Parcial", total: "Faturado",
 };
-
 const statusFaturamentoColors: Record<string, string> = {
   aguardando: "bg-warning/10 text-warning border-warning/30",
   parcial: "bg-info/10 text-info border-info/30",
@@ -53,8 +39,7 @@ const statusFaturamentoColors: Record<string, string> = {
 const OrdensVenda = () => {
   const navigate = useNavigate();
   const { data, loading, remove, fetchData } = useSupabaseCrud<OrdemVenda>({
-    table: "ordens_venda",
-    select: "*, clientes(nome_razao_social), orcamentos(numero)",
+    table: "ordens_venda", select: "*, clientes(nome_razao_social), orcamentos(numero)",
   });
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selected, setSelected] = useState<OrdemVenda | null>(null);
@@ -64,46 +49,41 @@ const OrdensVenda = () => {
   const [statusFilter, setStatusFilter] = useState<string>("todos");
   const [faturamentoFilter, setFaturamentoFilter] = useState<string>("todos");
 
+  // KPIs
+  const kpis = useMemo(() => {
+    const total = data.length;
+    const totalValue = data.reduce((s, o) => s + Number(o.valor_total || 0), 0);
+    const pending = data.filter(o => o.status === "pendente").length;
+    const inProgress = data.filter(o => o.status === "aprovada" || o.status === "em_separacao").length;
+    return { total, totalValue, pending, inProgress };
+  }, [data]);
+
   const handleView = async (ov: OrdemVenda) => {
-    setSelected(ov);
-    setDrawerOpen(true);
-    setLoadingItems(true);
-    const { data: items } = await (supabase as any)
-      .from("ordens_venda_itens")
-      .select("*, produtos(nome)")
-      .eq("ordem_venda_id", ov.id);
-    setOvItems(items || []);
-    setLoadingItems(false);
+    setSelected(ov); setDrawerOpen(true); setLoadingItems(true);
+    const { data: items } = await (supabase as any).from("ordens_venda_itens").select("*, produtos(nome)").eq("ordem_venda_id", ov.id);
+    setOvItems(items || []); setLoadingItems(false);
   };
 
   const handleApprove = async (ov: OrdemVenda) => {
     try {
       await (supabase as any).from("ordens_venda").update({
-        status: "aprovada",
-        data_aprovacao: new Date().toISOString().split("T")[0],
+        status: "aprovada", data_aprovacao: new Date().toISOString().split("T")[0],
       }).eq("id", ov.id);
       toast.success(`OV ${ov.numero} aprovada!`);
       fetchData();
     } catch (err: any) {
       console.error('[ordens-venda]', err);
-      toast.error("Erro ao aprovar ordem de venda. Tente novamente.");
+      toast.error("Erro ao aprovar ordem de venda.");
     }
   };
 
   const filteredData = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
-
     return data.filter((ov) => {
       if (statusFilter !== "todos" && ov.status !== statusFilter) return false;
       if (faturamentoFilter !== "todos" && ov.status_faturamento !== faturamentoFilter) return false;
       if (!query) return true;
-
-      const haystack = [ov.numero, ov.clientes?.nome_razao_social, ov.orcamentos?.numero, ov.observacoes]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-
-      return haystack.includes(query);
+      return [ov.numero, ov.clientes?.nome_razao_social, ov.orcamentos?.numero, ov.observacoes].filter(Boolean).join(" ").toLowerCase().includes(query);
     });
   }, [data, faturamentoFilter, searchTerm, statusFilter]);
 
@@ -128,7 +108,7 @@ const OrdensVenda = () => {
       },
     },
     {
-      key: "acoes_ov", label: "Ações", render: (o: OrdemVenda) => (
+      key: "acoes_ov", label: "Ações", sortable: false, render: (o: OrdemVenda) => (
         <div className="flex gap-1">
           {o.status === "pendente" && (
             <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={(e) => { e.stopPropagation(); handleApprove(o); }}>
@@ -151,13 +131,15 @@ const OrdensVenda = () => {
         searchPlaceholder="Buscar por OV, cliente ou cotação..."
         filters={<><Select value={statusFilter} onValueChange={setStatusFilter}><SelectTrigger className="h-9 w-[180px]"><SelectValue placeholder="Status comercial" /></SelectTrigger><SelectContent><SelectItem value="todos">Todos os status</SelectItem>{Object.entries(statusComercialLabels).map(([value, label]) => (<SelectItem key={value} value={value}>{label}</SelectItem>))}</SelectContent></Select><Select value={faturamentoFilter} onValueChange={setFaturamentoFilter}><SelectTrigger className="h-9 w-[190px]"><SelectValue placeholder="Faturamento" /></SelectTrigger><SelectContent><SelectItem value="todos">Todo faturamento</SelectItem>{Object.entries(statusFaturamentoLabels).map(([value, label]) => (<SelectItem key={value} value={value}>{label}</SelectItem>))}</SelectContent></Select></>}
       >
-        <DataTable
-          columns={columns}
-          data={filteredData}
-          loading={loading}
-          onView={handleView}
-          onDelete={(o) => remove(o.id)}
-        />
+        {/* KPI Cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <SummaryCard title="Total de OVs" value={formatNumber(kpis.total)} icon={FileText} variationType="neutral" variation="registros" />
+          <SummaryCard title="Valor Total" value={formatCurrency(kpis.totalValue)} icon={DollarSign} variationType="neutral" variation="acumulado" />
+          <SummaryCard title="Pendentes" value={formatNumber(kpis.pending)} icon={Clock} variationType={kpis.pending > 0 ? "negative" : "positive"} variant={kpis.pending > 0 ? "warning" : undefined} variation="aguardando aprovação" />
+          <SummaryCard title="Em Andamento" value={formatNumber(kpis.inProgress)} icon={Truck} variationType="positive" variation="aprovadas + separação" />
+        </div>
+
+        <DataTable columns={columns} data={filteredData} loading={loading} onView={handleView} onDelete={(o) => remove(o.id)} />
       </ModulePage>
 
       <ViewDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} title="Detalhes da Ordem de Venda">
@@ -182,12 +164,8 @@ const OrdensVenda = () => {
                 </Badge>
               </div>
             </div>
-
-            {/* Items */}
             <div className="pt-2">
-              <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
-                <Package className="w-4 h-4" /> Itens
-              </h4>
+              <h4 className="font-semibold text-sm mb-2 flex items-center gap-2"><Package className="w-4 h-4" /> Itens</h4>
               {loadingItems ? (
                 <div className="flex justify-center py-4"><div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" /></div>
               ) : ovItems.length === 0 ? (
@@ -202,23 +180,19 @@ const OrdensVenda = () => {
                       </div>
                       <div className="text-right">
                         <p className="font-semibold mono">{formatCurrency(Number(item.valor_total || 0))}</p>
-                        <p className="text-xs text-muted-foreground">
-                          Fat.: {item.quantidade_faturada || 0}/{item.quantidade}
-                        </p>
+                        <p className="text-xs text-muted-foreground">Fat.: {item.quantidade_faturada || 0}/{item.quantidade}</p>
                       </div>
                     </div>
                   ))}
                 </div>
               )}
             </div>
-
             {selected.observacoes && (
               <div className="pt-2">
                 <span className="text-xs text-muted-foreground">Observações</span>
                 <p className="text-sm mt-1">{selected.observacoes}</p>
               </div>
             )}
-
             <div className="pt-2 space-y-2">
               {selected.status === "pendente" && (
                 <Button onClick={() => { setDrawerOpen(false); handleApprove(selected); }} className="w-full gap-2">

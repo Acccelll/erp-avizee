@@ -276,7 +276,7 @@ export function DataTable<T extends Record<string, any>>({
                         </td>
                       )}
                       {visibleColumns.map((col) => (
-                        <td key={col.key} className="px-4 py-3 text-sm">{col.render ? col.render(item) : item[col.key]}</td>
+                        <td key={col.key} className="px-4 py-3 text-sm whitespace-nowrap">{col.render ? col.render(item) : item[col.key]}</td>
                       ))}
                       {hasActions && <td className="px-4 py-3 text-right">{renderActions(item)}</td>}
                     </tr>
