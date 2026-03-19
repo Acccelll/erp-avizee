@@ -259,6 +259,8 @@ const baseRouteLabels: Record<string, string> = {
   '/fiscal': 'Fiscal',
   '/relatorios': 'Relatórios',
   '/configuracoes': 'Configurações',
+  '/auditoria': 'Auditoria',
+  '/perfil': 'Meu Perfil',
 };
 
 export type FlatNavItem = NavLeafItem & { section: string; subgroup: string };
