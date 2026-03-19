@@ -1,7 +1,6 @@
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { useTheme } from 'next-themes';
-import { Building2, FileText, Loader2, Mail, Receipt, Settings, Shield, Users, Wallet, Check, X } from 'lucide-react';
+import { Building2, Loader2, Mail, Receipt, Shield, Users, Wallet } from 'lucide-react';
 import { AppLayout } from '@/components/AppLayout';
 import { ModulePage } from '@/components/ModulePage';
 import { Button } from '@/components/ui/button';
@@ -30,8 +29,46 @@ const ROLE_LABELS: Record<AppRole, string> = {
 const ROLE_COLORS: Record<AppRole, string> = {
   admin: 'bg-destructive/10 text-destructive border-destructive/30',
   vendedor: 'bg-primary/10 text-primary border-primary/30',
-  financeiro: 'bg-warning/10 text-warning border-warning/30',
-  estoquista: 'bg-success/10 text-success border-success/30',
+  financeiro: 'bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-700',
+  estoquista: 'bg-emerald-100 text-emerald-700 border-emerald-300 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-700',
+};
+
+const STORAGE_KEY = 'erp-avizee-admin-config';
+
+const defaultConfig = {
+  geral: {
+    empresa: 'AviZee Equipamentos LTDA',
+    nomeFantasia: 'AviZee',
+    email: 'contato@avizee.com.br',
+    telefone: '(19) 99999-0000',
+    logoUrl: '/images/logoavizee.png',
+    corPrimaria: '#690500',
+    corSecundaria: '#b2592c',
+  },
+  usuarios: {
+    permitirCadastro: false,
+    exigir2fa: false,
+    perfilPadrao: 'vendedor',
+  },
+  email: {
+    remetenteNome: 'ERP AviZee',
+    remetenteEmail: 'contato@avizee.com.br',
+    responderPara: 'comercial@avizee.com.br',
+    assinatura: 'Equipe AviZee',
+  },
+  fiscal: {
+    cfopPadraoVenda: '5102',
+    cfopPadraoCompra: '1102',
+    cstPadrao: '000',
+    ncmPadrao: '00000000',
+    gerarFinanceiroPadrao: true,
+  },
+  financeiro: {
+    condicaoPadrao: '30 dias',
+    formaPagamentoPadrao: 'boleto',
+    bancoPadrao: 'Inter',
+    permitirBaixaParcial: true,
+  },
 };
 
 interface SideNavItem {
@@ -49,9 +86,19 @@ const sideNavItems: SideNavItem[] = [
   { key: 'auditoria', label: 'Auditoria', icon: Shield },
 ];
 
+// ── User management types ──
+interface UserWithRoles {
+  id: string;
+  nome: string;
+  email: string | null;
+  cargo: string | null;
+  ativo: boolean;
+  created_at: string;
+  roles: AppRole[];
+}
+
 export default function Administracao() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const { setTheme } = useTheme();
   const initialTab = searchParams.get('tab') || 'empresa';
   const [config, setConfig] = useState(defaultConfig);
   const [activeSection, setActiveSection] = useState(initialTab);
@@ -59,28 +106,30 @@ export default function Administracao() {
   const [saving, setSaving] = useState(false);
   const [empresaConfigId, setEmpresaConfigId] = useState<string | null>(null);
 
+  // ── Users state ──
+  const [users, setUsers] = useState<UserWithRoles[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [roleUpdating, setRoleUpdating] = useState<string | null>(null);
+
   useEffect(() => {
     const tab = searchParams.get('tab');
     if (tab && tab !== activeSection) setActiveSection(tab);
   }, [searchParams]);
 
+  // ── Load config ──
   useEffect(() => {
     let mounted = true;
-
     const loadConfig = async () => {
       setLoading(true);
       try {
         const localBackup = localStorage.getItem(STORAGE_KEY);
         const parsedBackup = localBackup ? JSON.parse(localBackup) : defaultConfig;
-
         const [{ data: empresaRows }, { data: appRows }] = await Promise.all([
-          (supabase as any).from('empresa_config').select('*').limit(1),
-          (supabase as any).from('app_configuracoes').select('chave, valor'),
+          supabase.from('empresa_config').select('*').limit(1),
+          supabase.from('app_configuracoes').select('chave, valor'),
         ]);
-
         const empresa = empresaRows?.[0];
         const appConfig = Object.fromEntries((appRows || []).map((row: any) => [row.chave, row.valor || {}]));
-
         const merged = {
           ...defaultConfig,
           ...parsedBackup,
@@ -91,16 +140,15 @@ export default function Administracao() {
             nomeFantasia: empresa?.nome_fantasia || defaultConfig.geral.nomeFantasia,
             email: empresa?.email || defaultConfig.geral.email,
             telefone: empresa?.telefone || defaultConfig.geral.telefone,
-            logoUrl: empresa?.logo_url || appConfig.geral?.logoUrl || defaultConfig.geral.logoUrl,
-            corPrimaria: appConfig.geral?.corPrimaria || defaultConfig.geral.corPrimaria,
-            corSecundaria: appConfig.geral?.corSecundaria || defaultConfig.geral.corSecundaria,
+            logoUrl: empresa?.logo_url || (appConfig.geral as any)?.logoUrl || defaultConfig.geral.logoUrl,
+            corPrimaria: (appConfig.geral as any)?.corPrimaria || defaultConfig.geral.corPrimaria,
+            corSecundaria: (appConfig.geral as any)?.corSecundaria || defaultConfig.geral.corSecundaria,
           },
           usuarios: { ...defaultConfig.usuarios, ...(parsedBackup.usuarios || {}), ...(appConfig.usuarios || {}) },
           email: { ...defaultConfig.email, ...(parsedBackup.email || {}), ...(appConfig.email || {}) },
           fiscal: { ...defaultConfig.fiscal, ...(parsedBackup.fiscal || {}), ...(appConfig.fiscal || {}) },
           financeiro: { ...defaultConfig.financeiro, ...(parsedBackup.financeiro || {}), ...(appConfig.financeiro || {}) },
         };
-
         if (mounted) {
           setEmpresaConfigId(empresa?.id || null);
           setConfig(merged);
@@ -112,10 +160,68 @@ export default function Administracao() {
         if (mounted) setLoading(false);
       }
     };
-
     loadConfig();
     return () => { mounted = false; };
   }, []);
+
+  // ── Load users when tab = usuarios ──
+  const loadUsers = useCallback(async () => {
+    setUsersLoading(true);
+    try {
+      const [{ data: profiles }, { data: roles }] = await Promise.all([
+        supabase.from('profiles').select('id, nome, email, cargo, ativo, created_at'),
+        supabase.from('user_roles').select('user_id, role'),
+      ]);
+      const roleMap = new Map<string, AppRole[]>();
+      (roles || []).forEach((r: any) => {
+        const existing = roleMap.get(r.user_id) || [];
+        existing.push(r.role as AppRole);
+        roleMap.set(r.user_id, existing);
+      });
+      const merged: UserWithRoles[] = (profiles || []).map((p: any) => ({
+        ...p,
+        roles: roleMap.get(p.id) || [],
+      }));
+      merged.sort((a, b) => a.nome.localeCompare(b.nome));
+      setUsers(merged);
+    } catch (err) {
+      console.error('[admin] Erro ao carregar usuários:', err);
+      toast.error('Erro ao carregar lista de usuários.');
+    } finally {
+      setUsersLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeSection === 'usuarios') loadUsers();
+  }, [activeSection, loadUsers]);
+
+  // ── Toggle role ──
+  const toggleRole = async (userId: string, role: AppRole, currentlyHas: boolean) => {
+    setRoleUpdating(`${userId}-${role}`);
+    try {
+      if (currentlyHas) {
+        await supabase.from('user_roles').delete().eq('user_id', userId).eq('role', role);
+      } else {
+        await supabase.from('user_roles').insert({ user_id: userId, role });
+      }
+      setUsers((prev) =>
+        prev.map((u) => {
+          if (u.id !== userId) return u;
+          return {
+            ...u,
+            roles: currentlyHas ? u.roles.filter((r) => r !== role) : [...u.roles, role],
+          };
+        })
+      );
+      toast.success(`Perfil "${ROLE_LABELS[role]}" ${currentlyHas ? 'removido' : 'atribuído'} com sucesso.`);
+    } catch (err) {
+      console.error('[admin] Erro ao alterar role:', err);
+      toast.error('Erro ao alterar perfil do usuário.');
+    } finally {
+      setRoleUpdating(null);
+    }
+  };
 
   const updateSection = <T extends keyof typeof defaultConfig>(section: T, values: Partial<(typeof defaultConfig)[T]>) => {
     setConfig((current) => ({ ...current, [section]: { ...current[section], ...values } }));
@@ -140,31 +246,26 @@ export default function Administracao() {
         telefone: config.geral.telefone,
         logo_url: config.geral.logoUrl,
       };
-
       if (empresaConfigId) {
-        await (supabase as any).from('empresa_config').update(empresaPayload).eq('id', empresaConfigId);
+        await supabase.from('empresa_config').update(empresaPayload).eq('id', empresaConfigId);
       } else {
-        const { data: insertedEmpresa } = await (supabase as any).from('empresa_config').insert(empresaPayload).select('id').single();
+        const { data: insertedEmpresa } = await supabase.from('empresa_config').insert(empresaPayload as any).select('id').single();
         if (insertedEmpresa?.id) setEmpresaConfigId(insertedEmpresa.id);
       }
-
       const appRows = [
-        { chave: 'geral', valor: { logoUrl: config.geral.logoUrl, corPrimaria: config.geral.corPrimaria, corSecundaria: config.geral.corSecundaria }, descricao: 'Configurações gerais da interface e branding' },
-        { chave: 'usuarios', valor: config.usuarios, descricao: 'Parâmetros de usuários e permissões' },
-        { chave: 'email', valor: config.email, descricao: 'Remetente e assinatura de e-mails' },
-        { chave: 'fiscal', valor: config.fiscal, descricao: 'Parâmetros fiscais padrão' },
-        { chave: 'financeiro', valor: config.financeiro, descricao: 'Parâmetros financeiros padrão' },
+        { chave: 'geral', valor: { logoUrl: config.geral.logoUrl, corPrimaria: config.geral.corPrimaria, corSecundaria: config.geral.corSecundaria } as any, descricao: 'Configurações gerais' },
+        { chave: 'usuarios', valor: config.usuarios as any, descricao: 'Parâmetros de usuários' },
+        { chave: 'email', valor: config.email as any, descricao: 'Remetente e assinatura' },
+        { chave: 'fiscal', valor: config.fiscal as any, descricao: 'Parâmetros fiscais' },
+        { chave: 'financeiro', valor: config.financeiro as any, descricao: 'Parâmetros financeiros' },
       ];
-
-      await (supabase as any).from('app_configuracoes').upsert(appRows, { onConflict: 'chave' });
+      await supabase.from('app_configuracoes').upsert(appRows, { onConflict: 'chave' });
       localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
-
-      const sectionLabel = sideNavItems.find(i => i.key === activeSection)?.label || 'seção';
-      toast.success(`${sectionLabel} salvos com sucesso.`);
+      toast.success('Configurações salvas com sucesso.');
     } catch (error: any) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
       console.error('[admin] Erro ao salvar:', error);
-      toast.error('Não foi possível salvar. Backup mantido no navegador.');
+      toast.error('Não foi possível salvar.');
     } finally {
       setSaving(false);
     }
@@ -181,6 +282,72 @@ export default function Administracao() {
       </AppLayout>
     );
   }
+
+  const renderUsuarios = () => {
+    if (usersLoading) {
+      return (
+        <Card>
+          <CardContent className="flex items-center justify-center py-12">
+            <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Carregando usuários...
+          </CardContent>
+        </Card>
+      );
+    }
+
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Usuários cadastrados ({users.length})</CardTitle>
+          <CardDescription>Gerencie perfis de acesso de cada usuário. Clique nos badges para adicionar ou remover roles.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            {users.map((user) => (
+              <div key={user.id} className="flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium truncate">{user.nome}</p>
+                  <p className="text-sm text-muted-foreground truncate">{user.email}</p>
+                  {user.cargo && <p className="text-xs text-muted-foreground">Cargo: {user.cargo}</p>}
+                  <p className="text-xs text-muted-foreground">
+                    Status: {user.ativo ? 'Ativo' : 'Inativo'}
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {ALL_ROLES.map((role) => {
+                    const has = user.roles.includes(role);
+                    const isUpdating = roleUpdating === `${user.id}-${role}`;
+                    return (
+                      <button
+                        key={role}
+                        type="button"
+                        disabled={isUpdating}
+                        onClick={() => toggleRole(user.id, role, has)}
+                        className={cn(
+                          'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-all',
+                          has ? ROLE_COLORS[role] : 'bg-muted/50 text-muted-foreground border-border opacity-60 hover:opacity-100',
+                          isUpdating && 'opacity-50 cursor-wait',
+                        )}
+                      >
+                        {isUpdating ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : null}
+                        {ROLE_LABELS[role]}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+            {users.length === 0 && (
+              <p className="text-center text-sm text-muted-foreground py-8">
+                Nenhum usuário encontrado.
+              </p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
 
   const renderContent = () => {
     switch (activeSection) {
@@ -206,46 +373,7 @@ export default function Administracao() {
         );
 
       case 'usuarios':
-        return (
-          <Card>
-            <CardHeader>
-              <CardTitle>Perfis e permissões</CardTitle>
-              <CardDescription>Defina políticas de acesso e padrões de onboarding.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-3 md:grid-cols-2">
-                <div className="flex items-center justify-between rounded-lg border p-4">
-                  <div><p className="font-medium">Permitir novos cadastros</p><p className="text-sm text-muted-foreground">Usuários podem criar registros sem intervenção admin.</p></div>
-                  <Switch checked={config.usuarios.permitirCadastro} onCheckedChange={(checked) => updateSection('usuarios', { permitirCadastro: checked })} />
-                </div>
-                <div className="flex items-center justify-between rounded-lg border p-4">
-                  <div><p className="font-medium">Exigir 2FA</p><p className="text-sm text-muted-foreground">Aumenta a segurança para perfis críticos.</p></div>
-                  <Switch checked={config.usuarios.exigir2fa} onCheckedChange={(checked) => updateSection('usuarios', { exigir2fa: checked })} />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Perfil padrão de novos usuários</Label>
-                <Select value={config.usuarios.perfilPadrao} onValueChange={(value) => updateSection('usuarios', { perfilPadrao: value })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="administrador">Administrador</SelectItem>
-                    <SelectItem value="vendedor">Vendedor</SelectItem>
-                    <SelectItem value="financeiro">Financeiro</SelectItem>
-                    <SelectItem value="estoquista">Estoquista</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid gap-3">
-                {perfis.map((perfil) => (
-                  <div key={perfil.nome} className="flex items-start justify-between rounded-lg border p-4">
-                    <div><p className="font-medium">{perfil.nome}</p><p className="text-sm text-muted-foreground">{perfil.descricao}</p></div>
-                    <Badge variant="outline">{perfil.permissao}</Badge>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        );
+        return renderUsuarios();
 
       case 'email':
         return (
@@ -276,7 +404,7 @@ export default function Administracao() {
               <div className="space-y-2"><Label>CST padrão</Label><Input value={config.fiscal.cstPadrao} onChange={(e) => updateSection('fiscal', { cstPadrao: e.target.value })} /></div>
               <div className="space-y-2"><Label>NCM padrão</Label><Input value={config.fiscal.ncmPadrao} onChange={(e) => updateSection('fiscal', { ncmPadrao: e.target.value })} /></div>
               <div className="md:col-span-2 flex items-center justify-between rounded-lg border p-4">
-                <div><p className="font-medium">Gerar financeiro por padrão</p><p className="text-sm text-muted-foreground">Flag padrão em notas fiscais emitidas ou recebidas.</p></div>
+                <div><p className="font-medium">Gerar financeiro por padrão</p><p className="text-sm text-muted-foreground">Flag padrão em notas fiscais.</p></div>
                 <Switch checked={config.fiscal.gerarFinanceiroPadrao} onCheckedChange={(checked) => updateSection('fiscal', { gerarFinanceiroPadrao: checked })} />
               </div>
             </CardContent>
@@ -311,7 +439,7 @@ export default function Administracao() {
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground mb-4">
-                Acesse o módulo completo de auditoria para visualizar logs de alterações, filtrar por módulo, usuário e período.
+                Acesse o módulo completo de auditoria para visualizar logs de alterações.
               </p>
               <Button variant="outline" onClick={() => window.location.href = '/auditoria'}>
                 <Shield className="mr-2 h-4 w-4" /> Abrir Auditoria Completa
@@ -325,11 +453,12 @@ export default function Administracao() {
     }
   };
 
+  const showSaveButton = activeSection !== 'auditoria' && activeSection !== 'usuarios';
+
   return (
     <AppLayout>
       <ModulePage title="Administração" subtitle="Governança, parâmetros globais e gestão do sistema.">
         <div className="grid gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
-          {/* Side navigation */}
           <nav className="space-y-1">
             {sideNavItems.map((item) => {
               const Icon = item.icon;
@@ -351,11 +480,9 @@ export default function Administracao() {
               );
             })}
           </nav>
-
-          {/* Content */}
           <div className="space-y-4">
             {renderContent()}
-            {activeSection !== 'auditoria' && (
+            {showSaveButton && (
               <div className="flex justify-end">
                 <Button onClick={handleSave} disabled={saving} className="gap-2">
                   {saving && <Loader2 className="h-4 w-4 animate-spin" />}
