@@ -68,7 +68,7 @@ export function MobileMenu({ open, onOpenChange, onOpenSearch }: MobileMenuProps
             </div>
           </section>
 
-          {mobileMenuSections.map((section) => (
+          {filteredSections.map((section) => (
             <section key={section.key} className="mb-5 rounded-2xl border bg-card/70 p-4">
               <div className="mb-3 flex items-center gap-2">
                 <section.icon className="h-4 w-4 text-primary" />
