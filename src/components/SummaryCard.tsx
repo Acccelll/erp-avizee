@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { forwardRef } from 'react';
 import { ArrowUpIcon, ArrowDownIcon, LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
