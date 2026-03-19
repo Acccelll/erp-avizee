@@ -1,19 +1,23 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { AppLayout } from "@/components/AppLayout";
 import { ModulePage } from "@/components/ModulePage";
 import { DataTable, StatusBadge } from "@/components/DataTable";
 import { FormModal } from "@/components/FormModal";
 import { ViewDrawer } from "@/components/ViewDrawer";
+import { SummaryCard } from "@/components/SummaryCard";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { formatCurrency } from "@/lib/format";
 import { supabase } from "@/integrations/supabase/client";
+import { DollarSign, Clock, AlertTriangle, CheckCircle, CalendarClock, Download } from "lucide-react";
 
 interface Lancamento {
   id: string; tipo: string; descricao: string; valor: number;
@@ -61,6 +65,8 @@ const Financeiro = () => {
   const [filterStatus, setFilterStatus] = useState("todos");
   const [filterTipo, setFilterTipo] = useState<string>(tipoParam || "todos");
   const [filterBanco, setFilterBanco] = useState("todos");
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => { if (tipoParam) setFilterTipo(tipoParam); }, [tipoParam]);
 
@@ -115,11 +121,13 @@ const Financeiro = () => {
     setSaving(false);
   };
 
+  const hoje = useMemo(() => {
+    const d = new Date(); d.setHours(0, 0, 0, 0); return d;
+  }, []);
+
   const getEffectiveStatus = (lancamento: Lancamento) => {
     const status = (lancamento.status || "").toLowerCase();
     if (status === "aberto" && lancamento.data_vencimento) {
-      const hoje = new Date();
-      hoje.setHours(0, 0, 0, 0);
       const vencimento = new Date(lancamento.data_vencimento);
       vencimento.setHours(0, 0, 0, 0);
       if (vencimento < hoje) return "vencido";
@@ -127,28 +135,94 @@ const Financeiro = () => {
     return status || "aberto";
   };
 
-  const filteredData = data.filter((l) => {
-    const effectiveStatus = getEffectiveStatus(l);
-    if (filterStatus !== "todos" && effectiveStatus !== filterStatus) return false;
-    if (filterTipo !== "todos" && l.tipo !== filterTipo) return false;
-    if (filterBanco !== "todos" && l.conta_bancaria_id !== filterBanco) return false;
-    return true;
-  });
+  const filteredData = useMemo(() => {
+    const query = searchTerm.trim().toLowerCase();
+    return data.filter((l) => {
+      const effectiveStatus = getEffectiveStatus(l);
+      if (filterStatus !== "todos" && effectiveStatus !== filterStatus) return false;
+      if (filterTipo !== "todos" && l.tipo !== filterTipo) return false;
+      if (filterBanco !== "todos" && l.conta_bancaria_id !== filterBanco) return false;
+      if (query) {
+        const haystack = [l.descricao, l.clientes?.nome_razao_social, l.fornecedores?.nome_razao_social].filter(Boolean).join(" ").toLowerCase();
+        if (!haystack.includes(query)) return false;
+      }
+      return true;
+    });
+  }, [data, filterStatus, filterTipo, filterBanco, searchTerm, hoje]);
 
-  const totalFiltered = filteredData.reduce((s, l) => s + Number(l.valor || 0), 0);
+  // KPI calculations
+  const kpis = useMemo(() => {
+    const hojeStr = hoje.toISOString().split("T")[0];
+    let aVencer = 0, venceHoje = 0, vencido = 0, pagoNoPeriodo = 0;
+    let totalAVencer = 0, totalVencido = 0, totalPago = 0;
+    // Aging buckets
+    let age1_30 = 0, age31_60 = 0, age61_90 = 0, age90plus = 0;
+
+    const filtered = filterTipo === "todos" ? data : data.filter(l => l.tipo === filterTipo);
+
+    filtered.forEach(l => {
+      const val = Number(l.valor || 0);
+      const effectiveStatus = getEffectiveStatus(l);
+
+      if (effectiveStatus === "pago") {
+        pagoNoPeriodo++;
+        totalPago += val;
+      } else if (effectiveStatus === "vencido") {
+        vencido++;
+        totalVencido += val;
+        // Calculate aging days
+        const vencDate = new Date(l.data_vencimento);
+        const diffDays = Math.floor((hoje.getTime() - vencDate.getTime()) / (1000 * 60 * 60 * 24));
+        if (diffDays <= 30) age1_30 += val;
+        else if (diffDays <= 60) age31_60 += val;
+        else if (diffDays <= 90) age61_90 += val;
+        else age90plus += val;
+      } else if (effectiveStatus === "aberto") {
+        if (l.data_vencimento === hojeStr) {
+          venceHoje++;
+        }
+        aVencer++;
+        totalAVencer += val;
+      }
+    });
+
+    return { aVencer, venceHoje, vencido, pagoNoPeriodo, totalAVencer, totalVencido, totalPago, age1_30, age31_60, age61_90, age90plus };
+  }, [data, filterTipo, hoje]);
+
+  // Batch payment
+  const handleBatchPayment = async () => {
+    if (selectedIds.length === 0) { toast.error("Selecione os lançamentos para dar baixa"); return; }
+    try {
+      const today = new Date().toISOString().split("T")[0];
+      for (const id of selectedIds) {
+        await (supabase as any).from("financeiro_lancamentos").update({
+          status: "pago", data_pagamento: today,
+        }).eq("id", id);
+      }
+      toast.success(`${selectedIds.length} lançamento(s) baixado(s) com sucesso!`);
+      setSelectedIds([]);
+      // Refresh data
+      window.location.reload();
+    } catch {
+      toast.error("Erro ao processar baixa em lote");
+    }
+  };
+
+  const tipoLabel = filterTipo === "receber" ? "Contas a Receber" : filterTipo === "pagar" ? "Contas a Pagar" : "Financeiro";
 
   const columns = [
     { key: "tipo", label: "Tipo", render: (l: Lancamento) => l.tipo === "receber" ? "A Receber" : "A Pagar" },
     { key: "descricao", label: "Descrição" },
-    { key: "parceiro", label: "Parceiro", render: (l: Lancamento) => l.tipo === "receber" ? (l as any).clientes?.nome_razao_social || "—" : (l as any).fornecedores?.nome_razao_social || "—" },
+    { key: "parceiro", label: "Parceiro", render: (l: Lancamento) => l.tipo === "receber" ? l.clientes?.nome_razao_social || "—" : l.fornecedores?.nome_razao_social || "—" },
     { key: "valor", label: "Valor", render: (l: Lancamento) => <span className="font-semibold mono">{formatCurrency(Number(l.valor))}</span> },
     { key: "data_vencimento", label: "Vencimento", render: (l: Lancamento) => {
       const d = new Date(l.data_vencimento);
-      const isOverdue = l.status === "aberto" && d < new Date();
-      return <span className={isOverdue ? "text-destructive font-semibold" : ""}>{d.toLocaleDateString("pt-BR")}</span>;
+      const isOverdue = getEffectiveStatus(l) === "vencido";
+      const isToday = l.data_vencimento === hoje.toISOString().split("T")[0];
+      return <span className={isOverdue ? "text-destructive font-semibold" : isToday ? "text-warning font-semibold" : ""}>{d.toLocaleDateString("pt-BR")}</span>;
     }},
     { key: "conta_bancaria", label: "Banco/Conta", render: (l: Lancamento) => {
-      if (!l.contas_bancarias) return "—";
+      if (!l.contas_bancarias) return <span className="text-muted-foreground text-xs">—</span>;
       return <span className="text-xs">{l.contas_bancarias.bancos?.nome} - {l.contas_bancarias.descricao}</span>;
     }},
     { key: "forma_pagamento", label: "Forma", render: (l: Lancamento) => l.forma_pagamento || "—" },
@@ -157,24 +231,44 @@ const Financeiro = () => {
 
   return (
     <AppLayout>
-      <ModulePage title="Financeiro" subtitle="Contas a pagar e receber" addLabel="Novo Lançamento" onAdd={openCreate} count={filteredData.length}>
-        {/* Summary bar */}
-        <div className="flex flex-wrap items-center gap-4 mb-4 p-3 bg-muted/30 rounded-lg border">
-          <div className="text-sm">
-            <span className="text-muted-foreground">Total filtrado: </span>
-            <span className="font-bold mono">{formatCurrency(totalFiltered)}</span>
-          </div>
-          <div className="text-sm">
-            <span className="text-muted-foreground">Lançamentos: </span>
-            <span className="font-bold mono">{filteredData.length}</span>
-          </div>
+      <ModulePage title={tipoLabel} subtitle="Gestão de contas a pagar e receber" addLabel="Novo Lançamento" onAdd={openCreate} count={filteredData.length}
+        searchValue={searchTerm} onSearchChange={setSearchTerm} searchPlaceholder="Buscar por descrição ou parceiro...">
+
+        {/* KPI Summary Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <SummaryCard title="A Vencer" value={kpis.aVencer.toString()} subtitle={formatCurrency(kpis.totalAVencer)} icon={CalendarClock} variant="info" onClick={() => setFilterStatus("aberto")} />
+          <SummaryCard title="Vence Hoje" value={kpis.venceHoje.toString()} icon={Clock} variant="warning" />
+          <SummaryCard title="Vencidos" value={kpis.vencido.toString()} subtitle={formatCurrency(kpis.totalVencido)} icon={AlertTriangle} variant="danger" onClick={() => setFilterStatus("vencido")} />
+          <SummaryCard title="Pagos" value={kpis.pagoNoPeriodo.toString()} subtitle={formatCurrency(kpis.totalPago)} icon={CheckCircle} variant="success" onClick={() => setFilterStatus("pago")} />
         </div>
+
+        {/* Aging bar (only when vencidos exist) */}
+        {kpis.totalVencido > 0 && (
+          <div className="mb-4 rounded-lg border bg-card p-4">
+            <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-destructive" /> Aging — Vencidos por faixa
+            </h4>
+            <div className="flex gap-4 flex-wrap">
+              {[
+                { label: "1-30 dias", value: kpis.age1_30, color: "bg-warning/20 text-warning" },
+                { label: "31-60 dias", value: kpis.age31_60, color: "bg-orange-500/20 text-orange-600" },
+                { label: "61-90 dias", value: kpis.age61_90, color: "bg-destructive/20 text-destructive" },
+                { label: "90+ dias", value: kpis.age90plus, color: "bg-destructive/30 text-destructive font-bold" },
+              ].map(bucket => (
+                <div key={bucket.label} className={`rounded-lg px-4 py-2 ${bucket.color}`}>
+                  <p className="text-xs font-medium">{bucket.label}</p>
+                  <p className="text-sm font-bold mono">{formatCurrency(bucket.value)}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Filter bars */}
         <div className="flex flex-wrap gap-2 mb-4">
           <div className="flex gap-1 mr-4">
             {["todos", "receber", "pagar"].map(t => (
-              <Button key={t} size="sm" variant={filterTipo === t ? "default" : "outline"} onClick={() => setFilterTipo(t)} className="capitalize">
+              <Button key={t} size="sm" variant={filterTipo === t ? "default" : "outline"} onClick={() => setFilterTipo(t)}>
                 {t === "todos" ? "Todos" : t === "receber" ? "A Receber" : "A Pagar"}
               </Button>
             ))}
@@ -199,8 +293,17 @@ const Financeiro = () => {
               </SelectContent>
             </Select>
           )}
+
+          {/* Batch actions */}
+          {selectedIds.length > 0 && (
+            <Button size="sm" variant="default" className="ml-auto gap-2" onClick={handleBatchPayment}>
+              <Download className="w-3.5 h-3.5" /> Baixar {selectedIds.length} selecionado(s)
+            </Button>
+          )}
         </div>
+
         <DataTable columns={columns} data={filteredData} loading={loading}
+          selectable selectedIds={selectedIds} onSelectionChange={setSelectedIds}
           onView={(l) => { setSelected(l); setDrawerOpen(true); }}
           onEdit={openEdit} onDelete={(l) => remove(l.id)} />
       </ModulePage>
@@ -270,7 +373,6 @@ const Financeiro = () => {
             )}
           </div>
 
-          {/* Conta Contábil */}
           {contasContabeis.length > 0 && (
             <div className="space-y-2">
               <Label>Conta Contábil (opcional)</Label>
@@ -305,7 +407,7 @@ const Financeiro = () => {
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-4">
               <div><span className="text-xs text-muted-foreground">Tipo</span><p>{selected.tipo === "receber" ? "A Receber" : "A Pagar"}</p></div>
-              <div><span className="text-xs text-muted-foreground">Status</span><StatusBadge status={selected.status} /></div>
+              <div><span className="text-xs text-muted-foreground">Status</span><StatusBadge status={getEffectiveStatus(selected)} /></div>
             </div>
             <div><span className="text-xs text-muted-foreground">Descrição</span><p className="font-medium">{selected.descricao}</p></div>
             <div className="grid grid-cols-2 gap-4">
@@ -322,7 +424,18 @@ const Financeiro = () => {
               </div>
             </div>
             {selected.parcela_numero && (
-              <div><span className="text-xs text-muted-foreground">Parcela</span><p>{selected.parcela_numero}/{selected.parcela_total}</p></div>
+              <div><span className="text-xs text-muted-foreground">Parcela</span><p className="mono">{selected.parcela_numero}/{selected.parcela_total}</p></div>
+            )}
+            <div className="grid grid-cols-2 gap-4">
+              <div><span className="text-xs text-muted-foreground">Parceiro</span>
+                <p>{selected.tipo === "receber" ? selected.clientes?.nome_razao_social : selected.fornecedores?.nome_razao_social || "—"}</p>
+              </div>
+              {selected.nota_fiscal_id && (
+                <div><span className="text-xs text-muted-foreground">Origem</span><Badge variant="outline" className="text-xs">NF vinculada</Badge></div>
+              )}
+            </div>
+            {selected.observacoes && (
+              <div className="border-t pt-2"><span className="text-xs text-muted-foreground">Observações</span><p className="text-sm">{selected.observacoes}</p></div>
             )}
           </div>
         )}

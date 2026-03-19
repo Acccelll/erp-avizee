@@ -1,15 +1,18 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { AppLayout } from "@/components/AppLayout";
 import { ModulePage } from "@/components/ModulePage";
 import { DataTable } from "@/components/DataTable";
 import { FormModal } from "@/components/FormModal";
 import { ViewDrawer } from "@/components/ViewDrawer";
+import { SummaryCard } from "@/components/SummaryCard";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
+import { formatCurrency } from "@/lib/format";
+import { Wallet, TrendingUp, TrendingDown, ArrowUpDown } from "lucide-react";
 
 interface CaixaMov {
   id: string; tipo: string; descricao: string; valor: number;
@@ -23,8 +26,28 @@ const Caixa = () => {
   const [selected, setSelected] = useState<CaixaMov | null>(null);
   const [form, setForm] = useState({ tipo: "suprimento", descricao: "", valor: 0 });
   const [saving, setSaving] = useState(false);
+  const [filterTipo, setFilterTipo] = useState("todos");
 
   const saldoAtual = data.length > 0 ? Number(data[0].saldo_atual) : 0;
+
+  const kpis = useMemo(() => {
+    const today = new Date().toISOString().split("T")[0];
+    let entradasHoje = 0, saidasHoje = 0, movHoje = 0;
+    data.forEach(m => {
+      if (m.created_at.startsWith(today)) {
+        movHoje++;
+        const positive = ["abertura", "suprimento", "venda"].includes(m.tipo);
+        if (positive) entradasHoje += Number(m.valor);
+        else saidasHoje += Number(m.valor);
+      }
+    });
+    return { entradasHoje, saidasHoje, movHoje };
+  }, [data]);
+
+  const filteredData = useMemo(() => {
+    if (filterTipo === "todos") return data;
+    return data.filter(m => m.tipo === filterTipo);
+  }, [data, filterTipo]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,17 +74,34 @@ const Caixa = () => {
     { key: "valor", label: "Valor", render: (m: CaixaMov) => {
       const positive = ["abertura", "suprimento", "venda"].includes(m.tipo);
       return <span className={positive ? "text-success font-semibold" : "text-destructive font-semibold"}>
-        {positive ? "+" : "-"}R$ {Number(m.valor).toFixed(2)}
+        {positive ? "+" : "-"}{formatCurrency(Number(m.valor))}
       </span>;
     }},
-    { key: "saldo_atual", label: "Saldo", render: (m: CaixaMov) => <span className="font-semibold">R$ {Number(m.saldo_atual).toFixed(2)}</span> },
+    { key: "saldo_atual", label: "Saldo", render: (m: CaixaMov) => <span className="font-semibold mono">{formatCurrency(Number(m.saldo_atual))}</span> },
     { key: "created_at", label: "Data/Hora", render: (m: CaixaMov) => new Date(m.created_at).toLocaleString("pt-BR") },
   ];
 
   return (
     <AppLayout>
-      <ModulePage title="Caixa" subtitle={`Saldo atual: R$ ${saldoAtual.toFixed(2)}`} addLabel="Nova Movimentação" onAdd={() => setModalOpen(true)} count={data.length}>
-        <DataTable columns={columns} data={data} loading={loading}
+      <ModulePage title="Caixa" subtitle="Movimentações e controle de caixa" addLabel="Nova Movimentação" onAdd={() => setModalOpen(true)} count={filteredData.length}>
+        {/* KPI Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <SummaryCard title="Saldo Atual" value={formatCurrency(saldoAtual)} icon={Wallet} variant={saldoAtual >= 0 ? "success" : "danger"} />
+          <SummaryCard title="Entradas Hoje" value={formatCurrency(kpis.entradasHoje)} icon={TrendingUp} variant="success" />
+          <SummaryCard title="Saídas Hoje" value={formatCurrency(kpis.saidasHoje)} icon={TrendingDown} variant="danger" />
+          <SummaryCard title="Mov. Hoje" value={kpis.movHoje.toString()} icon={ArrowUpDown} variant="info" />
+        </div>
+
+        {/* Type filter */}
+        <div className="flex gap-1 mb-4">
+          {["todos", "abertura", "suprimento", "sangria", "venda", "pagamento", "fechamento"].map(t => (
+            <Button key={t} size="sm" variant={filterTipo === t ? "default" : "outline"} onClick={() => setFilterTipo(t)}>
+              {t === "todos" ? "Todos" : typeLabels[t] || t}
+            </Button>
+          ))}
+        </div>
+
+        <DataTable columns={columns} data={filteredData} loading={loading}
           onView={(m) => { setSelected(m); setDrawerOpen(true); }} />
       </ModulePage>
 
@@ -94,10 +134,10 @@ const Caixa = () => {
           <div className="space-y-3">
             <div><span className="text-xs text-muted-foreground">Tipo</span><p>{typeLabels[selected.tipo]}</p></div>
             <div><span className="text-xs text-muted-foreground">Descrição</span><p className="font-medium">{selected.descricao}</p></div>
-            <div><span className="text-xs text-muted-foreground">Valor</span><p className="font-semibold">R$ {Number(selected.valor).toFixed(2)}</p></div>
+            <div><span className="text-xs text-muted-foreground">Valor</span><p className="font-semibold">{formatCurrency(Number(selected.valor))}</p></div>
             <div className="grid grid-cols-2 gap-4">
-              <div><span className="text-xs text-muted-foreground">Saldo Anterior</span><p>R$ {Number(selected.saldo_anterior).toFixed(2)}</p></div>
-              <div><span className="text-xs text-muted-foreground">Saldo Atual</span><p className="font-semibold">R$ {Number(selected.saldo_atual).toFixed(2)}</p></div>
+              <div><span className="text-xs text-muted-foreground">Saldo Anterior</span><p>{formatCurrency(Number(selected.saldo_anterior))}</p></div>
+              <div><span className="text-xs text-muted-foreground">Saldo Atual</span><p className="font-semibold">{formatCurrency(Number(selected.saldo_atual))}</p></div>
             </div>
           </div>
         )}

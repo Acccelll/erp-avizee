@@ -1,12 +1,15 @@
 import { useState, useEffect, useMemo } from "react";
 import { AppLayout } from "@/components/AppLayout";
+import { SummaryCard } from "@/components/SummaryCard";
 import { supabase } from "@/integrations/supabase/client";
 import { formatCurrency } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { TrendingUp, TrendingDown, Wallet, ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { TrendingUp, TrendingDown, Wallet, AlertTriangle } from "lucide-react";
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 
 interface Lancamento {
   id: string; tipo: string; valor: number; status: string;
@@ -60,7 +63,6 @@ const FluxoCaixa = () => {
     return lancamentos.filter(l => l.conta_bancaria_id === filterBanco);
   }, [lancamentos, filterBanco]);
 
-  // Group by period
   const grouped = useMemo(() => {
     const groups: Record<string, { prevReceber: number; prevPagar: number; realReceber: number; realPagar: number; items: Lancamento[] }> = {};
 
@@ -93,7 +95,6 @@ const FluxoCaixa = () => {
     return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
   }, [filtered, periodicidade]);
 
-  // Totals
   const totals = useMemo(() => {
     let prevReceber = 0, prevPagar = 0, realReceber = 0, realPagar = 0;
     filtered.forEach(l => {
@@ -104,6 +105,23 @@ const FluxoCaixa = () => {
     return { prevReceber, prevPagar, realReceber, realPagar, saldoPrevisto: prevReceber - prevPagar, saldoRealizado: realReceber - realPagar };
   }, [filtered]);
 
+  // Chart data
+  const chartData = useMemo(() => {
+    let saldoAcumPrev = 0;
+    let saldoAcumReal = 0;
+    return grouped.map(([key, g]) => {
+      saldoAcumPrev += (g.prevReceber - g.prevPagar);
+      saldoAcumReal += (g.realReceber - g.realPagar);
+      const label = periodicidade === "diaria"
+        ? new Date(key + "T00:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
+        : key;
+      return { name: label, previsto: saldoAcumPrev, realizado: saldoAcumReal };
+    });
+  }, [grouped, periodicidade]);
+
+  // Risk detection
+  const hasNegativeRisk = chartData.some(d => d.previsto < 0);
+
   return (
     <AppLayout>
       <div className="mb-6">
@@ -113,29 +131,42 @@ const FluxoCaixa = () => {
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <div className="stat-card border-l-4 border-l-success">
-          <p className="text-xs text-muted-foreground font-medium">Entradas Previstas</p>
-          <p className="text-lg font-bold mono mt-1 text-success">{formatCurrency(totals.prevReceber)}</p>
-          <p className="text-xs text-muted-foreground">Realizado: {formatCurrency(totals.realReceber)}</p>
-        </div>
-        <div className="stat-card border-l-4 border-l-destructive">
-          <p className="text-xs text-muted-foreground font-medium">Saídas Previstas</p>
-          <p className="text-lg font-bold mono mt-1 text-destructive">{formatCurrency(totals.prevPagar)}</p>
-          <p className="text-xs text-muted-foreground">Realizado: {formatCurrency(totals.realPagar)}</p>
-        </div>
-        <div className="stat-card border-l-4 border-l-primary">
-          <p className="text-xs text-muted-foreground font-medium">Saldo Previsto</p>
-          <p className={`text-lg font-bold mono mt-1 ${totals.saldoPrevisto >= 0 ? "text-success" : "text-destructive"}`}>
-            {formatCurrency(totals.saldoPrevisto)}
-          </p>
-        </div>
-        <div className="stat-card border-l-4 border-l-info">
-          <p className="text-xs text-muted-foreground font-medium">Saldo Realizado</p>
-          <p className={`text-lg font-bold mono mt-1 ${totals.saldoRealizado >= 0 ? "text-success" : "text-destructive"}`}>
-            {formatCurrency(totals.saldoRealizado)}
-          </p>
-        </div>
+        <SummaryCard title="Entradas Previstas" value={formatCurrency(totals.prevReceber)} subtitle={`Realizado: ${formatCurrency(totals.realReceber)}`} icon={TrendingUp} variant="success" />
+        <SummaryCard title="Saídas Previstas" value={formatCurrency(totals.prevPagar)} subtitle={`Realizado: ${formatCurrency(totals.realPagar)}`} icon={TrendingDown} variant="danger" />
+        <SummaryCard title="Saldo Previsto" value={formatCurrency(totals.saldoPrevisto)} icon={Wallet} variant={totals.saldoPrevisto >= 0 ? "success" : "danger"} />
+        <SummaryCard title="Saldo Realizado" value={formatCurrency(totals.saldoRealizado)} icon={Wallet} variant={totals.saldoRealizado >= 0 ? "info" : "danger"} />
       </div>
+
+      {/* Risk alert */}
+      {hasNegativeRisk && (
+        <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/5 p-3 flex items-center gap-2 text-destructive text-sm">
+          <AlertTriangle className="w-4 h-4 shrink-0" />
+          <span className="font-medium">Atenção: o saldo previsto ficará negativo em algum período. Considere antecipar recebíveis ou postergar pagamentos.</span>
+        </div>
+      )}
+
+      {/* Chart */}
+      {chartData.length > 0 && (
+        <Card className="mb-6">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Saldo Acumulado — Previsto vs Realizado</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                  <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
+                  <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                  <Area type="monotone" dataKey="previsto" stroke="hsl(var(--primary))" fill="hsl(var(--primary) / 0.15)" strokeWidth={2} name="Previsto" />
+                  <Area type="monotone" dataKey="realizado" stroke="hsl(var(--success))" fill="hsl(var(--success) / 0.15)" strokeWidth={2} name="Realizado" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Filters */}
       <div className="flex flex-wrap items-end gap-4 mb-6 p-4 bg-card rounded-xl border">
@@ -197,10 +228,8 @@ const FluxoCaixa = () => {
                 let saldoAcumPrev = 0;
                 let saldoAcumReal = 0;
                 return grouped.map(([key, g]) => {
-                  const saldoPeriodo = g.prevReceber - g.prevPagar;
-                  const saldoRealPeriodo = g.realReceber - g.realPagar;
-                  saldoAcumPrev += saldoPeriodo;
-                  saldoAcumReal += saldoRealPeriodo;
+                  saldoAcumPrev += (g.prevReceber - g.prevPagar);
+                  saldoAcumReal += (g.realReceber - g.realPagar);
                   return (
                     <tr key={key} className="border-b hover:bg-muted/10">
                       <td className="p-3 font-medium">
@@ -246,7 +275,7 @@ const FluxoCaixa = () => {
             {contasBancarias.map(c => (
               <div
                 key={c.id}
-                className={`stat-card cursor-pointer ${filterBanco === c.id ? "ring-2 ring-primary" : ""}`}
+                className={`stat-card cursor-pointer transition-all ${filterBanco === c.id ? "ring-2 ring-primary" : ""}`}
                 onClick={() => setFilterBanco(filterBanco === c.id ? "todos" : c.id)}
               >
                 <p className="text-xs text-muted-foreground font-medium">{c.bancos?.nome}</p>

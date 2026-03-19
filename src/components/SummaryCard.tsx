@@ -2,21 +2,33 @@ import React from 'react';
 import { ArrowUpIcon, ArrowDownIcon, LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-interface SummaryCardProps {
+export interface SummaryCardProps {
   title: string;
   value: string | number;
+  subtitle?: string;
   variation?: string;
   variationType?: 'positive' | 'negative' | 'neutral';
+  variant?: 'default' | 'success' | 'danger' | 'warning' | 'info';
   icon?: LucideIcon;
   onClick?: () => void;
   className?: string;
 }
 
+const variantStyles: Record<string, { border: string; iconBg: string; iconColor: string }> = {
+  default: { border: '', iconBg: 'bg-accent', iconColor: 'text-primary' },
+  success: { border: 'border-l-4 border-l-success', iconBg: 'bg-success/10', iconColor: 'text-success' },
+  danger: { border: 'border-l-4 border-l-destructive', iconBg: 'bg-destructive/10', iconColor: 'text-destructive' },
+  warning: { border: 'border-l-4 border-l-warning', iconBg: 'bg-warning/10', iconColor: 'text-warning' },
+  info: { border: 'border-l-4 border-l-primary', iconBg: 'bg-primary/10', iconColor: 'text-primary' },
+};
+
 export function SummaryCard({
   title,
   value,
+  subtitle,
   variation,
   variationType = 'neutral',
+  variant = 'default',
   icon: Icon,
   onClick,
   className,
@@ -27,10 +39,13 @@ export function SummaryCard({
     neutral: 'text-muted-foreground',
   };
 
+  const styles = variantStyles[variant] || variantStyles.default;
+
   return (
     <div
       className={cn(
         'stat-card',
+        styles.border,
         onClick && 'cursor-pointer hover:border-primary/30 active:scale-[0.98]',
         className
       )}
@@ -43,6 +58,9 @@ export function SummaryCard({
         <div className="min-w-0 flex-1">
           <p className="text-sm text-muted-foreground font-medium tracking-wide truncate">{title}</p>
           <p className="text-2xl font-bold mt-1 tracking-tight">{value}</p>
+          {subtitle && (
+            <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>
+          )}
           {variation && (
             <div className={cn('flex items-center gap-1 text-xs mt-1 font-medium', variationColors[variationType])}>
               {variationType === 'positive' && <ArrowUpIcon className="h-3 w-3" />}
@@ -52,8 +70,8 @@ export function SummaryCard({
           )}
         </div>
         {Icon && (
-          <div className="p-3 rounded-lg bg-accent">
-            <Icon className="w-5 h-5 text-primary" />
+          <div className={cn('p-3 rounded-lg', styles.iconBg)}>
+            <Icon className={cn('w-5 h-5', styles.iconColor)} />
           </div>
         )}
       </div>
