@@ -110,7 +110,6 @@ export function MobileMenu({ open, onOpenChange, onOpenSearch }: MobileMenuProps
               <Button variant="ghost" className="h-11 w-full justify-start rounded-xl" onClick={() => handleNavigate('/configuracoes')}>
                 <Settings className="mr-2 h-4 w-4" /> Configurações
               </Button>
-              </Button>
               <Button
                 variant="ghost"
                 className="h-11 w-full justify-start rounded-xl"
