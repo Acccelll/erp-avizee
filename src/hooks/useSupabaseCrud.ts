@@ -51,7 +51,8 @@ export function useSupabaseCrud<T extends Record<string, any>>({
   const create = async (record: Partial<T>) => {
     const { data: result, error } = await (supabase as any).from(table).insert(record).select().single();
     if (error) {
-      toast.error(`Erro ao criar: ${error.message}`);
+      console.error(`[crud] Erro ao criar em ${table}:`, error);
+      toast.error("Erro ao criar registro. Tente novamente.");
       throw error;
     }
     toast.success("Registro criado com sucesso!");
