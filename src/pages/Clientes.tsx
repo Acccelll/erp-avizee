@@ -210,9 +210,9 @@ const Clientes = () => {
           <h3 className="font-semibold text-sm pt-2 border-t flex items-center gap-2"><Building2 className="w-4 h-4" /> Grupo Econômico</h3>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2"><Label>Grupo</Label>
-              <Select value={form.grupo_economico_id} onValueChange={(v) => setForm({ ...form, grupo_economico_id: v })}>
+              <Select value={form.grupo_economico_id || "nenhum"} onValueChange={(v) => setForm({ ...form, grupo_economico_id: v === "nenhum" ? "" : v })}>
                 <SelectTrigger><SelectValue placeholder="Nenhum" /></SelectTrigger>
-                <SelectContent><SelectItem value="">Nenhum</SelectItem>{grupos.map(g => <SelectItem key={g.id} value={g.id}>{g.nome}</SelectItem>)}</SelectContent>
+                <SelectContent><SelectItem value="nenhum">Nenhum</SelectItem>{grupos.map(g => <SelectItem key={g.id} value={g.id}>{g.nome}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div className="space-y-2"><Label>Tipo de Relação</Label>
