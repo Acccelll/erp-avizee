@@ -1,14 +1,179 @@
+import { useMemo, useState } from "react";
 import { AppLayout } from "@/components/AppLayout";
 import { ModulePage } from "@/components/ModulePage";
+import { DataTable, StatusBadge } from "@/components/DataTable";
+import { FormModal } from "@/components/FormModal";
+import { ViewDrawer } from "@/components/ViewDrawer";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { MaskedInput } from "@/components/ui/MaskedInput";
+import { toast } from "sonner";
+import { Truck } from "lucide-react";
+import { useState as useLocalState } from "react";
+
+// Local state since no DB table yet - ready for future migration
+interface Transportadora {
+  id: string;
+  nome_razao_social: string;
+  nome_fantasia: string;
+  cpf_cnpj: string;
+  contato: string;
+  telefone: string;
+  email: string;
+  cidade: string;
+  uf: string;
+  modalidade: string;
+  prazo_medio: string;
+  observacoes: string;
+  ativo: boolean;
+  created_at: string;
+}
+
+// Mock data store (will be replaced with useSupabaseCrud when table exists)
+const useMockTransportadoras = () => {
+  const [items, setItems] = useState<Transportadora[]>([]);
+  const create = (payload: any) => {
+    const item = { ...payload, id: crypto.randomUUID(), ativo: true, created_at: new Date().toISOString() };
+    setItems(prev => [...prev, item]);
+    toast.success("Transportadora cadastrada!");
+    return item;
+  };
+  const update = (id: string, payload: any) => {
+    setItems(prev => prev.map(i => i.id === id ? { ...i, ...payload } : i));
+    toast.success("Transportadora atualizada!");
+  };
+  const remove = (id: string) => {
+    setItems(prev => prev.filter(i => i.id !== id));
+    toast.success("Transportadora removida!");
+  };
+  return { data: items, loading: false, create, update, remove };
+};
+
+const emptyForm: Record<string, any> = {
+  nome_razao_social: "", nome_fantasia: "", cpf_cnpj: "", contato: "",
+  telefone: "", email: "", cidade: "", uf: "", modalidade: "rodoviario",
+  prazo_medio: "", observacoes: "",
+};
 
 export default function Transportadoras() {
+  const { data, loading, create, update, remove } = useMockTransportadoras();
+  const [modalOpen, setModalOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [selected, setSelected] = useState<Transportadora | null>(null);
+  const [mode, setMode] = useState<"create" | "edit">("create");
+  const [form, setForm] = useState(emptyForm);
+  const [saving, setSaving] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const openCreate = () => { setMode("create"); setForm({...emptyForm}); setSelected(null); setModalOpen(true); };
+  const openEdit = (t: Transportadora) => {
+    setMode("edit"); setSelected(t);
+    setForm({
+      nome_razao_social: t.nome_razao_social, nome_fantasia: t.nome_fantasia || "",
+      cpf_cnpj: t.cpf_cnpj || "", contato: t.contato || "",
+      telefone: t.telefone || "", email: t.email || "",
+      cidade: t.cidade || "", uf: t.uf || "",
+      modalidade: t.modalidade || "rodoviario",
+      prazo_medio: t.prazo_medio || "", observacoes: t.observacoes || "",
+    });
+    setModalOpen(true);
+  };
+  const openView = (t: Transportadora) => { setSelected(t); setDrawerOpen(true); };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.nome_razao_social) { toast.error("Razão Social é obrigatória"); return; }
+    setSaving(true);
+    if (mode === "create") create(form);
+    else if (selected) update(selected.id, form);
+    setModalOpen(false);
+    setSaving(false);
+  };
+
+  const modalidadeLabel: Record<string, string> = { rodoviario: "Rodoviário", aereo: "Aéreo", maritimo: "Marítimo", ferroviario: "Ferroviário", multimodal: "Multimodal" };
+
+  const filteredData = useMemo(() => {
+    const query = searchTerm.trim().toLowerCase();
+    if (!query) return data;
+    return data.filter(t => [t.nome_razao_social, t.cpf_cnpj, t.cidade, t.uf].filter(Boolean).join(" ").toLowerCase().includes(query));
+  }, [data, searchTerm]);
+
+  const columns = [
+    { key: "nome_razao_social", label: "Razão Social" },
+    { key: "cpf_cnpj", label: "CNPJ", render: (t: Transportadora) => <span className="font-mono text-xs">{t.cpf_cnpj || "—"}</span> },
+    { key: "telefone", label: "Telefone" },
+    { key: "cidade", label: "Cidade", render: (t: Transportadora) => t.cidade ? `${t.cidade}/${t.uf}` : "—" },
+    { key: "modalidade", label: "Modalidade", render: (t: Transportadora) => modalidadeLabel[t.modalidade] || t.modalidade },
+    { key: "ativo", label: "Status", render: (t: Transportadora) => <StatusBadge status={t.ativo ? "Ativo" : "Inativo"} /> },
+  ];
+
   return (
     <AppLayout>
-      <ModulePage title="Transportadoras">
-        <div className="text-muted-foreground text-center py-12">
-          Módulo em desenvolvimento.
-        </div>
+      <ModulePage title="Transportadoras" subtitle="Cadastro de transportadoras e logística" addLabel="Nova Transportadora" onAdd={openCreate} count={filteredData.length}
+        searchValue={searchTerm} onSearchChange={setSearchTerm} searchPlaceholder="Buscar por nome ou CNPJ...">
+        <DataTable columns={columns} data={filteredData} loading={loading}
+          onView={openView} onEdit={openEdit} onDelete={(t) => remove(t.id)} />
       </ModulePage>
+
+      <FormModal open={modalOpen} onClose={() => setModalOpen(false)} title={mode === "create" ? "Nova Transportadora" : "Editar Transportadora"} size="lg">
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <div className="col-span-2 space-y-2"><Label>Razão Social *</Label><Input value={form.nome_razao_social} onChange={(e) => setForm({ ...form, nome_razao_social: e.target.value })} required /></div>
+            <div className="space-y-2"><Label>Nome Fantasia</Label><Input value={form.nome_fantasia} onChange={(e) => setForm({ ...form, nome_fantasia: e.target.value })} /></div>
+            <div className="space-y-2"><Label>CNPJ</Label><MaskedInput mask="cnpj" value={form.cpf_cnpj} onChange={(v) => setForm({ ...form, cpf_cnpj: v })} /></div>
+            <div className="space-y-2"><Label>Contato</Label><Input value={form.contato} onChange={(e) => setForm({ ...form, contato: e.target.value })} /></div>
+            <div className="space-y-2"><Label>Telefone</Label><MaskedInput mask="telefone" value={form.telefone} onChange={(v) => setForm({ ...form, telefone: v })} /></div>
+            <div className="space-y-2"><Label>E-mail</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
+            <div className="space-y-2"><Label>Cidade</Label><Input value={form.cidade} onChange={(e) => setForm({ ...form, cidade: e.target.value })} /></div>
+            <div className="space-y-2"><Label>UF</Label><Input maxLength={2} value={form.uf} onChange={(e) => setForm({ ...form, uf: e.target.value.toUpperCase() })} /></div>
+            <div className="space-y-2"><Label>Modalidade</Label>
+              <Select value={form.modalidade} onValueChange={(v) => setForm({ ...form, modalidade: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="rodoviario">Rodoviário</SelectItem>
+                  <SelectItem value="aereo">Aéreo</SelectItem>
+                  <SelectItem value="maritimo">Marítimo</SelectItem>
+                  <SelectItem value="ferroviario">Ferroviário</SelectItem>
+                  <SelectItem value="multimodal">Multimodal</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2"><Label>Prazo Médio</Label><Input value={form.prazo_medio} onChange={(e) => setForm({ ...form, prazo_medio: e.target.value })} placeholder="Ex: 3-5 dias úteis" /></div>
+          </div>
+          <div className="space-y-2"><Label>Observações Logísticas</Label><Textarea value={form.observacoes} onChange={(e) => setForm({ ...form, observacoes: e.target.value })} placeholder="Restrições, particularidades..." /></div>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setModalOpen(false)}>Cancelar</Button>
+            <Button type="submit" disabled={saving}>{saving ? "Salvando..." : "Salvar"}</Button>
+          </div>
+        </form>
+      </FormModal>
+
+      <ViewDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} title="Detalhes da Transportadora">
+        {selected && (
+          <div className="space-y-4">
+            <div className="bg-muted/30 rounded-lg p-4">
+              <div className="flex items-center gap-3 mb-2">
+                <Truck className="w-5 h-5 text-primary" />
+                <h3 className="font-semibold text-lg">{selected.nome_razao_social}</h3>
+              </div>
+              {selected.nome_fantasia && <p className="text-sm text-muted-foreground">{selected.nome_fantasia}</p>}
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div><span className="text-xs text-muted-foreground">CNPJ</span><p className="font-mono text-sm">{selected.cpf_cnpj || "—"}</p></div>
+              <div><span className="text-xs text-muted-foreground">Contato</span><p>{selected.contato || "—"}</p></div>
+              <div><span className="text-xs text-muted-foreground">Telefone</span><p>{selected.telefone || "—"}</p></div>
+              <div><span className="text-xs text-muted-foreground">E-mail</span><p>{selected.email || "—"}</p></div>
+              <div><span className="text-xs text-muted-foreground">Cidade/UF</span><p>{selected.cidade ? `${selected.cidade}/${selected.uf}` : "—"}</p></div>
+              <div><span className="text-xs text-muted-foreground">Modalidade</span><p>{modalidadeLabel[selected.modalidade] || "—"}</p></div>
+              <div><span className="text-xs text-muted-foreground">Prazo Médio</span><p>{selected.prazo_medio || "—"}</p></div>
+            </div>
+            {selected.observacoes && <div className="border-t pt-3"><span className="text-xs text-muted-foreground">Observações</span><p className="text-sm">{selected.observacoes}</p></div>}
+          </div>
+        )}
+      </ViewDrawer>
     </AppLayout>
   );
 }

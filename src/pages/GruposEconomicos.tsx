@@ -10,8 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
-import { useEffect } from "react";
-import { Building2, Users } from "lucide-react";
+import { Building2, DollarSign, AlertTriangle } from "lucide-react";
+import { formatCurrency } from "@/lib/format";
 
 interface GrupoEconomico {
   id: string;
@@ -32,10 +32,7 @@ interface ClienteDoGrupo {
   uf: string | null;
 }
 
-const emptyForm: Record<string, any> = {
-  nome: "",
-  observacoes: "",
-};
+const emptyForm: Record<string, any> = { nome: "", observacoes: "" };
 
 const GruposEconomicos = () => {
   const { data, loading, create, update, remove } = useSupabaseCrud<GrupoEconomico>({ table: "grupos_economicos" });
@@ -46,6 +43,8 @@ const GruposEconomicos = () => {
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [empresas, setEmpresas] = useState<ClienteDoGrupo[]>([]);
+  const [saldoConsolidado, setSaldoConsolidado] = useState(0);
+  const [titulosVencidos, setTitulosVencidos] = useState(0);
 
   const openCreate = () => { setMode("create"); setForm({ ...emptyForm }); setSelected(null); setModalOpen(true); };
   const openEdit = (g: GrupoEconomico) => {
@@ -59,9 +58,25 @@ const GruposEconomicos = () => {
     const { data: clientes } = await (supabase as any)
       .from("clientes")
       .select("id, nome_razao_social, nome_fantasia, cpf_cnpj, tipo_relacao_grupo, cidade, uf")
-      .eq("grupo_economico_id", g.id)
-      .eq("ativo", true);
+      .eq("grupo_economico_id", g.id).eq("ativo", true);
     setEmpresas(clientes || []);
+
+    // Consolidate financials across all group clients
+    const clienteIds = (clientes || []).map((c: any) => c.id);
+    if (clienteIds.length > 0) {
+      const { data: titulos } = await (supabase as any)
+        .from("financeiro_lancamentos")
+        .select("valor, status")
+        .in("cliente_id", clienteIds)
+        .eq("tipo", "receber").eq("ativo", true)
+        .in("status", ["aberto", "vencido"]);
+      const tots = titulos || [];
+      setSaldoConsolidado(tots.reduce((s: number, t: any) => s + Number(t.valor || 0), 0));
+      setTitulosVencidos(tots.filter((t: any) => t.status === "vencido").length);
+    } else {
+      setSaldoConsolidado(0);
+      setTitulosVencidos(0);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -76,23 +91,10 @@ const GruposEconomicos = () => {
     setSaving(false);
   };
 
-  const relacaoLabel: Record<string, string> = {
-    matriz: "Matriz",
-    filial: "Filial",
-    coligada: "Coligada",
-    independente: "Independente",
-  };
+  const relacaoLabel: Record<string, string> = { matriz: "Matriz", filial: "Filial", coligada: "Coligada", independente: "Independente" };
 
   const columns = [
     { key: "nome", label: "Nome do Grupo" },
-    {
-      key: "empresas",
-      label: "Empresas",
-      render: (g: GrupoEconomico) => {
-        // We'll show count from a simple approach
-        return <span className="text-muted-foreground text-xs">—</span>;
-      },
-    },
     { key: "ativo", label: "Status", render: (g: GrupoEconomico) => <StatusBadge status={g.ativo ? "Ativo" : "Inativo"} /> },
   ];
 
@@ -105,14 +107,8 @@ const GruposEconomicos = () => {
 
       <FormModal open={modalOpen} onClose={() => setModalOpen(false)} title={mode === "create" ? "Novo Grupo Econômico" : "Editar Grupo Econômico"}>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label>Nome do Grupo *</Label>
-            <Input value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} required />
-          </div>
-          <div className="space-y-2">
-            <Label>Observações</Label>
-            <Textarea value={form.observacoes} onChange={(e) => setForm({ ...form, observacoes: e.target.value })} />
-          </div>
+          <div className="space-y-2"><Label>Nome do Grupo *</Label><Input value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} required /></div>
+          <div className="space-y-2"><Label>Observações</Label><Textarea value={form.observacoes} onChange={(e) => setForm({ ...form, observacoes: e.target.value })} /></div>
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={() => setModalOpen(false)}>Cancelar</Button>
             <Button type="submit" disabled={saving}>{saving ? "Salvando..." : "Salvar"}</Button>
@@ -123,17 +119,37 @@ const GruposEconomicos = () => {
       <ViewDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} title="Detalhes do Grupo Econômico">
         {selected && (
           <div className="space-y-4">
-            <div>
-              <span className="text-xs text-muted-foreground">Nome</span>
-              <p className="font-medium text-lg">{selected.nome}</p>
+            {/* Header */}
+            <div className="bg-muted/30 rounded-lg p-4">
+              <h3 className="font-semibold text-lg flex items-center gap-2">
+                <Building2 className="w-5 h-5 text-primary" /> {selected.nome}
+              </h3>
+              {selected.observacoes && <p className="text-sm text-muted-foreground mt-1">{selected.observacoes}</p>}
             </div>
-            {selected.observacoes && (
-              <div>
-                <span className="text-xs text-muted-foreground">Observações</span>
-                <p className="text-sm">{selected.observacoes}</p>
+
+            {/* Consolidated KPIs */}
+            <div className="grid grid-cols-3 gap-3">
+              <div className="text-center rounded-lg border bg-muted/30 p-3">
+                <p className="text-[10px] text-muted-foreground uppercase">Empresas</p>
+                <p className="text-2xl font-bold">{empresas.length}</p>
+              </div>
+              <div className="text-center rounded-lg border bg-muted/30 p-3">
+                <p className="text-[10px] text-muted-foreground uppercase">Saldo Aberto</p>
+                <p className={`font-mono font-semibold text-sm ${saldoConsolidado > 0 ? "text-warning" : ""}`}>{formatCurrency(saldoConsolidado)}</p>
+              </div>
+              <div className="text-center rounded-lg border bg-muted/30 p-3">
+                <p className="text-[10px] text-muted-foreground uppercase">Vencidos</p>
+                <p className={`text-2xl font-bold ${titulosVencidos > 0 ? "text-destructive" : "text-success"}`}>{titulosVencidos}</p>
+              </div>
+            </div>
+
+            {titulosVencidos > 0 && (
+              <div className="flex items-center gap-2 text-xs text-destructive bg-destructive/10 rounded-lg p-2">
+                <AlertTriangle className="w-3 h-3" /> Grupo possui {titulosVencidos} título(s) vencido(s) — risco consolidado
               </div>
             )}
 
+            {/* Empresas */}
             <div className="border-t pt-4">
               <h4 className="font-semibold text-sm flex items-center gap-2 mb-3">
                 <Building2 className="w-4 h-4" /> Empresas do Grupo ({empresas.length})
@@ -147,9 +163,7 @@ const GruposEconomicos = () => {
                       <div>
                         <p className="font-medium text-sm">{emp.nome_razao_social}</p>
                         {emp.nome_fantasia && <p className="text-xs text-muted-foreground">{emp.nome_fantasia}</p>}
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          {emp.cpf_cnpj || "—"} • {emp.cidade ? `${emp.cidade}/${emp.uf}` : "—"}
-                        </p>
+                        <p className="text-xs text-muted-foreground mt-0.5">{emp.cpf_cnpj || "—"} • {emp.cidade ? `${emp.cidade}/${emp.uf}` : "—"}</p>
                       </div>
                       <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
                         {relacaoLabel[emp.tipo_relacao_grupo || "independente"] || emp.tipo_relacao_grupo}
