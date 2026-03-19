@@ -1,7 +1,8 @@
 import type { Period } from '@/components/dashboard/PeriodFilter';
 
 /**
- * Returns the ISO date string for the start of the given period.
+ * Returns the date string (YYYY-MM-DD) for the start of the given period.
+ * Uses plain date format so it works correctly with Supabase `date` columns.
  */
 export function periodToDateFrom(period: Period): string {
   const now = new Date();
@@ -27,5 +28,9 @@ export function periodToDateFrom(period: Period): string {
       d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30);
   }
 
-  return d.toISOString();
+  // Return YYYY-MM-DD format for correct comparison with Supabase date columns
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
 }
