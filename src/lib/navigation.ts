@@ -186,11 +186,12 @@ export const navSections: NavSection[] = [
       {
         title: 'Configurações',
         items: [
-          { title: 'Usuários', path: '/configuracoes?tab=usuarios' },
-          { title: 'Permissões', path: '/configuracoes?tab=usuarios' },
           { title: 'Empresa', path: '/configuracoes?tab=geral' },
+          { title: 'Usuários', path: '/configuracoes?tab=usuarios' },
           { title: 'E-mails', path: '/configuracoes?tab=email' },
           { title: 'Aparência', path: '/configuracoes?tab=aparencia' },
+          { title: 'Auditoria', path: '/auditoria', keywords: ['logs', 'historico', 'rastreabilidade'] },
+          { title: 'Meu Perfil', path: '/perfil', keywords: ['conta', 'senha'] },
         ],
       },
     ],
