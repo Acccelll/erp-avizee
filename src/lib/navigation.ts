@@ -260,6 +260,7 @@ const baseRouteLabels: Record<string, string> = {
   '/fiscal': 'Fiscal',
   '/relatorios': 'Relatórios',
   '/configuracoes': 'Configurações',
+  '/administracao': 'Administração',
   '/auditoria': 'Auditoria',
   '/perfil': 'Meu Perfil',
 };
