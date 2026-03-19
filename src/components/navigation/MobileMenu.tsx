@@ -1,4 +1,4 @@
-import { Moon, Search, Sun, User } from 'lucide-react';
+import { Moon, Search, Settings, Sun, User } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from 'next-themes';
 import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { mobileMenuSections, quickActions } from '@/lib/navigation';
 import { useAuth } from '@/contexts/AuthContext';
+import { useIsAdmin } from '@/hooks/useIsAdmin';
 
 interface MobileMenuProps {
   open: boolean;
@@ -17,6 +18,11 @@ export function MobileMenu({ open, onOpenChange, onOpenSearch }: MobileMenuProps
   const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
   const { profile, signOut } = useAuth();
+  const { isAdmin } = useIsAdmin();
+
+  const filteredSections = isAdmin
+    ? mobileMenuSections
+    : mobileMenuSections.filter((s) => s.key !== 'administracao');
 
   const handleNavigate = (path: string) => {
     onOpenChange(false);
@@ -62,7 +68,7 @@ export function MobileMenu({ open, onOpenChange, onOpenSearch }: MobileMenuProps
             </div>
           </section>
 
-          {mobileMenuSections.map((section) => (
+          {filteredSections.map((section) => (
             <section key={section.key} className="mb-5 rounded-2xl border bg-card/70 p-4">
               <div className="mb-3 flex items-center gap-2">
                 <section.icon className="h-4 w-4 text-primary" />
@@ -98,8 +104,11 @@ export function MobileMenu({ open, onOpenChange, onOpenSearch }: MobileMenuProps
                 <p className="text-sm font-semibold">{profile?.nome || 'Admin'}</p>
                 <p className="text-xs text-muted-foreground">{profile?.cargo || 'Administrador'}</p>
               </div>
-              <Button variant="ghost" className="h-11 w-full justify-start rounded-xl" onClick={() => handleNavigate('/configuracoes?tab=usuarios')}>
+              <Button variant="ghost" className="h-11 w-full justify-start rounded-xl" onClick={() => handleNavigate('/perfil')}>
                 <User className="mr-2 h-4 w-4" /> Meu perfil
+              </Button>
+              <Button variant="ghost" className="h-11 w-full justify-start rounded-xl" onClick={() => handleNavigate('/configuracoes')}>
+                <Settings className="mr-2 h-4 w-4" /> Configurações
               </Button>
               <Button
                 variant="ghost"

@@ -1,5 +1,5 @@
 import { Fragment, useMemo, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   ChevronDown,
   ChevronRight,
@@ -10,6 +10,7 @@ import {
 import logoAvizee from '@/assets/logoavizee.png';
 import { Button } from '@/components/ui/button';
 import { navSections, dashboardItem, isPathActive } from '@/lib/navigation';
+import { useIsAdmin } from '@/hooks/useIsAdmin';
 
 interface AppSidebarProps {
   collapsed: boolean;
@@ -21,7 +22,15 @@ interface AppSidebarProps {
 
 export function AppSidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMobile, onOpenSearch }: AppSidebarProps) {
   const location = useLocation();
+  const navigate = useNavigate();
   const currentRoute = `${location.pathname}${location.search}`;
+  const { isAdmin } = useIsAdmin();
+
+  // Filter out admin-only sections for non-admin users
+  const visibleSections = useMemo(
+    () => (isAdmin ? navSections : navSections.filter((s) => s.key !== 'administracao')),
+    [isAdmin],
+  );
 
   const isItemActive = (targetPath: string) => {
     const [targetBase, targetQuery] = targetPath.split('?');
@@ -29,24 +38,28 @@ export function AppSidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMo
     return location.pathname === targetBase || location.pathname.startsWith(`${targetBase}/`);
   };
 
-  // Auto-open sections that have active items
   const [manualSections, setManualSections] = useState<Record<string, boolean>>({});
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const activeSectionKeys = useMemo(
     () =>
-      navSections
+      visibleSections
         .filter((section) =>
           section.items.some((group) => group.items.some((item) => isItemActive(item.path))),
         )
         .map((section) => section.key),
-    [currentRoute],
+    [currentRoute, visibleSections],
   );
 
   const isSectionOpen = (key: string) => {
     if (collapsed) return false;
     if (key in manualSections) return manualSections[key];
     return activeSectionKeys.includes(key);
+  };
+
+  const handleNavClick = (path: string) => {
+    onCloseMobile();
+    navigate(path);
   };
 
   const containerClasses = collapsed ? 'w-[240px] md:w-[72px]' : 'w-[240px]';
@@ -110,7 +123,7 @@ export function AppSidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMo
 
           {/* Sections */}
           <div className="space-y-1">
-            {navSections.map((section) => {
+            {visibleSections.map((section) => {
               const sectionActive = activeSectionKeys.includes(section.key);
               const isOpen = isSectionOpen(section.key);
               return (
@@ -149,18 +162,18 @@ export function AppSidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMo
                           {group.items.map((item) => {
                             const active = isItemActive(item.path);
                             return (
-                              <Link
+                              <button
                                 key={item.path}
-                                to={item.path}
-                                onClick={onCloseMobile}
-                                className={`block rounded-md px-3 py-1.5 text-[13px] transition ${
+                                type="button"
+                                onClick={() => handleNavClick(item.path)}
+                                className={`block w-full text-left rounded-md px-3 py-1.5 text-[13px] transition ${
                                   active
                                     ? 'bg-primary/10 font-medium text-primary'
                                     : 'text-muted-foreground hover:bg-accent hover:text-foreground'
                                 }`}
                               >
                                 {item.title}
-                              </Link>
+                              </button>
                             );
                           })}
                         </Fragment>
@@ -175,15 +188,15 @@ export function AppSidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMo
 
         {/* Footer */}
         <div className="border-t border-border p-2">
-          <Link
-            to="/configuracoes"
-            onClick={onCloseMobile}
+          <button
+            type="button"
+            onClick={() => handleNavClick('/configuracoes')}
             className={`sidebar-item ${isPathActive(location.pathname, '/configuracoes') ? 'sidebar-item-active' : 'sidebar-item-inactive'} ${collapsed ? 'justify-center' : ''}`}
             title={collapsed ? 'Configurações' : undefined}
           >
             <Settings className="h-5 w-5 shrink-0" />
             {!collapsed && <span>Configurações</span>}
-          </Link>
+          </button>
         </div>
       </aside>
     </>
