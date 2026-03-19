@@ -1,53 +1,64 @@
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowUpIcon, ArrowDownIcon } from 'lucide-react';
+import { ArrowUpIcon, ArrowDownIcon, LucideIcon } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface SummaryCardProps {
   title: string;
   value: string | number;
-  variation?: { value: number; isPositive: boolean; };
-  icon?: React.ReactNode;
+  variation?: string;
+  variationType?: 'positive' | 'negative' | 'neutral';
+  icon?: LucideIcon;
   onClick?: () => void;
-  colorClass?: string;
+  className?: string;
 }
 
-export const SummaryCard: React.FC<SummaryCardProps> = ({
+export function SummaryCard({
   title,
   value,
   variation,
-  icon,
+  variationType = 'neutral',
+  icon: Icon,
   onClick,
-  colorClass = 'bg-blue-50',
-}) => {
+  className,
+}: SummaryCardProps) {
+  const variationColors = {
+    positive: 'text-success',
+    negative: 'text-destructive',
+    neutral: 'text-muted-foreground',
+  };
+
   return (
-    <Card onClick={onClick} className={`cursor-pointer hover:shadow-lg transition-shadow ${onClick ? 'cursor-pointer' : ''} ${colorClass}`}> 
-      <CardHeader className='pb-3'>
-        <div className='flex items-center justify-between'>
-          <CardTitle className='text-sm font-medium text-gray-600'>
-            {title}
-          </CardTitle>
-          {icon && <div className='text-2xl'>{icon}</div>}
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className='space-y-2'>
-          <div className='text-3xl font-bold'>{value}</div>
+    <div
+      className={cn(
+        'stat-card',
+        onClick && 'cursor-pointer hover:border-primary/30 active:scale-[0.98]',
+        className
+      )}
+      onClick={onClick}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } } : undefined}
+    >
+      <div className="flex items-start justify-between">
+        <div className="min-w-0 flex-1">
+          <p className="text-sm text-muted-foreground font-medium tracking-wide truncate">{title}</p>
+          <p className="text-2xl font-bold mt-1 tracking-tight">{value}</p>
           {variation && (
-            <div className='flex items-center gap-1'>
-              {variation.isPositive ? (
-                <ArrowUpIcon className='w-4 h-4 text-green-500' />
-              ) : (
-                <ArrowDownIcon className='w-4 h-4 text-red-500' />
-              )}
-              <span className={variation.isPositive ? 'text-green-600' : 'text-red-600'}>
-                {variation.value}%
-              </span>
+            <div className={cn('flex items-center gap-1 text-xs mt-1 font-medium', variationColors[variationType])}>
+              {variationType === 'positive' && <ArrowUpIcon className="h-3 w-3" />}
+              {variationType === 'negative' && <ArrowDownIcon className="h-3 w-3" />}
+              <span>{variation}</span>
             </div>
           )}
         </div>
-      </CardContent>
-    </Card>
+        {Icon && (
+          <div className="p-3 rounded-lg bg-accent">
+            <Icon className="w-5 h-5 text-primary" />
+          </div>
+        )}
+      </div>
+    </div>
   );
-};
+}
 
 export default SummaryCard;
