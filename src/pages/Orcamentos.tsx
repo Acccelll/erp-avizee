@@ -4,7 +4,7 @@ import { AppLayout } from "@/components/AppLayout";
 import { ModulePage } from "@/components/ModulePage";
 import { DataTable, StatusBadge } from "@/components/DataTable";
 import { SummaryCard } from "@/components/SummaryCard";
-import { ViewDrawer } from "@/components/ViewDrawer";
+import { ViewDrawer, ViewField, ViewSection } from "@/components/ViewDrawer";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -35,7 +35,6 @@ const Orcamentos = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("todos");
 
-  // KPIs
   const kpis = useMemo(() => {
     const total = data.length;
     const totalValue = data.reduce((s, o) => s + Number(o.valor_total || 0), 0);
@@ -88,7 +87,6 @@ const Orcamentos = () => {
       toast.success(`Cotação ${orc.numero} aprovada!`);
       fetchData();
     } catch (err: any) {
-      console.error('[orcamentos] aprovar:', err);
       toast.error("Erro ao aprovar cotação.");
     }
   };
@@ -121,7 +119,6 @@ const Orcamentos = () => {
       fetchData();
       navigate(`/ordens-venda`);
     } catch (err: any) {
-      console.error('[orcamentos] converter:', err);
       toast.error("Erro ao converter cotação.");
     } finally {
       setConvertingId(null);
@@ -138,11 +135,11 @@ const Orcamentos = () => {
   }, [data, searchTerm, statusFilter]);
 
   const columns = [
-    { key: "numero", label: "Nº", render: (o: Orcamento) => <span className="mono text-xs font-medium text-primary">{o.numero}</span> },
-    { key: "cliente", label: "Cliente", render: (o: Orcamento) => (o as any).clientes?.nome_razao_social || "—" },
+    { key: "numero", label: "Nº", render: (o: Orcamento) => <span className="font-mono text-xs font-medium text-primary">{o.numero}</span> },
+    { key: "cliente", label: "Cliente", render: (o: Orcamento) => o.clientes?.nome_razao_social || "—" },
     { key: "data_orcamento", label: "Data", render: (o: Orcamento) => formatDate(o.data_orcamento) },
     { key: "validade", label: "Validade", render: (o: Orcamento) => o.validade ? formatDate(o.validade) : "—" },
-    { key: "valor_total", label: "Total", render: (o: Orcamento) => <span className="font-semibold mono">{formatCurrency(Number(o.valor_total || 0))}</span> },
+    { key: "valor_total", label: "Total", render: (o: Orcamento) => <span className="font-semibold font-mono">{formatCurrency(Number(o.valor_total || 0))}</span> },
     { key: "status", label: "Status", render: (o: Orcamento) => <StatusBadge status={o.status} label={statusLabels[o.status]} /> },
     {
       key: "acoes_comercial", label: "Ações", sortable: false, render: (o: Orcamento) => (
@@ -178,7 +175,6 @@ const Orcamentos = () => {
         searchPlaceholder="Buscar por número da cotação ou cliente..."
         filters={<Select value={statusFilter} onValueChange={setStatusFilter}><SelectTrigger className="h-9 w-[190px]"><SelectValue placeholder="Status" /></SelectTrigger><SelectContent>{statusOptions.map((status) => (<SelectItem key={status} value={status}>{status === "todos" ? "Todos os status" : statusLabels[status] || status}</SelectItem>))}</SelectContent></Select>}
       >
-        {/* KPI Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <SummaryCard title="Total de Cotações" value={String(kpis.total)} icon={FileText} variationType="neutral" variation="registros" />
           <SummaryCard title="Valor Total" value={formatCurrency(kpis.totalValue)} icon={DollarSign} variationType="neutral" variation="acumulado" />
@@ -194,18 +190,37 @@ const Orcamentos = () => {
         />
       </ModulePage>
 
-      <ViewDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} title="Detalhes da Cotação">
+      <ViewDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        title={`Cotação ${selected?.numero || ""}`}
+        badge={selected ? <StatusBadge status={selected.status} label={statusLabels[selected.status]} /> : undefined}
+      >
         {selected && (
-          <div className="space-y-3">
-            <div><span className="text-xs text-muted-foreground">Número</span><p className="font-medium mono">{selected.numero}</p></div>
-            <div><span className="text-xs text-muted-foreground">Cliente</span><p>{(selected as any).clientes?.nome_razao_social || "—"}</p></div>
-            <div className="grid grid-cols-2 gap-4">
-              <div><span className="text-xs text-muted-foreground">Data</span><p>{formatDate(selected.data_orcamento)}</p></div>
-              <div><span className="text-xs text-muted-foreground">Validade</span><p>{selected.validade ? formatDate(selected.validade) : "—"}</p></div>
-            </div>
-            <div><span className="text-xs text-muted-foreground">Valor Total</span><p className="font-semibold mono text-lg">{formatCurrency(Number(selected.valor_total || 0))}</p></div>
-            <div><span className="text-xs text-muted-foreground">Status</span><StatusBadge status={selected.status} label={statusLabels[selected.status]} /></div>
-            <div className="pt-2 space-y-2">
+          <div className="space-y-5">
+            <ViewSection title="Dados Gerais">
+              <div className="grid grid-cols-2 gap-4">
+                <ViewField label="Número"><span className="font-mono font-medium">{selected.numero}</span></ViewField>
+                <ViewField label="Cliente">{selected.clientes?.nome_razao_social || "—"}</ViewField>
+                <ViewField label="Data">{formatDate(selected.data_orcamento)}</ViewField>
+                <ViewField label="Validade">{selected.validade ? formatDate(selected.validade) : "—"}</ViewField>
+              </div>
+            </ViewSection>
+
+            <ViewSection title="Valores">
+              <div className="rounded-xl bg-primary/5 border border-primary/20 p-4 text-center">
+                <span className="text-xs text-muted-foreground uppercase tracking-wider">Valor Total</span>
+                <p className="text-2xl font-bold font-mono mt-1">{formatCurrency(Number(selected.valor_total || 0))}</p>
+              </div>
+            </ViewSection>
+
+            {selected.observacoes && (
+              <ViewSection title="Observações">
+                <p className="text-sm text-muted-foreground">{selected.observacoes}</p>
+              </ViewSection>
+            )}
+
+            <div className="space-y-2 pt-2">
               <Button onClick={() => { setDrawerOpen(false); navigate(`/cotacoes/${selected.id}`); }} className="w-full gap-2">Abrir Cotação</Button>
               {(selected.status === "rascunho" || selected.status === "confirmado") && (
                 <Button variant="secondary" onClick={() => { setDrawerOpen(false); handleApprove(selected); }} className="w-full gap-2">
@@ -230,7 +245,7 @@ const Orcamentos = () => {
         onClose={() => setConvertingId(null)}
         onConfirm={() => convertingOrc && handleConvertToOV(convertingOrc)}
         title="Converter em Ordem de Venda"
-        description={`Deseja converter a cotação ${convertingOrc?.numero} em uma Ordem de Venda? A cotação será marcada como "Convertida".`}
+        description={`Deseja converter a cotação ${convertingOrc?.numero} em uma Ordem de Venda?`}
       />
     </AppLayout>
   );

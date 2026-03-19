@@ -4,7 +4,8 @@ import { AppLayout } from "@/components/AppLayout";
 import { ModulePage } from "@/components/ModulePage";
 import { DataTable, StatusBadge } from "@/components/DataTable";
 import { FormModal } from "@/components/FormModal";
-import { ViewDrawer } from "@/components/ViewDrawer";
+import { ViewDrawer, ViewField, ViewSection } from "@/components/ViewDrawer";
+import { SummaryCard } from "@/components/SummaryCard";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
 import { AutocompleteSearch } from "@/components/ui/AutocompleteSearch";
 import { ItemsGrid, type GridItem } from "@/components/ui/ItemsGrid";
@@ -15,7 +16,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, formatDate } from "@/lib/format";
+import { FileText, DollarSign, CheckCircle, AlertTriangle, Clock } from "lucide-react";
 
 interface NotaFiscal {
   id: string; tipo: string; numero: string; serie: string; chave_acesso: string;
@@ -70,6 +72,17 @@ const Fiscal = () => {
     load();
   }, []);
 
+  // KPIs
+  const kpis = useMemo(() => {
+    const tipoParam = searchParams.get("tipo");
+    const filtered = tipoParam ? data.filter(n => n.tipo === tipoParam) : data;
+    const total = filtered.length;
+    const pendentes = filtered.filter(n => n.status === "pendente").length;
+    const confirmadas = filtered.filter(n => n.status === "confirmada").length;
+    const valorTotal = filtered.reduce((s, n) => s + Number(n.valor_total || 0), 0);
+    return { total, pendentes, confirmadas, valorTotal };
+  }, [data, searchParams]);
+
   const openCreate = () => { setMode("create"); setForm({ ...emptyForm }); setItems([]); setSelected(null); setParcelas(1); setModalOpen(true); };
   const openEdit = async (n: NotaFiscal) => {
     setMode("edit"); setSelected(n);
@@ -101,11 +114,8 @@ const Fiscal = () => {
   const handleConfirmar = async (nf: NotaFiscal) => {
     try {
       await (supabase as any).from("notas_fiscais").update({ status: "confirmada" }).eq("id", nf.id);
+      const { data: itens } = await (supabase as any).from("notas_fiscais_itens").select("*").eq("nota_fiscal_id", nf.id);
 
-      const { data: itens } = await (supabase as any).from("notas_fiscais_itens")
-        .select("*").eq("nota_fiscal_id", nf.id);
-
-      // Stock movements
       if (nf.movimenta_estoque !== false && itens) {
         for (const item of itens) {
           const { data: prod } = await (supabase as any).from("produtos").select("estoque_atual").eq("id", item.produto_id).single();
@@ -121,7 +131,6 @@ const Fiscal = () => {
         }
       }
 
-      // Financial records
       if (nf.gera_financeiro !== false) {
         const tipo_fin = nf.tipo === "entrada" ? "pagar" : "receber";
         const isAVista = nf.condicao_pagamento === "a_vista";
@@ -154,7 +163,6 @@ const Fiscal = () => {
         }
       }
 
-      // Update OV billing status if NF is saída and linked to an OV
       if (nf.tipo === "saida" && nf.ordem_venda_id) {
         await updateOVFaturamento(nf.ordem_venda_id, itens || []);
       }
@@ -163,48 +171,28 @@ const Fiscal = () => {
       fetchData();
     } catch (err: any) {
       console.error('[fiscal] confirmar NF:', err);
-      toast.error("Erro ao confirmar nota fiscal. Tente novamente.");
+      toast.error("Erro ao confirmar nota fiscal.");
     }
   };
 
   const updateOVFaturamento = async (ordemVendaId: string, nfItens: any[]) => {
     try {
-      // Get OV items
       const { data: ovItens } = await (supabase as any).from("ordens_venda_itens")
-        .select("id, produto_id, quantidade, quantidade_faturada")
-        .eq("ordem_venda_id", ordemVendaId);
-
+        .select("id, produto_id, quantidade, quantidade_faturada").eq("ordem_venda_id", ordemVendaId);
       if (!ovItens) return;
-
-      // Update quantidade_faturada for matching products
       for (const nfItem of nfItens) {
         const ovItem = ovItens.find((oi: any) => oi.produto_id === nfItem.produto_id);
         if (ovItem) {
-          const novaQtdFaturada = (ovItem.quantidade_faturada || 0) + nfItem.quantidade;
           await (supabase as any).from("ordens_venda_itens")
-            .update({ quantidade_faturada: novaQtdFaturada })
-            .eq("id", ovItem.id);
+            .update({ quantidade_faturada: (ovItem.quantidade_faturada || 0) + nfItem.quantidade }).eq("id", ovItem.id);
         }
       }
-
-      // Recalculate OV faturamento status
       const { data: updatedItems } = await (supabase as any).from("ordens_venda_itens")
-        .select("quantidade, quantidade_faturada")
-        .eq("ordem_venda_id", ordemVendaId);
-
+        .select("quantidade, quantidade_faturada").eq("ordem_venda_id", ordemVendaId);
       const totalQtd = (updatedItems || []).reduce((s: number, i: any) => s + Number(i.quantidade), 0);
       const totalFaturado = (updatedItems || []).reduce((s: number, i: any) => s + Number(i.quantidade_faturada || 0), 0);
-
-      let newStatus: string;
-      if (totalFaturado >= totalQtd) newStatus = "total";
-      else if (totalFaturado > 0) newStatus = "parcial";
-      else newStatus = "aguardando";
-
-      await (supabase as any).from("ordens_venda")
-        .update({ status_faturamento: newStatus })
-        .eq("id", ordemVendaId);
-
-      toast.info(`OV atualizada: faturamento ${newStatus === "total" ? "total" : newStatus === "parcial" ? "parcial" : "aguardando"}`);
+      const newStatus = totalFaturado >= totalQtd ? "total" : totalFaturado > 0 ? "parcial" : "aguardando";
+      await (supabase as any).from("ordens_venda").update({ status_faturamento: newStatus }).eq("id", ordemVendaId);
     } catch (err: any) {
       console.error("Erro ao atualizar faturamento OV:", err);
     }
@@ -223,7 +211,6 @@ const Fiscal = () => {
         conta_contabil_id: form.conta_contabil_id || null,
         valor_total: valorProdutos || form.valor_total,
       };
-
       let nfId = selected?.id;
       if (mode === "create") {
         const { data: newNf, error } = await (supabase as any).from("notas_fiscais").insert(payload).select().single();
@@ -233,7 +220,6 @@ const Fiscal = () => {
         await (supabase as any).from("notas_fiscais").update(payload).eq("id", selected.id);
         await (supabase as any).from("notas_fiscais_itens").delete().eq("nota_fiscal_id", selected.id);
       }
-
       if (items.length > 0 && nfId) {
         const itemsPayload = items.filter(i => i.produto_id).map(i => ({
           nota_fiscal_id: nfId, produto_id: i.produto_id, quantidade: i.quantidade, valor_unitario: i.valor_unitario,
@@ -242,51 +228,41 @@ const Fiscal = () => {
           await (supabase as any).from("notas_fiscais_itens").insert(itemsPayload);
         }
       }
-
       toast.success("Nota fiscal salva!");
       setModalOpen(false);
       fetchData();
     } catch (err: any) {
       console.error('[fiscal] salvar NF:', err);
-      toast.error("Erro ao salvar nota fiscal. Tente novamente.");
+      toast.error("Erro ao salvar nota fiscal.");
     }
     setSaving(false);
   };
-
 
   const tipoParam = searchParams.get("tipo");
   const viewParam = searchParams.get("view");
   const filteredData = useMemo(() => {
     const query = consultaSearch.trim().toLowerCase();
-
     return data.filter((n) => {
       if (tipoParam && n.tipo !== tipoParam) return false;
       if (viewParam !== "consulta" || !query) return true;
-
       const parceiro = n.tipo === "entrada" ? n.fornecedores?.nome_razao_social : n.clientes?.nome_razao_social;
-      const haystack = [n.numero, n.serie, n.chave_acesso, parceiro, n.ordens_venda?.numero]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-
+      const haystack = [n.numero, n.serie, n.chave_acesso, parceiro, n.ordens_venda?.numero].filter(Boolean).join(" ").toLowerCase();
       return haystack.includes(query);
     });
   }, [consultaSearch, data, tipoParam, viewParam]);
 
   const fiscalSubtitle = viewParam === "consulta"
     ? "Consulta rápida de documentos fiscais e chaves de acesso"
-    : tipoParam === "entrada"
-      ? "Notas fiscais de entrada e documentos de recebimento"
-      : tipoParam === "saida"
-        ? "Notas fiscais de saída e faturamento"
-        : "Notas fiscais, faturas e documentos";
+    : tipoParam === "entrada" ? "Notas fiscais de entrada e documentos de recebimento"
+    : tipoParam === "saida" ? "Notas fiscais de saída e faturamento"
+    : "Notas fiscais, faturas e documentos";
 
   const columns = [
     { key: "tipo", label: "Tipo", render: (n: NotaFiscal) => n.tipo === "entrada" ? "Entrada" : "Saída" },
     { key: "numero", label: "Número", render: (n: NotaFiscal) => <span className="font-mono text-xs font-medium text-primary">{n.numero}</span> },
-    { key: "parceiro", label: "Parceiro", render: (n: NotaFiscal) => n.tipo === "entrada" ? (n as any).fornecedores?.nome_razao_social || "—" : (n as any).clientes?.nome_razao_social || "—" },
-    { key: "ov", label: "OV", render: (n: NotaFiscal) => n.ordens_venda?.numero ? <span className="mono text-xs">{n.ordens_venda.numero}</span> : "—" },
-    { key: "data_emissao", label: "Emissão", render: (n: NotaFiscal) => new Date(n.data_emissao).toLocaleDateString("pt-BR") },
+    { key: "parceiro", label: "Parceiro", render: (n: NotaFiscal) => n.tipo === "entrada" ? n.fornecedores?.nome_razao_social || "—" : n.clientes?.nome_razao_social || "—" },
+    { key: "ov", label: "OV", render: (n: NotaFiscal) => n.ordens_venda?.numero ? <span className="font-mono text-xs">{n.ordens_venda.numero}</span> : "—" },
+    { key: "data_emissao", label: "Emissão", render: (n: NotaFiscal) => formatDate(n.data_emissao) },
     { key: "valor_total", label: "Total", render: (n: NotaFiscal) => <span className="font-semibold font-mono">{formatCurrency(Number(n.valor_total))}</span> },
     { key: "gera_fin", label: "Gera Fin.", render: (n: NotaFiscal) => (
       <span className={`text-xs font-medium ${n.gera_financeiro !== false ? "text-green-600" : "text-muted-foreground"}`}>
@@ -303,6 +279,14 @@ const Fiscal = () => {
         onSearchChange={viewParam === "consulta" ? setConsultaSearch : undefined}
         searchPlaceholder="Buscar por número, chave ou parceiro..."
       >
+        {/* KPI Cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <SummaryCard title="Total de NFs" value={String(kpis.total)} icon={FileText} variationType="neutral" variation="registros" />
+          <SummaryCard title="Valor Total" value={formatCurrency(kpis.valorTotal)} icon={DollarSign} variationType="neutral" variation="acumulado" />
+          <SummaryCard title="Pendentes" value={String(kpis.pendentes)} icon={Clock} variationType={kpis.pendentes > 0 ? "negative" : "neutral"} variation="aguardando confirmação" />
+          <SummaryCard title="Confirmadas" value={String(kpis.confirmadas)} icon={CheckCircle} variationType="positive" variation="processadas" />
+        </div>
+
         <DataTable columns={columns} data={filteredData} loading={loading}
           onView={openView} onEdit={openEdit} onDelete={(n) => remove(n.id)} />
       </ModulePage>
@@ -323,7 +307,6 @@ const Fiscal = () => {
 
           <div className="col-span-2 space-y-2"><Label>Chave de Acesso</Label><Input value={form.chave_acesso} onChange={(e) => setForm({ ...form, chave_acesso: e.target.value })} className="font-mono text-xs" /></div>
 
-          {/* Partner */}
           <div className="bg-accent/30 rounded-lg p-4 space-y-3">
             {form.tipo === "entrada" ? (
               <>
@@ -346,7 +329,6 @@ const Fiscal = () => {
             )}
           </div>
 
-          {/* OV Link (only for saída) */}
           {form.tipo === "saida" && ordensVenda.length > 0 && (
             <div className="space-y-2">
               <Label>Ordem de Venda (opcional)</Label>
@@ -355,19 +337,15 @@ const Fiscal = () => {
                 <SelectContent>
                   <SelectItem value="none">Nenhuma</SelectItem>
                   {ordensVenda.map((ov: any) => (
-                    <SelectItem key={ov.id} value={ov.id}>
-                      {ov.numero} — {ov.clientes?.nome_razao_social || ""}
-                    </SelectItem>
+                    <SelectItem key={ov.id} value={ov.id}>{ov.numero} — {ov.clientes?.nome_razao_social || ""}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
           )}
 
-          {/* Items */}
           <ItemsGrid items={items} onChange={setItems} produtos={produtosCrud.data} title="Itens da Nota" />
 
-          {/* Payment + Flags */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="space-y-2"><Label>Forma de Pagamento</Label>
               <Select value={form.forma_pagamento} onValueChange={(v) => setForm({ ...form, forma_pagamento: v })}>
@@ -405,7 +383,6 @@ const Fiscal = () => {
             </div>
           </div>
 
-          {/* Conta Contábil */}
           {contasContabeis.length > 0 && (
             <div className="space-y-2">
               <Label>Conta Contábil (opcional)</Label>
@@ -421,7 +398,6 @@ const Fiscal = () => {
             </div>
           )}
 
-          {/* Total */}
           <div className="bg-accent/50 rounded-lg p-4 flex justify-between items-center">
             <span className="text-sm text-muted-foreground">Total dos Itens: <span className="font-mono font-semibold">{formatCurrency(valorProdutos)}</span></span>
             {form.condicao_pagamento === "a_prazo" && parcelas > 1 && (
@@ -443,43 +419,89 @@ const Fiscal = () => {
         </form>
       </FormModal>
 
-      <ViewDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} title="Detalhes da Nota Fiscal">
+      <ViewDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        title={`NF ${selected?.numero || ""}`}
+        badge={selected ? <StatusBadge status={selected.status} /> : undefined}
+      >
         {selected && (
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div><span className="text-xs text-muted-foreground">Tipo</span><p className="capitalize">{selected.tipo}</p></div>
-              <div><span className="text-xs text-muted-foreground">Número / Série</span><p className="font-mono font-medium">{selected.numero} / {selected.serie}</p></div>
-            </div>
-            <div><span className="text-xs text-muted-foreground">Valor Total</span><p className="font-semibold font-mono">{formatCurrency(Number(selected.valor_total))}</p></div>
-            <div className="grid grid-cols-2 gap-4">
-              <div><span className="text-xs text-muted-foreground">Status</span><StatusBadge status={selected.status} /></div>
-              <div><span className="text-xs text-muted-foreground">Gera Financeiro</span>
-                <p className={selected.gera_financeiro !== false ? "text-green-600 font-medium" : "text-muted-foreground"}>
-                  {selected.gera_financeiro !== false ? "Sim" : "Não"}
-                </p>
+          <div className="space-y-5">
+            <ViewSection title="Informações Gerais">
+              <div className="grid grid-cols-2 gap-4">
+                <ViewField label="Tipo"><span className="capitalize font-medium">{selected.tipo}</span></ViewField>
+                <ViewField label="Número / Série"><span className="font-mono font-medium">{selected.numero} / {selected.serie}</span></ViewField>
+                <ViewField label="Data Emissão">{formatDate(selected.data_emissao)}</ViewField>
+                <ViewField label="Valor Total"><span className="font-semibold font-mono text-lg">{formatCurrency(Number(selected.valor_total))}</span></ViewField>
               </div>
-            </div>
-            {selected.ordem_venda_id && selected.ordens_venda && (
-              <div><span className="text-xs text-muted-foreground">Ordem de Venda</span><p className="mono font-medium">{selected.ordens_venda.numero}</p></div>
-            )}
+            </ViewSection>
+
+            <ViewSection title="Parceiro">
+              <div className="grid grid-cols-2 gap-4">
+                <ViewField label={selected.tipo === "entrada" ? "Fornecedor" : "Cliente"}>
+                  {selected.tipo === "entrada" ? selected.fornecedores?.nome_razao_social || "—" : selected.clientes?.nome_razao_social || "—"}
+                </ViewField>
+                {selected.chave_acesso && (
+                  <ViewField label="Chave de Acesso"><span className="font-mono text-xs break-all">{selected.chave_acesso}</span></ViewField>
+                )}
+              </div>
+            </ViewSection>
+
+            <ViewSection title="Configuração">
+              <div className="grid grid-cols-2 gap-4">
+                <ViewField label="Gera Financeiro">
+                  <span className={selected.gera_financeiro !== false ? "text-green-600 font-medium" : "text-muted-foreground"}>
+                    {selected.gera_financeiro !== false ? "Sim" : "Não"}
+                  </span>
+                </ViewField>
+                <ViewField label="Movimenta Estoque">
+                  <span className={selected.movimenta_estoque !== false ? "text-green-600 font-medium" : "text-muted-foreground"}>
+                    {selected.movimenta_estoque !== false ? "Sim" : "Não"}
+                  </span>
+                </ViewField>
+                {selected.ordem_venda_id && selected.ordens_venda && (
+                  <ViewField label="Ordem de Venda"><span className="font-mono font-medium">{selected.ordens_venda.numero}</span></ViewField>
+                )}
+                {selected.forma_pagamento && (
+                  <ViewField label="Forma de Pagamento"><span className="capitalize">{selected.forma_pagamento}</span></ViewField>
+                )}
+              </div>
+            </ViewSection>
 
             {viewItems.length > 0 && (
-              <div className="border-t pt-3">
-                <h4 className="font-semibold text-sm mb-2">Itens ({viewItems.length})</h4>
-                <div className="space-y-1">
-                  {viewItems.map((i: any, idx: number) => (
-                    <div key={idx} className="flex justify-between text-sm py-1 border-b last:border-b-0">
-                      <span>{i.produtos?.nome || "—"} × {i.quantidade}</span>
-                      <span className="font-mono">{formatCurrency(i.quantidade * i.valor_unitario)}</span>
-                    </div>
-                  ))}
+              <ViewSection title={`Itens (${viewItems.length})`}>
+                <div className="rounded-lg border overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-muted/50 border-b">
+                        <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground">Produto</th>
+                        <th className="px-3 py-2 text-right text-xs font-semibold text-muted-foreground">Qtd</th>
+                        <th className="px-3 py-2 text-right text-xs font-semibold text-muted-foreground">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {viewItems.map((i: any, idx: number) => (
+                        <tr key={idx} className="border-b last:border-b-0 hover:bg-muted/20">
+                          <td className="px-3 py-2">{i.produtos?.nome || "—"}</td>
+                          <td className="px-3 py-2 text-right font-mono">{i.quantidade}</td>
+                          <td className="px-3 py-2 text-right font-mono font-medium">{formatCurrency(i.quantidade * i.valor_unitario)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-              </div>
+              </ViewSection>
+            )}
+
+            {selected.observacoes && (
+              <ViewSection title="Observações">
+                <p className="text-sm text-muted-foreground">{selected.observacoes}</p>
+              </ViewSection>
             )}
 
             {selected.status === "pendente" && (
-              <Button className="w-full mt-3" onClick={() => { handleConfirmar(selected); setDrawerOpen(false); }}>
-                Confirmar Nota Fiscal
+              <Button className="w-full" onClick={() => { handleConfirmar(selected); setDrawerOpen(false); }}>
+                <CheckCircle className="w-4 h-4 mr-2" /> Confirmar Nota Fiscal
               </Button>
             )}
           </div>
