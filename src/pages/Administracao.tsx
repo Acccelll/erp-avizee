@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useTheme } from 'next-themes';
-import { Building2, FileText, Loader2, Mail, Receipt, Settings, Shield, Users, Wallet } from 'lucide-react';
+import { Building2, FileText, Loader2, Mail, Receipt, Settings, Shield, Users, Wallet, Check, X } from 'lucide-react';
 import { AppLayout } from '@/components/AppLayout';
 import { ModulePage } from '@/components/ModulePage';
 import { Button } from '@/components/ui/button';
@@ -15,51 +15,24 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
+import type { Database } from '@/integrations/supabase/types';
 
-const STORAGE_KEY = 'erp-avizee-admin-config';
+type AppRole = Database['public']['Enums']['app_role'];
+const ALL_ROLES: AppRole[] = ['admin', 'vendedor', 'financeiro', 'estoquista'];
 
-const defaultConfig = {
-  geral: {
-    empresa: 'AviZee Equipamentos LTDA',
-    nomeFantasia: 'AviZee',
-    email: 'contato@avizee.com.br',
-    telefone: '(19) 99999-0000',
-    logoUrl: '/images/logoavizee.png',
-    corPrimaria: '#690500',
-    corSecundaria: '#b2592c',
-  },
-  usuarios: {
-    permitirCadastro: false,
-    exigir2fa: false,
-    perfilPadrao: 'vendedor',
-  },
-  email: {
-    remetenteNome: 'ERP AviZee',
-    remetenteEmail: 'contato@avizee.com.br',
-    responderPara: 'comercial@avizee.com.br',
-    assinatura: 'Equipe AviZee',
-  },
-  fiscal: {
-    cfopPadraoVenda: '5102',
-    cfopPadraoCompra: '1102',
-    cstPadrao: '000',
-    ncmPadrao: '00000000',
-    gerarFinanceiroPadrao: true,
-  },
-  financeiro: {
-    condicaoPadrao: '30 dias',
-    formaPagamentoPadrao: 'boleto',
-    bancoPadrao: 'Inter',
-    permitirBaixaParcial: true,
-  },
+const ROLE_LABELS: Record<AppRole, string> = {
+  admin: 'Administrador',
+  vendedor: 'Vendedor',
+  financeiro: 'Financeiro',
+  estoquista: 'Estoquista',
 };
 
-const perfis = [
-  { nome: 'Administrador', descricao: 'Acesso total ao sistema', permissao: 'admin' },
-  { nome: 'Vendedor', descricao: 'Cotações, pedidos e clientes', permissao: 'vendedor' },
-  { nome: 'Financeiro', descricao: 'Contas, notas e caixa', permissao: 'financeiro' },
-  { nome: 'Estoquista', descricao: 'Movimentações e inventário', permissao: 'estoquista' },
-];
+const ROLE_COLORS: Record<AppRole, string> = {
+  admin: 'bg-destructive/10 text-destructive border-destructive/30',
+  vendedor: 'bg-primary/10 text-primary border-primary/30',
+  financeiro: 'bg-warning/10 text-warning border-warning/30',
+  estoquista: 'bg-success/10 text-success border-success/30',
+};
 
 interface SideNavItem {
   key: string;
