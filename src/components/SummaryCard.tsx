@@ -22,61 +22,67 @@ const variantStyles: Record<string, { border: string; iconBg: string; iconColor:
   info: { border: 'border-l-4 border-l-primary', iconBg: 'bg-primary/10', iconColor: 'text-primary' },
 };
 
-export function SummaryCard({
-  title,
-  value,
-  subtitle,
-  variation,
-  variationType = 'neutral',
-  variant = 'default',
-  icon: Icon,
-  onClick,
-  className,
-}: SummaryCardProps) {
-  const variationColors = {
-    positive: 'text-success',
-    negative: 'text-destructive',
-    neutral: 'text-muted-foreground',
-  };
+export const SummaryCard = forwardRef<HTMLDivElement, SummaryCardProps>(
+  function SummaryCard(
+    {
+      title,
+      value,
+      subtitle,
+      variation,
+      variationType = 'neutral',
+      variant = 'default',
+      icon: Icon,
+      onClick,
+      className,
+    },
+    ref,
+  ) {
+    const variationColors = {
+      positive: 'text-success',
+      negative: 'text-destructive',
+      neutral: 'text-muted-foreground',
+    };
 
-  const styles = variantStyles[variant] || variantStyles.default;
+    const styles = variantStyles[variant] || variantStyles.default;
 
-  return (
-    <div
-      className={cn(
-        'stat-card',
-        styles.border,
-        onClick && 'cursor-pointer hover:border-primary/30 active:scale-[0.98]',
-        className
-      )}
-      onClick={onClick}
-      role={onClick ? 'button' : undefined}
-      tabIndex={onClick ? 0 : undefined}
-      onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } } : undefined}
-    >
-      <div className="flex items-start justify-between">
-        <div className="min-w-0 flex-1">
-          <p className="text-sm text-muted-foreground font-medium tracking-wide truncate">{title}</p>
-          <p className="text-2xl font-bold mt-1 tracking-tight">{value}</p>
-          {subtitle && (
-            <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>
-          )}
-          {variation && (
-            <div className={cn('flex items-center gap-1 text-xs mt-1 font-medium', variationColors[variationType])}>
-              {variationType === 'positive' && <ArrowUpIcon className="h-3 w-3" />}
-              {variationType === 'negative' && <ArrowDownIcon className="h-3 w-3" />}
-              <span>{variation}</span>
+    return (
+      <div
+        ref={ref}
+        className={cn(
+          'stat-card',
+          styles.border,
+          onClick && 'cursor-pointer hover:border-primary/30 active:scale-[0.98]',
+          className
+        )}
+        onClick={onClick}
+        role={onClick ? 'button' : undefined}
+        tabIndex={onClick ? 0 : undefined}
+        onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } } : undefined}
+      >
+        <div className="flex items-start justify-between">
+          <div className="min-w-0 flex-1">
+            <p className="text-sm text-muted-foreground font-medium tracking-wide truncate">{title}</p>
+            <p className="text-2xl font-bold mt-1 tracking-tight">{value}</p>
+            {subtitle && (
+              <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>
+            )}
+            {variation && (
+              <div className={cn('flex items-center gap-1 text-xs mt-1 font-medium', variationColors[variationType])}>
+                {variationType === 'positive' && <ArrowUpIcon className="h-3 w-3" />}
+                {variationType === 'negative' && <ArrowDownIcon className="h-3 w-3" />}
+                <span>{variation}</span>
+              </div>
+            )}
+          </div>
+          {Icon && (
+            <div className={cn('p-3 rounded-lg', styles.iconBg)}>
+              <Icon className={cn('w-5 h-5', styles.iconColor)} />
             </div>
           )}
         </div>
-        {Icon && (
-          <div className={cn('p-3 rounded-lg', styles.iconBg)}>
-            <Icon className={cn('w-5 h-5', styles.iconColor)} />
-          </div>
-        )}
       </div>
-    </div>
-  );
-}
+    );
+  }
+);
 
 export default SummaryCard;
