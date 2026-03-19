@@ -1,4 +1,4 @@
-import { Moon, Search, Sun, User } from 'lucide-react';
+import { Moon, Search, Settings, Sun, User } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from 'next-themes';
 import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { mobileMenuSections, quickActions } from '@/lib/navigation';
 import { useAuth } from '@/contexts/AuthContext';
+import { useIsAdmin } from '@/hooks/useIsAdmin';
 
 interface MobileMenuProps {
   open: boolean;
