@@ -30,6 +30,9 @@ import Signup from "./pages/Signup";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
+import Transportadoras from "./pages/Transportadoras";
+import FormasPagamento from "./pages/FormasPagamento";
+import CotacoesCompra from "./pages/CotacoesCompra";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 
 const queryClient = new QueryClient();
@@ -51,8 +54,11 @@ const App = () => (
             <Route path="/produtos" element={<ProtectedRoute><Produtos /></ProtectedRoute>} />
             <Route path="/clientes" element={<ProtectedRoute><Clientes /></ProtectedRoute>} />
             <Route path="/fornecedores" element={<ProtectedRoute><Fornecedores /></ProtectedRoute>} />
+            <Route path="/transportadoras" element={<ProtectedRoute><Transportadoras /></ProtectedRoute>} />
+            <Route path="/formas-pagamento" element={<ProtectedRoute><FormasPagamento /></ProtectedRoute>} />
             <Route path="/grupos-economicos" element={<ProtectedRoute><GruposEconomicos /></ProtectedRoute>} />
             <Route path="/compras" element={<ProtectedRoute><Compras /></ProtectedRoute>} />
+            <Route path="/cotacoes-compra" element={<ProtectedRoute><CotacoesCompra /></ProtectedRoute>} />
             <Route path="/cotacoes" element={<ProtectedRoute><Orcamentos /></ProtectedRoute>} />
             <Route path="/cotacoes/novo" element={<ProtectedRoute><OrcamentoForm /></ProtectedRoute>} />
             <Route path="/cotacoes/:id" element={<ProtectedRoute><OrcamentoForm /></ProtectedRoute>} />
