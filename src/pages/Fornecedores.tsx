@@ -10,9 +10,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MaskedInput } from "@/components/ui/MaskedInput";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { Truck, Clock, AlertTriangle, ShoppingCart, DollarSign } from "lucide-react";
+import { formatCurrency, formatDate } from "@/lib/format";
 
 interface Fornecedor {
   id: string; tipo_pessoa: string; nome_razao_social: string; nome_fantasia: string;
@@ -40,6 +43,8 @@ const Fornecedores = () => {
   const [comprasHist, setComprasHist] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [tipoFilter, setTipoFilter] = useState<"todos" | "F" | "J">("todos");
+  const [produtosForn, setProdutosForn] = useState<any[]>([]);
+  const [titulosForn, setTitulosForn] = useState<any[]>([]);
 
   const openCreate = () => { setMode("create"); setForm({...emptyForm}); setSelected(null); setModalOpen(true); };
   const openEdit = (f: Fornecedor) => {
@@ -57,10 +62,21 @@ const Fornecedores = () => {
 
   const openView = async (f: Fornecedor) => {
     setSelected(f); setDrawerOpen(true);
-    const { data: compras } = await (supabase as any).from("compras")
-      .select("numero, data_compra, valor_total, status, data_entrega_prevista, data_entrega_real")
-      .eq("fornecedor_id", f.id).eq("ativo", true).order("data_compra", { ascending: false }).limit(20);
-    setComprasHist(compras || []);
+    const [comprasRes, prodsRes, titRes] = await Promise.all([
+      (supabase as any).from("compras")
+        .select("numero, data_compra, valor_total, status, data_entrega_prevista, data_entrega_real")
+        .eq("fornecedor_id", f.id).eq("ativo", true).order("data_compra", { ascending: false }).limit(20),
+      (supabase as any).from("produtos_fornecedores")
+        .select("preco_compra, lead_time_dias, referencia_fornecedor, produtos:produto_id(nome, sku)")
+        .eq("fornecedor_id", f.id),
+      (supabase as any).from("financeiro_lancamentos")
+        .select("descricao, data_vencimento, data_pagamento, valor, status")
+        .eq("fornecedor_id", f.id).eq("tipo", "pagar").eq("ativo", true)
+        .order("data_vencimento", { ascending: false }).limit(20),
+    ]);
+    setComprasHist(comprasRes.data || []);
+    setProdutosForn(prodsRes.data || []);
+    setTitulosForn(titRes.data || []);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -75,7 +91,7 @@ const Fornecedores = () => {
     setSaving(false);
   };
 
-  // Compute delivery stats from history
+  // Stats
   const deliveryStats = (() => {
     const delivered = comprasHist.filter((c: any) => c.data_entrega_real && c.data_entrega_prevista);
     if (delivered.length === 0) return { prazoMedio: 0, atrasoMedio: 0 };
@@ -90,19 +106,14 @@ const Fornecedores = () => {
     return { prazoMedio: Math.round(totalDias / delivered.length), atrasoMedio: Math.round(totalAtraso / delivered.length) };
   })();
 
+  const volumeComprado = comprasHist.reduce((s: number, c: any) => s + Number(c.valor_total || 0), 0);
+
   const filteredData = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
-
     return data.filter((fornecedor) => {
       if (tipoFilter !== "todos" && fornecedor.tipo_pessoa !== tipoFilter) return false;
       if (!query) return true;
-
-      const haystack = [fornecedor.nome_razao_social, fornecedor.nome_fantasia, fornecedor.cpf_cnpj, fornecedor.email, fornecedor.cidade, fornecedor.uf, fornecedor.telefone, fornecedor.contato]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-
-      return haystack.includes(query);
+      return [fornecedor.nome_razao_social, fornecedor.nome_fantasia, fornecedor.cpf_cnpj, fornecedor.email, fornecedor.cidade, fornecedor.uf, fornecedor.telefone, fornecedor.contato].filter(Boolean).join(" ").toLowerCase().includes(query);
     });
   }, [data, searchTerm, tipoFilter]);
 
@@ -130,17 +141,11 @@ const Fornecedores = () => {
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             <div className="col-span-2 space-y-2"><Label>Razão Social *</Label><Input value={form.nome_razao_social} onChange={(e) => setForm({ ...form, nome_razao_social: e.target.value })} required /></div>
             <div className="space-y-2"><Label>Nome Fantasia</Label><Input value={form.nome_fantasia} onChange={(e) => setForm({ ...form, nome_fantasia: e.target.value })} /></div>
-            <div className="space-y-2"><Label>CNPJ</Label>
-              <MaskedInput mask="cnpj" value={form.cpf_cnpj} onChange={(v) => setForm({ ...form, cpf_cnpj: v })} />
-            </div>
+            <div className="space-y-2"><Label>CNPJ</Label><MaskedInput mask="cnpj" value={form.cpf_cnpj} onChange={(v) => setForm({ ...form, cpf_cnpj: v })} /></div>
             <div className="space-y-2"><Label>I.E.</Label><Input value={form.inscricao_estadual} onChange={(e) => setForm({ ...form, inscricao_estadual: e.target.value })} /></div>
             <div className="space-y-2"><Label>E-mail</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
-            <div className="space-y-2"><Label>Telefone</Label>
-              <MaskedInput mask="telefone" value={form.telefone} onChange={(v) => setForm({ ...form, telefone: v })} />
-            </div>
-            <div className="space-y-2"><Label>Celular</Label>
-              <MaskedInput mask="celular" value={form.celular} onChange={(v) => setForm({ ...form, celular: v })} />
-            </div>
+            <div className="space-y-2"><Label>Telefone</Label><MaskedInput mask="telefone" value={form.telefone} onChange={(v) => setForm({ ...form, telefone: v })} /></div>
+            <div className="space-y-2"><Label>Celular</Label><MaskedInput mask="celular" value={form.celular} onChange={(v) => setForm({ ...form, celular: v })} /></div>
             <div className="space-y-2"><Label>Contato</Label><Input value={form.contato} onChange={(e) => setForm({ ...form, contato: e.target.value })} /></div>
           </div>
           <h3 className="font-semibold text-sm pt-2 border-t">Endereço</h3>
@@ -164,52 +169,126 @@ const Fornecedores = () => {
       <ViewDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} title="Detalhes do Fornecedor">
         {selected && (
           <div className="space-y-4">
-            <div><span className="text-xs text-muted-foreground">Razão Social</span><p className="font-medium">{selected.nome_razao_social}</p></div>
-            <div className="grid grid-cols-2 gap-4">
-              <div><span className="text-xs text-muted-foreground">CNPJ</span><p className="font-mono text-sm">{selected.cpf_cnpj || "—"}</p></div>
-              <div><span className="text-xs text-muted-foreground">I.E.</span><p>{selected.inscricao_estadual || "—"}</p></div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div><span className="text-xs text-muted-foreground">Telefone</span><p>{selected.telefone || "—"}</p></div>
-              <div><span className="text-xs text-muted-foreground">E-mail</span><p>{selected.email || "—"}</p></div>
-            </div>
-
-            {/* Delivery Stats */}
-            {comprasHist.length > 0 && (
-              <div className="grid grid-cols-2 gap-3 border-t pt-4">
-                <div className="bg-accent/50 rounded-lg p-3 text-center">
-                  <p className="text-xs text-muted-foreground">Prazo Médio Entrega</p>
-                  <p className="text-lg font-bold font-mono">{deliveryStats.prazoMedio} dias</p>
+            {/* Summary Header */}
+            <div className="bg-muted/30 rounded-lg p-4">
+              <div className="flex items-start justify-between mb-3">
+                <div>
+                  <p className="text-xs text-muted-foreground">{selected.cpf_cnpj || "—"}</p>
+                  <h3 className="font-semibold text-lg">{selected.nome_razao_social}</h3>
+                  {selected.nome_fantasia && <p className="text-sm text-muted-foreground">{selected.nome_fantasia}</p>}
                 </div>
-                <div className="bg-accent/50 rounded-lg p-3 text-center">
-                  <p className="text-xs text-muted-foreground">Atraso Médio</p>
-                  <p className={`text-lg font-bold font-mono ${deliveryStats.atrasoMedio > 0 ? "text-destructive" : "text-success"}`}>{deliveryStats.atrasoMedio} dias</p>
+                <StatusBadge status={selected.ativo ? "Ativo" : "Inativo"} />
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="text-center rounded-lg border bg-background p-2">
+                  <p className="text-[10px] text-muted-foreground uppercase">Prazo Médio</p>
+                  <p className="font-mono font-semibold text-sm">{deliveryStats.prazoMedio}d</p>
+                </div>
+                <div className="text-center rounded-lg border bg-background p-2">
+                  <p className="text-[10px] text-muted-foreground uppercase">Atraso Médio</p>
+                  <p className={`font-mono font-semibold text-sm ${deliveryStats.atrasoMedio > 0 ? "text-destructive" : "text-success"}`}>{deliveryStats.atrasoMedio}d</p>
+                </div>
+                <div className="text-center rounded-lg border bg-background p-2">
+                  <p className="text-[10px] text-muted-foreground uppercase">Volume</p>
+                  <p className="font-mono font-semibold text-sm">{formatCurrency(volumeComprado)}</p>
+                </div>
+                <div className="text-center rounded-lg border bg-background p-2">
+                  <p className="text-[10px] text-muted-foreground uppercase">Últ. Compra</p>
+                  <p className="font-mono font-semibold text-sm">{comprasHist.length > 0 ? formatDate(comprasHist[0].data_compra) : "—"}</p>
                 </div>
               </div>
-            )}
-
-            {/* Histórico Compras */}
-            <div className="border-t pt-4">
-              <h4 className="font-semibold text-sm mb-3">Histórico de Compras ({comprasHist.length})</h4>
-              {comprasHist.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Nenhuma compra registrada</p>
-              ) : (
-                <div className="space-y-2 max-h-[300px] overflow-y-auto">
-                  {comprasHist.map((c: any, idx: number) => (
-                    <div key={idx} className="flex items-center justify-between py-2 border-b last:border-b-0 text-sm">
-                      <div>
-                        <span className="font-mono text-xs text-primary font-medium">{c.numero}</span>
-                        <span className="text-xs text-muted-foreground ml-2">{new Date(c.data_compra).toLocaleDateString("pt-BR")}</span>
-                      </div>
-                      <div className="text-right">
-                        <span className="font-mono font-semibold">R$ {Number(c.valor_total || 0).toFixed(2)}</span>
-                        <StatusBadge status={c.status} />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
+
+            <Tabs defaultValue="cadastro" className="w-full">
+              <TabsList className="w-full grid grid-cols-4">
+                <TabsTrigger value="cadastro" className="text-xs">Cadastro</TabsTrigger>
+                <TabsTrigger value="financeiro" className="text-xs">Financeiro</TabsTrigger>
+                <TabsTrigger value="compras" className="text-xs">Compras</TabsTrigger>
+                <TabsTrigger value="produtos" className="text-xs">Produtos</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="cadastro" className="space-y-3 mt-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div><span className="text-xs text-muted-foreground">CNPJ</span><p className="font-mono text-sm">{selected.cpf_cnpj || "—"}</p></div>
+                  <div><span className="text-xs text-muted-foreground">I.E.</span><p>{selected.inscricao_estadual || "—"}</p></div>
+                  <div><span className="text-xs text-muted-foreground">Telefone</span><p>{selected.telefone || "—"}</p></div>
+                  <div><span className="text-xs text-muted-foreground">E-mail</span><p>{selected.email || "—"}</p></div>
+                  <div><span className="text-xs text-muted-foreground">Contato</span><p>{selected.contato || "—"}</p></div>
+                  <div><span className="text-xs text-muted-foreground">Celular</span><p>{selected.celular || "—"}</p></div>
+                </div>
+                {selected.logradouro && (
+                  <div className="border-t pt-3">
+                    <span className="text-xs text-muted-foreground">Endereço</span>
+                    <p className="text-sm">{selected.logradouro}, {selected.numero}{selected.complemento ? ` - ${selected.complemento}` : ""} — {selected.bairro} - {selected.cidade}/{selected.uf} - CEP {selected.cep}</p>
+                  </div>
+                )}
+                {selected.observacoes && <div><span className="text-xs text-muted-foreground">Observações</span><p className="text-sm">{selected.observacoes}</p></div>}
+              </TabsContent>
+
+              <TabsContent value="financeiro" className="space-y-3 mt-3">
+                {titulosForn.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">Nenhum título registrado</p>
+                ) : (
+                  <div className="space-y-1 max-h-[350px] overflow-y-auto">
+                    {titulosForn.map((t: any, idx: number) => (
+                      <div key={idx} className="flex justify-between text-sm py-1.5 border-b last:border-b-0">
+                        <div>
+                          <p className="text-xs">{t.descricao}</p>
+                          <p className="text-[10px] text-muted-foreground">Venc: {formatDate(t.data_vencimento)}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-mono text-xs">{formatCurrency(t.valor)}</p>
+                          <StatusBadge status={t.status === "pago" ? "Pago" : t.status === "vencido" ? "Vencido" : "Aberto"} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="compras" className="space-y-3 mt-3">
+                {comprasHist.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">Nenhuma compra registrada</p>
+                ) : (
+                  <div className="space-y-2 max-h-[350px] overflow-y-auto">
+                    {comprasHist.map((c: any, idx: number) => (
+                      <div key={idx} className="flex items-center justify-between py-2 border-b last:border-b-0 text-sm">
+                        <div>
+                          <span className="font-mono text-xs text-primary font-medium">{c.numero}</span>
+                          <span className="text-xs text-muted-foreground ml-2">{formatDate(c.data_compra)}</span>
+                        </div>
+                        <div className="text-right">
+                          <span className="font-mono font-semibold">{formatCurrency(Number(c.valor_total || 0))}</span>
+                          <StatusBadge status={c.status} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="produtos" className="space-y-3 mt-3">
+                {produtosForn.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">Nenhum produto vinculado</p>
+                ) : (
+                  <div className="space-y-2">
+                    {produtosForn.map((pf: any, idx: number) => (
+                      <div key={idx} className="flex justify-between text-sm py-1.5 border-b last:border-b-0">
+                        <div>
+                          <p className="font-medium">{pf.produtos?.nome}</p>
+                          {pf.produtos?.sku && <p className="text-xs text-muted-foreground font-mono">{pf.produtos.sku}</p>}
+                          {pf.referencia_fornecedor && <p className="text-xs text-muted-foreground">Ref: {pf.referencia_fornecedor}</p>}
+                        </div>
+                        <div className="text-right text-xs">
+                          {pf.preco_compra && <p className="font-mono">{formatCurrency(pf.preco_compra)}</p>}
+                          {pf.lead_time_dias && <p className="text-muted-foreground">{pf.lead_time_dias} dias</p>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
           </div>
         )}
       </ViewDrawer>

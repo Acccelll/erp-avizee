@@ -10,11 +10,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MaskedInput } from "@/components/ui/MaskedInput";
 import { TimelineList } from "@/components/ui/TimelineList";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { MessageSquare, Plus, Building2, Clock, DollarSign } from "lucide-react";
+import { MessageSquare, Plus, Building2, Clock, DollarSign, CreditCard, AlertTriangle } from "lucide-react";
+import { formatCurrency, formatDate } from "@/lib/format";
 
 interface Cliente {
   id: string; tipo_pessoa: string; nome_razao_social: string; nome_fantasia: string;
@@ -25,9 +27,7 @@ interface Cliente {
   grupo_economico_id: string | null; tipo_relacao_grupo: string | null; caixa_postal: string | null;
 }
 
-interface GrupoEconomico {
-  id: string; nome: string;
-}
+interface GrupoEconomico { id: string; nome: string; }
 
 const emptyCliente: Record<string, any> = {
   tipo_pessoa: "J", nome_razao_social: "", nome_fantasia: "", cpf_cnpj: "",
@@ -62,6 +62,9 @@ const Clientes = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [tipoFilter, setTipoFilter] = useState<"todos" | "F" | "J">("todos");
   const [grupoFilter, setGrupoFilter] = useState<"todos" | "com_grupo" | "sem_grupo">("todos");
+  const [saldoAberto, setSaldoAberto] = useState(0);
+  const [titulosVencidos, setTitulosVencidos] = useState(0);
+  const [ultimaCompra, setUltimaCompra] = useState<string | null>(null);
 
   useEffect(() => {
     (supabase as any).from("grupos_economicos").select("id, nome").eq("ativo", true).order("nome").then(({ data: g }: any) => setGrupos(g || []));
@@ -86,50 +89,50 @@ const Clientes = () => {
 
   const openView = async (c: Cliente) => {
     setSelected(c); setDrawerOpen(true);
-    // Communication records
-    const { data: records } = await (supabase as any).from("cliente_registros_comunicacao")
-      .select("*").eq("cliente_id", c.id).order("data_hora", { ascending: false });
-    setComRecords(records || []);
-
-    // Related companies from same grupo econômico
-    if (c.grupo_economico_id) {
-      const { data: emp } = await (supabase as any).from("clientes")
+    const [comRes, empRes, titulosRes, orcRes] = await Promise.all([
+      (supabase as any).from("cliente_registros_comunicacao").select("*").eq("cliente_id", c.id).order("data_hora", { ascending: false }),
+      c.grupo_economico_id ? (supabase as any).from("clientes")
         .select("id, nome_razao_social, nome_fantasia, cpf_cnpj, tipo_relacao_grupo, cidade, uf")
-        .eq("grupo_economico_id", c.grupo_economico_id).eq("ativo", true).neq("id", c.id);
-      setEmpresasGrupo(emp || []);
-    } else {
-      setEmpresasGrupo([]);
-    }
+        .eq("grupo_economico_id", c.grupo_economico_id).eq("ativo", true).neq("id", c.id) : Promise.resolve({ data: [] }),
+      (supabase as any).from("financeiro_lancamentos")
+        .select("id, descricao, data_vencimento, data_pagamento, valor, status")
+        .eq("cliente_id", c.id).eq("tipo", "receber").eq("ativo", true)
+        .order("data_vencimento", { ascending: false }).limit(50),
+      (supabase as any).from("orcamentos")
+        .select("data_orcamento").eq("cliente_id", c.id).eq("ativo", true)
+        .order("data_orcamento", { ascending: false }).limit(1),
+    ]);
+    setComRecords(comRes.data || []);
+    setEmpresasGrupo(empRes.data || []);
 
-    // PMV calculation - average days between due date and payment date for paid invoices
-    const { data: titulos } = await (supabase as any).from("financeiro_lancamentos")
-      .select("id, descricao, data_vencimento, data_pagamento, valor, status")
-      .eq("cliente_id", c.id).eq("tipo", "receber").eq("ativo", true)
-      .not("data_pagamento", "is", null)
-      .order("data_pagamento", { ascending: false }).limit(50);
+    const titulos = titulosRes.data || [];
+    setPmvTitulos(titulos);
 
-    setPmvTitulos(titulos || []);
-    if (titulos && titulos.length > 0) {
-      const totalDias = titulos.reduce((acc: number, t: any) => {
+    // Saldo em aberto
+    const aberto = titulos.filter((t: any) => t.status === "aberto" || t.status === "vencido");
+    setSaldoAberto(aberto.reduce((s: number, t: any) => s + Number(t.valor || 0), 0));
+    setTitulosVencidos(aberto.filter((t: any) => t.status === "vencido").length);
+
+    // PMV
+    const pagos = titulos.filter((t: any) => t.data_pagamento);
+    if (pagos.length > 0) {
+      const totalDias = pagos.reduce((acc: number, t: any) => {
         const venc = new Date(t.data_vencimento);
         const pag = new Date(t.data_pagamento);
         return acc + Math.round((pag.getTime() - venc.getTime()) / (1000 * 60 * 60 * 24));
       }, 0);
-      setPmv(Math.round(totalDias / titulos.length));
-    } else {
-      setPmv(null);
-    }
+      setPmv(Math.round(totalDias / pagos.length));
+    } else { setPmv(null); }
+
+    // Última compra/cotação
+    setUltimaCompra(orcRes.data?.[0]?.data_orcamento || null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.nome_razao_social) { toast.error("Nome/Razão Social é obrigatório"); return; }
     setSaving(true);
-    const payload = {
-      ...form,
-      grupo_economico_id: form.grupo_economico_id || null,
-      caixa_postal: form.caixa_postal || null,
-    };
+    const payload = { ...form, grupo_economico_id: form.grupo_economico_id || null, caixa_postal: form.caixa_postal || null };
     try {
       if (mode === "create") await create(payload);
       else if (selected) await update(selected.id, payload);
@@ -140,39 +143,25 @@ const Clientes = () => {
 
   const addComunicacao = async () => {
     if (!selected || !comForm.assunto) { toast.error("Assunto é obrigatório"); return; }
-    await (supabase as any).from("cliente_registros_comunicacao").insert({
-      cliente_id: selected.id, ...comForm, data_hora: new Date().toISOString(),
-    });
+    await (supabase as any).from("cliente_registros_comunicacao").insert({ cliente_id: selected.id, ...comForm, data_hora: new Date().toISOString() });
     toast.success("Registro adicionado!");
-    const { data: records } = await (supabase as any).from("cliente_registros_comunicacao")
-      .select("*").eq("cliente_id", selected.id).order("data_hora", { ascending: false });
+    const { data: records } = await (supabase as any).from("cliente_registros_comunicacao").select("*").eq("cliente_id", selected.id).order("data_hora", { ascending: false });
     setComRecords(records || []);
     setComForm({ canal: "", assunto: "", descricao: "" });
     setComOpen(false);
   };
 
-  const grupoNome = (id: string | null) => {
-    if (!id) return "—";
-    return grupos.find(g => g.id === id)?.nome || "—";
-  };
-
+  const grupoNome = (id: string | null) => !id ? "—" : grupos.find(g => g.id === id)?.nome || "—";
   const relacaoLabel: Record<string, string> = { matriz: "Matriz", filial: "Filial", coligada: "Coligada", independente: "Independente" };
 
   const filteredData = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
-
     return data.filter((cliente) => {
       if (tipoFilter !== "todos" && cliente.tipo_pessoa !== tipoFilter) return false;
       if (grupoFilter === "com_grupo" && !cliente.grupo_economico_id) return false;
       if (grupoFilter === "sem_grupo" && cliente.grupo_economico_id) return false;
       if (!query) return true;
-
-      const haystack = [cliente.nome_razao_social, cliente.nome_fantasia, cliente.cpf_cnpj, cliente.email, cliente.cidade, cliente.uf, cliente.telefone, cliente.contato]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-
-      return haystack.includes(query);
+      return [cliente.nome_razao_social, cliente.nome_fantasia, cliente.cpf_cnpj, cliente.email, cliente.cidade, cliente.uf, cliente.telefone, cliente.contato].filter(Boolean).join(" ").toLowerCase().includes(query);
     });
   }, [data, grupoFilter, searchTerm, tipoFilter]);
 
@@ -197,6 +186,7 @@ const Clientes = () => {
           onView={openView} onEdit={openEdit} onDelete={(c) => remove(c.id)} onDuplicate={(c) => duplicate(c)} />
       </ModulePage>
 
+      {/* Form Modal */}
       <FormModal open={modalOpen} onClose={() => setModalOpen(false)} title={mode === "create" ? "Novo Cliente" : "Editar Cliente"} size="lg">
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -206,51 +196,35 @@ const Clientes = () => {
                 <SelectContent><SelectItem value="F">Pessoa Física</SelectItem><SelectItem value="J">Pessoa Jurídica</SelectItem></SelectContent>
               </Select>
             </div>
-            <div className="space-y-2"><Label>CPF/CNPJ</Label>
-              <MaskedInput mask="cpf_cnpj" value={form.cpf_cnpj} onChange={(v) => setForm({ ...form, cpf_cnpj: v })} />
-            </div>
+            <div className="space-y-2"><Label>CPF/CNPJ</Label><MaskedInput mask="cpf_cnpj" value={form.cpf_cnpj} onChange={(v) => setForm({ ...form, cpf_cnpj: v })} /></div>
             <div className="space-y-2"><Label>I.E.</Label><Input value={form.inscricao_estadual} onChange={(e) => setForm({ ...form, inscricao_estadual: e.target.value })} /></div>
             <div className="col-span-2 md:col-span-3 space-y-2"><Label>Nome / Razão Social *</Label><Input value={form.nome_razao_social} onChange={(e) => setForm({ ...form, nome_razao_social: e.target.value })} required /></div>
             <div className="col-span-2 md:col-span-3 space-y-2"><Label>Nome Fantasia</Label><Input value={form.nome_fantasia} onChange={(e) => setForm({ ...form, nome_fantasia: e.target.value })} /></div>
             <div className="space-y-2"><Label>E-mail</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
-            <div className="space-y-2"><Label>Telefone</Label>
-              <MaskedInput mask="telefone" value={form.telefone} onChange={(v) => setForm({ ...form, telefone: v })} />
-            </div>
-            <div className="space-y-2"><Label>Celular</Label>
-              <MaskedInput mask="celular" value={form.celular} onChange={(v) => setForm({ ...form, celular: v })} />
-            </div>
+            <div className="space-y-2"><Label>Telefone</Label><MaskedInput mask="telefone" value={form.telefone} onChange={(v) => setForm({ ...form, telefone: v })} /></div>
+            <div className="space-y-2"><Label>Celular</Label><MaskedInput mask="celular" value={form.celular} onChange={(v) => setForm({ ...form, celular: v })} /></div>
             <div className="space-y-2"><Label>Contato</Label><Input value={form.contato} onChange={(e) => setForm({ ...form, contato: e.target.value })} /></div>
             <div className="space-y-2"><Label>Prazo (dias)</Label><Input type="number" value={form.prazo_padrao} onChange={(e) => setForm({ ...form, prazo_padrao: Number(e.target.value) })} /></div>
             <div className="space-y-2"><Label>Limite Crédito</Label><Input type="number" step="0.01" value={form.limite_credito} onChange={(e) => setForm({ ...form, limite_credito: Number(e.target.value) })} /></div>
           </div>
-
-          {/* Grupo Econômico */}
           <h3 className="font-semibold text-sm pt-2 border-t flex items-center gap-2"><Building2 className="w-4 h-4" /> Grupo Econômico</h3>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2"><Label>Grupo</Label>
               <Select value={form.grupo_economico_id} onValueChange={(v) => setForm({ ...form, grupo_economico_id: v })}>
                 <SelectTrigger><SelectValue placeholder="Nenhum" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">Nenhum</SelectItem>
-                  {grupos.map(g => <SelectItem key={g.id} value={g.id}>{g.nome}</SelectItem>)}
-                </SelectContent>
+                <SelectContent><SelectItem value="">Nenhum</SelectItem>{grupos.map(g => <SelectItem key={g.id} value={g.id}>{g.nome}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div className="space-y-2"><Label>Tipo de Relação</Label>
               <Select value={form.tipo_relacao_grupo} onValueChange={(v) => setForm({ ...form, tipo_relacao_grupo: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {relacaoOptions.map(r => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}
-                </SelectContent>
+                <SelectContent>{relacaoOptions.map(r => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}</SelectContent>
               </Select>
             </div>
           </div>
-
           <h3 className="font-semibold text-sm pt-2 border-t">Endereço</h3>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            <div className="space-y-2"><Label>CEP</Label>
-              <MaskedInput mask="cep" value={form.cep} onChange={(v) => setForm({ ...form, cep: v })} />
-            </div>
+            <div className="space-y-2"><Label>CEP</Label><MaskedInput mask="cep" value={form.cep} onChange={(v) => setForm({ ...form, cep: v })} /></div>
             <div className="col-span-2 space-y-2"><Label>Logradouro</Label><Input value={form.logradouro} onChange={(e) => setForm({ ...form, logradouro: e.target.value })} /></div>
             <div className="space-y-2"><Label>Número</Label><Input value={form.numero} onChange={(e) => setForm({ ...form, numero: e.target.value })} /></div>
             <div className="space-y-2"><Label>Complemento</Label><Input value={form.complemento} onChange={(e) => setForm({ ...form, complemento: e.target.value })} /></div>
@@ -268,107 +242,163 @@ const Clientes = () => {
         </form>
       </FormModal>
 
+      {/* View Drawer with Tabs */}
       <ViewDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} title="Detalhes do Cliente">
         {selected && (
           <div className="space-y-4">
-            <div><span className="text-xs text-muted-foreground">Nome / Razão Social</span><p className="font-medium">{selected.nome_razao_social}</p></div>
-            {selected.nome_fantasia && <div><span className="text-xs text-muted-foreground">Fantasia</span><p>{selected.nome_fantasia}</p></div>}
-            <div className="grid grid-cols-2 gap-4">
-              <div><span className="text-xs text-muted-foreground">Tipo</span><p>{selected.tipo_pessoa === "F" ? "Pessoa Física" : "Pessoa Jurídica"}</p></div>
-              <div><span className="text-xs text-muted-foreground">CPF/CNPJ</span><p className="font-mono text-sm">{selected.cpf_cnpj || "—"}</p></div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div><span className="text-xs text-muted-foreground">E-mail</span><p>{selected.email || "—"}</p></div>
-              <div><span className="text-xs text-muted-foreground">Contato</span><p>{selected.contato || "—"}</p></div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div><span className="text-xs text-muted-foreground">Telefone</span><p>{selected.telefone || "—"}</p></div>
-              <div><span className="text-xs text-muted-foreground">Celular</span><p>{selected.celular || "—"}</p></div>
-            </div>
-            {selected.logradouro && (
-              <div><span className="text-xs text-muted-foreground">Endereço</span>
-                <p>{selected.logradouro}, {selected.numero}{selected.complemento ? ` - ${selected.complemento}` : ""}<br/>
-                {selected.bairro} - {selected.cidade}/{selected.uf} - CEP {selected.cep}</p>
-              </div>
-            )}
-            {selected.caixa_postal && (
-              <div><span className="text-xs text-muted-foreground">Caixa Postal</span><p>{selected.caixa_postal}</p></div>
-            )}
-
-            {/* Grupo Econômico */}
-            {selected.grupo_economico_id && (
-              <div className="bg-muted/30 rounded-lg p-3">
-                <span className="text-xs text-muted-foreground flex items-center gap-1"><Building2 className="w-3 h-3" /> Grupo Econômico</span>
-                <p className="font-medium">{grupoNome(selected.grupo_economico_id)}</p>
-                <p className="text-xs text-muted-foreground">{relacaoLabel[selected.tipo_relacao_grupo || "independente"]}</p>
-              </div>
-            )}
-
-            {/* PMV Card */}
-            <div className="bg-muted/30 rounded-lg p-3">
-              <span className="text-xs text-muted-foreground flex items-center gap-1"><Clock className="w-3 h-3" /> PMV — Prazo Médio de Vencimento</span>
-              {pmv !== null ? (
+            {/* Summary Header */}
+            <div className="bg-muted/30 rounded-lg p-4">
+              <div className="flex items-start justify-between mb-3">
                 <div>
-                  <p className="text-2xl font-bold mt-1">
-                    {pmv > 0 ? `+${pmv}` : pmv} <span className="text-sm font-normal text-muted-foreground">dias</span>
+                  <p className="text-xs text-muted-foreground">{selected.tipo_pessoa === "F" ? "Pessoa Física" : "Pessoa Jurídica"} • {selected.cpf_cnpj || "—"}</p>
+                  <h3 className="font-semibold text-lg">{selected.nome_razao_social}</h3>
+                  {selected.nome_fantasia && <p className="text-sm text-muted-foreground">{selected.nome_fantasia}</p>}
+                </div>
+                <StatusBadge status={selected.ativo ? "Ativo" : "Inativo"} />
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="text-center rounded-lg border bg-background p-2">
+                  <p className="text-[10px] text-muted-foreground uppercase">Limite</p>
+                  <p className="font-mono font-semibold text-sm">{formatCurrency(selected.limite_credito || 0)}</p>
+                </div>
+                <div className="text-center rounded-lg border bg-background p-2">
+                  <p className="text-[10px] text-muted-foreground uppercase">Saldo Aberto</p>
+                  <p className={`font-mono font-semibold text-sm ${saldoAberto > 0 ? "text-warning" : ""}`}>{formatCurrency(saldoAberto)}</p>
+                </div>
+                <div className="text-center rounded-lg border bg-background p-2">
+                  <p className="text-[10px] text-muted-foreground uppercase">PMV</p>
+                  <p className={`font-mono font-semibold text-sm ${pmv !== null && pmv > 0 ? "text-warning" : pmv !== null && pmv < 0 ? "text-success" : ""}`}>
+                    {pmv !== null ? `${pmv > 0 ? "+" : ""}${pmv}d` : "—"}
                   </p>
-                  <p className="text-xs text-muted-foreground">Baseado em {pmvTitulos.length} título(s) pago(s)</p>
-                  {pmv > 0 && <p className="text-xs text-warning mt-1">Cliente paga em média {pmv} dias após o vencimento</p>}
-                  {pmv < 0 && <p className="text-xs text-success mt-1">Cliente paga em média {Math.abs(pmv)} dias antes do vencimento</p>}
-                  {pmv === 0 && <p className="text-xs text-success mt-1">Cliente paga no vencimento</p>}
                 </div>
-              ) : (
-                <p className="text-sm text-muted-foreground mt-1">Sem títulos pagos para cálculo</p>
+                <div className="text-center rounded-lg border bg-background p-2">
+                  <p className="text-[10px] text-muted-foreground uppercase">Últ. Compra</p>
+                  <p className="font-mono font-semibold text-sm">{ultimaCompra ? formatDate(ultimaCompra) : "—"}</p>
+                </div>
+              </div>
+              {titulosVencidos > 0 && (
+                <div className="flex items-center gap-2 text-xs text-destructive bg-destructive/10 rounded-lg p-2 mt-2">
+                  <AlertTriangle className="w-3 h-3" /> {titulosVencidos} título(s) vencido(s)
+                </div>
               )}
             </div>
 
-            {/* Empresas Relacionadas */}
-            {selected.grupo_economico_id && empresasGrupo.length > 0 && (
-              <div className="border-t pt-4">
-                <h4 className="font-semibold text-sm flex items-center gap-2 mb-3">
-                  <Building2 className="w-4 h-4" /> Empresas Relacionadas ({empresasGrupo.length})
-                </h4>
-                <div className="space-y-2">
-                  {empresasGrupo.map((emp: any) => (
-                    <div key={emp.id} className="bg-muted/30 rounded-lg p-3 flex items-center justify-between">
-                      <div>
-                        <p className="font-medium text-sm">{emp.nome_razao_social}</p>
-                        <p className="text-xs text-muted-foreground">{emp.cpf_cnpj || "—"} • {emp.cidade ? `${emp.cidade}/${emp.uf}` : "—"}</p>
-                      </div>
-                      <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
-                        {relacaoLabel[emp.tipo_relacao_grupo || "independente"]}
-                      </span>
+            <Tabs defaultValue="cadastro" className="w-full">
+              <TabsList className="w-full grid grid-cols-5">
+                <TabsTrigger value="cadastro" className="text-xs">Cadastro</TabsTrigger>
+                <TabsTrigger value="financeiro" className="text-xs">Financeiro</TabsTrigger>
+                <TabsTrigger value="endereco" className="text-xs">Endereço</TabsTrigger>
+                <TabsTrigger value="grupo" className="text-xs">Grupo</TabsTrigger>
+                <TabsTrigger value="historico" className="text-xs">Histórico</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="cadastro" className="space-y-3 mt-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div><span className="text-xs text-muted-foreground">E-mail</span><p>{selected.email || "—"}</p></div>
+                  <div><span className="text-xs text-muted-foreground">Contato</span><p>{selected.contato || "—"}</p></div>
+                  <div><span className="text-xs text-muted-foreground">Telefone</span><p>{selected.telefone || "—"}</p></div>
+                  <div><span className="text-xs text-muted-foreground">Celular</span><p>{selected.celular || "—"}</p></div>
+                  <div><span className="text-xs text-muted-foreground">Prazo Padrão</span><p>{selected.prazo_padrao || 30} dias</p></div>
+                  <div><span className="text-xs text-muted-foreground">I.E.</span><p className="font-mono">{selected.inscricao_estadual || "—"}</p></div>
+                </div>
+                {selected.observacoes && <div><span className="text-xs text-muted-foreground">Observações</span><p className="text-sm">{selected.observacoes}</p></div>}
+              </TabsContent>
+
+              <TabsContent value="financeiro" className="space-y-3 mt-3">
+                <div className="rounded-lg border bg-muted/30 p-3">
+                  <span className="text-xs text-muted-foreground flex items-center gap-1"><Clock className="w-3 h-3" /> PMV — Prazo Médio de Vencimento</span>
+                  {pmv !== null ? (
+                    <div>
+                      <p className="text-2xl font-bold mt-1">{pmv > 0 ? `+${pmv}` : pmv} <span className="text-sm font-normal text-muted-foreground">dias</span></p>
+                      <p className="text-xs text-muted-foreground">Baseado em {pmvTitulos.filter((t: any) => t.data_pagamento).length} título(s)</p>
+                      {pmv > 0 && <p className="text-xs text-warning mt-1">Paga em média {pmv} dias após vencimento</p>}
+                      {pmv < 0 && <p className="text-xs text-success mt-1">Paga em média {Math.abs(pmv)} dias antes</p>}
+                      {pmv === 0 && <p className="text-xs text-success mt-1">Paga no vencimento</p>}
                     </div>
-                  ))}
+                  ) : <p className="text-sm text-muted-foreground mt-1">Sem títulos pagos para cálculo</p>}
                 </div>
-              </div>
-            )}
-
-            {/* Comunicação */}
-            <div className="border-t pt-4">
-              <div className="flex items-center justify-between mb-3">
-                <h4 className="font-semibold text-sm flex items-center gap-2"><MessageSquare className="w-4 h-4" /> Comunicações</h4>
-                <Button size="sm" variant="outline" onClick={() => setComOpen(!comOpen)} className="gap-1">
-                  <Plus className="w-3 h-3" /> Novo
-                </Button>
-              </div>
-              {comOpen && (
-                <div className="bg-accent/30 rounded-lg p-3 mb-3 space-y-2">
-                  <div className="grid grid-cols-2 gap-2">
-                    <Input placeholder="Canal (email, telefone...)" value={comForm.canal} onChange={(e) => setComForm({...comForm, canal: e.target.value})} className="h-8 text-xs" />
-                    <Input placeholder="Assunto *" value={comForm.assunto} onChange={(e) => setComForm({...comForm, assunto: e.target.value})} className="h-8 text-xs" />
+                {pmvTitulos.length > 0 && (
+                  <div>
+                    <h4 className="font-semibold text-sm mb-2">Últimos Títulos</h4>
+                    <div className="space-y-1 max-h-[250px] overflow-y-auto">
+                      {pmvTitulos.slice(0, 15).map((t: any) => (
+                        <div key={t.id} className="flex justify-between text-sm py-1.5 border-b last:border-b-0">
+                          <div>
+                            <p className="text-xs">{t.descricao}</p>
+                            <p className="text-[10px] text-muted-foreground">Venc: {formatDate(t.data_vencimento)}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-mono text-xs">{formatCurrency(t.valor)}</p>
+                            <StatusBadge status={t.status === "pago" ? "Pago" : t.status === "vencido" ? "Vencido" : "Aberto"} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                  <Textarea placeholder="Descrição..." value={comForm.descricao} onChange={(e) => setComForm({...comForm, descricao: e.target.value})} className="min-h-[60px] text-xs" />
-                  <Button size="sm" onClick={addComunicacao}>Salvar</Button>
+                )}
+              </TabsContent>
+
+              <TabsContent value="endereco" className="space-y-3 mt-3">
+                {selected.logradouro ? (
+                  <div className="space-y-2">
+                    <p>{selected.logradouro}, {selected.numero}{selected.complemento ? ` - ${selected.complemento}` : ""}</p>
+                    <p>{selected.bairro} - {selected.cidade}/{selected.uf}</p>
+                    <p>CEP: {selected.cep}</p>
+                    {selected.pais && selected.pais !== "Brasil" && <p>País: {selected.pais}</p>}
+                    {selected.caixa_postal && <p>Caixa Postal: {selected.caixa_postal}</p>}
+                  </div>
+                ) : <p className="text-sm text-muted-foreground">Nenhum endereço cadastrado</p>}
+              </TabsContent>
+
+              <TabsContent value="grupo" className="space-y-3 mt-3">
+                {selected.grupo_economico_id ? (
+                  <>
+                    <div className="bg-muted/30 rounded-lg p-3">
+                      <span className="text-xs text-muted-foreground flex items-center gap-1"><Building2 className="w-3 h-3" /> Grupo Econômico</span>
+                      <p className="font-medium">{grupoNome(selected.grupo_economico_id)}</p>
+                      <p className="text-xs text-muted-foreground">{relacaoLabel[selected.tipo_relacao_grupo || "independente"]}</p>
+                    </div>
+                    {empresasGrupo.length > 0 && (
+                      <div>
+                        <h4 className="font-semibold text-sm flex items-center gap-2 mb-3"><Building2 className="w-4 h-4" /> Empresas Relacionadas ({empresasGrupo.length})</h4>
+                        <div className="space-y-2">
+                          {empresasGrupo.map((emp: any) => (
+                            <div key={emp.id} className="bg-muted/30 rounded-lg p-3 flex items-center justify-between">
+                              <div>
+                                <p className="font-medium text-sm">{emp.nome_razao_social}</p>
+                                <p className="text-xs text-muted-foreground">{emp.cpf_cnpj || "—"} • {emp.cidade ? `${emp.cidade}/${emp.uf}` : "—"}</p>
+                              </div>
+                              <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">{relacaoLabel[emp.tipo_relacao_grupo || "independente"]}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                ) : <p className="text-sm text-muted-foreground">Não pertence a nenhum grupo econômico</p>}
+              </TabsContent>
+
+              <TabsContent value="historico" className="space-y-3 mt-3">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="font-semibold text-sm flex items-center gap-2"><MessageSquare className="w-4 h-4" /> Comunicações</h4>
+                  <Button size="sm" variant="outline" onClick={() => setComOpen(!comOpen)} className="gap-1"><Plus className="w-3 h-3" /> Novo</Button>
                 </div>
-              )}
-              <TimelineList
-                items={comRecords.map((r: any) => ({
-                  id: r.id, title: r.assunto, description: r.descricao, date: r.data_hora, type: r.canal,
-                }))}
-                emptyMessage="Nenhum registro de comunicação"
-              />
-            </div>
+                {comOpen && (
+                  <div className="bg-accent/30 rounded-lg p-3 mb-3 space-y-2">
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input placeholder="Canal (email, telefone...)" value={comForm.canal} onChange={(e) => setComForm({...comForm, canal: e.target.value})} className="h-8 text-xs" />
+                      <Input placeholder="Assunto *" value={comForm.assunto} onChange={(e) => setComForm({...comForm, assunto: e.target.value})} className="h-8 text-xs" />
+                    </div>
+                    <Textarea placeholder="Descrição..." value={comForm.descricao} onChange={(e) => setComForm({...comForm, descricao: e.target.value})} className="min-h-[60px] text-xs" />
+                    <Button size="sm" onClick={addComunicacao}>Salvar</Button>
+                  </div>
+                )}
+                <TimelineList
+                  items={comRecords.map((r: any) => ({ id: r.id, title: r.assunto, description: r.descricao, date: r.data_hora, type: r.canal }))}
+                  emptyMessage="Nenhum registro de comunicação"
+                />
+              </TabsContent>
+            </Tabs>
           </div>
         )}
       </ViewDrawer>
