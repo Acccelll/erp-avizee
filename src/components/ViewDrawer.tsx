@@ -1,6 +1,7 @@
 import { ReactNode } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
+import { cn } from "@/lib/utils";
 
 interface ViewDrawerProps {
   open: boolean;
