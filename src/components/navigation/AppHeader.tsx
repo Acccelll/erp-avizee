@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, Moon, Plus, Search, Sun, User } from 'lucide-react';
+import { ArrowLeft, Moon, Plus, Search, Settings, Sun, User } from 'lucide-react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTheme } from 'next-themes';
 import { Button } from '@/components/ui/button';
