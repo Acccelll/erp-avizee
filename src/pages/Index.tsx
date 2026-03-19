@@ -6,6 +6,7 @@ import { PeriodFilter, Period } from "@/components/dashboard/PeriodFilter";
 import { AlertCards } from "@/components/dashboard/AlertCards";
 import { BacklogDetail } from "@/components/dashboard/BacklogDetail";
 import { EstoqueBaixoDetail } from "@/components/dashboard/EstoqueBaixoDetail";
+import { ComprasConfirmadasDetail } from "@/components/dashboard/ComprasConfirmadasDetail";
 import { RecentOrcamentos } from "@/components/dashboard/RecentOrcamentos";
 import { RecentCompras } from "@/components/dashboard/RecentCompras";
 import { SummaryPie } from "@/components/dashboard/SummaryPie";
