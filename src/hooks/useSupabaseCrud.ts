@@ -36,7 +36,8 @@ export function useSupabaseCrud<T extends Record<string, any>>({
 
     const { data: result, error } = await query;
     if (error) {
-      toast.error(`Erro ao carregar ${table}: ${error.message}`);
+      console.error(`[crud] Erro ao carregar ${table}:`, error);
+      toast.error("Erro ao carregar dados. Tente novamente.");
     } else {
       setData(result || []);
     }
