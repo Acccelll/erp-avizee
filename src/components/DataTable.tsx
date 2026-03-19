@@ -36,6 +36,7 @@ interface DataTableProps<T> {
 
 type SortDirection = 'asc' | 'desc' | null;
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function DataTable<T extends Record<string, any>>({
   columns,
   data,
@@ -141,6 +142,7 @@ export function DataTable<T extends Record<string, any>>({
 
   const renderSkeleton = () => (
     <div className="p-4 space-y-3">
+      <span className="sr-only">Carregando...</span>
       {Array.from({ length: 5 }).map((_, i) => (
         <div key={i} className="flex gap-4">
           {visibleColumns.map((col) => (
