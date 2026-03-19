@@ -235,9 +235,7 @@ export default function Relatorios() {
                 <CardDescription>{resultado.subtitle}</CardDescription>
               </CardHeader>
               <CardContent className="p-0">
-                <DataTable columns={columns} data={resultado.rows as Record<string, unknown>[]} loading={loading}
-                  emptyMessage={`Nenhum registro encontrado para ${reportCards.find(r => r.type === tipo)?.title || 'este relatório'} no período selecionado.`}
-                />
+                <DataTable columns={columns} data={resultado.rows as Record<string, unknown>[]} loading={loading} />
               </CardContent>
             </Card>
 
