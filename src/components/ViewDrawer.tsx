@@ -39,9 +39,9 @@ interface ViewFieldProps {
 
 export function ViewField({ label, children, className = "" }: ViewFieldProps) {
   return (
-    <div className={className}>
+    <div className={cn("min-w-0", className)}>
       <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</span>
-      <div className="mt-0.5 text-sm text-foreground">{children}</div>
+      <div className="mt-0.5 text-sm text-foreground break-words overflow-wrap-anywhere max-w-full truncate" title={typeof children === 'string' ? children : undefined}>{children}</div>
     </div>
   );
 }
