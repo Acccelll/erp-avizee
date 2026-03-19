@@ -75,7 +75,7 @@ export function useSupabaseCrud<T extends Record<string, any>>({
   const remove = async (id: string, soft = true) => {
     if (soft && hasAtivo) {
       const { error } = await (supabase as any).from(table).update({ ativo: false }).eq("id", id);
-      if (error) { toast.error(`Erro ao remover: ${error.message}`); throw error; }
+      if (error) { console.error(`[crud] Erro ao remover de ${table}:`, error); toast.error("Erro ao remover registro. Tente novamente."); throw error; }
     } else {
       const { error } = await (supabase as any).from(table).delete().eq("id", id);
       if (error) { toast.error(`Erro ao remover: ${error.message}`); throw error; }
