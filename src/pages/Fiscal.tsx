@@ -162,7 +162,8 @@ const Fiscal = () => {
       toast.success("Nota fiscal confirmada! Estoque e financeiro atualizados.");
       fetchData();
     } catch (err: any) {
-      toast.error(`Erro: ${err.message}`);
+      console.error('[fiscal] confirmar NF:', err);
+      toast.error("Erro ao confirmar nota fiscal. Tente novamente.");
     }
   };
 
