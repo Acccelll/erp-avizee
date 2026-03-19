@@ -18,6 +18,11 @@ export function MobileMenu({ open, onOpenChange, onOpenSearch }: MobileMenuProps
   const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
   const { profile, signOut } = useAuth();
+  const { isAdmin } = useIsAdmin();
+
+  const filteredSections = isAdmin
+    ? mobileMenuSections
+    : mobileMenuSections.filter((s) => s.key !== 'administracao');
 
   const handleNavigate = (path: string) => {
     onOpenChange(false);
