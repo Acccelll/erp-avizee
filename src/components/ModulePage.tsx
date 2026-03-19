@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
-import { Plus, Search } from "lucide-react";
+import { Plus, Search, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 
 interface ModulePageProps {
@@ -16,6 +16,10 @@ interface ModulePageProps {
   filters?: ReactNode;
   toolbarExtra?: ReactNode;
   showToolbar?: boolean;
+  /** KPI cards to render above the toolbar */
+  summaryCards?: ReactNode;
+  /** Actions shown on the right side of the header */
+  headerActions?: ReactNode;
 }
 
 export function ModulePage({
@@ -31,25 +35,39 @@ export function ModulePage({
   filters,
   toolbarExtra,
   showToolbar,
+  summaryCards,
+  headerActions,
 }: ModulePageProps) {
   const hasSearch = typeof onSearchChange === "function";
   const shouldShowToolbar = showToolbar ?? Boolean(hasSearch || filters || toolbarExtra || count !== undefined);
 
   return (
     <div>
+      {/* Page Header */}
       <div className="page-header">
         <div>
           <h1 className="page-title">{title}</h1>
           {subtitle && <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>}
         </div>
-        {addLabel && (
-          <Button onClick={onAdd} className="gap-2">
-            <Plus className="h-4 w-4" />
-            {addLabel}
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {headerActions}
+          {addLabel && (
+            <Button onClick={onAdd} className="gap-2">
+              <Plus className="h-4 w-4" />
+              {addLabel}
+            </Button>
+          )}
+        </div>
       </div>
 
+      {/* Summary Cards / KPIs */}
+      {summaryCards && (
+        <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4 lg:gap-4">
+          {summaryCards}
+        </div>
+      )}
+
+      {/* Toolbar: Search + Filters */}
       {shouldShowToolbar && (
         <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center">
           <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
@@ -60,8 +78,17 @@ export function ModulePage({
                   value={searchValue ?? ""}
                   onChange={(event) => onSearchChange?.(event.target.value)}
                   placeholder={searchPlaceholder}
-                  className="pl-9"
+                  className="pl-9 pr-8"
                 />
+                {searchValue && (
+                  <button
+                    type="button"
+                    onClick={() => onSearchChange?.("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
               </div>
             )}
             {filters && <div className="flex flex-wrap items-center gap-2">{filters}</div>}

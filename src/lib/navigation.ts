@@ -58,63 +58,13 @@ export const dashboardItem: NavLeafItem = {
 };
 
 export const quickActions: QuickAction[] = [
-  {
-    id: 'nova-cotacao',
-    title: 'Nova Cotação',
-    description: 'Criar proposta comercial',
-    path: '/cotacoes/novo',
-    shortcut: '⌘N',
-  },
-  {
-    id: 'novo-cliente',
-    title: 'Novo Cliente',
-    description: 'Cadastrar cliente rapidamente',
-    path: '/clientes',
-  },
-  {
-    id: 'novo-produto',
-    title: 'Novo Produto',
-    description: 'Abrir cadastro de produto',
-    path: '/produtos',
-  },
-  {
-    id: 'abrir-financeiro',
-    title: 'Contas a Receber',
-    description: 'Ir para o financeiro filtrado',
-    path: '/financeiro?tipo=receber',
-  },
+  { id: 'nova-cotacao', title: 'Nova Cotação', description: 'Criar proposta comercial', path: '/cotacoes/novo', shortcut: '⌘N' },
+  { id: 'novo-cliente', title: 'Novo Cliente', description: 'Cadastrar cliente rapidamente', path: '/clientes' },
+  { id: 'novo-produto', title: 'Novo Produto', description: 'Abrir cadastro de produto', path: '/produtos' },
+  { id: 'abrir-financeiro', title: 'Contas a Receber', description: 'Ir para o financeiro filtrado', path: '/financeiro?tipo=receber' },
 ];
 
 export const navSections: NavSection[] = [
-  {
-    key: 'operacional',
-    title: 'Operacional',
-    icon: Package,
-    items: [
-      {
-        title: 'Vendas',
-        items: [
-          { title: 'Cotações', path: '/cotacoes', keywords: ['orcamentos', 'propostas'] },
-          { title: 'Pedidos', path: '/pedidos', keywords: ['pipeline', 'pedidos comerciais'] },
-          { title: 'Ordens de Venda', path: '/ordens-venda', keywords: ['ov', 'backlog'] },
-        ],
-      },
-      {
-        title: 'Compras',
-        items: [
-          { title: 'Cotações de Compra', path: '/compras?view=cotacoes', keywords: ['compra', 'solicitacoes', 'negociacao'] },
-          { title: 'Pedidos de Compra', path: '/compras', keywords: ['compras', 'fornecedores'] },
-        ],
-      },
-      {
-        title: 'Estoque',
-        items: [
-          { title: 'Produtos', path: '/produtos', keywords: ['cadastro de produtos'] },
-          { title: 'Movimentações', path: '/estoque?view=movimentacoes', keywords: ['entradas', 'saidas', 'inventario'] },
-        ],
-      },
-    ],
-  },
   {
     key: 'cadastros',
     title: 'Cadastros',
@@ -123,10 +73,52 @@ export const navSections: NavSection[] = [
       {
         title: 'Base cadastral',
         items: [
+          { title: 'Produtos', path: '/produtos', keywords: ['sku', 'catalogo'] },
           { title: 'Clientes', path: '/clientes' },
           { title: 'Fornecedores', path: '/fornecedores' },
           { title: 'Grupos Econômicos', path: '/grupos-economicos', keywords: ['matriz', 'filiais'] },
-          { title: 'Produtos', path: '/produtos', keywords: ['sku', 'catalogo'] },
+        ],
+      },
+    ],
+  },
+  {
+    key: 'comercial',
+    title: 'Comercial',
+    icon: FileText,
+    items: [
+      {
+        title: 'Pipeline de vendas',
+        items: [
+          { title: 'Cotações', path: '/cotacoes', keywords: ['orcamentos', 'propostas'] },
+          { title: 'Pedidos', path: '/pedidos', keywords: ['pipeline', 'pedidos comerciais'] },
+          { title: 'Ordens de Venda', path: '/ordens-venda', keywords: ['ov', 'backlog'] },
+        ],
+      },
+    ],
+  },
+  {
+    key: 'compras',
+    title: 'Compras',
+    icon: ShoppingCart,
+    items: [
+      {
+        title: 'Gestão de compras',
+        items: [
+          { title: 'Pedidos de Compra', path: '/compras', keywords: ['compras', 'fornecedores'] },
+        ],
+      },
+    ],
+  },
+  {
+    key: 'estoque',
+    title: 'Estoque',
+    icon: Warehouse,
+    items: [
+      {
+        title: 'Controle de estoque',
+        items: [
+          { title: 'Posição Atual', path: '/estoque', keywords: ['saldo', 'inventario'] },
+          { title: 'Movimentações', path: '/estoque?view=movimentacoes', keywords: ['entradas', 'saidas'] },
         ],
       },
     ],
@@ -141,10 +133,10 @@ export const navSections: NavSection[] = [
         items: [
           { title: 'Contas a Pagar', path: '/financeiro?tipo=pagar', keywords: ['cp', 'despesas'] },
           { title: 'Contas a Receber', path: '/financeiro?tipo=receber', keywords: ['cr', 'recebimentos'] },
-          { title: 'Contas Bancárias', path: '/contas-bancarias', keywords: ['bancos', 'inter', 'c6', 'recargapay'] },
-          { title: 'Fluxo de Caixa', path: '/fluxo-caixa' },
           { title: 'Caixa', path: '/caixa' },
-          { title: 'Plano de Contas', path: '/contas-contabeis-plano', keywords: ['contabil', 'contas contabeis'] },
+          { title: 'Fluxo de Caixa', path: '/fluxo-caixa' },
+          { title: 'Contas Bancárias', path: '/contas-bancarias', keywords: ['bancos'] },
+          { title: 'Plano de Contas', path: '/contas-contabeis-plano', keywords: ['contabil'] },
         ],
       },
     ],
@@ -187,7 +179,7 @@ export const navSections: NavSection[] = [
     icon: Settings,
     items: [
       {
-        title: 'Parâmetros',
+        title: 'Configurações',
         items: [
           { title: 'Usuários', path: '/configuracoes?tab=usuarios' },
           { title: 'Permissões', path: '/configuracoes?tab=usuarios' },
@@ -202,12 +194,14 @@ export const navSections: NavSection[] = [
 
 export const mobileBottomTabs: MobileBottomTab[] = [
   { key: 'inicio', title: 'Início', icon: LayoutDashboard, path: '/' },
-  { key: 'operacional', title: 'Operações', icon: Package, path: '/cotacoes' },
+  { key: 'comercial', title: 'Comercial', icon: FileText, path: '/cotacoes' },
   { key: 'cadastros', title: 'Cadastros', icon: Users, path: '/clientes' },
   { key: 'financeiro', title: 'Financeiro', icon: DollarSign, path: '/financeiro?tipo=receber' },
 ];
 
-export const mobileMenuSections = navSections.filter((section) => ['fiscal', 'relatorios', 'administracao'].includes(section.key));
+export const mobileMenuSections = navSections.filter((section) =>
+  ['compras', 'estoque', 'fiscal', 'relatorios', 'administracao'].includes(section.key),
+);
 
 export const headerIcons: Record<string, LucideIcon> = {
   '/': LayoutDashboard,
@@ -276,13 +270,10 @@ export function isPathActive(currentPath: string, targetPath: string) {
 
 export function getRouteLabel(pathname: string) {
   if (baseRouteLabels[pathname]) return baseRouteLabels[pathname];
-
   const exactMatch = flatNavItems.find((item) => item.path === pathname);
   if (exactMatch) return exactMatch.title;
-
   const match = flatNavItems.find((item) => item.path.split('?')[0] === pathname);
   if (match) return match.title;
-
   if (pathname.startsWith('/orcamentos/')) return 'Cotação';
   if (pathname.startsWith('/cotacoes/')) return 'Cotação';
   if (pathname.startsWith('/clientes/')) return 'Cliente';
@@ -293,11 +284,11 @@ export function getRouteLabel(pathname: string) {
 
 export function getNavSectionKey(currentRoute: string) {
   if (currentRoute === '/' || currentRoute.startsWith('/?')) return 'inicio';
-
   const pathname = currentRoute.split('?')[0];
   const section = navSections.find((entry) =>
-    entry.items.some((group) => group.items.some((item) => pathname === item.path.split('?')[0] || pathname.startsWith(`${item.path.split('?')[0]}/`))),
+    entry.items.some((group) =>
+      group.items.some((item) => pathname === item.path.split('?')[0] || pathname.startsWith(`${item.path.split('?')[0]}/`)),
+    ),
   );
-
   return section?.key ?? 'menu';
 }

@@ -28,14 +28,9 @@ export function AppSidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMo
     if (targetQuery) return currentRoute === targetPath;
     return location.pathname === targetBase || location.pathname.startsWith(`${targetBase}/`);
   };
-  const [openSections, setOpenSections] = useState<Record<string, boolean>>({
-    operacional: true,
-    cadastros: true,
-    financeiro: true,
-    fiscal: true,
-    relatorios: true,
-    administracao: true,
-  });
+
+  // Auto-open sections that have active items
+  const [manualSections, setManualSections] = useState<Record<string, boolean>>({});
 
   const activeSectionKeys = useMemo(
     () =>
@@ -46,6 +41,12 @@ export function AppSidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMo
         .map((section) => section.key),
     [currentRoute],
   );
+
+  const isSectionOpen = (key: string) => {
+    if (collapsed) return false;
+    if (key in manualSections) return manualSections[key];
+    return activeSectionKeys.includes(key);
+  };
 
   const containerClasses = collapsed ? 'w-[240px] md:w-[72px]' : 'w-[240px]';
 
@@ -59,6 +60,7 @@ export function AppSidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMo
           mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
         ].join(' ')}
       >
+        {/* Logo */}
         <div className="flex h-16 items-center justify-between border-b border-border px-4">
           <div className="flex items-center gap-3 overflow-hidden">
             <img src={logoAvizee} alt="AviZee" className="h-9 w-9 rounded object-contain" />
@@ -74,6 +76,7 @@ export function AppSidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMo
           </Button>
         </div>
 
+        {/* Search */}
         <div className="border-b border-border px-3 py-3">
           <button
             type="button"
@@ -84,75 +87,81 @@ export function AppSidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMo
             <Search className="h-4 w-4" />
             {!collapsed && (
               <>
-                <span className="truncate">Buscar módulos...</span>
+                <span className="truncate">Buscar...</span>
                 <span className="ml-auto text-[10px]">⌘K</span>
               </>
             )}
           </button>
         </div>
 
+        {/* Navigation */}
         <nav className="flex-1 overflow-y-auto px-2 py-3">
+          {/* Dashboard */}
           <Link
             to={dashboardItem.path}
             onClick={onCloseMobile}
-            className={`sidebar-item mb-2 ${location.pathname === dashboardItem.path ? 'sidebar-item-active' : 'sidebar-item-inactive'} ${collapsed ? 'justify-center' : ''}`}
+            className={`sidebar-item mb-3 ${location.pathname === dashboardItem.path ? 'sidebar-item-active' : 'sidebar-item-inactive'} ${collapsed ? 'justify-center' : ''}`}
             title={collapsed ? dashboardItem.title : undefined}
           >
             <LayoutDashboard className="h-5 w-5 shrink-0" />
             {!collapsed && <span>{dashboardItem.title}</span>}
           </Link>
 
-          <div className="space-y-2">
+          {/* Sections */}
+          <div className="space-y-1">
             {navSections.map((section) => {
               const sectionActive = activeSectionKeys.includes(section.key);
-              const isOpen = collapsed ? false : openSections[section.key];
+              const isOpen = isSectionOpen(section.key);
               return (
-                <div key={section.key} className="rounded-xl border border-transparent bg-background/40">
+                <div key={section.key}>
                   <button
                     type="button"
                     onClick={() => {
-                      if (collapsed) {
-                        onToggleCollapsed();
-                        return;
-                      }
-                      setOpenSections((current) => ({ ...current, [section.key]: !current[section.key] }));
+                      if (collapsed) { onToggleCollapsed(); return; }
+                      setManualSections((c) => ({ ...c, [section.key]: !isOpen }));
                     }}
-                    className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition ${sectionActive ? 'bg-primary text-primary-foreground' : 'text-foreground hover:bg-accent'} ${collapsed ? 'justify-center px-0' : ''}`}
+                    className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-medium transition ${
+                      sectionActive
+                        ? 'text-primary'
+                        : 'text-foreground hover:bg-accent'
+                    } ${collapsed ? 'justify-center px-0' : ''}`}
                     title={collapsed ? section.title : undefined}
                   >
-                    <section.icon className="h-5 w-5 shrink-0" />
+                    <section.icon className="h-4.5 w-4.5 shrink-0" />
                     {!collapsed && (
                       <>
                         <span className="flex-1">{section.title}</span>
-                        {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                        {isOpen ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
                       </>
                     )}
                   </button>
 
                   {!collapsed && isOpen && (
-                    <div className="space-y-4 px-2 pb-3 pt-2">
+                    <div className="ml-3 space-y-0.5 border-l border-border pl-3 py-1">
                       {section.items.map((group) => (
                         <Fragment key={group.title}>
-                          <div>
-                            <p className="px-2 pb-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+                          {section.items.length > 1 && (
+                            <p className="px-2 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
                               {group.title}
                             </p>
-                            <div className="space-y-1">
-                              {group.items.map((item) => {
-                                const active = isItemActive(item.path);
-                                return (
-                                  <Link
-                                    key={item.path}
-                                    to={item.path}
-                                    onClick={onCloseMobile}
-                                    className={`block rounded-lg px-3 py-2 text-sm transition ${active ? 'bg-primary/10 font-medium text-primary' : 'text-muted-foreground hover:bg-accent hover:text-foreground'}`}
-                                  >
-                                    {item.title}
-                                  </Link>
-                                );
-                              })}
-                            </div>
-                          </div>
+                          )}
+                          {group.items.map((item) => {
+                            const active = isItemActive(item.path);
+                            return (
+                              <Link
+                                key={item.path}
+                                to={item.path}
+                                onClick={onCloseMobile}
+                                className={`block rounded-md px-3 py-1.5 text-[13px] transition ${
+                                  active
+                                    ? 'bg-primary/10 font-medium text-primary'
+                                    : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+                                }`}
+                              >
+                                {item.title}
+                              </Link>
+                            );
+                          })}
                         </Fragment>
                       ))}
                     </div>
@@ -163,6 +172,7 @@ export function AppSidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMo
           </div>
         </nav>
 
+        {/* Footer */}
         <div className="border-t border-border p-2">
           <Link
             to="/configuracoes"

@@ -5,9 +5,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
-import { AlertTriangle, LogIn, Eye, EyeOff } from "lucide-react";
+import { AlertTriangle, LogIn, Eye, EyeOff, Mail, Lock } from "lucide-react";
 import logoAvizee from "@/assets/logoavizee.png";
 
 export default function Login() {
@@ -15,6 +15,7 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
 
@@ -24,18 +25,34 @@ export default function Login() {
     }
   }, [authLoading, user, navigate]);
 
+  const validate = () => {
+    const newErrors: typeof errors = {};
+    if (!email.trim()) newErrors.email = "Informe seu e-mail";
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) newErrors.email = "E-mail inválido";
+    if (!password) newErrors.password = "Informe sua senha";
+    else if (password.length < 6) newErrors.password = "Mínimo 6 caracteres";
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!validate()) return;
 
     if (!isSupabaseConfigured) {
-      toast.error(supabaseConfigError || "Configuração do Supabase ausente.");
+      toast.error(supabaseConfigError || "Configuração do backend ausente.");
       return;
     }
 
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
     if (error) {
-      toast.error(error.message === "Invalid login credentials" ? "E-mail ou senha inválidos" : error.message);
+      const msg = error.message === "Invalid login credentials"
+        ? "E-mail ou senha inválidos. Verifique suas credenciais."
+        : error.message === "Email not confirmed"
+        ? "Confirme seu e-mail antes de fazer login. Verifique sua caixa de entrada."
+        : error.message;
+      toast.error(msg);
     } else {
       toast.success("Login realizado com sucesso!");
       navigate("/", { replace: true });
@@ -43,56 +60,86 @@ export default function Login() {
     setLoading(false);
   };
 
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <img src={logoAvizee} alt="AviZee" className="h-14 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-foreground">Sistema AviZee</h1>
+          <img src={logoAvizee} alt="AviZee ERP" className="h-14 mx-auto mb-4" />
+          <h1 className="text-2xl font-bold text-foreground tracking-tight">Bem-vindo ao AviZee</h1>
           <p className="text-muted-foreground text-sm mt-1">Acesse sua conta para continuar</p>
         </div>
 
-        <form onSubmit={handleLogin} className="bg-card border rounded-xl p-6 space-y-4">
+        {!isSupabaseConfigured && (
+          <Alert variant="destructive" className="mb-4">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>{supabaseConfigError}</AlertDescription>
+          </Alert>
+        )}
+
+        <form onSubmit={handleLogin} className="bg-card border rounded-xl p-6 space-y-4 shadow-sm">
           <div className="space-y-2">
             <Label htmlFor="email">E-mail</Label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="seu@email.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
+            <div className="relative">
+              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                id="email"
+                type="email"
+                placeholder="seu@email.com"
+                value={email}
+                onChange={(e) => { setEmail(e.target.value); setErrors((prev) => ({ ...prev, email: undefined })); }}
+                className={`pl-9 ${errors.email ? "border-destructive" : ""}`}
+                autoComplete="email"
+                autoFocus
+              />
+            </div>
+            {errors.email && <p className="text-xs text-destructive">{errors.email}</p>}
           </div>
+
           <div className="space-y-2">
             <Label htmlFor="password">Senha</Label>
             <div className="relative">
+              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 id="password"
                 type={showPassword ? "text" : "password"}
                 placeholder="••••••••"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
+                onChange={(e) => { setPassword(e.target.value); setErrors((prev) => ({ ...prev, password: undefined })); }}
+                className={`pl-9 pr-10 ${errors.password ? "border-destructive" : ""}`}
+                autoComplete="current-password"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                tabIndex={-1}
+                aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
               >
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
+            {errors.password && <p className="text-xs text-destructive">{errors.password}</p>}
           </div>
+
           <div className="flex justify-end">
             <Link to="/forgot-password" className="text-sm text-primary hover:underline">
               Esqueceu a senha?
             </Link>
           </div>
+
           <Button type="submit" className="w-full gap-2" disabled={loading || !isSupabaseConfigured}>
             <LogIn className="w-4 h-4" />
             {loading ? "Entrando..." : "Entrar"}
           </Button>
+
           <p className="text-center text-sm text-muted-foreground">
             Não tem conta?{" "}
             <Link to="/signup" className="text-primary hover:underline font-medium">
@@ -100,6 +147,10 @@ export default function Login() {
             </Link>
           </p>
         </form>
+
+        <p className="text-center text-xs text-muted-foreground mt-6">
+          © {new Date().getFullYear()} AviZee ERP — Todos os direitos reservados
+        </p>
       </div>
     </div>
   );

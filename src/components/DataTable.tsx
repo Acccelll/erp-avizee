@@ -1,16 +1,20 @@
-import { useState } from 'react';
-import { Eye, Edit, Trash2, Copy } from 'lucide-react';
+import { useState, useMemo, useCallback } from 'react';
+import { Eye, Edit, Trash2, Copy, ChevronUp, ChevronDown, ChevronsUpDown, ChevronLeft, ChevronRight, PackageOpen } from 'lucide-react';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 
-interface Column<T> {
+export interface Column<T> {
   key: string;
   label: string;
   render?: (item: T) => React.ReactNode;
+  sortable?: boolean;
+  hidden?: boolean;
 }
 
 interface DataTableProps<T> {
@@ -22,7 +26,15 @@ interface DataTableProps<T> {
   onDelete?: (item: T) => void;
   onDuplicate?: (item: T) => void;
   loading?: boolean;
+  pageSize?: number;
+  selectable?: boolean;
+  selectedIds?: string[];
+  onSelectionChange?: (ids: string[]) => void;
+  emptyTitle?: string;
+  emptyDescription?: string;
 }
+
+type SortDirection = 'asc' | 'desc' | null;
 
 export function DataTable<T extends Record<string, any>>({
   columns,
@@ -33,137 +45,245 @@ export function DataTable<T extends Record<string, any>>({
   onDelete,
   onDuplicate,
   loading,
+  pageSize = 25,
+  selectable = false,
+  selectedIds = [],
+  onSelectionChange,
+  emptyTitle = "Nenhum registro encontrado",
+  emptyDescription = "Tente ajustar os filtros ou adicione um novo registro.",
 }: DataTableProps<T>) {
   const isMobile = useIsMobile();
   const [deleteItem, setDeleteItem] = useState<T | null>(null);
+  const [sortKey, setSortKey] = useState<string | null>(null);
+  const [sortDir, setSortDir] = useState<SortDirection>(null);
+  const [currentPage, setCurrentPage] = useState(0);
   const hasActions = onView || onEdit || onDelete || onDuplicate;
-  const primaryColumn = columns[0];
-  const secondaryColumns = columns.slice(1);
+  const visibleColumns = columns.filter((c) => !c.hidden);
+  const primaryColumn = visibleColumns[0];
+  const secondaryColumns = visibleColumns.slice(1);
+
+  const handleSort = (key: string) => {
+    if (sortKey === key) {
+      if (sortDir === 'asc') setSortDir('desc');
+      else if (sortDir === 'desc') { setSortKey(null); setSortDir(null); }
+    } else {
+      setSortKey(key);
+      setSortDir('asc');
+    }
+    setCurrentPage(0);
+  };
+
+  const sortedData = useMemo(() => {
+    if (!sortKey || !sortDir) return data;
+    return [...data].sort((a, b) => {
+      const aVal = a[sortKey];
+      const bVal = b[sortKey];
+      if (aVal == null && bVal == null) return 0;
+      if (aVal == null) return 1;
+      if (bVal == null) return -1;
+      const cmp = typeof aVal === 'number' ? aVal - bVal : String(aVal).localeCompare(String(bVal), 'pt-BR');
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+  }, [data, sortKey, sortDir]);
+
+  const totalPages = Math.max(1, Math.ceil(sortedData.length / pageSize));
+  const pagedData = sortedData.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
+
+  const toggleSelect = useCallback((id: string) => {
+    if (!onSelectionChange) return;
+    onSelectionChange(selectedIds.includes(id) ? selectedIds.filter((i) => i !== id) : [...selectedIds, id]);
+  }, [selectedIds, onSelectionChange]);
+
+  const toggleSelectAll = useCallback(() => {
+    if (!onSelectionChange) return;
+    const pageIds = pagedData.map((item) => item.id).filter(Boolean);
+    const allSelected = pageIds.every((id) => selectedIds.includes(id));
+    onSelectionChange(allSelected ? selectedIds.filter((id) => !pageIds.includes(id)) : [...new Set([...selectedIds, ...pageIds])]);
+  }, [pagedData, selectedIds, onSelectionChange]);
 
   const renderActions = (item: T) => (
-    <div className="flex flex-wrap items-center justify-end gap-1.5">
+    <div className="flex flex-wrap items-center justify-end gap-1">
       {onView && (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); onView(item); }}>
-              <Eye className="h-4 w-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Visualizar</TooltipContent>
-        </Tooltip>
+        <Tooltip><TooltipTrigger asChild>
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); onView(item); }}>
+            <Eye className="h-4 w-4" />
+          </Button>
+        </TooltipTrigger><TooltipContent>Visualizar</TooltipContent></Tooltip>
       )}
       {onEdit && (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); onEdit(item); }}>
-              <Edit className="h-4 w-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Editar</TooltipContent>
-        </Tooltip>
+        <Tooltip><TooltipTrigger asChild>
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); onEdit(item); }}>
+            <Edit className="h-4 w-4" />
+          </Button>
+        </TooltipTrigger><TooltipContent>Editar</TooltipContent></Tooltip>
       )}
       {onDuplicate && (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); onDuplicate(item); }}>
-              <Copy className="h-4 w-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Duplicar</TooltipContent>
-        </Tooltip>
+        <Tooltip><TooltipTrigger asChild>
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); onDuplicate(item); }}>
+            <Copy className="h-4 w-4" />
+          </Button>
+        </TooltipTrigger><TooltipContent>Duplicar</TooltipContent></Tooltip>
       )}
       {onDelete && (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={(e) => { e.stopPropagation(); setDeleteItem(item); }}>
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Excluir</TooltipContent>
-        </Tooltip>
+        <Tooltip><TooltipTrigger asChild>
+          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={(e) => { e.stopPropagation(); setDeleteItem(item); }}>
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </TooltipTrigger><TooltipContent>Excluir</TooltipContent></Tooltip>
       )}
     </div>
   );
 
+  const SortIcon = ({ colKey }: { colKey: string }) => {
+    if (sortKey !== colKey) return <ChevronsUpDown className="h-3.5 w-3.5 text-muted-foreground/50" />;
+    return sortDir === 'asc' ? <ChevronUp className="h-3.5 w-3.5 text-primary" /> : <ChevronDown className="h-3.5 w-3.5 text-primary" />;
+  };
+
+  const renderSkeleton = () => (
+    <div className="p-4 space-y-3">
+      {Array.from({ length: 5 }).map((_, i) => (
+        <div key={i} className="flex gap-4">
+          {visibleColumns.map((col) => (
+            <Skeleton key={col.key} className="h-5 flex-1 rounded" />
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+
+  const renderEmpty = () => (
+    <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
+      <div className="rounded-full bg-muted p-4 mb-4">
+        <PackageOpen className="h-8 w-8 text-muted-foreground" />
+      </div>
+      <h3 className="text-base font-semibold text-foreground mb-1">{emptyTitle}</h3>
+      <p className="text-sm text-muted-foreground max-w-sm">{emptyDescription}</p>
+    </div>
+  );
+
+  const renderPagination = () => {
+    if (sortedData.length <= pageSize) return null;
+    return (
+      <div className="flex items-center justify-between border-t px-4 py-3">
+        <span className="text-xs text-muted-foreground">
+          {currentPage * pageSize + 1}–{Math.min((currentPage + 1) * pageSize, sortedData.length)} de {sortedData.length}
+        </span>
+        <div className="flex gap-1">
+          <Button variant="ghost" size="icon" className="h-8 w-8" disabled={currentPage === 0} onClick={() => setCurrentPage((p) => p - 1)}>
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="icon" className="h-8 w-8" disabled={currentPage >= totalPages - 1} onClick={() => setCurrentPage((p) => p + 1)}>
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <>
       <div className="data-table">
-        {loading ? (
-          <div className="px-4 py-12 text-center text-muted-foreground">
-            <div className="flex items-center justify-center gap-2">
-              <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-              Carregando...
-            </div>
-          </div>
-        ) : data.length === 0 ? (
-          <div className="px-4 py-12 text-center text-muted-foreground">Nenhum registro encontrado</div>
-        ) : isMobile ? (
-          <div className="space-y-3 p-3">
-            {data.map((item, idx) => (
-              <div
-                key={item.id || idx}
-                role={onRowClick ? "button" : undefined}
-                tabIndex={onRowClick ? 0 : -1}
-                onClick={() => onRowClick?.(item)}
-                onKeyDown={(event) => { if ((event.key === "Enter" || event.key === " ") && onRowClick) { event.preventDefault(); onRowClick(item); } }}
-                className="w-full rounded-2xl border bg-background p-4 text-left shadow-sm transition hover:border-primary/30 hover:bg-accent/20"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">{primaryColumn.label}</p>
-                    <div className="mt-1 text-sm font-semibold text-foreground">
-                      {primaryColumn.render ? primaryColumn.render(item) : item[primaryColumn.key]}
-                    </div>
-                  </div>
-                  {hasActions && <div className="shrink-0">{renderActions(item)}</div>}
-                </div>
-
-                <div className="mt-3 space-y-2">
-                  {secondaryColumns.map((col) => (
-                    <div key={col.key} className="flex items-start justify-between gap-3 rounded-xl bg-accent/40 px-3 py-2">
-                      <span className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">{col.label}</span>
-                      <div className={cn('max-w-[60%] text-right text-sm text-foreground', col.key.toLowerCase().includes('status') && 'font-medium')}>
-                        {col.render ? col.render(item) : item[col.key]}
+        {loading ? renderSkeleton() : data.length === 0 ? renderEmpty() : isMobile ? (
+          <>
+            <div className="space-y-3 p-3">
+              {pagedData.map((item, idx) => (
+                <div
+                  key={item.id || idx}
+                  role={onRowClick ? "button" : undefined}
+                  tabIndex={onRowClick ? 0 : -1}
+                  onClick={() => onRowClick?.(item)}
+                  onKeyDown={(event) => { if ((event.key === "Enter" || event.key === " ") && onRowClick) { event.preventDefault(); onRowClick(item); } }}
+                  className="w-full rounded-xl border bg-background p-4 text-left shadow-sm transition hover:border-primary/30 hover:bg-accent/20"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{primaryColumn.label}</p>
+                      <div className="mt-1 text-sm font-semibold text-foreground">
+                        {primaryColumn.render ? primaryColumn.render(item) : item[primaryColumn.key]}
                       </div>
                     </div>
-                  ))}
+                    {hasActions && <div className="shrink-0">{renderActions(item)}</div>}
+                  </div>
+                  <div className="mt-3 space-y-1.5">
+                    {secondaryColumns.map((col) => (
+                      <div key={col.key} className="flex items-start justify-between gap-3 rounded-lg bg-accent/40 px-3 py-2">
+                        <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{col.label}</span>
+                        <div className="max-w-[60%] text-right text-sm text-foreground">
+                          {col.render ? col.render(item) : item[col.key]}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <table className="w-full">
-            <thead>
-              <tr className="border-b bg-muted/50">
-                {columns.map((col) => (
-                  <th key={col.key} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    {col.label}
-                  </th>
-                ))}
-                {hasActions && (
-                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Ações
-                  </th>
-                )}
-              </tr>
-            </thead>
-            <tbody>
-              {data.map((item, idx) => (
-                <tr
-                  key={item.id || idx}
-                  onClick={() => onRowClick?.(item)}
-                  className="border-b transition-colors last:border-b-0 hover:bg-muted/30"
-                >
-                  {columns.map((col) => (
-                    <td key={col.key} className="px-4 py-3 text-sm">
-                      {col.render ? col.render(item) : item[col.key]}
-                    </td>
-                  ))}
-                  {hasActions && <td className="px-4 py-3 text-right">{renderActions(item)}</td>}
-                </tr>
               ))}
-            </tbody>
-          </table>
+            </div>
+            {renderPagination()}
+          </>
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b bg-muted/50">
+                    {selectable && (
+                      <th className="w-10 px-3 py-3">
+                        <Checkbox
+                          checked={pagedData.length > 0 && pagedData.every((item) => selectedIds.includes(item.id))}
+                          onCheckedChange={toggleSelectAll}
+                        />
+                      </th>
+                    )}
+                    {visibleColumns.map((col) => (
+                      <th
+                        key={col.key}
+                        className={cn(
+                          "px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground",
+                          col.sortable !== false && "cursor-pointer select-none hover:text-foreground transition-colors"
+                        )}
+                        onClick={() => col.sortable !== false && handleSort(col.key)}
+                      >
+                        <div className="flex items-center gap-1.5">
+                          {col.label}
+                          {col.sortable !== false && <SortIcon colKey={col.key} />}
+                        </div>
+                      </th>
+                    ))}
+                    {hasActions && (
+                      <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground">Ações</th>
+                    )}
+                  </tr>
+                </thead>
+                <tbody>
+                  {pagedData.map((item, idx) => (
+                    <tr
+                      key={item.id || idx}
+                      onClick={() => onRowClick?.(item)}
+                      className={cn(
+                        "border-b transition-colors last:border-b-0 hover:bg-muted/30",
+                        onRowClick && "cursor-pointer",
+                        selectable && selectedIds.includes(item.id) && "bg-primary/5"
+                      )}
+                    >
+                      {selectable && (
+                        <td className="w-10 px-3 py-3">
+                          <Checkbox
+                            checked={selectedIds.includes(item.id)}
+                            onCheckedChange={() => toggleSelect(item.id)}
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        </td>
+                      )}
+                      {visibleColumns.map((col) => (
+                        <td key={col.key} className="px-4 py-3 text-sm">{col.render ? col.render(item) : item[col.key]}</td>
+                      ))}
+                      {hasActions && <td className="px-4 py-3 text-right">{renderActions(item)}</td>}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {renderPagination()}
+          </>
         )}
       </div>
 
@@ -172,44 +292,56 @@ export function DataTable<T extends Record<string, any>>({
         onClose={() => setDeleteItem(null)}
         title="Excluir registro"
         description="Esta ação não pode ser desfeita. Tem certeza que deseja continuar?"
-        onConfirm={() => {
-          if (deleteItem && onDelete) {
-            onDelete(deleteItem);
-            setDeleteItem(null);
-          }
-        }}
+        onConfirm={() => { if (deleteItem && onDelete) { onDelete(deleteItem); setDeleteItem(null); } }}
       />
     </>
   );
 }
 
+// ====== StatusBadge ======
+
+const statusConfig: Record<string, { classes: string; icon?: string }> = {
+  ativo: { classes: "bg-success/10 text-success border-success/20" },
+  inativo: { classes: "bg-muted text-muted-foreground border-muted" },
+  rascunho: { classes: "bg-muted text-muted-foreground border-muted" },
+  pendente: { classes: "bg-warning/10 text-warning border-warning/20" },
+  aberto: { classes: "bg-warning/10 text-warning border-warning/20" },
+  confirmado: { classes: "bg-success/10 text-success border-success/20" },
+  confirmada: { classes: "bg-success/10 text-success border-success/20" },
+  aprovado: { classes: "bg-info/10 text-info border-info/20" },
+  aprovada: { classes: "bg-info/10 text-info border-info/20" },
+  em_separacao: { classes: "bg-warning/10 text-warning border-warning/20" },
+  processando: { classes: "bg-info/10 text-info border-info/20" },
+  convertido: { classes: "bg-primary/10 text-primary border-primary/20" },
+  concluido: { classes: "bg-success/10 text-success border-success/20" },
+  parcial: { classes: "bg-warning/10 text-warning border-warning/20" },
+  cancelado: { classes: "bg-destructive/10 text-destructive border-destructive/20" },
+  cancelada: { classes: "bg-destructive/10 text-destructive border-destructive/20" },
+  pago: { classes: "bg-success/10 text-success border-success/20" },
+  vencido: { classes: "bg-destructive/10 text-destructive border-destructive/20" },
+  faturado: { classes: "bg-primary/10 text-primary border-primary/20" },
+  entregue: { classes: "bg-success/10 text-success border-success/20" },
+  bloqueado: { classes: "bg-destructive/10 text-destructive border-destructive/20" },
+  simples: { classes: "bg-muted text-muted-foreground border-muted" },
+  composto: { classes: "bg-primary/10 text-primary border-primary/20" },
+  aguardando: { classes: "bg-warning/10 text-warning border-warning/20" },
+  total: { classes: "bg-success/10 text-success border-success/20" },
+};
+
+const statusLabels: Record<string, string> = {
+  em_separacao: 'Em Separação',
+  aguardando: 'Aguardando',
+  parcial: 'Parcial',
+  total: 'Total',
+};
 
 export function StatusBadge({ status, label }: { status: string; label?: string }) {
-  const variants: Record<string, string> = {
-    ativo: "bg-success/10 text-success border-success/20",
-    inativo: "bg-muted text-muted-foreground border-muted",
-    pendente: "bg-warning/10 text-warning border-warning/20",
-    confirmado: "bg-success/10 text-success border-success/20",
-    confirmada: "bg-success/10 text-success border-success/20",
-    aprovado: "bg-info/10 text-info border-info/20",
-    aprovada: "bg-info/10 text-info border-info/20",
-    convertido: "bg-primary/10 text-primary border-primary/20",
-    em_separacao: "bg-warning/10 text-warning border-warning/20",
-    cancelado: "bg-destructive/10 text-destructive border-destructive/20",
-    cancelada: "bg-destructive/10 text-destructive border-destructive/20",
-    rascunho: "bg-muted text-muted-foreground border-muted",
-    pago: "bg-success/10 text-success border-success/20",
-    aberto: "bg-warning/10 text-warning border-warning/20",
-    vencido: "bg-destructive/10 text-destructive border-destructive/20",
-    faturado: "bg-primary/10 text-primary border-primary/20",
-    entregue: "bg-success/10 text-success border-success/20",
-    simples: "bg-muted text-muted-foreground border-muted",
-    composto: "bg-primary/10 text-primary border-primary/20",
-  };
+  const config = statusConfig[status?.toLowerCase()] || { classes: '' };
+  const displayLabel = label || statusLabels[status?.toLowerCase()] || status;
 
   return (
-    <Badge variant="outline" className={`text-xs font-medium ${variants[status?.toLowerCase()] || ''}`}>
-      {label || status}
+    <Badge variant="outline" className={`text-xs font-medium ${config.classes}`}>
+      {displayLabel}
     </Badge>
   );
 }
