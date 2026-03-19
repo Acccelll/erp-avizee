@@ -184,14 +184,15 @@ export const navSections: NavSection[] = [
     icon: Settings,
     items: [
       {
-        title: 'Configurações',
+        title: 'Gestão do sistema',
         items: [
           { title: 'Empresa', path: '/configuracoes?tab=geral' },
           { title: 'Usuários', path: '/configuracoes?tab=usuarios' },
           { title: 'E-mails', path: '/configuracoes?tab=email' },
+          { title: 'Parâmetros Fiscais', path: '/configuracoes?tab=fiscal' },
+          { title: 'Parâmetros Financeiros', path: '/configuracoes?tab=financeiro' },
           { title: 'Aparência', path: '/configuracoes?tab=aparencia' },
           { title: 'Auditoria', path: '/auditoria', keywords: ['logs', 'historico', 'rastreabilidade'] },
-          { title: 'Meu Perfil', path: '/perfil', keywords: ['conta', 'senha'] },
         ],
       },
     ],
