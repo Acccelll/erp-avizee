@@ -63,7 +63,8 @@ export function useSupabaseCrud<T extends Record<string, any>>({
   const update = async (id: string, record: Partial<T>) => {
     const { data: result, error } = await (supabase as any).from(table).update(record).eq("id", id).select().single();
     if (error) {
-      toast.error(`Erro ao atualizar: ${error.message}`);
+      console.error(`[crud] Erro ao atualizar em ${table}:`, error);
+      toast.error("Erro ao atualizar registro. Tente novamente.");
       throw error;
     }
     toast.success("Registro atualizado com sucesso!");
