@@ -1,5 +1,5 @@
 import { AppLayout } from "@/components/AppLayout";
-import ModulePage from "@/components/ModulePage";
+import { ModulePage } from "@/components/ModulePage";
 import { Truck } from "lucide-react";
 
 export default function Transportadoras() {
