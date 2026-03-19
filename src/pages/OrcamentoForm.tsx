@@ -154,7 +154,8 @@ export default function OrcamentoForm() {
       toast.success("Cotação salva com sucesso!");
       if (!isEdit && orcId) navigate(`/cotacoes/${orcId}`, { replace: true });
     } catch (err: any) {
-      toast.error(`Erro ao salvar: ${err.message}`);
+      console.error('[orcamento]', err);
+      toast.error("Erro ao salvar cotação. Tente novamente.");
     }
     setSaving(false);
   };
