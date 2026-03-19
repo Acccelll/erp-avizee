@@ -232,6 +232,7 @@ export const headerIcons: Record<string, LucideIcon> = {
   '/fiscal': Receipt,
   '/relatorios': BarChart3,
   '/configuracoes': Settings,
+  '/administracao': Shield,
   '/auditoria': Shield,
   '/perfil': User,
 };
