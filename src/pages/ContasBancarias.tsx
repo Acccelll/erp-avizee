@@ -4,6 +4,7 @@ import { ModulePage } from "@/components/ModulePage";
 import { DataTable } from "@/components/DataTable";
 import { FormModal } from "@/components/FormModal";
 import { ViewDrawer } from "@/components/ViewDrawer";
+import { SummaryCard } from "@/components/SummaryCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { formatCurrency } from "@/lib/format";
 import { supabase } from "@/integrations/supabase/client";
+import { Wallet, Landmark, CreditCard, Building2 } from "lucide-react";
 
 interface Banco { id: string; nome: string; tipo: string; ativo: boolean; }
 interface ContaBancaria {
@@ -43,6 +45,8 @@ const ContasBancarias = () => {
 
   useEffect(() => { fetchData(); }, []);
 
+  const saldoTotal = contas.reduce((s, c) => s + Number(c.saldo_atual || 0), 0);
+
   const openCreate = () => {
     setMode("create");
     setForm({ banco_id: "", descricao: "", agencia: "", conta: "", titular: "", saldo_atual: 0 });
@@ -71,31 +75,51 @@ const ContasBancarias = () => {
       }
       setModalOpen(false);
       fetchData();
-    } catch (err: any) { console.error('[contas-bancarias]', err); toast.error("Erro ao salvar conta bancária. Tente novamente."); }
+    } catch (err: any) { console.error('[contas-bancarias]', err); toast.error("Erro ao salvar conta bancária."); }
     setSaving(false);
   };
 
   const handleDelete = async (c: ContaBancaria) => {
     const { error } = await (supabase as any).from("contas_bancarias").update({ ativo: false }).eq("id", c.id);
-    if (error) { console.error('[contas-bancarias]', error); toast.error("Erro ao remover conta. Tente novamente."); return; }
+    if (error) { toast.error("Erro ao remover conta."); return; }
     toast.success("Conta removida!");
     fetchData();
   };
 
-  const tipoLabels: Record<string, string> = { banco: "Banco", wallet: "Carteira Digital", conta_pagamento: "Conta Pagamento" };
-
   const columns = [
     { key: "banco", label: "Banco", render: (c: ContaBancaria) => c.bancos?.nome || "—" },
-    { key: "tipo", label: "Tipo", render: (c: ContaBancaria) => tipoLabels[c.bancos?.tipo || ""] || c.bancos?.tipo || "—" },
     { key: "descricao", label: "Descrição" },
     { key: "agencia", label: "Agência", render: (c: ContaBancaria) => c.agencia || "—" },
     { key: "conta", label: "Conta", render: (c: ContaBancaria) => c.conta || "—" },
-    { key: "saldo", label: "Saldo", render: (c: ContaBancaria) => <span className="font-semibold mono">{formatCurrency(Number(c.saldo_atual || 0))}</span> },
+    { key: "titular", label: "Titular", render: (c: ContaBancaria) => c.titular || "—" },
+    { key: "saldo", label: "Saldo", render: (c: ContaBancaria) => (
+      <span className={`font-semibold mono ${Number(c.saldo_atual || 0) >= 0 ? "text-success" : "text-destructive"}`}>
+        {formatCurrency(Number(c.saldo_atual || 0))}
+      </span>
+    )},
   ];
 
   return (
     <AppLayout>
       <ModulePage title="Contas Bancárias" subtitle="Bancos e contas financeiras" addLabel="Nova Conta" onAdd={openCreate} count={contas.length}>
+        {/* Summary cards per bank */}
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
+          <SummaryCard title="Saldo Total" value={formatCurrency(saldoTotal)} icon={Wallet} variant={saldoTotal >= 0 ? "success" : "danger"} />
+          {contas.slice(0, 3).map(c => (
+            <div key={c.id} className="rounded-xl border bg-card p-4 space-y-1">
+              <div className="flex items-center gap-2">
+                <Landmark className="w-4 h-4 text-muted-foreground" />
+                <p className="text-xs text-muted-foreground font-medium">{c.bancos?.nome}</p>
+              </div>
+              <p className="text-sm font-medium">{c.descricao}</p>
+              <p className={`text-lg font-bold mono ${Number(c.saldo_atual || 0) >= 0 ? "text-success" : "text-destructive"}`}>
+                {formatCurrency(Number(c.saldo_atual || 0))}
+              </p>
+              {c.agencia && <p className="text-xs text-muted-foreground">Ag: {c.agencia} | CC: {c.conta}</p>}
+            </div>
+          ))}
+        </div>
+
         <DataTable columns={columns} data={contas} loading={loading}
           onView={(c) => { setSelected(c); setDrawerOpen(true); }}
           onEdit={openEdit} onDelete={handleDelete} />

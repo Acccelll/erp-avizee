@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { AppLayout } from "@/components/AppLayout";
 import { ModulePage } from "@/components/ModulePage";
 import { DataTable, StatusBadge } from "@/components/DataTable";
@@ -8,9 +8,11 @@ import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
+import { ChevronRight, FolderTree, FileText } from "lucide-react";
 
 interface ContaContabil {
   id: string;
@@ -35,6 +37,7 @@ const ContasContabeis = () => {
   const [mode, setMode] = useState<"create" | "edit">("create");
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [viewMode, setViewMode] = useState<"tree" | "flat">("tree");
 
   const openCreate = () => { setMode("create"); setForm({ ...emptyForm }); setSelected(null); setModalOpen(true); };
   const openEdit = (c: ContaContabil) => {
@@ -56,36 +59,82 @@ const ContasContabeis = () => {
     setSaving(false);
   };
 
-  // Build hierarchy labels
-  const getHierarchyLabel = (conta: ContaContabil): string => {
-    if (!conta.conta_pai_id) return conta.codigo;
-    const pai = data.find(c => c.id === conta.conta_pai_id);
-    return pai ? `${pai.codigo} > ${conta.codigo}` : conta.codigo;
+  // Build tree structure
+  const treeData = useMemo(() => {
+    if (viewMode !== "tree") return data;
+
+    const sorted = [...data].sort((a, b) => a.codigo.localeCompare(b.codigo));
+    const roots = sorted.filter(c => !c.conta_pai_id);
+    const childMap = new Map<string, ContaContabil[]>();
+    sorted.forEach(c => {
+      if (c.conta_pai_id) {
+        if (!childMap.has(c.conta_pai_id)) childMap.set(c.conta_pai_id, []);
+        childMap.get(c.conta_pai_id)!.push(c);
+      }
+    });
+
+    const result: ContaContabil[] = [];
+    const flatten = (items: ContaContabil[], depth: number) => {
+      items.forEach(item => {
+        result.push(item);
+        const children = childMap.get(item.id);
+        if (children) flatten(children, depth + 1);
+      });
+    };
+    flatten(roots, 0);
+    return result;
+  }, [data, viewMode]);
+
+  // Get depth for indentation
+  const getDepth = (conta: ContaContabil): number => {
+    if (!conta.conta_pai_id) return 0;
+    const parent = data.find(c => c.id === conta.conta_pai_id);
+    return parent ? 1 + getDepth(parent) : 0;
   };
 
-  const contasPai = data.filter(c => c.aceita_lancamento === false || !c.conta_pai_id);
-
   const columns = [
-    { key: "codigo", label: "Código", render: (c: ContaContabil) => <span className="font-mono font-semibold text-primary">{c.codigo}</span> },
-    { key: "descricao", label: "Descrição" },
+    { key: "codigo", label: "Código", render: (c: ContaContabil) => {
+      const depth = viewMode === "tree" ? getDepth(c) : 0;
+      const isLeaf = c.aceita_lancamento;
+      return (
+        <div className="flex items-center gap-1" style={{ paddingLeft: `${depth * 20}px` }}>
+          {isLeaf ? <FileText className="w-3.5 h-3.5 text-muted-foreground" /> : <FolderTree className="w-3.5 h-3.5 text-primary" />}
+          <span className={`font-mono font-semibold ${isLeaf ? "text-foreground" : "text-primary"}`}>{c.codigo}</span>
+        </div>
+      );
+    }},
+    { key: "descricao", label: "Descrição", render: (c: ContaContabil) => (
+      <span className={c.aceita_lancamento ? "" : "font-semibold"}>{c.descricao}</span>
+    )},
     { key: "natureza", label: "Natureza", render: (c: ContaContabil) => (
-      <StatusBadge status={c.natureza === "devedora" ? "Confirmado" : c.natureza === "credora" ? "Pendente" : "Rascunho"} />
+      <Badge variant="outline" className="text-xs capitalize">{c.natureza}</Badge>
     )},
-    { key: "aceita_lancamento", label: "Lançável", render: (c: ContaContabil) => (
-      <span className={`text-xs ${c.aceita_lancamento ? "text-green-600 font-medium" : "text-muted-foreground"}`}>{c.aceita_lancamento ? "Sim" : "Não"}</span>
+    { key: "tipo", label: "Tipo", render: (c: ContaContabil) => (
+      <Badge variant={c.aceita_lancamento ? "default" : "secondary"} className="text-xs">
+        {c.aceita_lancamento ? "Analítica" : "Sintética"}
+      </Badge>
     )},
-    { key: "pai", label: "Conta Pai", render: (c: ContaContabil) => {
-      if (!c.conta_pai_id) return <span className="text-muted-foreground text-xs">—</span>;
-      const pai = data.find(p => p.id === c.conta_pai_id);
-      return <span className="font-mono text-xs">{pai?.codigo || "—"}</span>;
+    { key: "filhas", label: "Subcontas", render: (c: ContaContabil) => {
+      const count = data.filter(d => d.conta_pai_id === c.id).length;
+      return count > 0 ? <span className="text-xs text-muted-foreground">{count}</span> : <span className="text-xs text-muted-foreground">—</span>;
     }},
     { key: "ativo", label: "Status", render: (c: ContaContabil) => <StatusBadge status={c.ativo ? "Ativo" : "Inativo"} /> },
   ];
 
   return (
     <AppLayout>
-      <ModulePage title="Plano de Contas" subtitle="Contas contábeis do ERP" addLabel="Nova Conta" onAdd={openCreate} count={data.length}>
-        <DataTable columns={columns} data={data} loading={loading}
+      <ModulePage title="Plano de Contas" subtitle="Estrutura hierárquica de contas contábeis" addLabel="Nova Conta" onAdd={openCreate} count={data.length}
+        filters={
+          <div className="flex gap-1">
+            <Button size="sm" variant={viewMode === "tree" ? "default" : "outline"} onClick={() => setViewMode("tree")} className="gap-1">
+              <FolderTree className="w-3.5 h-3.5" /> Árvore
+            </Button>
+            <Button size="sm" variant={viewMode === "flat" ? "default" : "outline"} onClick={() => setViewMode("flat")} className="gap-1">
+              <FileText className="w-3.5 h-3.5" /> Lista
+            </Button>
+          </div>
+        }>
+        <DataTable columns={columns} data={treeData} loading={loading}
           onView={(c) => { setSelected(c); setDrawerOpen(true); }}
           onEdit={openEdit} onDelete={(c) => remove(c.id)} />
       </ModulePage>
@@ -145,7 +194,9 @@ const ContasContabeis = () => {
             </div>
             <div><span className="text-xs text-muted-foreground">Descrição</span><p className="font-medium">{selected.descricao}</p></div>
             <div className="grid grid-cols-2 gap-4">
-              <div><span className="text-xs text-muted-foreground">Aceita Lançamento</span><p>{selected.aceita_lancamento ? "Sim (analítica)" : "Não (sintética)"}</p></div>
+              <div><span className="text-xs text-muted-foreground">Tipo</span>
+                <Badge variant={selected.aceita_lancamento ? "default" : "secondary"}>{selected.aceita_lancamento ? "Analítica" : "Sintética"}</Badge>
+              </div>
               <div><span className="text-xs text-muted-foreground">Conta Pai</span><p className="font-mono">{selected.conta_pai_id ? data.find(c => c.id === selected.conta_pai_id)?.codigo || "—" : "Raiz"}</p></div>
             </div>
             {/* Sub-accounts */}
@@ -157,8 +208,11 @@ const ContasContabeis = () => {
                   <h4 className="font-semibold text-sm mb-2">Subcontas ({filhas.length})</h4>
                   <div className="space-y-1">
                     {filhas.map(f => (
-                      <div key={f.id} className="flex justify-between text-sm py-1 border-b last:border-b-0">
-                        <span className="font-mono text-primary">{f.codigo}</span>
+                      <div key={f.id} className="flex justify-between items-center text-sm py-2 px-3 bg-accent/20 rounded-lg">
+                        <div className="flex items-center gap-2">
+                          {f.aceita_lancamento ? <FileText className="w-3.5 h-3.5 text-muted-foreground" /> : <FolderTree className="w-3.5 h-3.5 text-primary" />}
+                          <span className="font-mono text-primary">{f.codigo}</span>
+                        </div>
                         <span>{f.descricao}</span>
                       </div>
                     ))}
