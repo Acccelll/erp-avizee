@@ -300,50 +300,6 @@ export function DataTable<T extends Record<string, any>>({
   );
 }
 
-// ====== StatusBadge ======
+// Re-export StatusBadge from its dedicated module for backward compatibility
+export { StatusBadge } from '@/components/StatusBadge';
 
-const statusConfig: Record<string, { classes: string; icon?: string }> = {
-  ativo: { classes: "bg-success/10 text-success border-success/20" },
-  inativo: { classes: "bg-muted text-muted-foreground border-muted" },
-  rascunho: { classes: "bg-muted text-muted-foreground border-muted" },
-  pendente: { classes: "bg-warning/10 text-warning border-warning/20" },
-  aberto: { classes: "bg-warning/10 text-warning border-warning/20" },
-  confirmado: { classes: "bg-success/10 text-success border-success/20" },
-  confirmada: { classes: "bg-success/10 text-success border-success/20" },
-  aprovado: { classes: "bg-info/10 text-info border-info/20" },
-  aprovada: { classes: "bg-info/10 text-info border-info/20" },
-  em_separacao: { classes: "bg-warning/10 text-warning border-warning/20" },
-  processando: { classes: "bg-info/10 text-info border-info/20" },
-  convertido: { classes: "bg-primary/10 text-primary border-primary/20" },
-  concluido: { classes: "bg-success/10 text-success border-success/20" },
-  parcial: { classes: "bg-warning/10 text-warning border-warning/20" },
-  cancelado: { classes: "bg-destructive/10 text-destructive border-destructive/20" },
-  cancelada: { classes: "bg-destructive/10 text-destructive border-destructive/20" },
-  pago: { classes: "bg-success/10 text-success border-success/20" },
-  vencido: { classes: "bg-destructive/10 text-destructive border-destructive/20" },
-  faturado: { classes: "bg-primary/10 text-primary border-primary/20" },
-  entregue: { classes: "bg-success/10 text-success border-success/20" },
-  bloqueado: { classes: "bg-destructive/10 text-destructive border-destructive/20" },
-  simples: { classes: "bg-muted text-muted-foreground border-muted" },
-  composto: { classes: "bg-primary/10 text-primary border-primary/20" },
-  aguardando: { classes: "bg-warning/10 text-warning border-warning/20" },
-  total: { classes: "bg-success/10 text-success border-success/20" },
-};
-
-const statusLabels: Record<string, string> = {
-  em_separacao: 'Em Separação',
-  aguardando: 'Aguardando',
-  parcial: 'Parcial',
-  total: 'Total',
-};
-
-export function StatusBadge({ status, label }: { status: string; label?: string }) {
-  const config = statusConfig[status?.toLowerCase()] || { classes: '' };
-  const displayLabel = label || statusLabels[status?.toLowerCase()] || status;
-
-  return (
-    <Badge variant="outline" className={`text-xs font-medium ${config.classes}`}>
-      {displayLabel}
-    </Badge>
-  );
-}
