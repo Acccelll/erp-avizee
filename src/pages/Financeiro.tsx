@@ -4,8 +4,10 @@ import { AppLayout } from "@/components/AppLayout";
 import { ModulePage } from "@/components/ModulePage";
 import { DataTable, StatusBadge } from "@/components/DataTable";
 import { FormModal } from "@/components/FormModal";
-import { ViewDrawer } from "@/components/ViewDrawer";
+import { ViewDrawer, ViewField, ViewSection } from "@/components/ViewDrawer";
 import { SummaryCard } from "@/components/SummaryCard";
+import { PeriodFilter, financialPeriods, type Period } from "@/components/dashboard/PeriodFilter";
+import { periodToDateFrom, periodToDateTo } from "@/lib/periodFilter";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,7 +15,6 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { formatCurrency } from "@/lib/format";
 import { supabase } from "@/integrations/supabase/client";
@@ -67,6 +68,7 @@ const Financeiro = () => {
   const [filterBanco, setFilterBanco] = useState("todos");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [period, setPeriod] = useState<Period>("30d");
 
   useEffect(() => { if (tipoParam) setFilterTipo(tipoParam); }, [tipoParam]);
 
@@ -137,8 +139,21 @@ const Financeiro = () => {
 
   const filteredData = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
+    const dateFrom = periodToDateFrom(period);
+    const dateTo = periodToDateTo(period);
+    const isOverdueFilter = period === "vencidos";
+
     return data.filter((l) => {
       const effectiveStatus = getEffectiveStatus(l);
+
+      // Period filter
+      if (isOverdueFilter) {
+        if (effectiveStatus !== "vencido") return false;
+      } else {
+        if (l.data_vencimento < dateFrom) return false;
+        if (dateTo && l.data_vencimento > dateTo) return false;
+      }
+
       if (filterStatus !== "todos" && effectiveStatus !== filterStatus) return false;
       if (filterTipo !== "todos" && l.tipo !== filterTipo) return false;
       if (filterBanco !== "todos" && l.conta_bancaria_id !== filterBanco) return false;
@@ -148,19 +163,16 @@ const Financeiro = () => {
       }
       return true;
     });
-  }, [data, filterStatus, filterTipo, filterBanco, searchTerm, hoje]);
+  }, [data, filterStatus, filterTipo, filterBanco, searchTerm, hoje, period]);
 
   // KPI calculations
   const kpis = useMemo(() => {
     const hojeStr = hoje.toISOString().split("T")[0];
     let aVencer = 0, venceHoje = 0, vencido = 0, pagoNoPeriodo = 0;
     let totalAVencer = 0, totalVencido = 0, totalPago = 0;
-    // Aging buckets
     let age1_30 = 0, age31_60 = 0, age61_90 = 0, age90plus = 0;
 
-    const filtered = filterTipo === "todos" ? data : data.filter(l => l.tipo === filterTipo);
-
-    filtered.forEach(l => {
+    filteredData.forEach(l => {
       const val = Number(l.valor || 0);
       const effectiveStatus = getEffectiveStatus(l);
 
@@ -170,7 +182,6 @@ const Financeiro = () => {
       } else if (effectiveStatus === "vencido") {
         vencido++;
         totalVencido += val;
-        // Calculate aging days
         const vencDate = new Date(l.data_vencimento);
         const diffDays = Math.floor((hoje.getTime() - vencDate.getTime()) / (1000 * 60 * 60 * 24));
         if (diffDays <= 30) age1_30 += val;
@@ -178,16 +189,14 @@ const Financeiro = () => {
         else if (diffDays <= 90) age61_90 += val;
         else age90plus += val;
       } else if (effectiveStatus === "aberto") {
-        if (l.data_vencimento === hojeStr) {
-          venceHoje++;
-        }
+        if (l.data_vencimento === hojeStr) venceHoje++;
         aVencer++;
         totalAVencer += val;
       }
     });
 
     return { aVencer, venceHoje, vencido, pagoNoPeriodo, totalAVencer, totalVencido, totalPago, age1_30, age31_60, age61_90, age90plus };
-  }, [data, filterTipo, hoje]);
+  }, [filteredData, hoje]);
 
   // Batch payment
   const handleBatchPayment = async () => {
@@ -201,17 +210,18 @@ const Financeiro = () => {
       }
       toast.success(`${selectedIds.length} lançamento(s) baixado(s) com sucesso!`);
       setSelectedIds([]);
-      // Refresh data
       window.location.reload();
     } catch {
       toast.error("Erro ao processar baixa em lote");
     }
   };
 
-  const tipoLabel = filterTipo === "receber" ? "Contas a Receber" : filterTipo === "pagar" ? "Contas a Pagar" : "Financeiro";
-
   const columns = [
-    { key: "tipo", label: "Tipo", render: (l: Lancamento) => l.tipo === "receber" ? "A Receber" : "A Pagar" },
+    { key: "tipo", label: "Tipo", render: (l: Lancamento) => (
+      <Badge variant="outline" className={l.tipo === "receber" ? "border-success/40 text-success bg-success/5" : "border-destructive/40 text-destructive bg-destructive/5"}>
+        {l.tipo === "receber" ? "Receber" : "Pagar"}
+      </Badge>
+    )},
     { key: "descricao", label: "Descrição" },
     { key: "parceiro", label: "Parceiro", render: (l: Lancamento) => l.tipo === "receber" ? l.clientes?.nome_razao_social || "—" : l.fornecedores?.nome_razao_social || "—" },
     { key: "valor", label: "Valor", render: (l: Lancamento) => <span className="font-semibold mono">{formatCurrency(Number(l.valor))}</span> },
@@ -231,8 +241,13 @@ const Financeiro = () => {
 
   return (
     <AppLayout>
-      <ModulePage title={tipoLabel} subtitle="Gestão de contas a pagar e receber" addLabel="Novo Lançamento" onAdd={openCreate} count={filteredData.length}
+      <ModulePage title="Contas a Pagar/Receber" subtitle="Gestão unificada de contas a pagar e receber" addLabel="Novo Lançamento" onAdd={openCreate} count={filteredData.length}
         searchValue={searchTerm} onSearchChange={setSearchTerm} searchPlaceholder="Buscar por descrição ou parceiro...">
+
+        {/* Period filter */}
+        <div className="mb-4">
+          <PeriodFilter value={period} onChange={setPeriod} options={financialPeriods} />
+        </div>
 
         {/* KPI Summary Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
@@ -242,7 +257,7 @@ const Financeiro = () => {
           <SummaryCard title="Pagos" value={kpis.pagoNoPeriodo.toString()} subtitle={formatCurrency(kpis.totalPago)} icon={CheckCircle} variant="success" onClick={() => setFilterStatus("pago")} />
         </div>
 
-        {/* Aging bar (only when vencidos exist) */}
+        {/* Aging bar */}
         {kpis.totalVencido > 0 && (
           <div className="mb-4 rounded-lg border bg-card p-4">
             <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
@@ -267,9 +282,14 @@ const Financeiro = () => {
         {/* Filter bars */}
         <div className="flex flex-wrap gap-2 mb-4">
           <div className="flex gap-1 mr-4">
-            {["todos", "receber", "pagar"].map(t => (
-              <Button key={t} size="sm" variant={filterTipo === t ? "default" : "outline"} onClick={() => setFilterTipo(t)}>
-                {t === "todos" ? "Todos" : t === "receber" ? "A Receber" : "A Pagar"}
+            {[
+              { key: "todos", label: "Todos", className: "" },
+              { key: "receber", label: "A Receber", className: filterTipo === "receber" ? "bg-success/10 border-success/40 text-success hover:bg-success/20" : "" },
+              { key: "pagar", label: "A Pagar", className: filterTipo === "pagar" ? "bg-destructive/10 border-destructive/40 text-destructive hover:bg-destructive/20" : "" },
+            ].map(t => (
+              <Button key={t.key} size="sm" variant={filterTipo === t.key ? "outline" : "outline"} onClick={() => setFilterTipo(t.key)}
+                className={filterTipo === t.key ? t.className || "bg-primary text-primary-foreground hover:bg-primary/90" : ""}>
+                {t.label}
               </Button>
             ))}
           </div>
@@ -294,7 +314,6 @@ const Financeiro = () => {
             </Select>
           )}
 
-          {/* Batch actions */}
           {selectedIds.length > 0 && (
             <Button size="sm" variant="default" className="ml-auto gap-2" onClick={handleBatchPayment}>
               <Download className="w-3.5 h-3.5" /> Baixar {selectedIds.length} selecionado(s)
@@ -329,9 +348,10 @@ const Financeiro = () => {
               </Select>
             </div>
             <div className="space-y-2"><Label>Forma de Pagamento</Label>
-              <Select value={form.forma_pagamento} onValueChange={(v) => setForm({ ...form, forma_pagamento: v })}>
+              <Select value={form.forma_pagamento || "nenhum"} onValueChange={(v) => setForm({ ...form, forma_pagamento: v === "nenhum" ? "" : v })}>
                 <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="nenhum">Selecione...</SelectItem>
                   <SelectItem value="dinheiro">Dinheiro</SelectItem>
                   <SelectItem value="boleto">Boleto</SelectItem>
                   <SelectItem value="cartao">Cartão</SelectItem>
@@ -345,9 +365,10 @@ const Financeiro = () => {
             <div className="space-y-2"><Label>Vencimento</Label><Input type="date" value={form.data_vencimento} onChange={(e) => setForm({ ...form, data_vencimento: e.target.value })} /></div>
             <div className="space-y-2"><Label>Data Pagamento</Label><Input type="date" value={form.data_pagamento} onChange={(e) => setForm({ ...form, data_pagamento: e.target.value })} /></div>
             <div className="space-y-2"><Label>Conta Bancária {form.status === "pago" ? "*" : ""}</Label>
-              <Select value={form.conta_bancaria_id} onValueChange={(v) => setForm({ ...form, conta_bancaria_id: v })}>
+              <Select value={form.conta_bancaria_id || "nenhum"} onValueChange={(v) => setForm({ ...form, conta_bancaria_id: v === "nenhum" ? "" : v })}>
                 <SelectTrigger><SelectValue placeholder="Selecione conta..." /></SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="nenhum">Selecione...</SelectItem>
                   {contasBancarias.map(c => (
                     <SelectItem key={c.id} value={c.id}>{c.bancos?.nome} - {c.descricao}</SelectItem>
                   ))}
@@ -357,17 +378,23 @@ const Financeiro = () => {
             <div className="space-y-2"><Label>Cartão</Label><Input value={form.cartao} onChange={(e) => setForm({ ...form, cartao: e.target.value })} /></div>
             {form.tipo === "receber" && (
               <div className="space-y-2"><Label>Cliente</Label>
-                <Select value={form.cliente_id} onValueChange={(v) => setForm({ ...form, cliente_id: v })}>
+                <Select value={form.cliente_id || "nenhum"} onValueChange={(v) => setForm({ ...form, cliente_id: v === "nenhum" ? "" : v })}>
                   <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                  <SelectContent>{clientesCrud.data.map((c: any) => <SelectItem key={c.id} value={c.id}>{c.nome_razao_social}</SelectItem>)}</SelectContent>
+                  <SelectContent>
+                    <SelectItem value="nenhum">Selecione...</SelectItem>
+                    {clientesCrud.data.map((c: any) => <SelectItem key={c.id} value={c.id}>{c.nome_razao_social}</SelectItem>)}
+                  </SelectContent>
                 </Select>
               </div>
             )}
             {form.tipo === "pagar" && (
               <div className="space-y-2"><Label>Fornecedor</Label>
-                <Select value={form.fornecedor_id} onValueChange={(v) => setForm({ ...form, fornecedor_id: v })}>
+                <Select value={form.fornecedor_id || "nenhum"} onValueChange={(v) => setForm({ ...form, fornecedor_id: v === "nenhum" ? "" : v })}>
                   <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                  <SelectContent>{fornecedoresCrud.data.map((f: any) => <SelectItem key={f.id} value={f.id}>{f.nome_razao_social}</SelectItem>)}</SelectContent>
+                  <SelectContent>
+                    <SelectItem value="nenhum">Selecione...</SelectItem>
+                    {fornecedoresCrud.data.map((f: any) => <SelectItem key={f.id} value={f.id}>{f.nome_razao_social}</SelectItem>)}
+                  </SelectContent>
                 </Select>
               </div>
             )}
@@ -404,38 +431,53 @@ const Financeiro = () => {
 
       <ViewDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} title="Detalhes do Lançamento">
         {selected && (
-          <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-4">
-              <div><span className="text-xs text-muted-foreground">Tipo</span><p>{selected.tipo === "receber" ? "A Receber" : "A Pagar"}</p></div>
-              <div><span className="text-xs text-muted-foreground">Status</span><StatusBadge status={getEffectiveStatus(selected)} /></div>
-            </div>
-            <div><span className="text-xs text-muted-foreground">Descrição</span><p className="font-medium">{selected.descricao}</p></div>
-            <div className="grid grid-cols-2 gap-4">
-              <div><span className="text-xs text-muted-foreground">Valor</span><p className="font-semibold mono">{formatCurrency(Number(selected.valor))}</p></div>
-              <div><span className="text-xs text-muted-foreground">Vencimento</span><p>{new Date(selected.data_vencimento).toLocaleDateString("pt-BR")}</p></div>
-            </div>
-            {selected.data_pagamento && (
-              <div><span className="text-xs text-muted-foreground">Data Pagamento</span><p>{new Date(selected.data_pagamento).toLocaleDateString("pt-BR")}</p></div>
-            )}
-            <div className="grid grid-cols-2 gap-4">
-              <div><span className="text-xs text-muted-foreground">Forma</span><p>{selected.forma_pagamento || "—"}</p></div>
-              <div><span className="text-xs text-muted-foreground">Banco/Conta</span>
-                <p>{selected.contas_bancarias ? `${selected.contas_bancarias.bancos?.nome} - ${selected.contas_bancarias.descricao}` : "—"}</p>
+          <div className="space-y-4">
+            <ViewSection title="Informações gerais">
+              <div className="grid grid-cols-2 gap-4">
+                <ViewField label="Tipo">
+                  <Badge variant="outline" className={selected.tipo === "receber" ? "border-success/40 text-success" : "border-destructive/40 text-destructive"}>
+                    {selected.tipo === "receber" ? "A Receber" : "A Pagar"}
+                  </Badge>
+                </ViewField>
+                <ViewField label="Status"><StatusBadge status={getEffectiveStatus(selected)} /></ViewField>
               </div>
-            </div>
-            {selected.parcela_numero && (
-              <div><span className="text-xs text-muted-foreground">Parcela</span><p className="mono">{selected.parcela_numero}/{selected.parcela_total}</p></div>
-            )}
-            <div className="grid grid-cols-2 gap-4">
-              <div><span className="text-xs text-muted-foreground">Parceiro</span>
-                <p>{selected.tipo === "receber" ? selected.clientes?.nome_razao_social : selected.fornecedores?.nome_razao_social || "—"}</p>
+              <ViewField label="Descrição">{selected.descricao}</ViewField>
+            </ViewSection>
+
+            <ViewSection title="Valores e datas">
+              <div className="grid grid-cols-2 gap-4">
+                <ViewField label="Valor"><span className="font-semibold mono">{formatCurrency(Number(selected.valor))}</span></ViewField>
+                <ViewField label="Vencimento">{new Date(selected.data_vencimento).toLocaleDateString("pt-BR")}</ViewField>
               </div>
-              {selected.nota_fiscal_id && (
-                <div><span className="text-xs text-muted-foreground">Origem</span><Badge variant="outline" className="text-xs">NF vinculada</Badge></div>
+              {selected.data_pagamento && (
+                <ViewField label="Data Pagamento">{new Date(selected.data_pagamento).toLocaleDateString("pt-BR")}</ViewField>
               )}
-            </div>
+            </ViewSection>
+
+            <ViewSection title="Detalhes">
+              <div className="grid grid-cols-2 gap-4">
+                <ViewField label="Forma">{selected.forma_pagamento || "—"}</ViewField>
+                <ViewField label="Banco/Conta">
+                  {selected.contas_bancarias ? `${selected.contas_bancarias.bancos?.nome} - ${selected.contas_bancarias.descricao}` : "—"}
+                </ViewField>
+              </div>
+              {selected.parcela_numero && (
+                <ViewField label="Parcela"><span className="mono">{selected.parcela_numero}/{selected.parcela_total}</span></ViewField>
+              )}
+              <div className="grid grid-cols-2 gap-4">
+                <ViewField label="Parceiro">
+                  {selected.tipo === "receber" ? selected.clientes?.nome_razao_social : selected.fornecedores?.nome_razao_social || "—"}
+                </ViewField>
+                {selected.nota_fiscal_id && (
+                  <ViewField label="Origem"><Badge variant="outline" className="text-xs">NF vinculada</Badge></ViewField>
+                )}
+              </div>
+            </ViewSection>
+
             {selected.observacoes && (
-              <div className="border-t pt-2"><span className="text-xs text-muted-foreground">Observações</span><p className="text-sm">{selected.observacoes}</p></div>
+              <ViewSection title="Observações">
+                <p className="text-sm">{selected.observacoes}</p>
+              </ViewSection>
             )}
           </div>
         )}
