@@ -104,8 +104,12 @@ export function MobileMenu({ open, onOpenChange, onOpenSearch }: MobileMenuProps
                 <p className="text-sm font-semibold">{profile?.nome || 'Admin'}</p>
                 <p className="text-xs text-muted-foreground">{profile?.cargo || 'Administrador'}</p>
               </div>
-              <Button variant="ghost" className="h-11 w-full justify-start rounded-xl" onClick={() => handleNavigate('/configuracoes?tab=usuarios')}>
+              <Button variant="ghost" className="h-11 w-full justify-start rounded-xl" onClick={() => handleNavigate('/perfil')}>
                 <User className="mr-2 h-4 w-4" /> Meu perfil
+              </Button>
+              <Button variant="ghost" className="h-11 w-full justify-start rounded-xl" onClick={() => handleNavigate('/configuracoes')}>
+                <Settings className="mr-2 h-4 w-4" /> Configurações
+              </Button>
               </Button>
               <Button
                 variant="ghost"
