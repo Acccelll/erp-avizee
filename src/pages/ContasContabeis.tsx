@@ -206,18 +206,18 @@ const ContasContabeis = () => {
             </div>
 
             {/* KPI Cards */}
-            <div className="grid grid-cols-3 gap-2">
-              <div className="rounded-lg border bg-card p-3 text-center space-y-1">
+            <div className="grid grid-cols-3 gap-3">
+              <div className="rounded-lg border bg-card p-4 text-center space-y-1">
                 <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Natureza</p>
                 <p className="font-semibold text-sm text-foreground capitalize">{selected.natureza}</p>
               </div>
-              <div className="rounded-lg border bg-card p-3 text-center space-y-1">
+              <div className="rounded-lg border bg-card p-4 text-center space-y-1">
                 <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Tipo</p>
                 <Badge variant={selected.aceita_lancamento ? "default" : "secondary"} className="text-xs">
                   {selected.aceita_lancamento ? "Analítica" : "Sintética"}
                 </Badge>
               </div>
-              <div className="rounded-lg border bg-card p-3 text-center space-y-1">
+              <div className="rounded-lg border bg-card p-4 text-center space-y-1">
                 <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Conta Pai</p>
                 <p className="font-mono font-bold text-sm text-foreground">{selected.conta_pai_id ? data.find(c => c.id === selected.conta_pai_id)?.codigo || "—" : "Raiz"}</p>
               </div>

@@ -178,18 +178,18 @@ export default function Transportadoras() {
             </div>
 
             {/* KPI Cards */}
-            <div className="grid grid-cols-3 gap-2">
-              <div className="rounded-lg border bg-card p-3 text-center space-y-1">
+            <div className="grid grid-cols-3 gap-3">
+              <div className="rounded-lg border bg-card p-4 text-center space-y-1">
                 <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Modalidade</p>
                 <p className="font-semibold text-sm text-foreground">{modalidadeLabel[selected.modalidade] || "—"}</p>
               </div>
-              <div className="rounded-lg border bg-card p-3 text-center space-y-1">
+              <div className="rounded-lg border bg-card p-4 text-center space-y-1">
                 <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Prazo Médio</p>
                 <p className="font-mono font-bold text-sm text-foreground">{selected.prazo_medio || "—"}</p>
               </div>
-              <div className="rounded-lg border bg-card p-3 text-center space-y-1">
+              <div className="rounded-lg border bg-card p-4 text-center space-y-1">
                 <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Cidade/UF</p>
-                <p className="font-semibold text-sm text-foreground truncate">{selected.cidade ? `${selected.cidade}/${selected.uf}` : "—"}</p>
+                <p className="font-semibold text-sm text-foreground">{selected.cidade ? `${selected.cidade}/${selected.uf}` : "—"}</p>
               </div>
             </div>
 

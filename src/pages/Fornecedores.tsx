@@ -194,22 +194,22 @@ const Fornecedores = () => {
             </div>
 
             {/* KPI Cards */}
-            <div className="grid grid-cols-4 gap-2">
-              <div className="rounded-lg border bg-card p-3 text-center space-y-1">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="rounded-lg border bg-card p-4 text-center space-y-1">
                 <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Prazo Médio</p>
                 <p className="font-mono font-bold text-base text-foreground">{deliveryStats.prazoMedio}<span className="text-xs font-normal text-muted-foreground ml-0.5">d</span></p>
               </div>
-              <div className="rounded-lg border bg-card p-3 text-center space-y-1">
+              <div className="rounded-lg border bg-card p-4 text-center space-y-1">
                 <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Atraso</p>
                 <p className={`font-mono font-bold text-base ${deliveryStats.atrasoMedio > 0 ? "text-destructive" : "text-emerald-600 dark:text-emerald-400"}`}>{deliveryStats.atrasoMedio}<span className="text-xs font-normal text-muted-foreground ml-0.5">d</span></p>
               </div>
-              <div className="rounded-lg border bg-card p-3 text-center space-y-1">
+              <div className="rounded-lg border bg-card p-4 text-center space-y-1">
                 <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Volume</p>
-                <p className="font-mono font-bold text-sm text-foreground truncate" title={formatCurrency(volumeComprado)}>{formatCurrency(volumeComprado)}</p>
+                <p className="font-mono font-bold text-sm text-foreground">{formatCurrency(volumeComprado)}</p>
               </div>
-              <div className="rounded-lg border bg-card p-3 text-center space-y-1">
+              <div className="rounded-lg border bg-card p-4 text-center space-y-1">
                 <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Últ. Compra</p>
-                <p className="font-mono font-bold text-sm text-foreground truncate">{comprasHist.length > 0 ? formatDate(comprasHist[0].data_compra) : "—"}</p>
+                <p className="font-mono font-bold text-sm text-foreground">{comprasHist.length > 0 ? formatDate(comprasHist[0].data_compra) : "—"}</p>
               </div>
             </div>
 
