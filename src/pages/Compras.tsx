@@ -241,7 +241,12 @@ const Compras = () => {
         </form>
       </FormModal>
 
-      <ViewDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} title={isCotacoesView ? "Detalhes da Cotação de Compra" : "Detalhes da Compra"}>
+      <ViewDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} title={isCotacoesView ? "Detalhes da Cotação de Compra" : "Detalhes da Compra"}
+        actions={selected ? <>
+          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setDrawerOpen(false); openEdit(selected); }}><Edit className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Editar</TooltipContent></Tooltip>
+          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => { setDrawerOpen(false); remove(selected.id); }}><Trash2 className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Excluir</TooltipContent></Tooltip>
+        </> : undefined}
+      >
         {selected && (
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
