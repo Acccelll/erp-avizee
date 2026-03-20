@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { AppLayout } from "@/components/AppLayout";
 import { SummaryCard } from "@/components/SummaryCard";
-import { PeriodFilter, Period } from "@/components/dashboard/PeriodFilter";
+import { PeriodFilter, financialPeriods, Period } from "@/components/dashboard/PeriodFilter";
 import { AlertCards } from "@/components/dashboard/AlertCards";
 import { BacklogDetail } from "@/components/dashboard/BacklogDetail";
 import { EstoqueBaixoDetail } from "@/components/dashboard/EstoqueBaixoDetail";
