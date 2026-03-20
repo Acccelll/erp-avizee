@@ -303,8 +303,7 @@ const Financeiro = () => {
 
         <DataTable columns={columns} data={filteredData} loading={loading}
           selectable selectedIds={selectedIds} onSelectionChange={setSelectedIds}
-          onView={(l) => { setSelected(l); setDrawerOpen(true); }}
-          onEdit={openEdit} onDelete={(l) => remove(l.id)} />
+          onView={(l) => { setSelected(l); setDrawerOpen(true); }} />
       </ModulePage>
 
       <FormModal open={modalOpen} onClose={() => setModalOpen(false)} title={mode === "create" ? "Novo Lançamento" : "Editar Lançamento"} size="lg">
