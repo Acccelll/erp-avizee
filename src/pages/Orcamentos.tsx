@@ -184,9 +184,6 @@ const Orcamentos = () => {
 
         <DataTable columns={columns} data={filteredData} loading={loading}
           onView={(o) => { setSelected(o); setDrawerOpen(true); }}
-          onEdit={(o) => navigate(`/cotacoes/${o.id}`)}
-          onDelete={(o) => remove(o.id)}
-          onDuplicate={handleDuplicate}
         />
       </ModulePage>
 
