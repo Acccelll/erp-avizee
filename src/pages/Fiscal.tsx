@@ -308,7 +308,7 @@ const Fiscal = () => {
         </div>
 
         <DataTable columns={columns} data={filteredData} loading={loading}
-          onView={openView} onEdit={openEdit} onDelete={(n) => remove(n.id)} />
+          onView={openView} />
       </ModulePage>
 
       <FormModal open={modalOpen} onClose={() => setModalOpen(false)} title={mode === "create" ? "Nova Nota Fiscal" : "Editar Nota Fiscal"} size="xl">
