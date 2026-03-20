@@ -151,9 +151,9 @@ export default function Relatorios() {
     return Object.keys(resultado.rows[0]).map((key) => ({
       key,
       label: key.replace(/([A-Z])/g, ' $1').replace(/^./, (char) => char.toUpperCase()),
-      render: (item: Record<string, unknown>): React.ReactNode => formatCellValue(item[key], key) as React.ReactNode,
+      render: (item: Record<string, unknown>): React.ReactNode => formatCellValue(item[key], key, isQtyReport) as React.ReactNode,
     }));
-  }, [resultado.rows]);
+  }, [resultado.rows, isQtyReport]);
 
   const handleSelectTipo = (nextTipo: TipoRelatorio) => {
     setTipo(nextTipo);
