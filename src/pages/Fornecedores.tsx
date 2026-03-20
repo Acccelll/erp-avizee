@@ -210,7 +210,7 @@ const Fornecedores = () => {
               </div>
               <div className="rounded-lg border bg-card p-3 text-center space-y-1">
                 <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Volume</p>
-                <p className="font-mono font-bold text-sm text-foreground truncate" title={formatCurrency(volumeComprado)}>{formatCurrency(volumeComprado)}</p>
+                <p className="font-mono font-bold text-foreground truncate text-xs" title={formatCurrency(volumeComprado)}>{formatCurrency(volumeComprado)}</p>
               </div>
               <div className="rounded-lg border bg-card p-3 text-center space-y-1">
                 <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Últ. Compra</p>
