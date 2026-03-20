@@ -58,7 +58,7 @@ export function DataTable<T extends Record<string, any>>({
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<SortDirection>(null);
   const [currentPage, setCurrentPage] = useState(0);
-  const hasActions = onView || onEdit || onDelete || onDuplicate;
+  const hasActions = !!onView;
   const visibleColumns = columns.filter((c) => !c.hidden);
   const primaryColumn = visibleColumns[0];
   const secondaryColumns = visibleColumns.slice(1);
@@ -103,7 +103,7 @@ export function DataTable<T extends Record<string, any>>({
   }, [pagedData, selectedIds, onSelectionChange]);
 
   const renderActions = (item: T) => (
-    <div className="flex items-center justify-end gap-1 flex-nowrap">
+    <div className="flex items-center gap-1 flex-nowrap">
       {onView && (
         <Tooltip><TooltipTrigger asChild>
           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); onView(item); }}>
@@ -111,29 +111,12 @@ export function DataTable<T extends Record<string, any>>({
           </Button>
         </TooltipTrigger><TooltipContent>Visualizar</TooltipContent></Tooltip>
       )}
-      {onEdit && (
-        <Tooltip><TooltipTrigger asChild>
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); onEdit(item); }}>
-            <Edit className="h-4 w-4" />
-          </Button>
-        </TooltipTrigger><TooltipContent>Editar</TooltipContent></Tooltip>
-      )}
-      {onDuplicate && (
-        <Tooltip><TooltipTrigger asChild>
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); onDuplicate(item); }}>
-            <Copy className="h-4 w-4" />
-          </Button>
-        </TooltipTrigger><TooltipContent>Duplicar</TooltipContent></Tooltip>
-      )}
-      {onDelete && (
-        <Tooltip><TooltipTrigger asChild>
-          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={(e) => { e.stopPropagation(); setDeleteItem(item); }}>
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </TooltipTrigger><TooltipContent>Excluir</TooltipContent></Tooltip>
-      )}
     </div>
   );
+
+  const handleDoubleClick = (item: T) => {
+    if (onView) onView(item);
+  };
 
   const SortIcon = ({ colKey }: { colKey: string }) => {
     if (sortKey !== colKey) return <ChevronsUpDown className="h-3.5 w-3.5 text-muted-foreground/50" />;
@@ -191,20 +174,17 @@ export function DataTable<T extends Record<string, any>>({
               {pagedData.map((item, idx) => (
                 <div
                   key={item.id || idx}
-                  role={onRowClick ? "button" : undefined}
-                  tabIndex={onRowClick ? 0 : -1}
-                  onClick={() => onRowClick?.(item)}
-                  onKeyDown={(event) => { if ((event.key === "Enter" || event.key === " ") && onRowClick) { event.preventDefault(); onRowClick(item); } }}
+                  role={onView || onRowClick ? "button" : undefined}
+                  tabIndex={onView || onRowClick ? 0 : -1}
+                  onClick={() => onView ? onView(item) : onRowClick?.(item)}
+                  onKeyDown={(event) => { if ((event.key === "Enter" || event.key === " ") && (onView || onRowClick)) { event.preventDefault(); onView ? onView(item) : onRowClick?.(item); } }}
                   className="w-full rounded-xl border bg-background p-4 text-left shadow-sm transition hover:border-primary/30 hover:bg-accent/20"
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{primaryColumn.label}</p>
-                      <div className="mt-1 text-sm font-semibold text-foreground">
-                        {primaryColumn.render ? primaryColumn.render(item) : item[primaryColumn.key]}
-                      </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{primaryColumn.label}</p>
+                    <div className="mt-1 text-sm font-semibold text-foreground">
+                      {primaryColumn.render ? primaryColumn.render(item) : item[primaryColumn.key]}
                     </div>
-                    {hasActions && <div className="shrink-0">{renderActions(item)}</div>}
                   </div>
                   <div className="mt-3 space-y-1.5">
                     {secondaryColumns.map((col) => (
@@ -227,6 +207,9 @@ export function DataTable<T extends Record<string, any>>({
               <table className="w-full">
                 <thead>
                   <tr className="border-b bg-muted/50">
+                    {hasActions && (
+                      <th className="w-12 px-2 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Ações</th>
+                    )}
                     {selectable && (
                       <th className="w-10 px-3 py-3">
                         <Checkbox
@@ -250,9 +233,6 @@ export function DataTable<T extends Record<string, any>>({
                         </div>
                       </th>
                     ))}
-                    {hasActions && (
-                      <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground">Ações</th>
-                    )}
                   </tr>
                 </thead>
                 <tbody>
@@ -260,12 +240,14 @@ export function DataTable<T extends Record<string, any>>({
                     <tr
                       key={item.id || idx}
                       onClick={() => onRowClick?.(item)}
+                      onDoubleClick={() => handleDoubleClick(item)}
                       className={cn(
                         "border-b transition-colors last:border-b-0 hover:bg-muted/30",
-                        onRowClick && "cursor-pointer",
+                        (onRowClick || onView) && "cursor-pointer",
                         selectable && selectedIds.includes(item.id) && "bg-primary/5"
                       )}
                     >
+                      {hasActions && <td className="w-12 px-2 py-3">{renderActions(item)}</td>}
                       {selectable && (
                         <td className="w-10 px-3 py-3">
                           <Checkbox
@@ -278,7 +260,6 @@ export function DataTable<T extends Record<string, any>>({
                       {visibleColumns.map((col) => (
                         <td key={col.key} className="px-4 py-3 text-sm whitespace-nowrap">{col.render ? col.render(item) : item[col.key]}</td>
                       ))}
-                      {hasActions && <td className="px-4 py-3 text-right">{renderActions(item)}</td>}
                     </tr>
                   ))}
                 </tbody>
