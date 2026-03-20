@@ -41,24 +41,78 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
 
       if (error) throw error;
 
-      const rows = (data || []).map((item: any) => ({
-        codigo: item.codigo_interno || "-",
-        produto: item.nome,
-        unidade: item.unidade_medida || "UN",
-        estoqueAtual: Number(item.estoque_atual || 0),
-        estoqueMinimo: Number(item.estoque_minimo || 0),
-        custo: Number(item.preco_custo || 0),
-        venda: Number(item.preco_venda || 0),
-        situacao: Number(item.estoque_atual || 0) <= Number(item.estoque_minimo || 0) ? "Abaixo do mínimo" : "OK",
-      }));
+      const rows = (data || []).map((item: any) => {
+        const qty = Number(item.estoque_atual || 0);
+        const custo = Number(item.preco_custo || 0);
+        const venda = Number(item.preco_venda || 0);
+        return {
+          codigo: item.codigo_interno || "-",
+          produto: item.nome,
+          unidade: item.unidade_medida || "UN",
+          estoqueAtual: qty,
+          estoqueMinimo: Number(item.estoque_minimo || 0),
+          custoUnit: custo,
+          vendaUnit: venda,
+          totalCusto: qty * custo,
+          totalVenda: qty * venda,
+          situacao: qty <= Number(item.estoque_minimo || 0) ? "Abaixo do mínimo" : "OK",
+        };
+      });
+
+      const totalQtd = rows.reduce((s, r) => s + r.estoqueAtual, 0);
+      const totalCusto = rows.reduce((s, r) => s + r.totalCusto, 0);
+      const totalVenda = rows.reduce((s, r) => s + r.totalVenda, 0);
 
       return {
         title: "Posição de estoque",
-        subtitle: "Saldo atual, custo, venda e alerta de mínimo.",
+        subtitle: "Saldo atual, custo unitário, preço de venda e totalizadores.",
         rows,
         chartData: [
           { name: "Abaixo do mínimo", value: rows.filter((row) => row.situacao !== "OK").length },
           { name: "Estoque OK", value: rows.filter((row) => row.situacao === "OK").length },
+        ],
+        totals: {
+          totalQtd,
+          totalCusto,
+          totalVenda,
+        },
+      };
+    }
+
+    case "movimentos_estoque": {
+      let query = (supabase as any)
+        .from("estoque_movimentos")
+        .select("tipo, quantidade, saldo_anterior, saldo_atual, documento_tipo, motivo, created_at, produtos(nome, codigo_interno)")
+        .order("created_at", { ascending: false });
+
+      query = withDateRange(query, "created_at", filtros);
+      const { data, error } = await query;
+      if (error) throw error;
+
+      const rows = (data || []).map((item: any) => ({
+        data: item.created_at,
+        produto: item.produtos?.nome || "-",
+        codigo: item.produtos?.codigo_interno || "-",
+        tipo: item.tipo,
+        quantidade: Number(item.quantidade || 0),
+        saldoAnterior: Number(item.saldo_anterior || 0),
+        saldoAtual: Number(item.saldo_atual || 0),
+        documento: item.documento_tipo || "-",
+        motivo: item.motivo || "-",
+      }));
+
+      const entradas = rows.filter((r) => r.tipo === "entrada").reduce((s, r) => s + r.quantidade, 0);
+      const saidas = rows.filter((r) => r.tipo === "saida").reduce((s, r) => s + r.quantidade, 0);
+      const ajustes = rows.filter((r) => r.tipo === "ajuste").reduce((s, r) => s + r.quantidade, 0);
+
+      return {
+        title: "Movimentos de estoque",
+        subtitle: "Entradas, saídas e ajustes de estoque no período.",
+        rows,
+        chartData: [
+          { name: "Entradas", value: entradas },
+          { name: "Saídas", value: Math.abs(saidas) },
+          { name: "Ajustes", value: Math.abs(ajustes) },
         ],
       };
     }
