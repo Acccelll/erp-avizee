@@ -5,6 +5,8 @@ import { ModulePage } from "@/components/ModulePage";
 import { DataTable, StatusBadge } from "@/components/DataTable";
 import { SummaryCard } from "@/components/SummaryCard";
 import { ViewDrawer } from "@/components/ViewDrawer";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Trash2 } from "lucide-react";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -139,10 +141,14 @@ const OrdensVenda = () => {
           <SummaryCard title="Em Andamento" value={formatNumber(kpis.inProgress)} icon={Truck} variationType="positive" variation="aprovadas + separação" />
         </div>
 
-        <DataTable columns={columns} data={filteredData} loading={loading} onView={handleView} onDelete={(o) => remove(o.id)} />
+        <DataTable columns={columns} data={filteredData} loading={loading} onView={handleView} />
       </ModulePage>
 
-      <ViewDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} title="Detalhes da Ordem de Venda">
+      <ViewDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} title="Detalhes da Ordem de Venda"
+        actions={selected ? <>
+          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => { setDrawerOpen(false); remove(selected.id); }}><Trash2 className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Excluir</TooltipContent></Tooltip>
+        </> : undefined}
+      >
         {selected && (
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">

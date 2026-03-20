@@ -5,6 +5,8 @@ import { ModulePage } from "@/components/ModulePage";
 import { DataTable, StatusBadge } from "@/components/DataTable";
 import { FormModal } from "@/components/FormModal";
 import { ViewDrawer, ViewField, ViewSection } from "@/components/ViewDrawer";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Edit, Trash2 } from "lucide-react";
 import { SummaryCard } from "@/components/SummaryCard";
 import { PeriodFilter, financialPeriods, type Period } from "@/components/dashboard/PeriodFilter";
 import { periodToDateFrom, periodToDateTo } from "@/lib/periodFilter";
@@ -303,8 +305,7 @@ const Financeiro = () => {
 
         <DataTable columns={columns} data={filteredData} loading={loading}
           selectable selectedIds={selectedIds} onSelectionChange={setSelectedIds}
-          onView={(l) => { setSelected(l); setDrawerOpen(true); }}
-          onEdit={openEdit} onDelete={(l) => remove(l.id)} />
+          onView={(l) => { setSelected(l); setDrawerOpen(true); }} />
       </ModulePage>
 
       <FormModal open={modalOpen} onClose={() => setModalOpen(false)} title={mode === "create" ? "Novo Lançamento" : "Editar Lançamento"} size="lg">
@@ -409,7 +410,12 @@ const Financeiro = () => {
         </form>
       </FormModal>
 
-      <ViewDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} title="Detalhes do Lançamento">
+      <ViewDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} title="Detalhes do Lançamento"
+        actions={selected ? <>
+          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setDrawerOpen(false); openEdit(selected); }}><Edit className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Editar</TooltipContent></Tooltip>
+          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => { setDrawerOpen(false); remove(selected.id); }}><Trash2 className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Excluir</TooltipContent></Tooltip>
+        </> : undefined}
+      >
         {selected && (
           <div className="space-y-4">
             <ViewSection title="Informações gerais">
