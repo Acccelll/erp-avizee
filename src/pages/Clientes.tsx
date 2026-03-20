@@ -257,13 +257,13 @@ const Clientes = () => {
                 <StatusBadge status={selected.ativo ? "Ativo" : "Inativo"} />
               </div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div className="text-center rounded-lg border bg-background p-2">
+                <div className="text-center rounded-lg border bg-background p-2 overflow-hidden">
                   <p className="text-[10px] text-muted-foreground uppercase">Limite</p>
-                  <p className="font-mono font-semibold text-sm">{formatCurrency(selected.limite_credito || 0)}</p>
+                  <p className="font-mono font-semibold text-sm truncate" title={formatCurrency(selected.limite_credito || 0)}>{formatCurrency(selected.limite_credito || 0)}</p>
                 </div>
-                <div className="text-center rounded-lg border bg-background p-2">
+                <div className="text-center rounded-lg border bg-background p-2 overflow-hidden">
                   <p className="text-[10px] text-muted-foreground uppercase">Saldo Aberto</p>
-                  <p className={`font-mono font-semibold text-sm ${saldoAberto > 0 ? "text-warning" : ""}`}>{formatCurrency(saldoAberto)}</p>
+                  <p className={`font-mono font-semibold text-sm truncate ${saldoAberto > 0 ? "text-warning" : ""}`} title={formatCurrency(saldoAberto)}>{formatCurrency(saldoAberto)}</p>
                 </div>
                 <div className="text-center rounded-lg border bg-background p-2">
                   <p className="text-[10px] text-muted-foreground uppercase">PMV</p>
