@@ -25,6 +25,8 @@ interface NotaFiscal {
   valor_total: number; status: string; forma_pagamento: string; condicao_pagamento: string;
   observacoes: string; ativo: boolean; movimenta_estoque: boolean; gera_financeiro: boolean;
   ordem_venda_id: string | null; conta_contabil_id: string | null;
+  frete_valor: number; icms_valor: number; ipi_valor: number; pis_valor: number;
+  cofins_valor: number; icms_st_valor: number; desconto_valor: number; outras_despesas: number;
   fornecedores?: { nome_razao_social: string; cpf_cnpj: string };
   clientes?: { nome_razao_social: string };
   ordens_venda?: { numero: string };
@@ -35,6 +37,8 @@ const emptyForm: Record<string, any> = {
   fornecedor_id: "", cliente_id: "", valor_total: 0, status: "pendente", observacoes: "",
   movimenta_estoque: true, gera_financeiro: true, forma_pagamento: "", condicao_pagamento: "a_vista",
   ordem_venda_id: "", conta_contabil_id: "",
+  frete_valor: 0, icms_valor: 0, ipi_valor: 0, pis_valor: 0, cofins_valor: 0,
+  icms_st_valor: 0, desconto_valor: 0, outras_despesas: 0,
 };
 
 const Fiscal = () => {
@@ -57,8 +61,12 @@ const Fiscal = () => {
   const [viewItems, setViewItems] = useState<any[]>([]);
   const [searchParams] = useSearchParams();
   const [consultaSearch, setConsultaSearch] = useState("");
+  // Per-item conta contábil
+  const [itemContaContabil, setItemContaContabil] = useState<Record<number, string>>({});
 
   const valorProdutos = items.reduce((s, i) => s + (i.valor_total || 0), 0);
+  const totalImpostos = Number(form.icms_valor || 0) + Number(form.ipi_valor || 0) + Number(form.pis_valor || 0) + Number(form.cofins_valor || 0) + Number(form.icms_st_valor || 0);
+  const totalNF = valorProdutos + Number(form.frete_valor || 0) + totalImpostos + Number(form.outras_despesas || 0) - Number(form.desconto_valor || 0);
 
   useEffect(() => {
     const load = async () => {
@@ -83,7 +91,7 @@ const Fiscal = () => {
     return { total, pendentes, confirmadas, valorTotal };
   }, [data, searchParams]);
 
-  const openCreate = () => { setMode("create"); setForm({ ...emptyForm }); setItems([]); setSelected(null); setParcelas(1); setModalOpen(true); };
+  const openCreate = () => { setMode("create"); setForm({ ...emptyForm }); setItems([]); setSelected(null); setParcelas(1); setItemContaContabil({}); setModalOpen(true); };
   const openEdit = async (n: NotaFiscal) => {
     setMode("edit"); setSelected(n);
     setForm({
@@ -93,21 +101,30 @@ const Fiscal = () => {
       movimenta_estoque: n.movimenta_estoque !== false, gera_financeiro: n.gera_financeiro !== false,
       forma_pagamento: n.forma_pagamento || "", condicao_pagamento: n.condicao_pagamento || "a_vista",
       ordem_venda_id: n.ordem_venda_id || "", conta_contabil_id: n.conta_contabil_id || "",
+      frete_valor: n.frete_valor || 0, icms_valor: n.icms_valor || 0, ipi_valor: n.ipi_valor || 0,
+      pis_valor: n.pis_valor || 0, cofins_valor: n.cofins_valor || 0, icms_st_valor: n.icms_st_valor || 0,
+      desconto_valor: n.desconto_valor || 0, outras_despesas: n.outras_despesas || 0,
     });
     const { data: itens } = await (supabase as any).from("notas_fiscais_itens")
       .select("*, produtos(nome, sku)").eq("nota_fiscal_id", n.id);
-    setItems((itens || []).map((i: any) => ({
+    const loadedItems = (itens || []).map((i: any) => ({
       id: i.id, produto_id: i.produto_id, codigo: i.produtos?.sku || "",
       descricao: i.produtos?.nome || "", quantidade: i.quantidade,
       valor_unitario: i.valor_unitario, valor_total: i.quantidade * i.valor_unitario,
-    })));
+    }));
+    setItems(loadedItems);
+    const contaMap: Record<number, string> = {};
+    (itens || []).forEach((i: any, idx: number) => {
+      if (i.conta_contabil_id) contaMap[idx] = i.conta_contabil_id;
+    });
+    setItemContaContabil(contaMap);
     setModalOpen(true);
   };
 
   const openView = async (n: NotaFiscal) => {
     setSelected(n); setDrawerOpen(true);
     const { data: itens } = await (supabase as any).from("notas_fiscais_itens")
-      .select("*, produtos(nome, sku)").eq("nota_fiscal_id", n.id);
+      .select("*, produtos(nome, sku), contas_contabeis(codigo, descricao)").eq("nota_fiscal_id", n.id);
     setViewItems(itens || []);
   };
 
@@ -134,10 +151,12 @@ const Fiscal = () => {
       if (nf.gera_financeiro !== false) {
         const tipo_fin = nf.tipo === "entrada" ? "pagar" : "receber";
         const isAVista = nf.condicao_pagamento === "a_vista";
+        // Use total NF including frete and taxes
+        const valorFin = Number(nf.valor_total || 0);
         if (isAVista) {
           await (supabase as any).from("financeiro_lancamentos").insert({
             tipo: tipo_fin, descricao: `NF ${nf.numero}`,
-            valor: nf.valor_total, data_vencimento: nf.data_emissao,
+            valor: valorFin, data_vencimento: nf.data_emissao,
             data_pagamento: nf.data_emissao, status: "pago",
             fornecedor_id: nf.fornecedor_id || null, cliente_id: nf.cliente_id || null,
             nota_fiscal_id: nf.id, documento_fiscal_id: nf.id,
@@ -151,7 +170,7 @@ const Fiscal = () => {
             venc.setDate(venc.getDate() + 30 * (i + 1));
             await (supabase as any).from("financeiro_lancamentos").insert({
               tipo: tipo_fin, descricao: `NF ${nf.numero} - Parcela ${i + 1}/${numParcelas}`,
-              valor: nf.valor_total / numParcelas, data_vencimento: venc.toISOString().split("T")[0],
+              valor: valorFin / numParcelas, data_vencimento: venc.toISOString().split("T")[0],
               status: "aberto",
               fornecedor_id: nf.fornecedor_id || null, cliente_id: nf.cliente_id || null,
               nota_fiscal_id: nf.id, documento_fiscal_id: nf.id,
@@ -209,7 +228,7 @@ const Fiscal = () => {
         cliente_id: form.cliente_id || null,
         ordem_venda_id: form.ordem_venda_id || null,
         conta_contabil_id: form.conta_contabil_id || null,
-        valor_total: valorProdutos || form.valor_total,
+        valor_total: totalNF || form.valor_total,
       };
       let nfId = selected?.id;
       if (mode === "create") {
@@ -221,8 +240,9 @@ const Fiscal = () => {
         await (supabase as any).from("notas_fiscais_itens").delete().eq("nota_fiscal_id", selected.id);
       }
       if (items.length > 0 && nfId) {
-        const itemsPayload = items.filter(i => i.produto_id).map(i => ({
+        const itemsPayload = items.filter(i => i.produto_id).map((i, idx) => ({
           nota_fiscal_id: nfId, produto_id: i.produto_id, quantidade: i.quantidade, valor_unitario: i.valor_unitario,
+          conta_contabil_id: itemContaContabil[idx] || null,
         }));
         if (itemsPayload.length > 0) {
           await (supabase as any).from("notas_fiscais_itens").insert(itemsPayload);
@@ -346,6 +366,68 @@ const Fiscal = () => {
 
           <ItemsGrid items={items} onChange={setItems} produtos={produtosCrud.data} title="Itens da Nota" />
 
+          {/* Per-item conta contábil */}
+          {items.length > 0 && contasContabeis.length > 0 && (
+            <div className="space-y-2">
+              <Label className="text-sm font-semibold">Conta Contábil por Item</Label>
+              <div className="space-y-2 rounded-lg border p-3">
+                {items.map((item, idx) => (
+                  <div key={idx} className="flex items-center gap-3">
+                    <span className="text-xs text-muted-foreground min-w-[120px] truncate">{item.descricao || `Item ${idx + 1}`}</span>
+                    <Select value={itemContaContabil[idx] || "none"} onValueChange={(v) => setItemContaContabil(prev => ({ ...prev, [idx]: v === "none" ? "" : v }))}>
+                      <SelectTrigger className="h-8 text-xs flex-1"><SelectValue placeholder="Conta contábil..." /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Nenhuma</SelectItem>
+                        {contasContabeis.map((c: any) => (
+                          <SelectItem key={c.id} value={c.id}>{c.codigo} - {c.descricao}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Frete, Impostos, Despesas */}
+          <div className="space-y-3">
+            <Label className="text-sm font-semibold">Frete, Impostos e Despesas</Label>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Frete</Label>
+                <Input type="number" step="0.01" value={form.frete_valor} onChange={(e) => setForm({ ...form, frete_valor: Number(e.target.value) })} className="h-8 text-xs" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">ICMS</Label>
+                <Input type="number" step="0.01" value={form.icms_valor} onChange={(e) => setForm({ ...form, icms_valor: Number(e.target.value) })} className="h-8 text-xs" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">IPI</Label>
+                <Input type="number" step="0.01" value={form.ipi_valor} onChange={(e) => setForm({ ...form, ipi_valor: Number(e.target.value) })} className="h-8 text-xs" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">PIS</Label>
+                <Input type="number" step="0.01" value={form.pis_valor} onChange={(e) => setForm({ ...form, pis_valor: Number(e.target.value) })} className="h-8 text-xs" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">COFINS</Label>
+                <Input type="number" step="0.01" value={form.cofins_valor} onChange={(e) => setForm({ ...form, cofins_valor: Number(e.target.value) })} className="h-8 text-xs" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">ICMS-ST</Label>
+                <Input type="number" step="0.01" value={form.icms_st_valor} onChange={(e) => setForm({ ...form, icms_st_valor: Number(e.target.value) })} className="h-8 text-xs" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Desconto</Label>
+                <Input type="number" step="0.01" value={form.desconto_valor} onChange={(e) => setForm({ ...form, desconto_valor: Number(e.target.value) })} className="h-8 text-xs" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Outras Despesas</Label>
+                <Input type="number" step="0.01" value={form.outras_despesas} onChange={(e) => setForm({ ...form, outras_despesas: Number(e.target.value) })} className="h-8 text-xs" />
+              </div>
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="space-y-2"><Label>Forma de Pagamento</Label>
               <Select value={form.forma_pagamento} onValueChange={(v) => setForm({ ...form, forma_pagamento: v })}>
@@ -383,9 +465,10 @@ const Fiscal = () => {
             </div>
           </div>
 
+          {/* Conta contábil geral (fallback) */}
           {contasContabeis.length > 0 && (
             <div className="space-y-2">
-              <Label>Conta Contábil (opcional)</Label>
+              <Label>Conta Contábil Geral (fallback para itens sem conta)</Label>
               <Select value={form.conta_contabil_id || "none"} onValueChange={(v) => setForm({ ...form, conta_contabil_id: v === "none" ? "" : v })}>
                 <SelectTrigger><SelectValue placeholder="Vincular conta contábil..." /></SelectTrigger>
                 <SelectContent>
@@ -398,10 +481,38 @@ const Fiscal = () => {
             </div>
           )}
 
-          <div className="bg-accent/50 rounded-lg p-4 flex justify-between items-center">
-            <span className="text-sm text-muted-foreground">Total dos Itens: <span className="font-mono font-semibold">{formatCurrency(valorProdutos)}</span></span>
+          <div className="bg-accent/50 rounded-lg p-4 space-y-2">
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-muted-foreground">Produtos:</span>
+              <span className="font-mono font-semibold">{formatCurrency(valorProdutos)}</span>
+            </div>
+            {Number(form.frete_valor || 0) > 0 && (
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-muted-foreground">Frete:</span>
+                <span className="font-mono">{formatCurrency(Number(form.frete_valor))}</span>
+              </div>
+            )}
+            {totalImpostos > 0 && (
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-muted-foreground">Impostos:</span>
+                <span className="font-mono">{formatCurrency(totalImpostos)}</span>
+              </div>
+            )}
+            {Number(form.desconto_valor || 0) > 0 && (
+              <div className="flex justify-between items-center text-sm text-destructive">
+                <span>Desconto:</span>
+                <span className="font-mono">-{formatCurrency(Number(form.desconto_valor))}</span>
+              </div>
+            )}
+            <div className="flex justify-between items-center text-sm font-bold border-t pt-2">
+              <span>Total da NF:</span>
+              <span className="font-mono text-lg">{formatCurrency(totalNF)}</span>
+            </div>
             {form.condicao_pagamento === "a_prazo" && parcelas > 1 && (
-              <span className="text-sm text-muted-foreground">{parcelas}× de <span className="font-mono font-semibold">{formatCurrency(valorProdutos / parcelas)}</span></span>
+              <div className="flex justify-between items-center text-xs text-muted-foreground">
+                <span>{parcelas}× de</span>
+                <span className="font-mono font-semibold">{formatCurrency(totalNF / parcelas)}</span>
+              </div>
             )}
           </div>
 
@@ -447,6 +558,21 @@ const Fiscal = () => {
               </div>
             </ViewSection>
 
+            {/* Frete, Impostos */}
+            {(Number(selected.frete_valor || 0) > 0 || Number(selected.icms_valor || 0) > 0 || Number(selected.ipi_valor || 0) > 0) && (
+              <ViewSection title="Frete e Impostos">
+                <div className="grid grid-cols-2 gap-4">
+                  {Number(selected.frete_valor || 0) > 0 && <ViewField label="Frete">{formatCurrency(Number(selected.frete_valor))}</ViewField>}
+                  {Number(selected.icms_valor || 0) > 0 && <ViewField label="ICMS">{formatCurrency(Number(selected.icms_valor))}</ViewField>}
+                  {Number(selected.ipi_valor || 0) > 0 && <ViewField label="IPI">{formatCurrency(Number(selected.ipi_valor))}</ViewField>}
+                  {Number(selected.pis_valor || 0) > 0 && <ViewField label="PIS">{formatCurrency(Number(selected.pis_valor))}</ViewField>}
+                  {Number(selected.cofins_valor || 0) > 0 && <ViewField label="COFINS">{formatCurrency(Number(selected.cofins_valor))}</ViewField>}
+                  {Number(selected.icms_st_valor || 0) > 0 && <ViewField label="ICMS-ST">{formatCurrency(Number(selected.icms_st_valor))}</ViewField>}
+                  {Number(selected.desconto_valor || 0) > 0 && <ViewField label="Desconto">{formatCurrency(Number(selected.desconto_valor))}</ViewField>}
+                </div>
+              </ViewSection>
+            )}
+
             <ViewSection title="Configuração">
               <div className="grid grid-cols-2 gap-4">
                 <ViewField label="Gera Financeiro">
@@ -477,6 +603,7 @@ const Fiscal = () => {
                         <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground">Produto</th>
                         <th className="px-3 py-2 text-right text-xs font-semibold text-muted-foreground">Qtd</th>
                         <th className="px-3 py-2 text-right text-xs font-semibold text-muted-foreground">Total</th>
+                        <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground">Conta</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -485,6 +612,7 @@ const Fiscal = () => {
                           <td className="px-3 py-2">{i.produtos?.nome || "—"}</td>
                           <td className="px-3 py-2 text-right font-mono">{i.quantidade}</td>
                           <td className="px-3 py-2 text-right font-mono font-medium">{formatCurrency(i.quantidade * i.valor_unitario)}</td>
+                          <td className="px-3 py-2 text-xs text-muted-foreground">{i.contas_contabeis ? `${i.contas_contabeis.codigo}` : "—"}</td>
                         </tr>
                       ))}
                     </tbody>

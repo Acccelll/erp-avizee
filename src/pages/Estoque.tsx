@@ -1,5 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useState, useEffect } from "react";
 import { AppLayout } from "@/components/AppLayout";
 import { ModulePage } from "@/components/ModulePage";
 import { DataTable, StatusBadge } from "@/components/DataTable";
@@ -13,26 +12,16 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { formatNumber, formatCurrency } from "@/lib/format";
-import { Calendar, Package, AlertTriangle, Lock, ArrowUpCircle, ArrowDownCircle, RotateCcw, TrendingDown } from "lucide-react";
+import { formatNumber } from "@/lib/format";
+import { AlertTriangle, ArrowUpCircle, ArrowDownCircle, RotateCcw, TrendingDown } from "lucide-react";
 
 interface Movimento {
   id: string; produto_id: string; tipo: string; quantidade: number;
   saldo_anterior: number; saldo_atual: number; motivo: string;
   documento_tipo: string; documento_id: string; created_at: string;
   produtos?: { nome: string; sku: string };
-}
-
-interface PosicaoEstoque {
-  produto_id: string;
-  nome: string;
-  sku: string;
-  estoque_atual: number;
-  estoque_minimo: number;
-  saldo_na_data: number;
 }
 
 const Estoque = () => {
@@ -46,27 +35,9 @@ const Estoque = () => {
   const [form, setForm] = useState({ produto_id: "", tipo: "entrada", quantidade: 0, motivo: "" });
   const [saving, setSaving] = useState(false);
   const [filterTipo, setFilterTipo] = useState("todos");
-  const [searchParams, setSearchParams] = useSearchParams();
-  const viewParam = searchParams.get("view") || "movimentacoes";
-  const [activeTab, setActiveTab] = useState(viewParam);
-
-  useEffect(() => {
-    if (viewParam !== activeTab) setActiveTab(viewParam);
-  }, [activeTab, viewParam]);
-
   const [dataInicio, setDataInicio] = useState("");
   const [dataFim, setDataFim] = useState("");
-  const [dataReferencia, setDataReferencia] = useState(new Date().toISOString().split("T")[0]);
-  const [posicaoData, setPosicaoData] = useState<PosicaoEstoque[]>([]);
-  const [loadingPosicao, setLoadingPosicao] = useState(false);
   const [abaixoMinimo, setAbaixoMinimo] = useState<any[]>([]);
-  const [mesFechamento, setMesFechamento] = useState(() => {
-    const d = new Date();
-    d.setMonth(d.getMonth() - 1);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-  });
-  const [fechamentoData, setFechamentoData] = useState<any[]>([]);
-  const [loadingFechamento, setLoadingFechamento] = useState(false);
 
   // KPI stats
   const kpis = (() => {
@@ -80,6 +51,13 @@ const Estoque = () => {
       abaixoMinimo: abaixoMinimo.length,
     };
   })();
+
+  useEffect(() => {
+    const low = produtosCrud.data.filter((p: any) =>
+      p.ativo && p.estoque_minimo > 0 && Number(p.estoque_atual || 0) <= Number(p.estoque_minimo)
+    );
+    setAbaixoMinimo(low);
+  }, [produtosCrud.data]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -107,35 +85,6 @@ const Estoque = () => {
     return true;
   });
 
-  const loadPosicao = useCallback(async () => {
-    setLoadingPosicao(true);
-    try {
-      const { data: produtos } = await (supabase as any).from("produtos")
-        .select("id, nome, sku, estoque_atual, estoque_minimo").eq("ativo", true).order("nome");
-      const refEnd = dataReferencia + "T23:59:59.999Z";
-      const allMovs = data.filter(m => m.created_at <= refEnd).sort((a, b) => a.created_at.localeCompare(b.created_at));
-
-      const posicao: PosicaoEstoque[] = (produtos || []).map((p: any) => {
-        const prodMovs = allMovs.filter(m => m.produto_id === p.id);
-        const saldo = prodMovs.length > 0 ? prodMovs[prodMovs.length - 1].saldo_atual : 0;
-        return {
-          produto_id: p.id, nome: p.nome, sku: p.sku || "",
-          estoque_atual: p.estoque_atual || 0, estoque_minimo: p.estoque_minimo || 0,
-          saldo_na_data: saldo,
-        };
-      }).filter((p: PosicaoEstoque) => p.saldo_na_data !== 0 || p.estoque_atual !== 0);
-      setPosicaoData(posicao);
-    } catch (err) { console.error(err); }
-    setLoadingPosicao(false);
-  }, [dataReferencia, data]);
-
-  useEffect(() => {
-    const low = produtosCrud.data.filter((p: any) =>
-      p.ativo && p.estoque_minimo > 0 && Number(p.estoque_atual || 0) <= Number(p.estoque_minimo)
-    );
-    setAbaixoMinimo(low);
-  }, [produtosCrud.data]);
-
   const origemLabel = (m: Movimento) => {
     if (!m.documento_tipo) return "—";
     const labels: Record<string, string> = { manual: "Manual", fiscal: "Fiscal", compra: "Compra", venda: "Venda", ajuste: "Ajuste" };
@@ -158,42 +107,9 @@ const Estoque = () => {
     { key: "created_at", label: "Data", render: (m: Movimento) => new Date(m.created_at).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" }) },
   ];
 
-  const posicaoColumns = [
-    { key: "sku", label: "SKU", render: (p: PosicaoEstoque) => <span className="font-mono text-xs text-primary">{p.sku || "—"}</span> },
-    { key: "nome", label: "Produto" },
-    { key: "saldo_na_data", label: "Saldo na Data", render: (p: PosicaoEstoque) => <span className="font-mono font-semibold">{formatNumber(p.saldo_na_data)}</span> },
-    { key: "estoque_atual", label: "Saldo Atual", render: (p: PosicaoEstoque) => <span className="font-mono">{formatNumber(p.estoque_atual)}</span> },
-    { key: "diff", label: "Diferença", render: (p: PosicaoEstoque) => {
-      const diff = p.estoque_atual - p.saldo_na_data;
-      return <span className={`font-mono ${diff > 0 ? "text-success" : diff < 0 ? "text-destructive" : ""}`}>{diff > 0 ? "+" : ""}{formatNumber(diff)}</span>;
-    }},
-    { key: "status", label: "Status", render: (p: PosicaoEstoque) => (
-      p.estoque_minimo > 0 && p.saldo_na_data <= p.estoque_minimo
-        ? <span className="text-destructive text-xs font-medium flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> Abaixo mín.</span>
-        : <span className="text-xs text-muted-foreground">OK</span>
-    )},
-  ];
-
-  const subtitleMap: Record<string, string> = {
-    movimentacoes: "Entradas, saídas e ajustes com rastreabilidade por origem.",
-    posicao: "Consulta de posição histórica do estoque por data de referência.",
-    fechamento: "Fechamento mensal do estoque com visão de quantidade e custo.",
-  };
-
-  const displayCount = activeTab === "movimentacoes" ? filteredData.length : activeTab === "posicao" ? posicaoData.length : fechamentoData.length;
-
-  const handleTabChange = (nextTab: string) => {
-    setActiveTab(nextTab);
-    setSearchParams((current) => {
-      const next = new URLSearchParams(current);
-      next.set("view", nextTab);
-      return next;
-    });
-  };
-
   return (
     <AppLayout>
-      <ModulePage title="Estoque" subtitle={subtitleMap[activeTab] || subtitleMap.movimentacoes} addLabel="Nova Movimentação" onAdd={() => setModalOpen(true)} count={displayCount}>
+      <ModulePage title="Estoque" subtitle="Entradas, saídas e ajustes com rastreabilidade por origem." addLabel="Nova Movimentação" onAdd={() => setModalOpen(true)} count={filteredData.length}>
 
         {/* KPI Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -221,135 +137,34 @@ const Estoque = () => {
           </Card>
         )}
 
-        <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="movimentacoes">Movimentações</TabsTrigger>
-            <TabsTrigger value="posicao">Posição por Data</TabsTrigger>
-            <TabsTrigger value="fechamento">Fechamento Mensal</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="movimentacoes" className="space-y-4">
-            <div className="flex flex-wrap items-end gap-3">
-              <div className="flex gap-1">
-                {["todos", "entrada", "saida", "ajuste"].map(t => (
-                  <Button key={t} size="sm" variant={filterTipo === t ? "default" : "outline"} onClick={() => setFilterTipo(t)} className="capitalize">
-                    {t === "todos" ? "Todos" : t === "saida" ? "Saída" : t}
-                  </Button>
-                ))}
-              </div>
-              <div className="flex items-end gap-2 ml-auto">
-                <div className="space-y-1">
-                  <Label className="text-xs">De</Label>
-                  <Input type="date" value={dataInicio} onChange={e => setDataInicio(e.target.value)} className="h-8 w-36 text-xs" />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Até</Label>
-                  <Input type="date" value={dataFim} onChange={e => setDataFim(e.target.value)} className="h-8 w-36 text-xs" />
-                </div>
-                {(dataInicio || dataFim) && (
-                  <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => { setDataInicio(""); setDataFim(""); }}>
-                    Limpar
-                  </Button>
-                )}
-              </div>
-            </div>
-            <DataTable columns={columns} data={filteredData} loading={loading}
-              onView={(m) => { setSelected(m); setDrawerOpen(true); }} />
-          </TabsContent>
-
-          <TabsContent value="posicao" className="space-y-4">
-            <div className="flex items-end gap-3">
-              <div className="space-y-1">
-                <Label className="text-xs flex items-center gap-1"><Calendar className="w-3 h-3" /> Data de Referência</Label>
-                <Input type="date" value={dataReferencia} onChange={e => setDataReferencia(e.target.value)} className="h-9 w-44" />
-              </div>
-              <Button size="sm" onClick={loadPosicao} disabled={loadingPosicao}>
-                {loadingPosicao ? "Consultando..." : "Consultar Posição"}
+        {/* Filters */}
+        <div className="flex flex-wrap items-end gap-3 mb-4">
+          <div className="flex gap-1">
+            {["todos", "entrada", "saida", "ajuste"].map(t => (
+              <Button key={t} size="sm" variant={filterTipo === t ? "default" : "outline"} onClick={() => setFilterTipo(t)} className="capitalize">
+                {t === "todos" ? "Todos" : t === "saida" ? "Saída" : t}
               </Button>
+            ))}
+          </div>
+          <div className="flex items-end gap-2 ml-auto">
+            <div className="space-y-1">
+              <Label className="text-xs">De</Label>
+              <Input type="date" value={dataInicio} onChange={e => setDataInicio(e.target.value)} className="h-8 w-36 text-xs" />
             </div>
-            {posicaoData.length > 0 ? (
-              <DataTable columns={posicaoColumns} data={posicaoData} loading={loadingPosicao} />
-            ) : (
-              <Card>
-                <CardContent className="py-12 text-center text-muted-foreground">
-                  <Package className="w-10 h-10 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">Selecione uma data e clique em "Consultar Posição" para ver o saldo de estoque na data.</p>
-                </CardContent>
-              </Card>
-            )}
-          </TabsContent>
-
-          <TabsContent value="fechamento" className="space-y-4">
-            <div className="flex items-end gap-3">
-              <div className="space-y-1">
-                <Label className="text-xs flex items-center gap-1"><Lock className="w-3 h-3" /> Mês de Referência</Label>
-                <Input type="month" value={mesFechamento} onChange={e => setMesFechamento(e.target.value)} className="h-9 w-44" />
-              </div>
-              <Button size="sm" onClick={async () => {
-                setLoadingFechamento(true);
-                try {
-                  const [year, month] = mesFechamento.split("-").map(Number);
-                  const lastDay = new Date(year, month, 0).getDate();
-                  const dataCorte = `${mesFechamento}-${String(lastDay).padStart(2, "0")}T23:59:59.999Z`;
-                  const { data: produtos } = await (supabase as any).from("produtos")
-                    .select("id, nome, sku, estoque_atual, estoque_minimo, preco_custo").eq("ativo", true).order("nome");
-                  const allMovs = data.filter(m => m.created_at <= dataCorte).sort((a, b) => a.created_at.localeCompare(b.created_at));
-                  const result = (produtos || []).map((p: any) => {
-                    const prodMovs = allMovs.filter(m => m.produto_id === p.id);
-                    const saldo = prodMovs.length > 0 ? prodMovs[prodMovs.length - 1].saldo_atual : 0;
-                    const valorUnit = Number(p.preco_custo || 0);
-                    return { id: p.id, nome: p.nome, sku: p.sku || "", saldo, valorUnit, valorTotal: saldo * valorUnit, estoque_minimo: p.estoque_minimo || 0 };
-                  }).filter((p: any) => p.saldo !== 0 || Number(p.valorUnit) > 0);
-                  setFechamentoData(result);
-                } catch (err) { console.error(err); }
-                setLoadingFechamento(false);
-              }} disabled={loadingFechamento}>
-                {loadingFechamento ? "Processando..." : "Gerar Fechamento"}
+            <div className="space-y-1">
+              <Label className="text-xs">Até</Label>
+              <Input type="date" value={dataFim} onChange={e => setDataFim(e.target.value)} className="h-8 w-36 text-xs" />
+            </div>
+            {(dataInicio || dataFim) && (
+              <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => { setDataInicio(""); setDataFim(""); }}>
+                Limpar
               </Button>
-            </div>
-            {fechamentoData.length > 0 ? (
-              <>
-                <div className="bg-accent/50 rounded-lg p-4 flex flex-wrap gap-6">
-                  <div>
-                    <span className="text-xs text-muted-foreground">Itens</span>
-                    <p className="font-bold mono">{formatNumber(fechamentoData.length)}</p>
-                  </div>
-                  <div>
-                    <span className="text-xs text-muted-foreground">Qtd Total</span>
-                    <p className="font-bold mono">{formatNumber(fechamentoData.reduce((s, p) => s + p.saldo, 0))}</p>
-                  </div>
-                  <div>
-                    <span className="text-xs text-muted-foreground">Valor Total (custo)</span>
-                    <p className="font-bold mono">{formatCurrency(fechamentoData.reduce((s, p) => s + p.valorTotal, 0))}</p>
-                  </div>
-                </div>
-                <DataTable
-                  columns={[
-                    { key: "sku", label: "SKU", render: (p: any) => <span className="font-mono text-xs text-primary">{p.sku || "—"}</span> },
-                    { key: "nome", label: "Produto" },
-                    { key: "saldo", label: "Saldo", render: (p: any) => <span className="font-mono font-semibold">{formatNumber(p.saldo)}</span> },
-                    { key: "valorUnit", label: "Custo Unit.", render: (p: any) => <span className="font-mono text-sm">{formatCurrency(p.valorUnit)}</span> },
-                    { key: "valorTotal", label: "Valor Total", render: (p: any) => <span className="font-mono font-semibold">{formatCurrency(p.valorTotal)}</span> },
-                    { key: "status", label: "Status", render: (p: any) => (
-                      p.estoque_minimo > 0 && p.saldo <= p.estoque_minimo
-                        ? <span className="text-destructive text-xs font-medium flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> Abaixo mín.</span>
-                        : <span className="text-xs text-muted-foreground">OK</span>
-                    )},
-                  ]}
-                  data={fechamentoData}
-                  loading={loadingFechamento}
-                />
-              </>
-            ) : (
-              <Card>
-                <CardContent className="py-12 text-center text-muted-foreground">
-                  <Lock className="w-10 h-10 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">Selecione o mês e clique em "Gerar Fechamento" para obter a posição de estoque no último dia do mês.</p>
-                </CardContent>
-              </Card>
             )}
-          </TabsContent>
-        </Tabs>
+          </div>
+        </div>
+
+        <DataTable columns={columns} data={filteredData} loading={loading}
+          onView={(m) => { setSelected(m); setDrawerOpen(true); }} />
       </ModulePage>
 
       <FormModal open={modalOpen} onClose={() => setModalOpen(false)} title="Nova Movimentação" size="md">

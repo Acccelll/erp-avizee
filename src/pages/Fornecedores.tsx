@@ -180,21 +180,21 @@ const Fornecedores = () => {
                 <StatusBadge status={selected.ativo ? "Ativo" : "Inativo"} />
               </div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div className="text-center rounded-lg border bg-background p-2">
+                <div className="text-center rounded-lg border bg-background p-2 overflow-hidden">
                   <p className="text-[10px] text-muted-foreground uppercase">Prazo Médio</p>
-                  <p className="font-mono font-semibold text-sm">{deliveryStats.prazoMedio}d</p>
+                  <p className="font-mono font-semibold text-sm truncate">{deliveryStats.prazoMedio}d</p>
                 </div>
-                <div className="text-center rounded-lg border bg-background p-2">
+                <div className="text-center rounded-lg border bg-background p-2 overflow-hidden">
                   <p className="text-[10px] text-muted-foreground uppercase">Atraso Médio</p>
-                  <p className={`font-mono font-semibold text-sm ${deliveryStats.atrasoMedio > 0 ? "text-destructive" : "text-success"}`}>{deliveryStats.atrasoMedio}d</p>
+                  <p className={`font-mono font-semibold text-sm truncate ${deliveryStats.atrasoMedio > 0 ? "text-destructive" : "text-success"}`}>{deliveryStats.atrasoMedio}d</p>
                 </div>
-                <div className="text-center rounded-lg border bg-background p-2">
+                <div className="text-center rounded-lg border bg-background p-2 overflow-hidden">
                   <p className="text-[10px] text-muted-foreground uppercase">Volume</p>
-                  <p className="font-mono font-semibold text-sm">{formatCurrency(volumeComprado)}</p>
+                  <p className="font-mono font-semibold text-sm truncate" title={formatCurrency(volumeComprado)}>{formatCurrency(volumeComprado)}</p>
                 </div>
-                <div className="text-center rounded-lg border bg-background p-2">
+                <div className="text-center rounded-lg border bg-background p-2 overflow-hidden">
                   <p className="text-[10px] text-muted-foreground uppercase">Últ. Compra</p>
-                  <p className="font-mono font-semibold text-sm">{comprasHist.length > 0 ? formatDate(comprasHist[0].data_compra) : "—"}</p>
+                  <p className="font-mono font-semibold text-sm truncate">{comprasHist.length > 0 ? formatDate(comprasHist[0].data_compra) : "—"}</p>
                 </div>
               </div>
             </div>

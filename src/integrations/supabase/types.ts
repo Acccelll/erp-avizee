@@ -960,19 +960,27 @@ export type Database = {
           ativo: boolean
           chave_acesso: string | null
           cliente_id: string | null
+          cofins_valor: number | null
           condicao_pagamento: string | null
           conta_contabil_id: string | null
           created_at: string
           data_emissao: string
           data_recebimento: string | null
+          desconto_valor: number | null
           forma_pagamento: string | null
           fornecedor_id: string | null
+          frete_valor: number | null
           gera_financeiro: boolean | null
+          icms_st_valor: number | null
+          icms_valor: number | null
           id: string
+          ipi_valor: number | null
           movimenta_estoque: boolean | null
           numero: string
           observacoes: string | null
           ordem_venda_id: string | null
+          outras_despesas: number | null
+          pis_valor: number | null
           serie: string | null
           status: Database["public"]["Enums"]["status_nota_fiscal"]
           tipo: Database["public"]["Enums"]["tipo_nota_fiscal"]
@@ -984,19 +992,27 @@ export type Database = {
           ativo?: boolean
           chave_acesso?: string | null
           cliente_id?: string | null
+          cofins_valor?: number | null
           condicao_pagamento?: string | null
           conta_contabil_id?: string | null
           created_at?: string
           data_emissao?: string
           data_recebimento?: string | null
+          desconto_valor?: number | null
           forma_pagamento?: string | null
           fornecedor_id?: string | null
+          frete_valor?: number | null
           gera_financeiro?: boolean | null
+          icms_st_valor?: number | null
+          icms_valor?: number | null
           id?: string
+          ipi_valor?: number | null
           movimenta_estoque?: boolean | null
           numero: string
           observacoes?: string | null
           ordem_venda_id?: string | null
+          outras_despesas?: number | null
+          pis_valor?: number | null
           serie?: string | null
           status?: Database["public"]["Enums"]["status_nota_fiscal"]
           tipo: Database["public"]["Enums"]["tipo_nota_fiscal"]
@@ -1008,19 +1024,27 @@ export type Database = {
           ativo?: boolean
           chave_acesso?: string | null
           cliente_id?: string | null
+          cofins_valor?: number | null
           condicao_pagamento?: string | null
           conta_contabil_id?: string | null
           created_at?: string
           data_emissao?: string
           data_recebimento?: string | null
+          desconto_valor?: number | null
           forma_pagamento?: string | null
           fornecedor_id?: string | null
+          frete_valor?: number | null
           gera_financeiro?: boolean | null
+          icms_st_valor?: number | null
+          icms_valor?: number | null
           id?: string
+          ipi_valor?: number | null
           movimenta_estoque?: boolean | null
           numero?: string
           observacoes?: string | null
           ordem_venda_id?: string | null
+          outras_despesas?: number | null
+          pis_valor?: number | null
           serie?: string | null
           status?: Database["public"]["Enums"]["status_nota_fiscal"]
           tipo?: Database["public"]["Enums"]["tipo_nota_fiscal"]
@@ -1062,35 +1086,57 @@ export type Database = {
       notas_fiscais_itens: {
         Row: {
           cfop: string | null
+          cofins_valor: number | null
+          conta_contabil_id: string | null
           created_at: string
           cst: string | null
+          icms_valor: number | null
           id: string
+          ipi_valor: number | null
           nota_fiscal_id: string
+          pis_valor: number | null
           produto_id: string
           quantidade: number
           valor_unitario: number
         }
         Insert: {
           cfop?: string | null
+          cofins_valor?: number | null
+          conta_contabil_id?: string | null
           created_at?: string
           cst?: string | null
+          icms_valor?: number | null
           id?: string
+          ipi_valor?: number | null
           nota_fiscal_id: string
+          pis_valor?: number | null
           produto_id: string
           quantidade: number
           valor_unitario: number
         }
         Update: {
           cfop?: string | null
+          cofins_valor?: number | null
+          conta_contabil_id?: string | null
           created_at?: string
           cst?: string | null
+          icms_valor?: number | null
           id?: string
+          ipi_valor?: number | null
           nota_fiscal_id?: string
+          pis_valor?: number | null
           produto_id?: string
           quantidade?: number
           valor_unitario?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "notas_fiscais_itens_conta_contabil_id_fkey"
+            columns: ["conta_contabil_id"]
+            isOneToOne: false
+            referencedRelation: "contas_contabeis"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "notas_fiscais_itens_nota_fiscal_id_fkey"
             columns: ["nota_fiscal_id"]

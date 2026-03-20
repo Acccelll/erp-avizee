@@ -153,21 +153,27 @@ const Dashboard = () => {
           <h1 className="page-title">Dashboard</h1>
           <p className="text-muted-foreground text-sm mt-1">Visão geral do sistema ERP AviZee</p>
         </div>
-        <PeriodFilter value={period} onChange={setPeriod} options={financialPeriods} />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        {kpiCards.map((c) => (
-          <SummaryCard
-            key={c.title}
-            title={c.title}
-            value={c.value}
-            variation={c.variation}
-            variationType={c.variationType}
-            icon={c.icon}
-            onClick={() => navigate(c.path)}
-          />
-        ))}
+      {/* Financial KPIs with period filter */}
+      <div className="mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Contas a Receber / Pagar</h2>
+          <PeriodFilter value={period} onChange={setPeriod} options={financialPeriods} />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {kpiCards.map((c) => (
+            <SummaryCard
+              key={c.title}
+              title={c.title}
+              value={c.value}
+              variation={c.variation}
+              variationType={c.variationType}
+              icon={c.icon}
+              onClick={() => navigate(c.path)}
+            />
+          ))}
+        </div>
       </div>
 
       <AlertCards
