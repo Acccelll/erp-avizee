@@ -302,28 +302,41 @@ const Produtos = () => {
         </> : undefined}>
         
         {selected &&
-        <div className="space-y-4">
+        <div className="space-y-5">
             {/* Header */}
-            <div className="bg-muted/30 rounded-lg p-4">
-              
+            <div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="font-semibold text-lg truncate">{selected.nome}</h3>
+                  <StatusBadge status={selected.ativo ? "Ativo" : "Inativo"} />
+                </div>
+                {selected.sku && (
+                  <p className="text-sm text-muted-foreground truncate">{selected.sku}</p>
+                )}
+                {selected.codigo_interno && (
+                  <p className="text-xs text-muted-foreground font-mono mt-0.5">{selected.codigo_interno}</p>
+                )}
+              </div>
+            </div>
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-            
+            {/* KPI Cards */}
+            <div className="grid grid-cols-4 gap-2">
+              <div className="rounded-lg border bg-card p-3 text-center space-y-1">
+                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Preço Venda</p>
+                <p className="font-mono font-bold text-sm text-foreground truncate" title={formatCurrency(selected.preco_venda)}>{formatCurrency(selected.preco_venda)}</p>
+              </div>
+              <div className="rounded-lg border bg-card p-3 text-center space-y-1">
+                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Custo</p>
+                <p className="font-mono font-bold text-sm text-foreground truncate" title={formatCurrency(selected.preco_custo || 0)}>{formatCurrency(selected.preco_custo || 0)}</p>
+              </div>
+              <div className="rounded-lg border bg-card p-3 text-center space-y-1">
+                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Margem</p>
+                <p className={`font-mono font-bold text-sm truncate ${selectedMargem > 0 ? "text-emerald-600 dark:text-emerald-400" : selectedMargem < 0 ? "text-destructive" : "text-foreground"}`}>{(selected.preco_custo || 0) > 0 ? `${selectedMargem.toFixed(1)}%` : "—"}</p>
+              </div>
+              <div className="rounded-lg border bg-card p-3 text-center space-y-1">
+                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Estoque</p>
+                <p className={`font-mono font-bold text-sm truncate ${(selected.estoque_atual || 0) <= (selected.estoque_minimo || 0) ? "text-destructive" : "text-foreground"}`}>{selected.estoque_atual ?? 0} {selected.unidade_medida}</p>
+              </div>
             </div>
 
             <Tabs defaultValue="geral" className="w-full">
