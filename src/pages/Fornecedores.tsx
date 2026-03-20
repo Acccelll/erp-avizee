@@ -176,37 +176,49 @@ const Fornecedores = () => {
         </> : undefined}
       >
         {selected && (
-          <div className="space-y-4">
-            {/* Summary Header */}
-            <div className="bg-muted/30 rounded-lg p-4">
-              <div className="flex items-start justify-between mb-3">
-                <div>
-                  <p className="text-xs text-muted-foreground">{selected.cpf_cnpj || "—"}</p>
-                  <h3 className="font-semibold text-lg">{selected.nome_razao_social}</h3>
-                  {selected.nome_fantasia && <p className="text-sm text-muted-foreground">{selected.nome_fantasia}</p>}
-                </div>
-                <StatusBadge status={selected.ativo ? "Ativo" : "Inativo"} />
+          <div className="space-y-5">
+            {/* Header with identity */}
+            <div className="flex items-start gap-4">
+              <div className="flex-shrink-0 h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
+                <span className="text-primary font-bold text-lg">
+                  {(selected.nome_fantasia || selected.nome_razao_social).charAt(0).toUpperCase()}
+                </span>
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div className="text-center rounded-lg border bg-background p-2 overflow-hidden">
-                  <p className="text-[10px] text-muted-foreground uppercase">Prazo Médio</p>
-                  <p className="font-mono font-semibold text-sm truncate">{deliveryStats.prazoMedio}d</p>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="font-semibold text-lg truncate">{selected.nome_razao_social}</h3>
+                  <StatusBadge status={selected.ativo ? "Ativo" : "Inativo"} />
                 </div>
-                <div className="text-center rounded-lg border bg-background p-2 overflow-hidden">
-                  <p className="text-[10px] text-muted-foreground uppercase">Atraso Médio</p>
-                  <p className={`font-mono font-semibold text-sm truncate ${deliveryStats.atrasoMedio > 0 ? "text-destructive" : "text-success"}`}>{deliveryStats.atrasoMedio}d</p>
-                </div>
-                <div className="text-center rounded-lg border bg-background p-2 overflow-hidden">
-                  <p className="text-[10px] text-muted-foreground uppercase">Volume</p>
-                  <p className="font-mono font-semibold text-sm truncate" title={formatCurrency(volumeComprado)}>{formatCurrency(volumeComprado)}</p>
-                </div>
-                <div className="text-center rounded-lg border bg-background p-2 overflow-hidden">
-                  <p className="text-[10px] text-muted-foreground uppercase">Últ. Compra</p>
-                  <p className="font-mono font-semibold text-sm truncate">{comprasHist.length > 0 ? formatDate(comprasHist[0].data_compra) : "—"}</p>
-                </div>
+                {selected.nome_fantasia && (
+                  <p className="text-sm text-muted-foreground truncate">{selected.nome_fantasia}</p>
+                )}
+                {selected.cpf_cnpj && (
+                  <p className="text-xs text-muted-foreground font-mono mt-0.5">{selected.cpf_cnpj}</p>
+                )}
               </div>
             </div>
 
+            {/* KPI Cards */}
+            <div className="grid grid-cols-4 gap-2">
+              <div className="rounded-lg border bg-card p-3 text-center space-y-1">
+                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Prazo Médio</p>
+                <p className="font-mono font-bold text-base text-foreground">{deliveryStats.prazoMedio}<span className="text-xs font-normal text-muted-foreground ml-0.5">d</span></p>
+              </div>
+              <div className="rounded-lg border bg-card p-3 text-center space-y-1">
+                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Atraso</p>
+                <p className={`font-mono font-bold text-base ${deliveryStats.atrasoMedio > 0 ? "text-destructive" : "text-emerald-600 dark:text-emerald-400"}`}>{deliveryStats.atrasoMedio}<span className="text-xs font-normal text-muted-foreground ml-0.5">d</span></p>
+              </div>
+              <div className="rounded-lg border bg-card p-3 text-center space-y-1">
+                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Volume</p>
+                <p className="font-mono font-bold text-sm text-foreground truncate" title={formatCurrency(volumeComprado)}>{formatCurrency(volumeComprado)}</p>
+              </div>
+              <div className="rounded-lg border bg-card p-3 text-center space-y-1">
+                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Últ. Compra</p>
+                <p className="font-mono font-bold text-sm text-foreground truncate">{comprasHist.length > 0 ? formatDate(comprasHist[0].data_compra) : "—"}</p>
+              </div>
+            </div>
+
+            {/* Tabs */}
             <Tabs defaultValue="cadastro" className="w-full">
               <TabsList className="w-full grid grid-cols-4">
                 <TabsTrigger value="cadastro" className="text-xs">Cadastro</TabsTrigger>
@@ -215,37 +227,49 @@ const Fornecedores = () => {
                 <TabsTrigger value="produtos" className="text-xs">Produtos</TabsTrigger>
               </TabsList>
 
-              <TabsContent value="cadastro" className="space-y-3 mt-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <div><span className="text-xs text-muted-foreground">CNPJ</span><p className="font-mono text-sm">{selected.cpf_cnpj || "—"}</p></div>
-                  <div><span className="text-xs text-muted-foreground">I.E.</span><p>{selected.inscricao_estadual || "—"}</p></div>
-                  <div><span className="text-xs text-muted-foreground">Telefone</span><p>{selected.telefone || "—"}</p></div>
-                  <div><span className="text-xs text-muted-foreground">E-mail</span><p>{selected.email || "—"}</p></div>
-                  <div><span className="text-xs text-muted-foreground">Contato</span><p>{selected.contato || "—"}</p></div>
-                  <div><span className="text-xs text-muted-foreground">Celular</span><p>{selected.celular || "—"}</p></div>
+              <TabsContent value="cadastro" className="mt-3 space-y-4">
+                <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                  {[
+                    { label: "CNPJ/CPF", value: selected.cpf_cnpj, mono: true },
+                    { label: "I.E.", value: selected.inscricao_estadual },
+                    { label: "Telefone", value: selected.telefone },
+                    { label: "E-mail", value: selected.email },
+                    { label: "Contato", value: selected.contato },
+                    { label: "Celular", value: selected.celular },
+                  ].map((field, i) => (
+                    <div key={i}>
+                      <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-0.5">{field.label}</p>
+                      <p className={`text-sm ${field.mono ? "font-mono" : ""}`}>{field.value || "—"}</p>
+                    </div>
+                  ))}
                 </div>
                 {selected.logradouro && (
                   <div className="border-t pt-3">
-                    <span className="text-xs text-muted-foreground">Endereço</span>
+                    <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-0.5">Endereço</p>
                     <p className="text-sm">{selected.logradouro}, {selected.numero}{selected.complemento ? ` - ${selected.complemento}` : ""} — {selected.bairro} - {selected.cidade}/{selected.uf} - CEP {selected.cep}</p>
                   </div>
                 )}
-                {selected.observacoes && <div><span className="text-xs text-muted-foreground">Observações</span><p className="text-sm">{selected.observacoes}</p></div>}
+                {selected.observacoes && (
+                  <div className="border-t pt-3">
+                    <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-0.5">Observações</p>
+                    <p className="text-sm text-muted-foreground">{selected.observacoes}</p>
+                  </div>
+                )}
               </TabsContent>
 
-              <TabsContent value="financeiro" className="space-y-3 mt-3">
+              <TabsContent value="financeiro" className="mt-3">
                 {titulosForn.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-4">Nenhum título registrado</p>
+                  <p className="text-sm text-muted-foreground text-center py-6">Nenhum título registrado</p>
                 ) : (
                   <div className="space-y-1 max-h-[350px] overflow-y-auto">
                     {titulosForn.map((t: any, idx: number) => (
-                      <div key={idx} className="flex justify-between text-sm py-1.5 border-b last:border-b-0">
-                        <div>
-                          <p className="text-xs">{t.descricao}</p>
+                      <div key={idx} className="flex items-center justify-between py-2 px-2 rounded-md hover:bg-muted/30 transition-colors border-b last:border-b-0">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium truncate">{t.descricao}</p>
                           <p className="text-[10px] text-muted-foreground">Venc: {formatDate(t.data_vencimento)}</p>
                         </div>
-                        <div className="text-right">
-                          <p className="font-mono text-xs">{formatCurrency(t.valor)}</p>
+                        <div className="text-right flex-shrink-0 ml-3 space-y-0.5">
+                          <p className="font-mono text-sm font-semibold">{formatCurrency(t.valor)}</p>
                           <StatusBadge status={t.status === "pago" ? "Pago" : t.status === "vencido" ? "Vencido" : "Aberto"} />
                         </div>
                       </div>
@@ -254,19 +278,19 @@ const Fornecedores = () => {
                 )}
               </TabsContent>
 
-              <TabsContent value="compras" className="space-y-3 mt-3">
+              <TabsContent value="compras" className="mt-3">
                 {comprasHist.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-4">Nenhuma compra registrada</p>
+                  <p className="text-sm text-muted-foreground text-center py-6">Nenhuma compra registrada</p>
                 ) : (
-                  <div className="space-y-2 max-h-[350px] overflow-y-auto">
+                  <div className="space-y-1 max-h-[350px] overflow-y-auto">
                     {comprasHist.map((c: any, idx: number) => (
-                      <div key={idx} className="flex items-center justify-between py-2 border-b last:border-b-0 text-sm">
-                        <div>
-                          <span className="font-mono text-xs text-primary font-medium">{c.numero}</span>
+                      <div key={idx} className="flex items-center justify-between py-2 px-2 rounded-md hover:bg-muted/30 transition-colors border-b last:border-b-0">
+                        <div className="min-w-0">
+                          <span className="font-mono text-xs text-primary font-semibold">{c.numero}</span>
                           <span className="text-xs text-muted-foreground ml-2">{formatDate(c.data_compra)}</span>
                         </div>
-                        <div className="text-right">
-                          <span className="font-mono font-semibold">{formatCurrency(Number(c.valor_total || 0))}</span>
+                        <div className="text-right flex-shrink-0 ml-3 flex items-center gap-2">
+                          <span className="font-mono font-semibold text-sm">{formatCurrency(Number(c.valor_total || 0))}</span>
                           <StatusBadge status={c.status} />
                         </div>
                       </div>
@@ -275,21 +299,23 @@ const Fornecedores = () => {
                 )}
               </TabsContent>
 
-              <TabsContent value="produtos" className="space-y-3 mt-3">
+              <TabsContent value="produtos" className="mt-3">
                 {produtosForn.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-4">Nenhum produto vinculado</p>
+                  <p className="text-sm text-muted-foreground text-center py-6">Nenhum produto vinculado</p>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="space-y-1 max-h-[350px] overflow-y-auto">
                     {produtosForn.map((pf: any, idx: number) => (
-                      <div key={idx} className="flex justify-between text-sm py-1.5 border-b last:border-b-0">
-                        <div>
-                          <p className="font-medium">{pf.produtos?.nome}</p>
-                          {pf.produtos?.sku && <p className="text-xs text-muted-foreground font-mono">{pf.produtos.sku}</p>}
-                          {pf.referencia_fornecedor && <p className="text-xs text-muted-foreground">Ref: {pf.referencia_fornecedor}</p>}
+                      <div key={idx} className="flex items-center justify-between py-2 px-2 rounded-md hover:bg-muted/30 transition-colors border-b last:border-b-0">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium truncate">{pf.produtos?.nome}</p>
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            {pf.produtos?.sku && <span className="font-mono">{pf.produtos.sku}</span>}
+                            {pf.referencia_fornecedor && <span>Ref: {pf.referencia_fornecedor}</span>}
+                          </div>
                         </div>
-                        <div className="text-right text-xs">
-                          {pf.preco_compra && <p className="font-mono">{formatCurrency(pf.preco_compra)}</p>}
-                          {pf.lead_time_dias && <p className="text-muted-foreground">{pf.lead_time_dias} dias</p>}
+                        <div className="text-right flex-shrink-0 ml-3 space-y-0.5">
+                          {pf.preco_compra && <p className="font-mono text-sm font-semibold">{formatCurrency(pf.preco_compra)}</p>}
+                          {pf.lead_time_dias && <p className="text-xs text-muted-foreground">{pf.lead_time_dias} dias</p>}
                         </div>
                       </div>
                     ))}
