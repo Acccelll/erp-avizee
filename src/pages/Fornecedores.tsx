@@ -20,18 +20,18 @@ import { Truck, Clock, AlertTriangle, ShoppingCart, DollarSign } from "lucide-re
 import { formatCurrency, formatDate } from "@/lib/format";
 
 interface Fornecedor {
-  id: string; tipo_pessoa: string; nome_razao_social: string; nome_fantasia: string;
-  cpf_cnpj: string; inscricao_estadual: string; email: string; telefone: string; celular: string;
-  contato: string; prazo_padrao: number; logradouro: string; numero: string; complemento: string;
-  bairro: string; cidade: string; uf: string; cep: string; pais: string;
-  observacoes: string; ativo: boolean; created_at: string;
+  id: string;tipo_pessoa: string;nome_razao_social: string;nome_fantasia: string;
+  cpf_cnpj: string;inscricao_estadual: string;email: string;telefone: string;celular: string;
+  contato: string;prazo_padrao: number;logradouro: string;numero: string;complemento: string;
+  bairro: string;cidade: string;uf: string;cep: string;pais: string;
+  observacoes: string;ativo: boolean;created_at: string;
 }
 
 const emptyForm: Record<string, any> = {
   tipo_pessoa: "J", nome_razao_social: "", nome_fantasia: "", cpf_cnpj: "",
   inscricao_estadual: "", email: "", telefone: "", celular: "", contato: "",
   prazo_padrao: 30, logradouro: "", numero: "", complemento: "",
-  bairro: "", cidade: "", uf: "", cep: "", pais: "Brasil", observacoes: "",
+  bairro: "", cidade: "", uf: "", cep: "", pais: "Brasil", observacoes: ""
 };
 
 const Fornecedores = () => {
@@ -48,34 +48,34 @@ const Fornecedores = () => {
   const [produtosForn, setProdutosForn] = useState<any[]>([]);
   const [titulosForn, setTitulosForn] = useState<any[]>([]);
 
-  const openCreate = () => { setMode("create"); setForm({...emptyForm}); setSelected(null); setModalOpen(true); };
+  const openCreate = () => {setMode("create");setForm({ ...emptyForm });setSelected(null);setModalOpen(true);};
   const openEdit = (f: Fornecedor) => {
-    setMode("edit"); setSelected(f);
+    setMode("edit");setSelected(f);
     setForm({
       tipo_pessoa: f.tipo_pessoa || "J", nome_razao_social: f.nome_razao_social, nome_fantasia: f.nome_fantasia || "",
       cpf_cnpj: f.cpf_cnpj || "", inscricao_estadual: f.inscricao_estadual || "",
       email: f.email || "", telefone: f.telefone || "", celular: f.celular || "", contato: f.contato || "",
       prazo_padrao: f.prazo_padrao || 30, logradouro: f.logradouro || "", numero: f.numero || "",
       complemento: f.complemento || "", bairro: f.bairro || "", cidade: f.cidade || "",
-      uf: f.uf || "", cep: f.cep || "", pais: f.pais || "Brasil", observacoes: f.observacoes || "",
+      uf: f.uf || "", cep: f.cep || "", pais: f.pais || "Brasil", observacoes: f.observacoes || ""
     });
     setModalOpen(true);
   };
 
   const openView = async (f: Fornecedor) => {
-    setSelected(f); setDrawerOpen(true);
+    setSelected(f);setDrawerOpen(true);
     const [comprasRes, prodsRes, titRes] = await Promise.all([
-      (supabase as any).from("compras")
-        .select("numero, data_compra, valor_total, status, data_entrega_prevista, data_entrega_real")
-        .eq("fornecedor_id", f.id).eq("ativo", true).order("data_compra", { ascending: false }).limit(20),
-      (supabase as any).from("produtos_fornecedores")
-        .select("preco_compra, lead_time_dias, referencia_fornecedor, produtos:produto_id(nome, sku)")
-        .eq("fornecedor_id", f.id),
-      (supabase as any).from("financeiro_lancamentos")
-        .select("descricao, data_vencimento, data_pagamento, valor, status")
-        .eq("fornecedor_id", f.id).eq("tipo", "pagar").eq("ativo", true)
-        .order("data_vencimento", { ascending: false }).limit(20),
-    ]);
+    (supabase as any).from("compras").
+    select("numero, data_compra, valor_total, status, data_entrega_prevista, data_entrega_real").
+    eq("fornecedor_id", f.id).eq("ativo", true).order("data_compra", { ascending: false }).limit(20),
+    (supabase as any).from("produtos_fornecedores").
+    select("preco_compra, lead_time_dias, referencia_fornecedor, produtos:produto_id(nome, sku)").
+    eq("fornecedor_id", f.id),
+    (supabase as any).from("financeiro_lancamentos").
+    select("descricao, data_vencimento, data_pagamento, valor, status").
+    eq("fornecedor_id", f.id).eq("tipo", "pagar").eq("ativo", true).
+    order("data_vencimento", { ascending: false }).limit(20)]
+    );
     setComprasHist(comprasRes.data || []);
     setProdutosForn(prodsRes.data || []);
     setTitulosForn(titRes.data || []);
@@ -83,11 +83,11 @@ const Fornecedores = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.nome_razao_social) { toast.error("Razão Social é obrigatória"); return; }
+    if (!form.nome_razao_social) {toast.error("Razão Social é obrigatória");return;}
     setSaving(true);
     try {
-      if (mode === "create") await create(form);
-      else if (selected) await update(selected.id, form);
+      if (mode === "create") await create(form);else
+      if (selected) await update(selected.id, form);
       setModalOpen(false);
     } catch {}
     setSaving(false);
@@ -97,7 +97,7 @@ const Fornecedores = () => {
   const deliveryStats = (() => {
     const delivered = comprasHist.filter((c: any) => c.data_entrega_real && c.data_entrega_prevista);
     if (delivered.length === 0) return { prazoMedio: 0, atrasoMedio: 0 };
-    let totalDias = 0, totalAtraso = 0;
+    let totalDias = 0,totalAtraso = 0;
     delivered.forEach((c: any) => {
       const prev = new Date(c.data_entrega_prevista).getTime();
       const real = new Date(c.data_entrega_real).getTime();
@@ -120,22 +120,22 @@ const Fornecedores = () => {
   }, [data, searchTerm, tipoFilter]);
 
   const columns = [
-    { key: "nome_razao_social", label: "Razão Social" },
-    { key: "cpf_cnpj", label: "CNPJ", render: (f: Fornecedor) => <span className="font-mono text-xs">{f.cpf_cnpj || "—"}</span> },
-    { key: "email", label: "E-mail" },
-    { key: "telefone", label: "Telefone" },
-    { key: "cidade", label: "Cidade", render: (f: Fornecedor) => f.cidade ? `${f.cidade}/${f.uf}` : "—" },
-    { key: "ativo", label: "Status", render: (f: Fornecedor) => <StatusBadge status={f.ativo ? "Ativo" : "Inativo"} /> },
-  ];
+  { key: "nome_razao_social", label: "Razão Social" },
+  { key: "cpf_cnpj", label: "CNPJ", render: (f: Fornecedor) => <span className="font-mono text-xs">{f.cpf_cnpj || "—"}</span> },
+  { key: "email", label: "E-mail" },
+  { key: "telefone", label: "Telefone" },
+  { key: "cidade", label: "Cidade", render: (f: Fornecedor) => f.cidade ? `${f.cidade}/${f.uf}` : "—" },
+  { key: "ativo", label: "Status", render: (f: Fornecedor) => <StatusBadge status={f.ativo ? "Ativo" : "Inativo"} /> }];
+
 
   return (
     <AppLayout>
       <ModulePage title="Fornecedores" subtitle="Cadastro e gestão de fornecedores" addLabel="Novo Fornecedor" onAdd={openCreate} count={filteredData.length}
-        searchValue={searchTerm} onSearchChange={setSearchTerm} searchPlaceholder="Buscar por razão social, CNPJ ou cidade..."
-        filters={<Select value={tipoFilter} onValueChange={(v: any) => setTipoFilter(v)}><SelectTrigger className="h-9 w-[170px]"><SelectValue placeholder="Tipo" /></SelectTrigger><SelectContent><SelectItem value="todos">Todos os tipos</SelectItem><SelectItem value="J">Pessoa jurídica</SelectItem><SelectItem value="F">Pessoa física</SelectItem></SelectContent></Select>}
-      >
+      searchValue={searchTerm} onSearchChange={setSearchTerm} searchPlaceholder="Buscar por razão social, CNPJ ou cidade..."
+      filters={<Select value={tipoFilter} onValueChange={(v: any) => setTipoFilter(v)}><SelectTrigger className="h-9 w-[170px]"><SelectValue placeholder="Tipo" /></SelectTrigger><SelectContent><SelectItem value="todos">Todos os tipos</SelectItem><SelectItem value="J">Pessoa jurídica</SelectItem><SelectItem value="F">Pessoa física</SelectItem></SelectContent></Select>}>
+        
         <DataTable columns={columns} data={filteredData} loading={loading}
-          onView={openView} />
+        onView={openView} />
       </ModulePage>
 
       <FormModal open={modalOpen} onClose={() => setModalOpen(false)} title={mode === "create" ? "Novo Fornecedor" : "Editar Fornecedor"} size="lg">
@@ -169,47 +169,52 @@ const Fornecedores = () => {
       </FormModal>
 
       <ViewDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} title="Detalhes do Fornecedor"
-        actions={selected ? <>
-          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setDrawerOpen(false); openEdit(selected); }}><Edit className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Editar</TooltipContent></Tooltip>
-          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setDrawerOpen(false); duplicate(selected); }}><Copy className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Duplicar</TooltipContent></Tooltip>
-          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => { setDrawerOpen(false); remove(selected.id); }}><Trash2 className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Excluir</TooltipContent></Tooltip>
-        </> : undefined}
-      >
-        {selected && (
-          <div className="space-y-5">
+      actions={selected ? <>
+          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {setDrawerOpen(false);openEdit(selected);}}><Edit className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Editar</TooltipContent></Tooltip>
+          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {setDrawerOpen(false);duplicate(selected);}}><Copy className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Duplicar</TooltipContent></Tooltip>
+          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => {setDrawerOpen(false);remove(selected.id);}}><Trash2 className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Excluir</TooltipContent></Tooltip>
+        </> : undefined}>
+        
+        {selected &&
+        <div className="space-y-5">
             {/* Header with identity */}
-            <div>
-              <div className="min-w-0">
+            <div className="flex items-start gap-4">
+              <div className="flex-shrink-0 h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
+                <span className="text-primary font-bold text-lg">
+                  {(selected.nome_fantasia || selected.nome_razao_social).charAt(0).toUpperCase()}
+                </span>
+              </div>
+              <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <h3 className="font-semibold text-lg truncate">{selected.nome_razao_social}</h3>
                   <StatusBadge status={selected.ativo ? "Ativo" : "Inativo"} />
                 </div>
-                {selected.nome_fantasia && (
-                  <p className="text-sm text-muted-foreground truncate">{selected.nome_fantasia}</p>
-                )}
-                {selected.cpf_cnpj && (
-                  <p className="text-xs text-muted-foreground font-mono mt-0.5">{selected.cpf_cnpj}</p>
-                )}
+                {selected.nome_fantasia &&
+              <p className="text-sm text-muted-foreground truncate">{selected.nome_fantasia}</p>
+              }
+                {selected.cpf_cnpj &&
+              <p className="text-xs text-muted-foreground font-mono mt-0.5">{selected.cpf_cnpj}</p>
+              }
               </div>
             </div>
 
             {/* KPI Cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div className="rounded-lg border bg-card p-4 text-center space-y-1">
+            <div className="grid grid-cols-4 gap-2">
+              <div className="rounded-lg border bg-card p-3 text-center space-y-1">
                 <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Prazo Médio</p>
                 <p className="font-mono font-bold text-base text-foreground">{deliveryStats.prazoMedio}<span className="text-xs font-normal text-muted-foreground ml-0.5">d</span></p>
               </div>
-              <div className="rounded-lg border bg-card p-4 text-center space-y-1">
-                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Atraso</p>
+              <div className="rounded-lg border bg-card p-3 text-center space-y-1">
+                <p className="font-medium text-muted-foreground uppercase tracking-wider text-xs">Atraso</p>
                 <p className={`font-mono font-bold text-base ${deliveryStats.atrasoMedio > 0 ? "text-destructive" : "text-emerald-600 dark:text-emerald-400"}`}>{deliveryStats.atrasoMedio}<span className="text-xs font-normal text-muted-foreground ml-0.5">d</span></p>
               </div>
-              <div className="rounded-lg border bg-card p-4 text-center space-y-1">
+              <div className="rounded-lg border bg-card p-3 text-center space-y-1">
                 <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Volume</p>
-                <p className="font-mono font-bold text-sm text-foreground">{formatCurrency(volumeComprado)}</p>
+                <p className="font-mono font-bold text-sm text-foreground truncate" title={formatCurrency(volumeComprado)}>{formatCurrency(volumeComprado)}</p>
               </div>
-              <div className="rounded-lg border bg-card p-4 text-center space-y-1">
+              <div className="rounded-lg border bg-card p-3 text-center space-y-1">
                 <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Últ. Compra</p>
-                <p className="font-mono font-bold text-sm text-foreground">{comprasHist.length > 0 ? formatDate(comprasHist[0].data_compra) : "—"}</p>
+                <p className="font-mono font-bold text-sm text-foreground truncate">{comprasHist.length > 0 ? formatDate(comprasHist[0].data_compra) : "—"}</p>
               </div>
             </div>
 
@@ -225,40 +230,40 @@ const Fornecedores = () => {
               <TabsContent value="cadastro" className="mt-3 space-y-4">
                 <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                   {[
-                    { label: "CNPJ/CPF", value: selected.cpf_cnpj, mono: true },
-                    { label: "I.E.", value: selected.inscricao_estadual },
-                    { label: "Telefone", value: selected.telefone },
-                    { label: "E-mail", value: selected.email },
-                    { label: "Contato", value: selected.contato },
-                    { label: "Celular", value: selected.celular },
-                  ].map((field, i) => (
-                    <div key={i}>
+                { label: "CNPJ/CPF", value: selected.cpf_cnpj, mono: true },
+                { label: "I.E.", value: selected.inscricao_estadual },
+                { label: "Telefone", value: selected.telefone },
+                { label: "E-mail", value: selected.email },
+                { label: "Contato", value: selected.contato },
+                { label: "Celular", value: selected.celular }].
+                map((field, i) =>
+                <div key={i}>
                       <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-0.5">{field.label}</p>
                       <p className={`text-sm ${field.mono ? "font-mono" : ""}`}>{field.value || "—"}</p>
                     </div>
-                  ))}
+                )}
                 </div>
-                {selected.logradouro && (
-                  <div className="border-t pt-3">
+                {selected.logradouro &&
+              <div className="border-t pt-3">
                     <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-0.5">Endereço</p>
                     <p className="text-sm">{selected.logradouro}, {selected.numero}{selected.complemento ? ` - ${selected.complemento}` : ""} — {selected.bairro} - {selected.cidade}/{selected.uf} - CEP {selected.cep}</p>
                   </div>
-                )}
-                {selected.observacoes && (
-                  <div className="border-t pt-3">
+              }
+                {selected.observacoes &&
+              <div className="border-t pt-3">
                     <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-0.5">Observações</p>
                     <p className="text-sm text-muted-foreground">{selected.observacoes}</p>
                   </div>
-                )}
+              }
               </TabsContent>
 
               <TabsContent value="financeiro" className="mt-3">
-                {titulosForn.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-6">Nenhum título registrado</p>
-                ) : (
-                  <div className="space-y-1 max-h-[350px] overflow-y-auto">
-                    {titulosForn.map((t: any, idx: number) => (
-                      <div key={idx} className="flex items-center justify-between py-2 px-2 rounded-md hover:bg-muted/30 transition-colors border-b last:border-b-0">
+                {titulosForn.length === 0 ?
+              <p className="text-sm text-muted-foreground text-center py-6">Nenhum título registrado</p> :
+
+              <div className="space-y-1 max-h-[350px] overflow-y-auto">
+                    {titulosForn.map((t: any, idx: number) =>
+                <div key={idx} className="flex items-center justify-between py-2 px-2 rounded-md hover:bg-muted/30 transition-colors border-b last:border-b-0">
                         <div className="min-w-0 flex-1">
                           <p className="text-sm font-medium truncate">{t.descricao}</p>
                           <p className="text-[10px] text-muted-foreground">Venc: {formatDate(t.data_vencimento)}</p>
@@ -268,18 +273,18 @@ const Fornecedores = () => {
                           <StatusBadge status={t.status === "pago" ? "Pago" : t.status === "vencido" ? "Vencido" : "Aberto"} />
                         </div>
                       </div>
-                    ))}
-                  </div>
                 )}
+                  </div>
+              }
               </TabsContent>
 
               <TabsContent value="compras" className="mt-3">
-                {comprasHist.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-6">Nenhuma compra registrada</p>
-                ) : (
-                  <div className="space-y-1 max-h-[350px] overflow-y-auto">
-                    {comprasHist.map((c: any, idx: number) => (
-                      <div key={idx} className="flex items-center justify-between py-2 px-2 rounded-md hover:bg-muted/30 transition-colors border-b last:border-b-0">
+                {comprasHist.length === 0 ?
+              <p className="text-sm text-muted-foreground text-center py-6">Nenhuma compra registrada</p> :
+
+              <div className="space-y-1 max-h-[350px] overflow-y-auto">
+                    {comprasHist.map((c: any, idx: number) =>
+                <div key={idx} className="flex items-center justify-between py-2 px-2 rounded-md hover:bg-muted/30 transition-colors border-b last:border-b-0">
                         <div className="min-w-0">
                           <span className="font-mono text-xs text-primary font-semibold">{c.numero}</span>
                           <span className="text-xs text-muted-foreground ml-2">{formatDate(c.data_compra)}</span>
@@ -289,18 +294,18 @@ const Fornecedores = () => {
                           <StatusBadge status={c.status} />
                         </div>
                       </div>
-                    ))}
-                  </div>
                 )}
+                  </div>
+              }
               </TabsContent>
 
               <TabsContent value="produtos" className="mt-3">
-                {produtosForn.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-6">Nenhum produto vinculado</p>
-                ) : (
-                  <div className="space-y-1 max-h-[350px] overflow-y-auto">
-                    {produtosForn.map((pf: any, idx: number) => (
-                      <div key={idx} className="flex items-center justify-between py-2 px-2 rounded-md hover:bg-muted/30 transition-colors border-b last:border-b-0">
+                {produtosForn.length === 0 ?
+              <p className="text-sm text-muted-foreground text-center py-6">Nenhum produto vinculado</p> :
+
+              <div className="space-y-1 max-h-[350px] overflow-y-auto">
+                    {produtosForn.map((pf: any, idx: number) =>
+                <div key={idx} className="flex items-center justify-between py-2 px-2 rounded-md hover:bg-muted/30 transition-colors border-b last:border-b-0">
                         <div className="min-w-0 flex-1">
                           <p className="text-sm font-medium truncate">{pf.produtos?.nome}</p>
                           <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -313,16 +318,16 @@ const Fornecedores = () => {
                           {pf.lead_time_dias && <p className="text-xs text-muted-foreground">{pf.lead_time_dias} dias</p>}
                         </div>
                       </div>
-                    ))}
-                  </div>
                 )}
+                  </div>
+              }
               </TabsContent>
             </Tabs>
           </div>
-        )}
+        }
       </ViewDrawer>
-    </AppLayout>
-  );
+    </AppLayout>);
+
 };
 
 export default Fornecedores;
