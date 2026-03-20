@@ -344,9 +344,16 @@ export default function Relatorios() {
           </div>
 
           {/* Totals */}
-          <div className="flex items-center justify-between border-t pt-3 text-sm">
+          <div className="flex flex-wrap items-center justify-between gap-4 border-t pt-3 text-sm">
             <span className="font-semibold text-foreground">Total de registros: {resultado.rows.length}</span>
-            {kpis.totalValue > 0 && <span className="font-semibold text-foreground">Valor consolidado: {formatCurrency(kpis.totalValue)}</span>}
+            {resultado.totals && (
+              <div className="flex flex-wrap gap-4">
+                {resultado.totals.totalQtd != null && <span className="font-semibold">Qtd Total: {formatNumber(resultado.totals.totalQtd)}</span>}
+                {resultado.totals.totalCusto != null && <span className="font-semibold">Total Custo: {formatCurrency(resultado.totals.totalCusto)}</span>}
+                {resultado.totals.totalVenda != null && <span className="font-semibold">Total Venda: {formatCurrency(resultado.totals.totalVenda)}</span>}
+              </div>
+            )}
+            {!resultado.totals && kpis.totalValue > 0 && <span className="font-semibold text-foreground">Valor consolidado: {formatCurrency(kpis.totalValue)}</span>}
           </div>
         </div>
       </PreviewModal>
