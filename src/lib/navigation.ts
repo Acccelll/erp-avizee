@@ -123,7 +123,6 @@ export const navSections: NavSection[] = [
         title: 'Controle de estoque',
         items: [
           { title: 'Posição Atual', path: '/estoque', keywords: ['saldo', 'inventario'] },
-          { title: 'Movimentações', path: '/estoque?view=movimentacoes', keywords: ['entradas', 'saidas'] },
         ],
       },
     ],
