@@ -140,7 +140,7 @@ const Dashboard = () => {
           <h1 className="page-title">Dashboard</h1>
           <p className="text-muted-foreground text-sm mt-1">Visão geral do sistema ERP AviZee</p>
         </div>
-        <PeriodFilter value={period} onChange={setPeriod} />
+        <PeriodFilter value={period} onChange={setPeriod} options={financialPeriods} />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
