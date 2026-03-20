@@ -265,7 +265,7 @@ export default function Relatorios() {
                               ))}
                             </Pie>
                             <Legend verticalAlign="bottom" height={36} />
-                            <Tooltip formatter={(v: number) => formatCurrency(v)} />
+                            <Tooltip formatter={(v: number) => isQtyReport ? formatNumber(v) : formatCurrency(v)} />
                           </PieChart>
                         ) : (
                           <BarChart data={resultado.chartData}>
