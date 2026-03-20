@@ -271,7 +271,7 @@ export default function Relatorios() {
                           <BarChart data={resultado.chartData}>
                             <XAxis dataKey="name" tick={{ fontSize: 11 }} />
                             <YAxis hide />
-                            <Tooltip formatter={(v: number) => formatCurrency(v)} />
+                            <Tooltip formatter={(v: number) => isQtyReport ? formatNumber(v) : formatCurrency(v)} />
                             <Bar dataKey="value" radius={[6, 6, 0, 0]} fill="hsl(var(--primary))" />
                           </BarChart>
                         )}
