@@ -183,7 +183,7 @@ const Clientes = () => {
         filters={<><Select value={tipoFilter} onValueChange={(v: any) => setTipoFilter(v)}><SelectTrigger className="h-9 w-[170px]"><SelectValue placeholder="Tipo" /></SelectTrigger><SelectContent><SelectItem value="todos">Todos os tipos</SelectItem><SelectItem value="J">Pessoa jurídica</SelectItem><SelectItem value="F">Pessoa física</SelectItem></SelectContent></Select><Select value={grupoFilter} onValueChange={(v: any) => setGrupoFilter(v)}><SelectTrigger className="h-9 w-[190px]"><SelectValue placeholder="Grupo econômico" /></SelectTrigger><SelectContent><SelectItem value="todos">Todos os grupos</SelectItem><SelectItem value="com_grupo">Com grupo econômico</SelectItem><SelectItem value="sem_grupo">Sem grupo econômico</SelectItem></SelectContent></Select></>}
       >
         <DataTable columns={columns} data={filteredData} loading={loading}
-          onView={openView} onEdit={openEdit} onDelete={(c) => remove(c.id)} onDuplicate={(c) => duplicate(c)} />
+          onView={openView} />
       </ModulePage>
 
       {/* Form Modal */}
