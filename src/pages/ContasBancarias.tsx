@@ -121,8 +121,7 @@ const ContasBancarias = () => {
         </div>
 
         <DataTable columns={columns} data={contas} loading={loading}
-          onView={(c) => { setSelected(c); setDrawerOpen(true); }}
-          onEdit={openEdit} onDelete={handleDelete} />
+          onView={(c) => { setSelected(c); setDrawerOpen(true); }} />
       </ModulePage>
 
       <FormModal open={modalOpen} onClose={() => setModalOpen(false)} title={mode === "create" ? "Nova Conta Bancária" : "Editar Conta"} size="md">
