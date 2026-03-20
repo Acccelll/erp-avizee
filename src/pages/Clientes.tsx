@@ -271,24 +271,24 @@ const Clientes = () => {
             </div>
 
             {/* KPI Cards */}
-            <div className="grid grid-cols-4 gap-2">
-              <div className="rounded-lg border bg-card p-3 text-center space-y-1">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="rounded-lg border bg-card p-4 text-center space-y-1">
                 <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Limite</p>
-                <p className="font-mono font-bold text-sm text-foreground truncate" title={formatCurrency(selected.limite_credito || 0)}>{formatCurrency(selected.limite_credito || 0)}</p>
+                <p className="font-mono font-bold text-sm text-foreground">{formatCurrency(selected.limite_credito || 0)}</p>
               </div>
-              <div className="rounded-lg border bg-card p-3 text-center space-y-1">
+              <div className="rounded-lg border bg-card p-4 text-center space-y-1">
                 <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Saldo Aberto</p>
-                <p className={`font-mono font-bold text-sm truncate ${saldoAberto > 0 ? "text-warning" : "text-foreground"}`} title={formatCurrency(saldoAberto)}>{formatCurrency(saldoAberto)}</p>
+                <p className={`font-mono font-bold text-sm ${saldoAberto > 0 ? "text-warning" : "text-foreground"}`}>{formatCurrency(saldoAberto)}</p>
               </div>
-              <div className="rounded-lg border bg-card p-3 text-center space-y-1">
+              <div className="rounded-lg border bg-card p-4 text-center space-y-1">
                 <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">PMV</p>
                 <p className={`font-mono font-bold text-base ${pmv !== null && pmv > 0 ? "text-warning" : pmv !== null && pmv < 0 ? "text-emerald-600 dark:text-emerald-400" : "text-foreground"}`}>
                   {pmv !== null ? `${pmv > 0 ? "+" : ""}${pmv}` : "—"}<span className="text-xs font-normal text-muted-foreground ml-0.5">{pmv !== null ? "d" : ""}</span>
                 </p>
               </div>
-              <div className="rounded-lg border bg-card p-3 text-center space-y-1">
+              <div className="rounded-lg border bg-card p-4 text-center space-y-1">
                 <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Últ. Compra</p>
-                <p className="font-mono font-bold text-sm text-foreground truncate">{ultimaCompra ? formatDate(ultimaCompra) : "—"}</p>
+                <p className="font-mono font-bold text-sm text-foreground">{ultimaCompra ? formatDate(ultimaCompra) : "—"}</p>
               </div>
             </div>
 

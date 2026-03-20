@@ -140,16 +140,16 @@ const GruposEconomicos = () => {
             </div>
 
             {/* KPI Cards */}
-            <div className="grid grid-cols-3 gap-2">
-              <div className="rounded-lg border bg-card p-3 text-center space-y-1">
+            <div className="grid grid-cols-3 gap-3">
+              <div className="rounded-lg border bg-card p-4 text-center space-y-1">
                 <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Empresas</p>
                 <p className="font-bold text-2xl text-foreground">{empresas.length}</p>
               </div>
-              <div className="rounded-lg border bg-card p-3 text-center space-y-1">
+              <div className="rounded-lg border bg-card p-4 text-center space-y-1">
                 <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Saldo Aberto</p>
                 <p className={`font-mono font-bold text-sm ${saldoConsolidado > 0 ? "text-warning" : "text-foreground"}`}>{formatCurrency(saldoConsolidado)}</p>
               </div>
-              <div className="rounded-lg border bg-card p-3 text-center space-y-1">
+              <div className="rounded-lg border bg-card p-4 text-center space-y-1">
                 <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Vencidos</p>
                 <p className={`font-bold text-2xl ${titulosVencidos > 0 ? "text-destructive" : "text-emerald-600 dark:text-emerald-400"}`}>{titulosVencidos}</p>
               </div>

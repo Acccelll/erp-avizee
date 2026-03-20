@@ -320,22 +320,22 @@ const Produtos = () => {
             </div>
 
             {/* KPI Cards */}
-            <div className="grid grid-cols-4 gap-2">
-              <div className="rounded-lg border bg-card p-3 text-center space-y-1">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="rounded-lg border bg-card p-4 text-center space-y-1">
                 <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Preço Venda</p>
-                <p className="font-mono font-bold text-sm text-foreground truncate" title={formatCurrency(selected.preco_venda)}>{formatCurrency(selected.preco_venda)}</p>
+                <p className="font-mono font-bold text-sm text-foreground">{formatCurrency(selected.preco_venda)}</p>
               </div>
-              <div className="rounded-lg border bg-card p-3 text-center space-y-1">
+              <div className="rounded-lg border bg-card p-4 text-center space-y-1">
                 <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Custo</p>
-                <p className="font-mono font-bold text-sm text-foreground truncate" title={formatCurrency(selected.preco_custo || 0)}>{formatCurrency(selected.preco_custo || 0)}</p>
+                <p className="font-mono font-bold text-sm text-foreground">{formatCurrency(selected.preco_custo || 0)}</p>
               </div>
-              <div className="rounded-lg border bg-card p-3 text-center space-y-1">
+              <div className="rounded-lg border bg-card p-4 text-center space-y-1">
                 <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Margem</p>
-                <p className={`font-mono font-bold text-sm truncate ${selectedMargem > 0 ? "text-emerald-600 dark:text-emerald-400" : selectedMargem < 0 ? "text-destructive" : "text-foreground"}`}>{(selected.preco_custo || 0) > 0 ? `${selectedMargem.toFixed(1)}%` : "—"}</p>
+                <p className={`font-mono font-bold text-sm ${selectedMargem > 0 ? "text-emerald-600 dark:text-emerald-400" : selectedMargem < 0 ? "text-destructive" : "text-foreground"}`}>{(selected.preco_custo || 0) > 0 ? `${selectedMargem.toFixed(1)}%` : "—"}</p>
               </div>
-              <div className="rounded-lg border bg-card p-3 text-center space-y-1">
+              <div className="rounded-lg border bg-card p-4 text-center space-y-1">
                 <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Estoque</p>
-                <p className={`font-mono font-bold text-sm truncate ${(selected.estoque_atual || 0) <= (selected.estoque_minimo || 0) ? "text-destructive" : "text-foreground"}`}>{selected.estoque_atual ?? 0} {selected.unidade_medida}</p>
+                <p className={`font-mono font-bold text-sm ${(selected.estoque_atual || 0) <= (selected.estoque_minimo || 0) ? "text-destructive" : "text-foreground"}`}>{selected.estoque_atual ?? 0} {selected.unidade_medida}</p>
               </div>
             </div>
 

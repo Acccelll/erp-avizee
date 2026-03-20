@@ -152,16 +152,16 @@ export default function FormasPagamento() {
             </div>
 
             {/* KPI Cards */}
-            <div className="grid grid-cols-3 gap-2">
-              <div className="rounded-lg border bg-card p-3 text-center space-y-1">
+            <div className="grid grid-cols-3 gap-3">
+              <div className="rounded-lg border bg-card p-4 text-center space-y-1">
                 <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Prazo</p>
                 <p className="font-mono font-bold text-base text-foreground">{selected.prazo_dias === 0 ? "À vista" : `${selected.prazo_dias}d`}</p>
               </div>
-              <div className="rounded-lg border bg-card p-3 text-center space-y-1">
+              <div className="rounded-lg border bg-card p-4 text-center space-y-1">
                 <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Parcelas</p>
                 <p className="font-mono font-bold text-base text-foreground">{selected.parcelas}x</p>
               </div>
-              <div className="rounded-lg border bg-card p-3 text-center space-y-1">
+              <div className="rounded-lg border bg-card p-4 text-center space-y-1">
                 <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Gera Financeiro</p>
                 <p className={`font-bold text-base ${selected.gera_financeiro ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}`}>{selected.gera_financeiro ? "Sim" : "Não"}</p>
               </div>

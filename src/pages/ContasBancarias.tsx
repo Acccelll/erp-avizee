@@ -169,7 +169,7 @@ const ContasBancarias = () => {
             </div>
 
             {/* KPI Card - Saldo */}
-            <div className="rounded-lg border bg-card p-4 text-center space-y-1">
+            <div className="rounded-lg border bg-card p-5 text-center space-y-1">
               <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Saldo Atual</p>
               <p className={`font-mono font-bold text-2xl ${Number(selected.saldo_atual || 0) >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"}`}>
                 {formatCurrency(Number(selected.saldo_atual || 0))}
