@@ -204,7 +204,7 @@ const Produtos = () => {
         filters={<><Select value={tipoFilter} onValueChange={(v: any) => setTipoFilter(v)}><SelectTrigger className="h-9 w-[170px]"><SelectValue placeholder="Tipo" /></SelectTrigger><SelectContent><SelectItem value="todos">Todos os tipos</SelectItem><SelectItem value="simples">Somente simples</SelectItem><SelectItem value="composto">Somente compostos</SelectItem></SelectContent></Select><Select value={estoqueFilter} onValueChange={(v: any) => setEstoqueFilter(v)}><SelectTrigger className="h-9 w-[190px]"><SelectValue placeholder="Estoque" /></SelectTrigger><SelectContent><SelectItem value="todos">Todo o estoque</SelectItem><SelectItem value="baixo">Abaixo do mínimo</SelectItem><SelectItem value="ok">Estoque normal</SelectItem></SelectContent></Select></>}
       >
         <DataTable columns={columns} data={filteredData} loading={loading}
-          onView={openView} onEdit={openEdit} onDelete={(p) => remove(p.id)} onDuplicate={(p) => duplicate(p)} />
+          onView={openView} />
       </ModulePage>
 
       {/* Form Modal - same as before */}
