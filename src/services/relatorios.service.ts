@@ -14,6 +14,7 @@ export interface RelatorioResultado<T = Record<string, unknown>> {
   subtitle: string;
   rows: T[];
   chartData?: Array<{ name: string; value: number }>;
+  totals?: Record<string, number>;
 }
 
 function withDateRange(query: any, column: string, filtros: FiltroRelatorio) {
