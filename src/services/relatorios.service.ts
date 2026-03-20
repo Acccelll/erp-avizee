@@ -286,9 +286,12 @@ function formatCsvValue(value: unknown) {
   return `"${String(value).split('"').join('""')}"`;
 }
 
-export function formatCellValue(value: unknown, key: string) {
+export function formatCellValue(value: unknown, key: string, isQuantityReport = false) {
   if (typeof value === "number") {
-    if (["valor", "custo", "venda", "saldo", "entrada", "saida"].some((field) => key.toLowerCase().includes(field))) {
+    if (isQuantityReport) {
+      return formatNumber(value);
+    }
+    if (["valor", "custo", "venda", "entrada", "saida"].some((field) => key.toLowerCase().includes(field))) {
       return formatCurrency(value);
     }
 
