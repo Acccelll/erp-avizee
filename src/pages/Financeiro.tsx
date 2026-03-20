@@ -257,27 +257,7 @@ const Financeiro = () => {
           <SummaryCard title="Pagos" value={kpis.pagoNoPeriodo.toString()} subtitle={formatCurrency(kpis.totalPago)} icon={CheckCircle} variant="success" onClick={() => setFilterStatus("pago")} />
         </div>
 
-        {/* Aging bar */}
-        {kpis.totalVencido > 0 && (
-          <div className="mb-4 rounded-lg border bg-card p-4">
-            <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-destructive" /> Aging — Vencidos por faixa
-            </h4>
-            <div className="flex gap-4 flex-wrap">
-              {[
-                { label: "1-30 dias", value: kpis.age1_30, color: "bg-warning/20 text-warning" },
-                { label: "31-60 dias", value: kpis.age31_60, color: "bg-orange-500/20 text-orange-600" },
-                { label: "61-90 dias", value: kpis.age61_90, color: "bg-destructive/20 text-destructive" },
-                { label: "90+ dias", value: kpis.age90plus, color: "bg-destructive/30 text-destructive font-bold" },
-              ].map(bucket => (
-                <div key={bucket.label} className={`rounded-lg px-4 py-2 ${bucket.color}`}>
-                  <p className="text-xs font-medium">{bucket.label}</p>
-                  <p className="text-sm font-bold mono">{formatCurrency(bucket.value)}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        {/* Aging block removed per user request */}
 
         {/* Filter bars */}
         <div className="flex flex-wrap gap-2 mb-4">

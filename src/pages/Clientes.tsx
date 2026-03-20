@@ -265,15 +265,15 @@ const Clientes = () => {
                   <p className="text-[10px] text-muted-foreground uppercase">Saldo Aberto</p>
                   <p className={`font-mono font-semibold text-sm truncate ${saldoAberto > 0 ? "text-warning" : ""}`} title={formatCurrency(saldoAberto)}>{formatCurrency(saldoAberto)}</p>
                 </div>
-                <div className="text-center rounded-lg border bg-background p-2">
+                <div className="text-center rounded-lg border bg-background p-2 overflow-hidden">
                   <p className="text-[10px] text-muted-foreground uppercase">PMV</p>
-                  <p className={`font-mono font-semibold text-sm ${pmv !== null && pmv > 0 ? "text-warning" : pmv !== null && pmv < 0 ? "text-success" : ""}`}>
+                  <p className={`font-mono font-semibold text-sm truncate ${pmv !== null && pmv > 0 ? "text-warning" : pmv !== null && pmv < 0 ? "text-success" : ""}`}>
                     {pmv !== null ? `${pmv > 0 ? "+" : ""}${pmv}d` : "—"}
                   </p>
                 </div>
-                <div className="text-center rounded-lg border bg-background p-2">
+                <div className="text-center rounded-lg border bg-background p-2 overflow-hidden">
                   <p className="text-[10px] text-muted-foreground uppercase">Últ. Compra</p>
-                  <p className="font-mono font-semibold text-sm">{ultimaCompra ? formatDate(ultimaCompra) : "—"}</p>
+                  <p className="font-mono font-semibold text-sm truncate">{ultimaCompra ? formatDate(ultimaCompra) : "—"}</p>
                 </div>
               </div>
               {titulosVencidos > 0 && (
