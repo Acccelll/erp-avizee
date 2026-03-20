@@ -285,7 +285,7 @@ export default function Relatorios() {
                             <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }} />
                             <span className="text-sm font-medium">{item.name}</span>
                           </div>
-                          <span className="text-sm font-mono font-semibold">{formatCurrency(item.value)}</span>
+                          <span className="text-sm font-mono font-semibold">{isQtyReport ? formatNumber(item.value) : formatCurrency(item.value)}</span>
                         </div>
                       ))}
                     </div>
