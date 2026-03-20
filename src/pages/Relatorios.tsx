@@ -336,7 +336,7 @@ export default function Relatorios() {
                   <tr key={ri} className={ri % 2 === 0 ? 'bg-muted/20' : ''}>
                     {columns.map((col) => (
                       <td key={col.key} className="px-3 py-1.5 border-b border-border/40 text-xs">
-                        {formatCellValue(row[col.key], col.key) as React.ReactNode}
+                        {formatCellValue(row[col.key], col.key, isQtyReport) as React.ReactNode}
                       </td>
                     ))}
                   </tr>
