@@ -15,6 +15,7 @@ export interface RelatorioResultado<T = Record<string, unknown>> {
   rows: T[];
   chartData?: Array<{ name: string; value: number }>;
   totals?: Record<string, number>;
+  _isQuantityReport?: boolean;
 }
 
 function withDateRange(query: any, column: string, filtros: FiltroRelatorio) {
@@ -105,6 +106,7 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
       const entradas = rows.filter((r) => r.tipo === "entrada").reduce((s, r) => s + r.quantidade, 0);
       const saidas = rows.filter((r) => r.tipo === "saida").reduce((s, r) => s + r.quantidade, 0);
       const ajustes = rows.filter((r) => r.tipo === "ajuste").reduce((s, r) => s + r.quantidade, 0);
+      const saldoFinal = rows.length > 0 ? rows[0].saldoAtual : 0;
 
       return {
         title: "Movimentos de estoque",
@@ -115,6 +117,13 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
           { name: "Saídas", value: Math.abs(saidas) },
           { name: "Ajustes", value: Math.abs(ajustes) },
         ],
+        totals: {
+          totalEntradas: entradas,
+          totalSaidas: Math.abs(saidas),
+          totalAjustes: Math.abs(ajustes),
+          saldoAtual: saldoFinal,
+        },
+        _isQuantityReport: true,
       };
     }
 
@@ -277,9 +286,12 @@ function formatCsvValue(value: unknown) {
   return `"${String(value).split('"').join('""')}"`;
 }
 
-export function formatCellValue(value: unknown, key: string) {
+export function formatCellValue(value: unknown, key: string, isQuantityReport = false) {
   if (typeof value === "number") {
-    if (["valor", "custo", "venda", "saldo", "entrada", "saida"].some((field) => key.toLowerCase().includes(field))) {
+    if (isQuantityReport) {
+      return formatNumber(value);
+    }
+    if (["valor", "custo", "venda", "entrada", "saida"].some((field) => key.toLowerCase().includes(field))) {
       return formatCurrency(value);
     }
 

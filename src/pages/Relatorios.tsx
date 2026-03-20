@@ -131,6 +131,8 @@ export default function Relatorios() {
 
   useEffect(() => { loadData(); }, [tipo]);
 
+  const isQtyReport = resultado._isQuantityReport === true;
+
   const kpis = useMemo(() => {
     const rows = resultado.rows as any[];
     const total = rows.length;
@@ -149,9 +151,9 @@ export default function Relatorios() {
     return Object.keys(resultado.rows[0]).map((key) => ({
       key,
       label: key.replace(/([A-Z])/g, ' $1').replace(/^./, (char) => char.toUpperCase()),
-      render: (item: Record<string, unknown>): React.ReactNode => formatCellValue(item[key], key) as React.ReactNode,
+      render: (item: Record<string, unknown>): React.ReactNode => formatCellValue(item[key], key, isQtyReport) as React.ReactNode,
     }));
-  }, [resultado.rows]);
+  }, [resultado.rows, isQtyReport]);
 
   const handleSelectTipo = (nextTipo: TipoRelatorio) => {
     setTipo(nextTipo);
@@ -206,7 +208,7 @@ export default function Relatorios() {
           {/* KPI Summary */}
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
             <SummaryCard title="Registros" value={formatNumber(kpis.total)} icon={Hash} variationType="neutral" variation="no relatório" />
-            <SummaryCard title="Valor Consolidado" value={formatCurrency(kpis.totalValue)} icon={DollarSign} variationType="neutral" variation="soma do gráfico" />
+            <SummaryCard title={isQtyReport ? "Total Movimentado" : "Valor Consolidado"} value={isQtyReport ? formatNumber(kpis.totalValue) : formatCurrency(kpis.totalValue)} icon={isQtyReport ? Package : DollarSign} variationType="neutral" variation={isQtyReport ? "soma das quantidades" : "soma do gráfico"} />
             {kpis.alertCount > 0 && (
               <SummaryCard title="Alertas" value={String(kpis.alertCount)} icon={AlertTriangle} variationType="negative" variation={tipo === 'estoque' ? 'abaixo do mínimo' : 'vencidos'} />
             )}
@@ -263,13 +265,13 @@ export default function Relatorios() {
                               ))}
                             </Pie>
                             <Legend verticalAlign="bottom" height={36} />
-                            <Tooltip formatter={(v: number) => formatCurrency(v)} />
+                            <Tooltip formatter={(v: number) => isQtyReport ? formatNumber(v) : formatCurrency(v)} />
                           </PieChart>
                         ) : (
                           <BarChart data={resultado.chartData}>
                             <XAxis dataKey="name" tick={{ fontSize: 11 }} />
                             <YAxis hide />
-                            <Tooltip formatter={(v: number) => formatCurrency(v)} />
+                            <Tooltip formatter={(v: number) => isQtyReport ? formatNumber(v) : formatCurrency(v)} />
                             <Bar dataKey="value" radius={[6, 6, 0, 0]} fill="hsl(var(--primary))" />
                           </BarChart>
                         )}
@@ -283,7 +285,7 @@ export default function Relatorios() {
                             <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }} />
                             <span className="text-sm font-medium">{item.name}</span>
                           </div>
-                          <span className="text-sm font-mono font-semibold">{formatCurrency(item.value)}</span>
+                          <span className="text-sm font-mono font-semibold">{isQtyReport ? formatNumber(item.value) : formatCurrency(item.value)}</span>
                         </div>
                       ))}
                     </div>
@@ -334,7 +336,7 @@ export default function Relatorios() {
                   <tr key={ri} className={ri % 2 === 0 ? 'bg-muted/20' : ''}>
                     {columns.map((col) => (
                       <td key={col.key} className="px-3 py-1.5 border-b border-border/40 text-xs">
-                        {formatCellValue(row[col.key], col.key) as React.ReactNode}
+                        {formatCellValue(row[col.key], col.key, isQtyReport) as React.ReactNode}
                       </td>
                     ))}
                   </tr>
@@ -351,6 +353,10 @@ export default function Relatorios() {
                 {resultado.totals.totalQtd != null && <span className="font-semibold">Qtd Total: {formatNumber(resultado.totals.totalQtd)}</span>}
                 {resultado.totals.totalCusto != null && <span className="font-semibold">Total Custo: {formatCurrency(resultado.totals.totalCusto)}</span>}
                 {resultado.totals.totalVenda != null && <span className="font-semibold">Total Venda: {formatCurrency(resultado.totals.totalVenda)}</span>}
+                {resultado.totals.totalEntradas != null && <span className="font-semibold">Entradas: {formatNumber(resultado.totals.totalEntradas)}</span>}
+                {resultado.totals.totalSaidas != null && <span className="font-semibold">Saídas: {formatNumber(resultado.totals.totalSaidas)}</span>}
+                {resultado.totals.totalAjustes != null && <span className="font-semibold">Ajustes: {formatNumber(resultado.totals.totalAjustes)}</span>}
+                {resultado.totals.saldoAtual != null && <span className="font-semibold">Saldo Atual: {formatNumber(resultado.totals.saldoAtual)}</span>}
               </div>
             )}
             {!resultado.totals && kpis.totalValue > 0 && <span className="font-semibold text-foreground">Valor consolidado: {formatCurrency(kpis.totalValue)}</span>}
