@@ -182,7 +182,7 @@ export default function Relatorios() {
       <ModulePage title="Relatórios" subtitle="Análises gerenciais, exportações e visão consolidada por módulo.">
         <div className="space-y-6">
           {/* Report type selector */}
-          <div className="grid gap-3 grid-cols-2 md:grid-cols-3 xl:grid-cols-5">
+          <div className="grid gap-3 grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
             {reportCards.map((card) => (
               <button
                 key={card.type}
