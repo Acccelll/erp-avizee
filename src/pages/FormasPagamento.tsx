@@ -93,7 +93,7 @@ export default function FormasPagamento() {
       <ModulePage title="Formas de Pagamento" subtitle="Condições de pagamento disponíveis" addLabel="Nova Forma" onAdd={openCreate} count={filteredData.length}
         searchValue={searchTerm} onSearchChange={setSearchTerm} searchPlaceholder="Buscar por descrição...">
         <DataTable columns={columns} data={filteredData} loading={loading}
-          onView={openView} onEdit={openEdit} onDelete={(f) => remove(f.id)} />
+          onView={openView} />
       </ModulePage>
 
       <FormModal open={modalOpen} onClose={() => setModalOpen(false)} title={mode === "create" ? "Nova Forma de Pagamento" : "Editar Forma de Pagamento"}>
