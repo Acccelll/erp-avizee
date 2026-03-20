@@ -2,7 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { downloadTextFile } from "@/lib/utils";
 import { formatCurrency, formatDate, formatNumber } from "@/lib/format";
 
-export type TipoRelatorio = "estoque" | "financeiro" | "fluxo_caixa" | "vendas" | "compras";
+export type TipoRelatorio = "estoque" | "movimentos_estoque" | "financeiro" | "fluxo_caixa" | "vendas" | "compras";
 
 export interface FiltroRelatorio {
   dataInicio?: string;
