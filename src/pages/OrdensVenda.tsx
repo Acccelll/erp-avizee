@@ -139,7 +139,7 @@ const OrdensVenda = () => {
           <SummaryCard title="Em Andamento" value={formatNumber(kpis.inProgress)} icon={Truck} variationType="positive" variation="aprovadas + separação" />
         </div>
 
-        <DataTable columns={columns} data={filteredData} loading={loading} onView={handleView} onDelete={(o) => remove(o.id)} />
+        <DataTable columns={columns} data={filteredData} loading={loading} onView={handleView} />
       </ModulePage>
 
       <ViewDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} title="Detalhes da Ordem de Venda">
