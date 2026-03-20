@@ -208,7 +208,7 @@ export default function Relatorios() {
           {/* KPI Summary */}
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
             <SummaryCard title="Registros" value={formatNumber(kpis.total)} icon={Hash} variationType="neutral" variation="no relatório" />
-            <SummaryCard title="Valor Consolidado" value={formatCurrency(kpis.totalValue)} icon={DollarSign} variationType="neutral" variation="soma do gráfico" />
+            <SummaryCard title={isQtyReport ? "Total Movimentado" : "Valor Consolidado"} value={isQtyReport ? formatNumber(kpis.totalValue) : formatCurrency(kpis.totalValue)} icon={isQtyReport ? Package : DollarSign} variationType="neutral" variation={isQtyReport ? "soma das quantidades" : "soma do gráfico"} />
             {kpis.alertCount > 0 && (
               <SummaryCard title="Alertas" value={String(kpis.alertCount)} icon={AlertTriangle} variationType="negative" variation={tipo === 'estoque' ? 'abaixo do mínimo' : 'vencidos'} />
             )}
