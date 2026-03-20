@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { AppLayout } from "@/components/AppLayout";
 import { SummaryCard } from "@/components/SummaryCard";
-import { PeriodFilter, Period } from "@/components/dashboard/PeriodFilter";
+import { PeriodFilter, financialPeriods, Period } from "@/components/dashboard/PeriodFilter";
 import { AlertCards } from "@/components/dashboard/AlertCards";
 import { BacklogDetail } from "@/components/dashboard/BacklogDetail";
 import { EstoqueBaixoDetail } from "@/components/dashboard/EstoqueBaixoDetail";
@@ -35,6 +35,19 @@ const Dashboard = () => {
     const load = async () => {
       setLoading(true);
       const dateFrom = periodToDateFrom(period);
+      const isVencidos = period === 'vencidos';
+      const today = new Date().toISOString().slice(0, 10);
+
+      // Build financial queries based on period
+      const buildFinQuery = (tipo: string) => {
+        let q = (supabase as any).from("financeiro_lancamentos").select("valor").eq("tipo", tipo).eq("ativo", true);
+        if (isVencidos) {
+          q = q.eq("status", "vencido").lt("data_vencimento", today);
+        } else {
+          q = q.eq("status", "aberto").gte("data_vencimento", dateFrom);
+        }
+        return q;
+      };
 
       const [
         { count: produtos },
@@ -56,8 +69,8 @@ const Dashboard = () => {
         (supabase as any).from("fornecedores").select("*", { count: "exact", head: true }).eq("ativo", true),
         (supabase as any).from("orcamentos").select("*", { count: "exact", head: true }).eq("ativo", true).gte("data_orcamento", dateFrom),
         (supabase as any).from("compras").select("*", { count: "exact", head: true }).eq("ativo", true).gte("data_compra", dateFrom),
-        (supabase as any).from("financeiro_lancamentos").select("valor").eq("tipo", "receber").eq("status", "aberto").eq("ativo", true).gte("data_vencimento", dateFrom),
-        (supabase as any).from("financeiro_lancamentos").select("valor").eq("tipo", "pagar").eq("status", "aberto").eq("ativo", true).gte("data_vencimento", dateFrom),
+        buildFinQuery("receber"),
+        buildFinQuery("pagar"),
         (supabase as any).from("financeiro_lancamentos").select("valor").eq("status", "vencido").eq("ativo", true),
         (supabase as any).from("orcamentos").select("id, numero, valor_total, status, data_orcamento, clientes(nome_razao_social)").eq("ativo", true).gte("data_orcamento", dateFrom).order("created_at", { ascending: false }).limit(5),
         (supabase as any).from("compras").select("numero, valor_total, status, data_compra, fornecedores(nome_razao_social)").eq("ativo", true).gte("data_compra", dateFrom).order("created_at", { ascending: false }).limit(5),
@@ -140,7 +153,7 @@ const Dashboard = () => {
           <h1 className="page-title">Dashboard</h1>
           <p className="text-muted-foreground text-sm mt-1">Visão geral do sistema ERP AviZee</p>
         </div>
-        <PeriodFilter value={period} onChange={setPeriod} />
+        <PeriodFilter value={period} onChange={setPeriod} options={financialPeriods} />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
