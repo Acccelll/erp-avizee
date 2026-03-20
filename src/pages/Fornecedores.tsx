@@ -133,7 +133,7 @@ const Fornecedores = () => {
         filters={<Select value={tipoFilter} onValueChange={(v: any) => setTipoFilter(v)}><SelectTrigger className="h-9 w-[170px]"><SelectValue placeholder="Tipo" /></SelectTrigger><SelectContent><SelectItem value="todos">Todos os tipos</SelectItem><SelectItem value="J">Pessoa jurídica</SelectItem><SelectItem value="F">Pessoa física</SelectItem></SelectContent></Select>}
       >
         <DataTable columns={columns} data={filteredData} loading={loading}
-          onView={openView} onEdit={openEdit} onDelete={(f) => remove(f.id)} onDuplicate={(f) => duplicate(f)} />
+          onView={openView} />
       </ModulePage>
 
       <FormModal open={modalOpen} onClose={() => setModalOpen(false)} title={mode === "create" ? "Novo Fornecedor" : "Editar Fornecedor"} size="lg">
