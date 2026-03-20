@@ -131,6 +131,8 @@ export default function Relatorios() {
 
   useEffect(() => { loadData(); }, [tipo]);
 
+  const isQtyReport = resultado._isQuantityReport === true;
+
   const kpis = useMemo(() => {
     const rows = resultado.rows as any[];
     const total = rows.length;
