@@ -176,7 +176,7 @@ const Compras = () => {
           </Card>
         )}
 
-        <DataTable columns={columns} data={filteredData} loading={loading} onView={openView} onEdit={openEdit} onDelete={(c) => remove(c.id)} />
+        <DataTable columns={columns} data={filteredData} loading={loading} onView={openView} />
       </ModulePage>
 
       <FormModal open={modalOpen} onClose={() => setModalOpen(false)} title={mode === "create" ? addLabel : "Editar Compra"} size="xl">
