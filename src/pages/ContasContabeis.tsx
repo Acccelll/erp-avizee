@@ -135,8 +135,7 @@ const ContasContabeis = () => {
           </div>
         }>
         <DataTable columns={columns} data={treeData} loading={loading}
-          onView={(c) => { setSelected(c); setDrawerOpen(true); }}
-          onEdit={openEdit} onDelete={(c) => remove(c.id)} />
+          onView={(c) => { setSelected(c); setDrawerOpen(true); }} />
       </ModulePage>
 
       <FormModal open={modalOpen} onClose={() => setModalOpen(false)} title={mode === "create" ? "Nova Conta Contábil" : "Editar Conta Contábil"} size="md">
