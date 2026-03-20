@@ -115,7 +115,7 @@ export default function Transportadoras() {
       <ModulePage title="Transportadoras" subtitle="Cadastro de transportadoras e logística" addLabel="Nova Transportadora" onAdd={openCreate} count={filteredData.length}
         searchValue={searchTerm} onSearchChange={setSearchTerm} searchPlaceholder="Buscar por nome ou CNPJ...">
         <DataTable columns={columns} data={filteredData} loading={loading}
-          onView={openView} onEdit={openEdit} onDelete={(t) => remove(t.id)} />
+          onView={openView} />
       </ModulePage>
 
       <FormModal open={modalOpen} onClose={() => setModalOpen(false)} title={mode === "create" ? "Nova Transportadora" : "Editar Transportadora"} size="lg">
