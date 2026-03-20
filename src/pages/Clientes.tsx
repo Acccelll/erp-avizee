@@ -253,44 +253,57 @@ const Clientes = () => {
         </> : undefined}
       >
         {selected && (
-          <div className="space-y-4">
-            {/* Summary Header */}
-            <div className="bg-muted/30 rounded-lg p-4">
-              <div className="flex items-start justify-between mb-3">
-                <div>
-                  <p className="text-xs text-muted-foreground">{selected.tipo_pessoa === "F" ? "Pessoa Física" : "Pessoa Jurídica"} • {selected.cpf_cnpj || "—"}</p>
-                  <h3 className="font-semibold text-lg">{selected.nome_razao_social}</h3>
-                  {selected.nome_fantasia && <p className="text-sm text-muted-foreground">{selected.nome_fantasia}</p>}
-                </div>
-                <StatusBadge status={selected.ativo ? "Ativo" : "Inativo"} />
+          <div className="space-y-5">
+            {/* Header with identity */}
+            <div className="flex items-start gap-4">
+              <div className="flex-shrink-0 h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
+                <span className="text-primary font-bold text-lg">
+                  {(selected.nome_fantasia || selected.nome_razao_social).charAt(0).toUpperCase()}
+                </span>
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div className="text-center rounded-lg border bg-background p-2 overflow-hidden">
-                  <p className="text-[10px] text-muted-foreground uppercase">Limite</p>
-                  <p className="font-mono font-semibold text-sm truncate" title={formatCurrency(selected.limite_credito || 0)}>{formatCurrency(selected.limite_credito || 0)}</p>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="font-semibold text-lg truncate">{selected.nome_razao_social}</h3>
+                  <StatusBadge status={selected.ativo ? "Ativo" : "Inativo"} />
                 </div>
-                <div className="text-center rounded-lg border bg-background p-2 overflow-hidden">
-                  <p className="text-[10px] text-muted-foreground uppercase">Saldo Aberto</p>
-                  <p className={`font-mono font-semibold text-sm truncate ${saldoAberto > 0 ? "text-warning" : ""}`} title={formatCurrency(saldoAberto)}>{formatCurrency(saldoAberto)}</p>
-                </div>
-                <div className="text-center rounded-lg border bg-background p-2 overflow-hidden">
-                  <p className="text-[10px] text-muted-foreground uppercase">PMV</p>
-                  <p className={`font-mono font-semibold text-sm truncate ${pmv !== null && pmv > 0 ? "text-warning" : pmv !== null && pmv < 0 ? "text-success" : ""}`}>
-                    {pmv !== null ? `${pmv > 0 ? "+" : ""}${pmv}d` : "—"}
-                  </p>
-                </div>
-                <div className="text-center rounded-lg border bg-background p-2 overflow-hidden">
-                  <p className="text-[10px] text-muted-foreground uppercase">Últ. Compra</p>
-                  <p className="font-mono font-semibold text-sm truncate">{ultimaCompra ? formatDate(ultimaCompra) : "—"}</p>
-                </div>
+                {selected.nome_fantasia && (
+                  <p className="text-sm text-muted-foreground truncate">{selected.nome_fantasia}</p>
+                )}
+                <p className="text-xs text-muted-foreground font-mono mt-0.5">
+                  {selected.tipo_pessoa === "F" ? "PF" : "PJ"} • {selected.cpf_cnpj || "—"}
+                </p>
               </div>
-              {titulosVencidos > 0 && (
-                <div className="flex items-center gap-2 text-xs text-destructive bg-destructive/10 rounded-lg p-2 mt-2">
-                  <AlertTriangle className="w-3 h-3" /> {titulosVencidos} título(s) vencido(s)
-                </div>
-              )}
             </div>
 
+            {/* KPI Cards */}
+            <div className="grid grid-cols-4 gap-2">
+              <div className="rounded-lg border bg-card p-3 text-center space-y-1">
+                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Limite</p>
+                <p className="font-mono font-bold text-sm text-foreground truncate" title={formatCurrency(selected.limite_credito || 0)}>{formatCurrency(selected.limite_credito || 0)}</p>
+              </div>
+              <div className="rounded-lg border bg-card p-3 text-center space-y-1">
+                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Saldo Aberto</p>
+                <p className={`font-mono font-bold text-sm truncate ${saldoAberto > 0 ? "text-warning" : "text-foreground"}`} title={formatCurrency(saldoAberto)}>{formatCurrency(saldoAberto)}</p>
+              </div>
+              <div className="rounded-lg border bg-card p-3 text-center space-y-1">
+                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">PMV</p>
+                <p className={`font-mono font-bold text-base ${pmv !== null && pmv > 0 ? "text-warning" : pmv !== null && pmv < 0 ? "text-emerald-600 dark:text-emerald-400" : "text-foreground"}`}>
+                  {pmv !== null ? `${pmv > 0 ? "+" : ""}${pmv}` : "—"}<span className="text-xs font-normal text-muted-foreground ml-0.5">{pmv !== null ? "d" : ""}</span>
+                </p>
+              </div>
+              <div className="rounded-lg border bg-card p-3 text-center space-y-1">
+                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Últ. Compra</p>
+                <p className="font-mono font-bold text-sm text-foreground truncate">{ultimaCompra ? formatDate(ultimaCompra) : "—"}</p>
+              </div>
+            </div>
+
+            {titulosVencidos > 0 && (
+              <div className="flex items-center gap-2 text-xs text-destructive bg-destructive/10 rounded-lg p-2">
+                <AlertTriangle className="w-3 h-3" /> {titulosVencidos} título(s) vencido(s)
+              </div>
+            )}
+
+            {/* Tabs */}
             <Tabs defaultValue="cadastro" className="w-full">
               <TabsList className="w-full grid grid-cols-5">
                 <TabsTrigger value="cadastro" className="text-xs">Cadastro</TabsTrigger>
@@ -300,28 +313,40 @@ const Clientes = () => {
                 <TabsTrigger value="historico" className="text-xs">Histórico</TabsTrigger>
               </TabsList>
 
-              <TabsContent value="cadastro" className="space-y-3 mt-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <div><span className="text-xs text-muted-foreground">E-mail</span><p>{selected.email || "—"}</p></div>
-                  <div><span className="text-xs text-muted-foreground">Contato</span><p>{selected.contato || "—"}</p></div>
-                  <div><span className="text-xs text-muted-foreground">Telefone</span><p>{selected.telefone || "—"}</p></div>
-                  <div><span className="text-xs text-muted-foreground">Celular</span><p>{selected.celular || "—"}</p></div>
-                  <div><span className="text-xs text-muted-foreground">Prazo Padrão</span><p>{selected.prazo_padrao || 30} dias</p></div>
-                  <div><span className="text-xs text-muted-foreground">I.E.</span><p className="font-mono">{selected.inscricao_estadual || "—"}</p></div>
+              <TabsContent value="cadastro" className="mt-3 space-y-4">
+                <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                  {[
+                    { label: "E-mail", value: selected.email },
+                    { label: "Contato", value: selected.contato },
+                    { label: "Telefone", value: selected.telefone },
+                    { label: "Celular", value: selected.celular },
+                    { label: "Prazo Padrão", value: `${selected.prazo_padrao || 30} dias` },
+                    { label: "I.E.", value: selected.inscricao_estadual, mono: true },
+                  ].map((field, i) => (
+                    <div key={i}>
+                      <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-0.5">{field.label}</p>
+                      <p className={`text-sm ${field.mono ? "font-mono" : ""}`}>{field.value || "—"}</p>
+                    </div>
+                  ))}
                 </div>
-                {selected.observacoes && <div><span className="text-xs text-muted-foreground">Observações</span><p className="text-sm">{selected.observacoes}</p></div>}
+                {selected.observacoes && (
+                  <div className="border-t pt-3">
+                    <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-0.5">Observações</p>
+                    <p className="text-sm text-muted-foreground">{selected.observacoes}</p>
+                  </div>
+                )}
               </TabsContent>
 
-              <TabsContent value="financeiro" className="space-y-3 mt-3">
-                <div className="rounded-lg border bg-muted/30 p-3">
-                  <span className="text-xs text-muted-foreground flex items-center gap-1"><Clock className="w-3 h-3" /> PMV — Prazo Médio de Vencimento</span>
+              <TabsContent value="financeiro" className="mt-3 space-y-3">
+                <div className="rounded-lg border bg-card p-3">
+                  <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1"><Clock className="w-3 h-3" /> PMV — Prazo Médio de Vencimento</p>
                   {pmv !== null ? (
                     <div>
                       <p className="text-2xl font-bold mt-1">{pmv > 0 ? `+${pmv}` : pmv} <span className="text-sm font-normal text-muted-foreground">dias</span></p>
                       <p className="text-xs text-muted-foreground">Baseado em {pmvTitulos.filter((t: any) => t.data_pagamento).length} título(s)</p>
                       {pmv > 0 && <p className="text-xs text-warning mt-1">Paga em média {pmv} dias após vencimento</p>}
-                      {pmv < 0 && <p className="text-xs text-success mt-1">Paga em média {Math.abs(pmv)} dias antes</p>}
-                      {pmv === 0 && <p className="text-xs text-success mt-1">Paga no vencimento</p>}
+                      {pmv < 0 && <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">Paga em média {Math.abs(pmv)} dias antes</p>}
+                      {pmv === 0 && <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">Paga no vencimento</p>}
                     </div>
                   ) : <p className="text-sm text-muted-foreground mt-1">Sem títulos pagos para cálculo</p>}
                 </div>
@@ -330,13 +355,13 @@ const Clientes = () => {
                     <h4 className="font-semibold text-sm mb-2">Últimos Títulos</h4>
                     <div className="space-y-1 max-h-[250px] overflow-y-auto">
                       {pmvTitulos.slice(0, 15).map((t: any) => (
-                        <div key={t.id} className="flex justify-between text-sm py-1.5 border-b last:border-b-0">
-                          <div>
-                            <p className="text-xs">{t.descricao}</p>
+                        <div key={t.id} className="flex items-center justify-between py-2 px-2 rounded-md hover:bg-muted/30 transition-colors border-b last:border-b-0">
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium truncate">{t.descricao}</p>
                             <p className="text-[10px] text-muted-foreground">Venc: {formatDate(t.data_vencimento)}</p>
                           </div>
-                          <div className="text-right">
-                            <p className="font-mono text-xs">{formatCurrency(t.valor)}</p>
+                          <div className="text-right flex-shrink-0 ml-3 space-y-0.5">
+                            <p className="font-mono text-sm font-semibold">{formatCurrency(t.valor)}</p>
                             <StatusBadge status={t.status === "pago" ? "Pago" : t.status === "vencido" ? "Vencido" : "Aberto"} />
                           </div>
                         </div>
@@ -346,47 +371,70 @@ const Clientes = () => {
                 )}
               </TabsContent>
 
-              <TabsContent value="endereco" className="space-y-3 mt-3">
+              <TabsContent value="endereco" className="mt-3 space-y-3">
                 {selected.logradouro ? (
-                  <div className="space-y-2">
-                    <p>{selected.logradouro}, {selected.numero}{selected.complemento ? ` - ${selected.complemento}` : ""}</p>
-                    <p>{selected.bairro} - {selected.cidade}/{selected.uf}</p>
-                    <p>CEP: {selected.cep}</p>
-                    {selected.pais && selected.pais !== "Brasil" && <p>País: {selected.pais}</p>}
-                    {selected.caixa_postal && <p>Caixa Postal: {selected.caixa_postal}</p>}
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                    <div className="col-span-2">
+                      <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-0.5">Logradouro</p>
+                      <p className="text-sm">{selected.logradouro}, {selected.numero}{selected.complemento ? ` - ${selected.complemento}` : ""}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-0.5">Bairro</p>
+                      <p className="text-sm">{selected.bairro || "—"}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-0.5">Cidade/UF</p>
+                      <p className="text-sm">{selected.cidade}/{selected.uf}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-0.5">CEP</p>
+                      <p className="text-sm font-mono">{selected.cep}</p>
+                    </div>
+                    {selected.pais && selected.pais !== "Brasil" && (
+                      <div>
+                        <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-0.5">País</p>
+                        <p className="text-sm">{selected.pais}</p>
+                      </div>
+                    )}
+                    {selected.caixa_postal && (
+                      <div>
+                        <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-0.5">Caixa Postal</p>
+                        <p className="text-sm">{selected.caixa_postal}</p>
+                      </div>
+                    )}
                   </div>
-                ) : <p className="text-sm text-muted-foreground">Nenhum endereço cadastrado</p>}
+                ) : <p className="text-sm text-muted-foreground text-center py-6">Nenhum endereço cadastrado</p>}
               </TabsContent>
 
-              <TabsContent value="grupo" className="space-y-3 mt-3">
+              <TabsContent value="grupo" className="mt-3 space-y-3">
                 {selected.grupo_economico_id ? (
                   <>
-                    <div className="bg-muted/30 rounded-lg p-3">
-                      <span className="text-xs text-muted-foreground flex items-center gap-1"><Building2 className="w-3 h-3" /> Grupo Econômico</span>
-                      <p className="font-medium">{grupoNome(selected.grupo_economico_id)}</p>
+                    <div className="rounded-lg border bg-card p-3">
+                      <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1"><Building2 className="w-3 h-3" /> Grupo Econômico</p>
+                      <p className="font-medium mt-1">{grupoNome(selected.grupo_economico_id)}</p>
                       <p className="text-xs text-muted-foreground">{relacaoLabel[selected.tipo_relacao_grupo || "independente"]}</p>
                     </div>
                     {empresasGrupo.length > 0 && (
                       <div>
                         <h4 className="font-semibold text-sm flex items-center gap-2 mb-3"><Building2 className="w-4 h-4" /> Empresas Relacionadas ({empresasGrupo.length})</h4>
-                        <div className="space-y-2">
+                        <div className="space-y-1">
                           {empresasGrupo.map((emp: any) => (
-                            <div key={emp.id} className="bg-muted/30 rounded-lg p-3 flex items-center justify-between">
-                              <div>
-                                <p className="font-medium text-sm">{emp.nome_razao_social}</p>
+                            <div key={emp.id} className="flex items-center justify-between py-2 px-2 rounded-md hover:bg-muted/30 transition-colors border-b last:border-b-0">
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm font-medium truncate">{emp.nome_razao_social}</p>
                                 <p className="text-xs text-muted-foreground">{emp.cpf_cnpj || "—"} • {emp.cidade ? `${emp.cidade}/${emp.uf}` : "—"}</p>
                               </div>
-                              <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">{relacaoLabel[emp.tipo_relacao_grupo || "independente"]}</span>
+                              <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full flex-shrink-0 ml-2">{relacaoLabel[emp.tipo_relacao_grupo || "independente"]}</span>
                             </div>
                           ))}
                         </div>
                       </div>
                     )}
                   </>
-                ) : <p className="text-sm text-muted-foreground">Não pertence a nenhum grupo econômico</p>}
+                ) : <p className="text-sm text-muted-foreground text-center py-6">Não pertence a nenhum grupo econômico</p>}
               </TabsContent>
 
-              <TabsContent value="historico" className="space-y-3 mt-3">
+              <TabsContent value="historico" className="mt-3 space-y-3">
                 <div className="flex items-center justify-between mb-3">
                   <h4 className="font-semibold text-sm flex items-center gap-2"><MessageSquare className="w-4 h-4" /> Comunicações</h4>
                   <Button size="sm" variant="outline" onClick={() => setComOpen(!comOpen)} className="gap-1"><Plus className="w-3 h-3" /> Novo</Button>

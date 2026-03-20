@@ -139,15 +139,43 @@ export default function FormasPagamento() {
         </> : undefined}
       >
         {selected && (
-          <div className="space-y-4">
-            <div><span className="text-xs text-muted-foreground">Descrição</span><p className="font-medium text-lg">{selected.descricao}</p></div>
-            <div className="grid grid-cols-2 gap-3">
-              <div><span className="text-xs text-muted-foreground">Tipo</span><p>{tipoLabel[selected.tipo] || selected.tipo}</p></div>
-              <div><span className="text-xs text-muted-foreground">Prazo</span><p>{selected.prazo_dias === 0 ? "À vista" : `${selected.prazo_dias} dias`}</p></div>
-              <div><span className="text-xs text-muted-foreground">Parcelas</span><p>{selected.parcelas}x</p></div>
-              <div><span className="text-xs text-muted-foreground">Gera Financeiro</span><p>{selected.gera_financeiro ? "Sim" : "Não"}</p></div>
+          <div className="space-y-5">
+            {/* Header with identity */}
+            <div className="flex items-start gap-4">
+              <div className="flex-shrink-0 h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
+                <span className="text-primary font-bold text-lg">$</span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="font-semibold text-lg truncate">{selected.descricao}</h3>
+                  <StatusBadge status={selected.ativo ? "Ativo" : "Inativo"} />
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">{tipoLabel[selected.tipo] || selected.tipo}</p>
+              </div>
             </div>
-            {selected.observacoes && <div><span className="text-xs text-muted-foreground">Observações</span><p className="text-sm">{selected.observacoes}</p></div>}
+
+            {/* KPI Cards */}
+            <div className="grid grid-cols-3 gap-2">
+              <div className="rounded-lg border bg-card p-3 text-center space-y-1">
+                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Prazo</p>
+                <p className="font-mono font-bold text-base text-foreground">{selected.prazo_dias === 0 ? "À vista" : `${selected.prazo_dias}d`}</p>
+              </div>
+              <div className="rounded-lg border bg-card p-3 text-center space-y-1">
+                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Parcelas</p>
+                <p className="font-mono font-bold text-base text-foreground">{selected.parcelas}x</p>
+              </div>
+              <div className="rounded-lg border bg-card p-3 text-center space-y-1">
+                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Gera Financeiro</p>
+                <p className={`font-bold text-base ${selected.gera_financeiro ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}`}>{selected.gera_financeiro ? "Sim" : "Não"}</p>
+              </div>
+            </div>
+
+            {selected.observacoes && (
+              <div className="border-t pt-3">
+                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-0.5">Observações</p>
+                <p className="text-sm text-muted-foreground">{selected.observacoes}</p>
+              </div>
+            )}
           </div>
         )}
       </ViewDrawer>
