@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { DataTable } from '@/components/DataTable';
 import { PreviewModal } from '@/components/ui/PreviewModal';
-import { BarChart3, Package, Wallet, ShoppingCart, TrendingUp, Truck, Download, RefreshCcw, Hash, AlertTriangle, DollarSign, FileText, Eye } from 'lucide-react';
+import { BarChart3, Package, Wallet, ShoppingCart, TrendingUp, Truck, Download, RefreshCcw, Hash, AlertTriangle, DollarSign, FileText, Eye, ArrowLeftRight } from 'lucide-react';
 import { ResponsiveContainer, BarChart, XAxis, YAxis, Tooltip, Bar, PieChart, Pie, Cell, Legend } from 'recharts';
 import { carregarRelatorio, exportarCsv, formatCellValue, type RelatorioResultado, type TipoRelatorio } from '@/services/relatorios.service';
 import { formatCurrency, formatNumber, formatDate } from '@/lib/format';
@@ -17,6 +17,7 @@ import { toast } from 'sonner';
 
 const reportCards: Array<{ type: TipoRelatorio; title: string; description: string; icon: typeof Package }> = [
   { type: 'estoque', title: 'Estoque', description: 'Posição atual, custo e alertas', icon: Package },
+  { type: 'movimentos_estoque', title: 'Movimentos de Estoque', description: 'Entradas, saídas e ajustes por período', icon: ArrowLeftRight },
   { type: 'financeiro', title: 'Financeiro', description: 'Contas a pagar e receber', icon: Wallet },
   { type: 'fluxo_caixa', title: 'Fluxo de Caixa', description: 'Entradas, saídas e saldo', icon: TrendingUp },
   { type: 'vendas', title: 'Vendas', description: 'Ordens por período e faturamento', icon: ShoppingCart },
@@ -181,7 +182,7 @@ export default function Relatorios() {
       <ModulePage title="Relatórios" subtitle="Análises gerenciais, exportações e visão consolidada por módulo.">
         <div className="space-y-6">
           {/* Report type selector */}
-          <div className="grid gap-3 grid-cols-2 md:grid-cols-3 xl:grid-cols-5">
+          <div className="grid gap-3 grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
             {reportCards.map((card) => (
               <button
                 key={card.type}
@@ -343,9 +344,16 @@ export default function Relatorios() {
           </div>
 
           {/* Totals */}
-          <div className="flex items-center justify-between border-t pt-3 text-sm">
+          <div className="flex flex-wrap items-center justify-between gap-4 border-t pt-3 text-sm">
             <span className="font-semibold text-foreground">Total de registros: {resultado.rows.length}</span>
-            {kpis.totalValue > 0 && <span className="font-semibold text-foreground">Valor consolidado: {formatCurrency(kpis.totalValue)}</span>}
+            {resultado.totals && (
+              <div className="flex flex-wrap gap-4">
+                {resultado.totals.totalQtd != null && <span className="font-semibold">Qtd Total: {formatNumber(resultado.totals.totalQtd)}</span>}
+                {resultado.totals.totalCusto != null && <span className="font-semibold">Total Custo: {formatCurrency(resultado.totals.totalCusto)}</span>}
+                {resultado.totals.totalVenda != null && <span className="font-semibold">Total Venda: {formatCurrency(resultado.totals.totalVenda)}</span>}
+              </div>
+            )}
+            {!resultado.totals && kpis.totalValue > 0 && <span className="font-semibold text-foreground">Valor consolidado: {formatCurrency(kpis.totalValue)}</span>}
           </div>
         </div>
       </PreviewModal>
