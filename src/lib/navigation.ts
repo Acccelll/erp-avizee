@@ -167,11 +167,12 @@ export const navSections: NavSection[] = [
       {
         title: 'Análises',
         items: [
-          { title: 'Vendas', path: '/relatorios?tipo=vendas' },
           { title: 'Estoque', path: '/relatorios?tipo=estoque' },
+          { title: 'Movimentos de Estoque', path: '/relatorios?tipo=movimentos_estoque', keywords: ['entradas', 'saidas', 'ajustes'] },
           { title: 'Financeiro', path: '/relatorios?tipo=financeiro' },
-          { title: 'Compras por Fornecedor', path: '/relatorios?tipo=compras' },
           { title: 'Fluxo de Caixa', path: '/relatorios?tipo=fluxo_caixa' },
+          { title: 'Vendas', path: '/relatorios?tipo=vendas' },
+          { title: 'Compras por Fornecedor', path: '/relatorios?tipo=compras' },
         ],
       },
     ],
