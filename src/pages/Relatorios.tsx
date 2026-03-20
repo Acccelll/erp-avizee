@@ -17,6 +17,7 @@ import { toast } from 'sonner';
 
 const reportCards: Array<{ type: TipoRelatorio; title: string; description: string; icon: typeof Package }> = [
   { type: 'estoque', title: 'Estoque', description: 'Posição atual, custo e alertas', icon: Package },
+  { type: 'movimentos_estoque', title: 'Movimentos de Estoque', description: 'Entradas, saídas e ajustes por período', icon: ArrowLeftRight },
   { type: 'financeiro', title: 'Financeiro', description: 'Contas a pagar e receber', icon: Wallet },
   { type: 'fluxo_caixa', title: 'Fluxo de Caixa', description: 'Entradas, saídas e saldo', icon: TrendingUp },
   { type: 'vendas', title: 'Vendas', description: 'Ordens por período e faturamento', icon: ShoppingCart },
