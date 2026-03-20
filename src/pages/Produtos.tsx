@@ -302,30 +302,49 @@ const Produtos = () => {
         </> : undefined}
       >
         {selected && (
-          <div className="space-y-4">
-            {/* Header */}
-            <div className="bg-muted/30 rounded-lg p-4">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="font-mono text-xs text-muted-foreground">{selected.sku || selected.codigo_interno || "—"}</p>
-                  <h3 className="font-semibold text-lg">{selected.nome}</h3>
-                  <div className="flex gap-2 mt-1">
-                    <StatusBadge status={selected.ativo ? "Ativo" : "Inativo"} />
-                    {selected.eh_composto && <StatusBadge status="Composto" />}
-                  </div>
+          <div className="space-y-5">
+            {/* Header with identity */}
+            <div className="flex items-start gap-4">
+              <div className="flex-shrink-0 h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
+                <Package className="w-5 h-5 text-primary" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="font-semibold text-lg truncate">{selected.nome}</h3>
+                  <StatusBadge status={selected.ativo ? "Ativo" : "Inativo"} />
+                  {selected.eh_composto && <StatusBadge status="Composto" />}
                 </div>
-                <div className="text-right">
-                  <p className="text-xs text-muted-foreground">Estoque</p>
-                  <p className={`text-2xl font-bold font-mono ${Number(selected.estoque_atual) <= Number(selected.estoque_minimo) && Number(selected.estoque_minimo) > 0 ? "text-destructive" : ""}`}>
-                    {selected.estoque_atual ?? 0}
-                  </p>
-                  {Number(selected.estoque_minimo) > 0 && (
-                    <p className="text-xs text-muted-foreground">Mín: {selected.estoque_minimo}</p>
-                  )}
-                </div>
+                {(selected.sku || selected.codigo_interno) && (
+                  <p className="text-xs text-muted-foreground font-mono mt-0.5">{selected.sku || selected.codigo_interno}</p>
+                )}
               </div>
             </div>
 
+            {/* KPI Cards */}
+            <div className="grid grid-cols-4 gap-2">
+              <div className="rounded-lg border bg-card p-3 text-center space-y-1">
+                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Estoque</p>
+                <p className={`font-mono font-bold text-base ${Number(selected.estoque_atual) <= Number(selected.estoque_minimo) && Number(selected.estoque_minimo) > 0 ? "text-destructive" : "text-foreground"}`}>
+                  {selected.estoque_atual ?? 0}
+                </p>
+              </div>
+              <div className="rounded-lg border bg-card p-3 text-center space-y-1">
+                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Custo</p>
+                <p className="font-mono font-bold text-sm text-foreground truncate" title={formatCurrency(selected.preco_custo || 0)}>{formatCurrency(selected.preco_custo || 0)}</p>
+              </div>
+              <div className="rounded-lg border bg-card p-3 text-center space-y-1">
+                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Venda</p>
+                <p className="font-mono font-bold text-sm text-primary truncate" title={formatCurrency(selected.preco_venda)}>{formatCurrency(selected.preco_venda)}</p>
+              </div>
+              <div className="rounded-lg border bg-card p-3 text-center space-y-1">
+                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Margem</p>
+                <p className={`font-mono font-bold text-base ${selectedMargem > 0 ? "text-emerald-600 dark:text-emerald-400" : selectedMargem < 0 ? "text-destructive" : "text-foreground"}`}>
+                  {(selected.preco_custo || 0) > 0 ? `${selectedMargem.toFixed(1)}%` : "—"}
+                </p>
+              </div>
+            </div>
+
+            {/* Tabs */}
             <Tabs defaultValue="geral" className="w-full">
               <TabsList className="w-full grid grid-cols-5">
                 <TabsTrigger value="geral" className="text-xs">Geral</TabsTrigger>
@@ -335,22 +354,34 @@ const Produtos = () => {
                 <TabsTrigger value="historico" className="text-xs">Histórico</TabsTrigger>
               </TabsList>
 
-              <TabsContent value="geral" className="space-y-3 mt-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <div><span className="text-xs text-muted-foreground">SKU</span><p className="font-mono">{selected.sku || "—"}</p></div>
-                  <div><span className="text-xs text-muted-foreground">Código</span><p className="font-mono">{selected.codigo_interno || "—"}</p></div>
-                  <div><span className="text-xs text-muted-foreground">Unidade</span><p>{selected.unidade_medida}</p></div>
-                  <div><span className="text-xs text-muted-foreground">Peso</span><p className="font-mono">{selected.peso || 0} kg</p></div>
+              <TabsContent value="geral" className="mt-3 space-y-4">
+                <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                  {[
+                    { label: "SKU", value: selected.sku, mono: true },
+                    { label: "Código", value: selected.codigo_interno, mono: true },
+                    { label: "Unidade", value: selected.unidade_medida },
+                    { label: "Peso", value: `${selected.peso || 0} kg`, mono: true },
+                  ].map((field, i) => (
+                    <div key={i}>
+                      <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-0.5">{field.label}</p>
+                      <p className={`text-sm ${field.mono ? "font-mono" : ""}`}>{field.value || "—"}</p>
+                    </div>
+                  ))}
                 </div>
-                {selected.descricao && <div><span className="text-xs text-muted-foreground">Descrição</span><p className="text-sm">{selected.descricao}</p></div>}
+                {selected.descricao && (
+                  <div className="border-t pt-3">
+                    <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-0.5">Descrição</p>
+                    <p className="text-sm text-muted-foreground">{selected.descricao}</p>
+                  </div>
+                )}
                 {selected.eh_composto && composicao.length > 0 && (
                   <div className="border-t pt-3">
                     <h4 className="font-semibold text-sm mb-2 flex items-center gap-2"><Package className="w-4 h-4" /> Composição</h4>
                     <div className="space-y-1">
                       {composicao.map((c, idx) => (
-                        <div key={idx} className="flex justify-between text-sm py-1.5 border-b last:border-b-0">
-                          <span>{c.nome} <span className="text-muted-foreground font-mono text-xs">({c.sku})</span></span>
-                          <div className="text-right"><span className="font-mono">× {c.quantidade}</span><span className="font-mono text-muted-foreground ml-3">{formatCurrency(c.quantidade * (c.preco_custo || 0))}</span></div>
+                        <div key={idx} className="flex items-center justify-between py-2 px-2 rounded-md hover:bg-muted/30 transition-colors border-b last:border-b-0">
+                          <span className="text-sm">{c.nome} <span className="text-muted-foreground font-mono text-xs">({c.sku})</span></span>
+                          <div className="text-right"><span className="font-mono text-sm">× {c.quantidade}</span><span className="font-mono text-muted-foreground text-sm ml-3">{formatCurrency(c.quantidade * (c.preco_custo || 0))}</span></div>
                         </div>
                       ))}
                       <div className="flex justify-between text-sm font-semibold pt-2"><span>Custo Composto</span><span className="font-mono text-primary">{formatCurrency(custoCompostoView)}</span></div>
@@ -360,30 +391,41 @@ const Produtos = () => {
                 {fornecedoresProd.length > 0 && (
                   <div className="border-t pt-3">
                     <h4 className="font-semibold text-sm mb-2">Fornecedores</h4>
-                    {fornecedoresProd.map((f: any, idx: number) => (
-                      <div key={idx} className="flex justify-between text-sm py-1.5 border-b last:border-b-0">
-                        <span>{f.fornecedores?.nome_razao_social || "—"}</span>
-                        <div className="text-right text-xs">
-                          {f.preco_compra && <span className="font-mono">{formatCurrency(f.preco_compra)}</span>}
-                          {f.lead_time_dias && <span className="text-muted-foreground ml-2">{f.lead_time_dias}d</span>}
+                    <div className="space-y-1">
+                      {fornecedoresProd.map((f: any, idx: number) => (
+                        <div key={idx} className="flex items-center justify-between py-2 px-2 rounded-md hover:bg-muted/30 transition-colors border-b last:border-b-0">
+                          <span className="text-sm">{f.fornecedores?.nome_razao_social || "—"}</span>
+                          <div className="text-right text-sm flex-shrink-0 ml-3">
+                            {f.preco_compra && <span className="font-mono">{formatCurrency(f.preco_compra)}</span>}
+                            {f.lead_time_dias && <span className="text-muted-foreground ml-2">{f.lead_time_dias}d</span>}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
                 )}
               </TabsContent>
 
-              <TabsContent value="preco" className="space-y-3 mt-3">
-                <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+              <TabsContent value="preco" className="mt-3 space-y-3">
+                <div className="rounded-lg border bg-card p-4 space-y-3">
                   <div className="grid grid-cols-3 gap-3 text-center">
-                    <div><span className="text-xs text-muted-foreground block">Custo</span><p className="font-mono font-medium text-lg">{formatCurrency(selected.preco_custo || 0)}</p></div>
-                    <div><span className="text-xs text-muted-foreground block">Margem</span><p className={`font-mono font-semibold text-lg ${selectedMargem > 0 ? "text-success" : selectedMargem < 0 ? "text-destructive" : ""}`}>{(selected.preco_custo || 0) > 0 ? `${selectedMargem.toFixed(1)}%` : "—"}</p></div>
-                    <div><span className="text-xs text-muted-foreground block">Venda</span><p className="font-mono font-semibold text-lg text-primary">{formatCurrency(selected.preco_venda)}</p></div>
+                    <div>
+                      <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Custo</p>
+                      <p className="font-mono font-bold text-lg mt-1">{formatCurrency(selected.preco_custo || 0)}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Margem</p>
+                      <p className={`font-mono font-bold text-lg mt-1 ${selectedMargem > 0 ? "text-emerald-600 dark:text-emerald-400" : selectedMargem < 0 ? "text-destructive" : ""}`}>{(selected.preco_custo || 0) > 0 ? `${selectedMargem.toFixed(1)}%` : "—"}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Venda</p>
+                      <p className="font-mono font-bold text-lg text-primary mt-1">{formatCurrency(selected.preco_venda)}</p>
+                    </div>
                   </div>
                   {(selected.preco_custo || 0) > 0 && (
                     <div className="text-center border-t pt-2">
-                      <span className="text-xs text-muted-foreground">Lucro Bruto</span>
-                      <p className="font-mono font-semibold">{formatCurrency(selected.preco_venda - (selected.preco_custo || 0))}</p>
+                      <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Lucro Bruto</p>
+                      <p className="font-mono font-semibold mt-1">{formatCurrency(selected.preco_venda - (selected.preco_custo || 0))}</p>
                     </div>
                   )}
                 </div>
@@ -394,15 +436,15 @@ const Produtos = () => {
                 )}
               </TabsContent>
 
-              <TabsContent value="estoque" className="space-y-3 mt-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-lg border p-3 text-center">
-                    <p className="text-xs text-muted-foreground">Estoque Atual</p>
-                    <p className={`text-2xl font-bold font-mono ${Number(selected.estoque_atual) <= Number(selected.estoque_minimo) && Number(selected.estoque_minimo) > 0 ? "text-destructive" : ""}`}>{selected.estoque_atual ?? 0}</p>
+              <TabsContent value="estoque" className="mt-3 space-y-3">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="rounded-lg border bg-card p-3 text-center space-y-1">
+                    <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Estoque Atual</p>
+                    <p className={`font-mono font-bold text-2xl ${Number(selected.estoque_atual) <= Number(selected.estoque_minimo) && Number(selected.estoque_minimo) > 0 ? "text-destructive" : "text-foreground"}`}>{selected.estoque_atual ?? 0}</p>
                   </div>
-                  <div className="rounded-lg border p-3 text-center">
-                    <p className="text-xs text-muted-foreground">Estoque Mínimo</p>
-                    <p className="text-2xl font-bold font-mono">{selected.estoque_minimo ?? 0}</p>
+                  <div className="rounded-lg border bg-card p-3 text-center space-y-1">
+                    <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Estoque Mínimo</p>
+                    <p className="font-mono font-bold text-2xl text-foreground">{selected.estoque_minimo ?? 0}</p>
                   </div>
                 </div>
                 {Number(selected.estoque_atual) <= Number(selected.estoque_minimo) && Number(selected.estoque_minimo) > 0 && (
@@ -415,9 +457,9 @@ const Produtos = () => {
                     <h4 className="font-semibold text-sm mb-2 flex items-center gap-2"><Archive className="w-4 h-4" /> Últimas Movimentações</h4>
                     <div className="space-y-1 max-h-[300px] overflow-y-auto">
                       {movimentos.map((m: any, idx: number) => (
-                        <div key={idx} className="flex items-center justify-between py-1.5 border-b last:border-b-0 text-sm">
+                        <div key={idx} className="flex items-center justify-between py-2 px-2 rounded-md hover:bg-muted/30 transition-colors border-b last:border-b-0 text-sm">
                           <div className="flex items-center gap-2">
-                            <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${m.tipo === 'entrada' ? 'bg-success/10 text-success' : m.tipo === 'saida' ? 'bg-destructive/10 text-destructive' : 'bg-warning/10 text-warning'}`}>
+                            <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${m.tipo === 'entrada' ? 'bg-emerald-500/10 text-emerald-600' : m.tipo === 'saida' ? 'bg-destructive/10 text-destructive' : 'bg-warning/10 text-warning'}`}>
                               {m.tipo === 'entrada' ? '↑' : m.tipo === 'saida' ? '↓' : '↔'} {m.quantidade}
                             </span>
                             <span className="text-muted-foreground text-xs">{m.motivo || m.tipo}</span>
@@ -430,29 +472,36 @@ const Produtos = () => {
                 )}
               </TabsContent>
 
-              <TabsContent value="fiscal" className="space-y-3 mt-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <div><span className="text-xs text-muted-foreground">NCM</span><p className="font-mono">{selected.ncm || "—"}</p></div>
-                  <div><span className="text-xs text-muted-foreground">CST</span><p className="font-mono">{selected.cst || "—"}</p></div>
-                  <div><span className="text-xs text-muted-foreground">CFOP Padrão</span><p className="font-mono">{selected.cfop_padrao || "—"}</p></div>
-                  <div><span className="text-xs text-muted-foreground">Unidade</span><p>{selected.unidade_medida}</p></div>
+              <TabsContent value="fiscal" className="mt-3 space-y-4">
+                <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                  {[
+                    { label: "NCM", value: selected.ncm },
+                    { label: "CST", value: selected.cst },
+                    { label: "CFOP Padrão", value: selected.cfop_padrao },
+                    { label: "Unidade", value: selected.unidade_medida },
+                  ].map((field, i) => (
+                    <div key={i}>
+                      <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-0.5">{field.label}</p>
+                      <p className="text-sm font-mono">{field.value || "—"}</p>
+                    </div>
+                  ))}
                 </div>
               </TabsContent>
 
-              <TabsContent value="historico" className="space-y-3 mt-3">
+              <TabsContent value="historico" className="mt-3">
                 {historico.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-4">Nenhum histórico de notas</p>
+                  <p className="text-sm text-muted-foreground text-center py-6">Nenhum histórico de notas</p>
                 ) : (
-                  <div className="space-y-2 max-h-[350px] overflow-y-auto">
+                  <div className="space-y-1 max-h-[350px] overflow-y-auto">
                     {historico.map((h: any, idx: number) => (
-                      <div key={idx} className="text-sm py-1.5 border-b last:border-b-0">
-                        <div className="flex justify-between">
-                          <span className="font-mono text-xs text-primary">{h.notas_fiscais?.numero}</span>
-                          <span className="text-xs text-muted-foreground">{formatDate(h.notas_fiscais?.data_emissao)}</span>
+                      <div key={idx} className="flex items-center justify-between py-2 px-2 rounded-md hover:bg-muted/30 transition-colors border-b last:border-b-0 text-sm">
+                        <div className="min-w-0">
+                          <span className="font-mono text-xs text-primary font-semibold">{h.notas_fiscais?.numero}</span>
+                          <span className="text-xs text-muted-foreground ml-2">{formatDate(h.notas_fiscais?.data_emissao)}</span>
                         </div>
-                        <div className="flex justify-between text-xs">
-                          <span>{h.notas_fiscais?.fornecedores?.nome_razao_social || "—"}</span>
-                          <span className="font-mono">Qtd: {h.quantidade} × {formatCurrency(h.valor_unitario)}</span>
+                        <div className="text-right flex-shrink-0 ml-3">
+                          <span className="text-xs text-muted-foreground">{h.notas_fiscais?.fornecedores?.nome_razao_social || ""}</span>
+                          <span className="font-mono text-sm ml-2">Qtd: {h.quantidade} × {formatCurrency(h.valor_unitario)}</span>
                         </div>
                       </div>
                     ))}

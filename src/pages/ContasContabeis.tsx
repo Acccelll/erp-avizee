@@ -193,33 +193,54 @@ const ContasContabeis = () => {
         </> : undefined}
       >
         {selected && (
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div><span className="text-xs text-muted-foreground">Código</span><p className="font-mono font-semibold text-primary">{selected.codigo}</p></div>
-              <div><span className="text-xs text-muted-foreground">Natureza</span><p className="capitalize">{selected.natureza}</p></div>
-            </div>
-            <div><span className="text-xs text-muted-foreground">Descrição</span><p className="font-medium">{selected.descricao}</p></div>
-            <div className="grid grid-cols-2 gap-4">
-              <div><span className="text-xs text-muted-foreground">Tipo</span>
-                <Badge variant={selected.aceita_lancamento ? "default" : "secondary"}>{selected.aceita_lancamento ? "Analítica" : "Sintética"}</Badge>
+          <div className="space-y-5">
+            {/* Header with identity */}
+            <div className="flex items-start gap-4">
+              <div className="flex-shrink-0 h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
+                {selected.aceita_lancamento ? <FileText className="w-5 h-5 text-primary" /> : <FolderTree className="w-5 h-5 text-primary" />}
               </div>
-              <div><span className="text-xs text-muted-foreground">Conta Pai</span><p className="font-mono">{selected.conta_pai_id ? data.find(c => c.id === selected.conta_pai_id)?.codigo || "—" : "Raiz"}</p></div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="font-semibold text-lg truncate">{selected.descricao}</h3>
+                  <StatusBadge status={selected.ativo ? "Ativo" : "Inativo"} />
+                </div>
+                <p className="text-xs text-muted-foreground font-mono mt-0.5">{selected.codigo}</p>
+              </div>
             </div>
+
+            {/* KPI Cards */}
+            <div className="grid grid-cols-3 gap-2">
+              <div className="rounded-lg border bg-card p-3 text-center space-y-1">
+                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Natureza</p>
+                <p className="font-semibold text-sm text-foreground capitalize">{selected.natureza}</p>
+              </div>
+              <div className="rounded-lg border bg-card p-3 text-center space-y-1">
+                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Tipo</p>
+                <Badge variant={selected.aceita_lancamento ? "default" : "secondary"} className="text-xs">
+                  {selected.aceita_lancamento ? "Analítica" : "Sintética"}
+                </Badge>
+              </div>
+              <div className="rounded-lg border bg-card p-3 text-center space-y-1">
+                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Conta Pai</p>
+                <p className="font-mono font-bold text-sm text-foreground">{selected.conta_pai_id ? data.find(c => c.id === selected.conta_pai_id)?.codigo || "—" : "Raiz"}</p>
+              </div>
+            </div>
+
             {/* Sub-accounts */}
             {(() => {
               const filhas = data.filter(c => c.conta_pai_id === selected.id);
               if (filhas.length === 0) return null;
               return (
-                <div className="border-t pt-3">
-                  <h4 className="font-semibold text-sm mb-2">Subcontas ({filhas.length})</h4>
+                <div className="border-t pt-4">
+                  <h4 className="font-semibold text-sm mb-3">Subcontas ({filhas.length})</h4>
                   <div className="space-y-1">
                     {filhas.map(f => (
-                      <div key={f.id} className="flex justify-between items-center text-sm py-2 px-3 bg-accent/20 rounded-lg">
+                      <div key={f.id} className="flex items-center justify-between py-2 px-2 rounded-md hover:bg-muted/30 transition-colors border-b last:border-b-0 text-sm">
                         <div className="flex items-center gap-2">
                           {f.aceita_lancamento ? <FileText className="w-3.5 h-3.5 text-muted-foreground" /> : <FolderTree className="w-3.5 h-3.5 text-primary" />}
                           <span className="font-mono text-primary">{f.codigo}</span>
                         </div>
-                        <span>{f.descricao}</span>
+                        <span className="truncate ml-2">{f.descricao}</span>
                       </div>
                     ))}
                   </div>

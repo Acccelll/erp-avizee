@@ -157,15 +157,42 @@ const ContasBancarias = () => {
         </> : undefined}
       >
         {selected && (
-          <div className="space-y-3">
-            <div><span className="text-xs text-muted-foreground">Banco</span><p className="font-medium">{selected.bancos?.nome}</p></div>
-            <div><span className="text-xs text-muted-foreground">Descrição</span><p>{selected.descricao}</p></div>
-            <div className="grid grid-cols-2 gap-4">
-              <div><span className="text-xs text-muted-foreground">Agência</span><p>{selected.agencia || "—"}</p></div>
-              <div><span className="text-xs text-muted-foreground">Conta</span><p>{selected.conta || "—"}</p></div>
+          <div className="space-y-5">
+            {/* Header with identity */}
+            <div className="flex items-start gap-4">
+              <div className="flex-shrink-0 h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
+                <Landmark className="w-5 h-5 text-primary" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="font-semibold text-lg truncate">{selected.descricao}</h3>
+                </div>
+                <p className="text-sm text-muted-foreground truncate">{selected.bancos?.nome}</p>
+              </div>
             </div>
-            <div><span className="text-xs text-muted-foreground">Titular</span><p>{selected.titular || "—"}</p></div>
-            <div><span className="text-xs text-muted-foreground">Saldo Atual</span><p className="font-bold mono text-lg">{formatCurrency(Number(selected.saldo_atual || 0))}</p></div>
+
+            {/* KPI Card - Saldo */}
+            <div className="rounded-lg border bg-card p-4 text-center space-y-1">
+              <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Saldo Atual</p>
+              <p className={`font-mono font-bold text-2xl ${Number(selected.saldo_atual || 0) >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"}`}>
+                {formatCurrency(Number(selected.saldo_atual || 0))}
+              </p>
+            </div>
+
+            {/* Details */}
+            <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+              {[
+                { label: "Agência", value: selected.agencia, mono: true },
+                { label: "Conta", value: selected.conta, mono: true },
+                { label: "Titular", value: selected.titular },
+                { label: "Banco", value: selected.bancos?.nome },
+              ].map((field, i) => (
+                <div key={i}>
+                  <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-0.5">{field.label}</p>
+                  <p className={`text-sm ${field.mono ? "font-mono" : ""}`}>{field.value || "—"}</p>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </ViewDrawer>

@@ -125,28 +125,36 @@ const GruposEconomicos = () => {
         </> : undefined}
       >
         {selected && (
-          <div className="space-y-4">
-            {/* Header */}
-            <div className="bg-muted/30 rounded-lg p-4">
-              <h3 className="font-semibold text-lg flex items-center gap-2">
-                <Building2 className="w-5 h-5 text-primary" /> {selected.nome}
-              </h3>
-              {selected.observacoes && <p className="text-sm text-muted-foreground mt-1">{selected.observacoes}</p>}
+          <div className="space-y-5">
+            {/* Header with identity */}
+            <div className="flex items-start gap-4">
+              <div className="flex-shrink-0 h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
+                <Building2 className="w-5 h-5 text-primary" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="font-semibold text-lg truncate">{selected.nome}</h3>
+                  <StatusBadge status={selected.ativo ? "Ativo" : "Inativo"} />
+                </div>
+                {selected.observacoes && (
+                  <p className="text-sm text-muted-foreground mt-0.5">{selected.observacoes}</p>
+                )}
+              </div>
             </div>
 
-            {/* Consolidated KPIs */}
-            <div className="grid grid-cols-3 gap-3">
-              <div className="text-center rounded-lg border bg-muted/30 p-3">
-                <p className="text-[10px] text-muted-foreground uppercase">Empresas</p>
-                <p className="text-2xl font-bold">{empresas.length}</p>
+            {/* KPI Cards */}
+            <div className="grid grid-cols-3 gap-2">
+              <div className="rounded-lg border bg-card p-3 text-center space-y-1">
+                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Empresas</p>
+                <p className="font-bold text-2xl text-foreground">{empresas.length}</p>
               </div>
-              <div className="text-center rounded-lg border bg-muted/30 p-3">
-                <p className="text-[10px] text-muted-foreground uppercase">Saldo Aberto</p>
-                <p className={`font-mono font-semibold text-sm ${saldoConsolidado > 0 ? "text-warning" : ""}`}>{formatCurrency(saldoConsolidado)}</p>
+              <div className="rounded-lg border bg-card p-3 text-center space-y-1">
+                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Saldo Aberto</p>
+                <p className={`font-mono font-bold text-sm ${saldoConsolidado > 0 ? "text-warning" : "text-foreground"}`}>{formatCurrency(saldoConsolidado)}</p>
               </div>
-              <div className="text-center rounded-lg border bg-muted/30 p-3">
-                <p className="text-[10px] text-muted-foreground uppercase">Vencidos</p>
-                <p className={`text-2xl font-bold ${titulosVencidos > 0 ? "text-destructive" : "text-success"}`}>{titulosVencidos}</p>
+              <div className="rounded-lg border bg-card p-3 text-center space-y-1">
+                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Vencidos</p>
+                <p className={`font-bold text-2xl ${titulosVencidos > 0 ? "text-destructive" : "text-emerald-600 dark:text-emerald-400"}`}>{titulosVencidos}</p>
               </div>
             </div>
 
@@ -162,17 +170,17 @@ const GruposEconomicos = () => {
                 <Building2 className="w-4 h-4" /> Empresas do Grupo ({empresas.length})
               </h4>
               {empresas.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Nenhuma empresa vinculada a este grupo.</p>
+                <p className="text-sm text-muted-foreground text-center py-6">Nenhuma empresa vinculada a este grupo.</p>
               ) : (
-                <div className="space-y-2">
+                <div className="space-y-1">
                   {empresas.map((emp) => (
-                    <div key={emp.id} className="bg-muted/30 rounded-lg p-3 flex items-center justify-between">
-                      <div>
-                        <p className="font-medium text-sm">{emp.nome_razao_social}</p>
-                        {emp.nome_fantasia && <p className="text-xs text-muted-foreground">{emp.nome_fantasia}</p>}
+                    <div key={emp.id} className="flex items-center justify-between py-2 px-2 rounded-md hover:bg-muted/30 transition-colors border-b last:border-b-0">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium text-sm truncate">{emp.nome_razao_social}</p>
+                        {emp.nome_fantasia && <p className="text-xs text-muted-foreground truncate">{emp.nome_fantasia}</p>}
                         <p className="text-xs text-muted-foreground mt-0.5">{emp.cpf_cnpj || "—"} • {emp.cidade ? `${emp.cidade}/${emp.uf}` : "—"}</p>
                       </div>
-                      <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                      <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full flex-shrink-0 ml-2">
                         {relacaoLabel[emp.tipo_relacao_grupo || "independente"] || emp.tipo_relacao_grupo}
                       </span>
                     </div>

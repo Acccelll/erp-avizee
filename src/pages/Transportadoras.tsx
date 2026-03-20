@@ -160,24 +160,62 @@ export default function Transportadoras() {
         </> : undefined}
       >
         {selected && (
-          <div className="space-y-4">
-            <div className="bg-muted/30 rounded-lg p-4">
-              <div className="flex items-center gap-3 mb-2">
+          <div className="space-y-5">
+            {/* Header with identity */}
+            <div className="flex items-start gap-4">
+              <div className="flex-shrink-0 h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
                 <Truck className="w-5 h-5 text-primary" />
-                <h3 className="font-semibold text-lg">{selected.nome_razao_social}</h3>
               </div>
-              {selected.nome_fantasia && <p className="text-sm text-muted-foreground">{selected.nome_fantasia}</p>}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="font-semibold text-lg truncate">{selected.nome_razao_social}</h3>
+                  <StatusBadge status={selected.ativo ? "Ativo" : "Inativo"} />
+                </div>
+                {selected.nome_fantasia && (
+                  <p className="text-sm text-muted-foreground truncate">{selected.nome_fantasia}</p>
+                )}
+                {selected.cpf_cnpj && (
+                  <p className="text-xs text-muted-foreground font-mono mt-0.5">{selected.cpf_cnpj}</p>
+                )}
+              </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div><span className="text-xs text-muted-foreground">CNPJ</span><p className="font-mono text-sm">{selected.cpf_cnpj || "—"}</p></div>
-              <div><span className="text-xs text-muted-foreground">Contato</span><p>{selected.contato || "—"}</p></div>
-              <div><span className="text-xs text-muted-foreground">Telefone</span><p>{selected.telefone || "—"}</p></div>
-              <div><span className="text-xs text-muted-foreground">E-mail</span><p>{selected.email || "—"}</p></div>
-              <div><span className="text-xs text-muted-foreground">Cidade/UF</span><p>{selected.cidade ? `${selected.cidade}/${selected.uf}` : "—"}</p></div>
-              <div><span className="text-xs text-muted-foreground">Modalidade</span><p>{modalidadeLabel[selected.modalidade] || "—"}</p></div>
-              <div><span className="text-xs text-muted-foreground">Prazo Médio</span><p>{selected.prazo_medio || "—"}</p></div>
+
+            {/* KPI Cards */}
+            <div className="grid grid-cols-3 gap-2">
+              <div className="rounded-lg border bg-card p-3 text-center space-y-1">
+                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Modalidade</p>
+                <p className="font-semibold text-sm text-foreground">{modalidadeLabel[selected.modalidade] || "—"}</p>
+              </div>
+              <div className="rounded-lg border bg-card p-3 text-center space-y-1">
+                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Prazo Médio</p>
+                <p className="font-mono font-bold text-sm text-foreground">{selected.prazo_medio || "—"}</p>
+              </div>
+              <div className="rounded-lg border bg-card p-3 text-center space-y-1">
+                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Cidade/UF</p>
+                <p className="font-semibold text-sm text-foreground truncate">{selected.cidade ? `${selected.cidade}/${selected.uf}` : "—"}</p>
+              </div>
             </div>
-            {selected.observacoes && <div className="border-t pt-3"><span className="text-xs text-muted-foreground">Observações</span><p className="text-sm">{selected.observacoes}</p></div>}
+
+            {/* Details */}
+            <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+              {[
+                { label: "CNPJ", value: selected.cpf_cnpj, mono: true },
+                { label: "Contato", value: selected.contato },
+                { label: "Telefone", value: selected.telefone },
+                { label: "E-mail", value: selected.email },
+              ].map((field, i) => (
+                <div key={i}>
+                  <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-0.5">{field.label}</p>
+                  <p className={`text-sm ${field.mono ? "font-mono" : ""}`}>{field.value || "—"}</p>
+                </div>
+              ))}
+            </div>
+            {selected.observacoes && (
+              <div className="border-t pt-3">
+                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-0.5">Observações</p>
+                <p className="text-sm text-muted-foreground">{selected.observacoes}</p>
+              </div>
+            )}
           </div>
         )}
       </ViewDrawer>
