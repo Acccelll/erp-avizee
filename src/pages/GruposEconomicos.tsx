@@ -102,7 +102,7 @@ const GruposEconomicos = () => {
     <AppLayout>
       <ModulePage title="Grupos Econômicos" subtitle="Gestão de grupos (matriz, filial, coligada)" addLabel="Novo Grupo" onAdd={openCreate} count={data.length}>
         <DataTable columns={columns} data={data} loading={loading}
-          onView={openView} onEdit={openEdit} onDelete={(g) => remove(g.id)} />
+          onView={openView} />
       </ModulePage>
 
       <FormModal open={modalOpen} onClose={() => setModalOpen(false)} title={mode === "create" ? "Novo Grupo Econômico" : "Editar Grupo Econômico"}>
