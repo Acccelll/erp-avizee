@@ -141,11 +141,8 @@ export default function FormasPagamento() {
         {selected && (
           <div className="space-y-5">
             {/* Header with identity */}
-            <div className="flex items-start gap-4">
-              <div className="flex-shrink-0 h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
-                <span className="text-primary font-bold text-lg">$</span>
-              </div>
-              <div className="flex-1 min-w-0">
+            <div>
+              <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <h3 className="font-semibold text-lg truncate">{selected.descricao}</h3>
                   <StatusBadge status={selected.ativo ? "Ativo" : "Inativo"} />
