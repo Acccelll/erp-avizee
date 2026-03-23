@@ -280,6 +280,15 @@ export function exportarCsv(title: string, rows: Record<string, unknown>[]) {
   downloadTextFile(`${title}.csv`, csv, "text/csv;charset=utf-8");
 }
 
+export async function exportarXlsx(title: string, rows: Record<string, unknown>[]) {
+  if (!rows.length) return;
+  const XLSX = await import("xlsx");
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Relatório");
+  XLSX.writeFile(wb, `${title}.xlsx`);
+}
+
 function formatCsvValue(value: unknown) {
   if (typeof value === "number") return value.toString().replace(".", ",");
   if (value == null) return "";
