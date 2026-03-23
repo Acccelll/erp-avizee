@@ -175,6 +175,11 @@ export default function Relatorios() {
     toast.success('PDF gerado com sucesso!');
   };
 
+  const handleExportXlsx = async () => {
+    await exportarXlsx(resultado.title || tipo, resultado.rows as Record<string, unknown>[]);
+    toast.success('Excel gerado com sucesso!');
+  };
+
   const periodoLabel = dataInicio || dataFim
     ? `${dataInicio ? formatDate(dataInicio) : '—'} a ${dataFim ? formatDate(dataFim) : '—'}`
     : new Date().toLocaleDateString('pt-BR');
