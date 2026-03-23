@@ -489,6 +489,145 @@ export type Database = {
           },
         ]
       }
+      cotacoes_compra: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          data_cotacao: string
+          data_validade: string | null
+          id: string
+          numero: string
+          observacoes: string | null
+          status: string
+          updated_at: string
+          usuario_id: string | null
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          data_cotacao?: string
+          data_validade?: string | null
+          id?: string
+          numero: string
+          observacoes?: string | null
+          status?: string
+          updated_at?: string
+          usuario_id?: string | null
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          data_cotacao?: string
+          data_validade?: string | null
+          id?: string
+          numero?: string
+          observacoes?: string | null
+          status?: string
+          updated_at?: string
+          usuario_id?: string | null
+        }
+        Relationships: []
+      }
+      cotacoes_compra_itens: {
+        Row: {
+          cotacao_compra_id: string
+          created_at: string
+          id: string
+          produto_id: string
+          quantidade: number
+          unidade: string | null
+        }
+        Insert: {
+          cotacao_compra_id: string
+          created_at?: string
+          id?: string
+          produto_id: string
+          quantidade?: number
+          unidade?: string | null
+        }
+        Update: {
+          cotacao_compra_id?: string
+          created_at?: string
+          id?: string
+          produto_id?: string
+          quantidade?: number
+          unidade?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cotacoes_compra_itens_cotacao_compra_id_fkey"
+            columns: ["cotacao_compra_id"]
+            isOneToOne: false
+            referencedRelation: "cotacoes_compra"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cotacoes_compra_itens_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cotacoes_compra_propostas: {
+        Row: {
+          cotacao_compra_id: string
+          created_at: string
+          fornecedor_id: string
+          id: string
+          item_id: string
+          observacoes: string | null
+          prazo_entrega_dias: number | null
+          preco_unitario: number
+          selecionado: boolean
+        }
+        Insert: {
+          cotacao_compra_id: string
+          created_at?: string
+          fornecedor_id: string
+          id?: string
+          item_id: string
+          observacoes?: string | null
+          prazo_entrega_dias?: number | null
+          preco_unitario?: number
+          selecionado?: boolean
+        }
+        Update: {
+          cotacao_compra_id?: string
+          created_at?: string
+          fornecedor_id?: string
+          id?: string
+          item_id?: string
+          observacoes?: string | null
+          prazo_entrega_dias?: number | null
+          preco_unitario?: number
+          selecionado?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cotacoes_compra_propostas_cotacao_compra_id_fkey"
+            columns: ["cotacao_compra_id"]
+            isOneToOne: false
+            referencedRelation: "cotacoes_compra"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cotacoes_compra_propostas_fornecedor_id_fkey"
+            columns: ["fornecedor_id"]
+            isOneToOne: false
+            referencedRelation: "fornecedores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cotacoes_compra_propostas_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "cotacoes_compra_itens"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       email_send_log: {
         Row: {
           created_at: string
