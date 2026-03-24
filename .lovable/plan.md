@@ -1,79 +1,146 @@
 
 
-# Análise: O que foi feito vs. O que falta no ERP AviZee
+# Análise Comparativa: ERP AviZee V2 (GitHub) vs. Projeto Atual (Lovable)
 
-## Mapeamento Documentação vs. Implementação Atual
+## Contexto
 
-### FEITO (Implementado)
-
-| Módulo | Status | Detalhes |
-|--------|--------|----------|
-| **Cadastros** | Completo | Produtos, Clientes, Fornecedores, Transportadoras, Formas de Pagamento, Grupos Econômicos — todos com CRUD, drawer de visualização padronizado, KPIs e abas |
-| **Vendas / Cotações** | Completo | Cotações (orçamentos) com formulário dedicado, itens, PDF, listagem, drawer. Conversão para OV |
-| **Ordens de Venda** | Completo | Listagem, drawer, status de faturamento, vínculo com cotação |
-| **Pedidos (pipeline)** | Completo | Visão unificada de cotações confirmadas + OVs pendentes |
-| **Compras** | Completo | Pedidos de compra com CRUD, itens, drawer, vínculo com fornecedor |
-| **Estoque** | Completo | Posição atual, movimentações (entrada/saída/ajuste), alerta de mínimo, ajuste manual com motivo |
-| **Financeiro** | Completo | Contas a pagar/receber, baixas, filtros por período/status/tipo, lançamento manual, conta contábil |
-| **Caixa** | Completo | Movimentos de caixa, resumo, filtros |
-| **Fluxo de Caixa** | Completo | Página dedicada |
-| **Contas Bancárias** | Completo | CRUD com drawer |
-| **Plano de Contas** | Completo | Contas contábeis hierárquicas |
-| **Fiscal** | Completo | Notas de entrada/saída, itens, rascunho/confirmação/cancelamento, consulta NF-e |
-| **Dashboard** | Completo | Cards KPI, filtro de período, alertas (estoque baixo, backlog, compras aguardando), gráficos, orçamentos e compras recentes |
-| **Relatórios** | Completo | 6 tipos (estoque, movimentos, financeiro, fluxo de caixa, vendas, compras), gráficos, exportação CSV, PDF |
-| **Autenticação** | Completo | Login, Signup, Forgot/Reset Password, AuthContext, ProtectedRoute |
-| **Usuários/Permissões** | Parcial | Roles (admin, vendedor, financeiro, estoquista) via `user_roles` + RLS. AdminRoute implementado |
-| **Administração** | Completo | Empresa, Usuários, E-mails, Parâmetros Fiscais/Financeiros |
-| **Auditoria** | Completo | Logs de auditoria com visualização para admins |
-| **Perfil** | Completo | Página de perfil do usuário |
-| **Navegação** | Completo | Sidebar hierárquica, busca global (Ctrl+K), breadcrumbs, quick actions, tema claro/escuro, mobile bottom nav |
-| **Infraestrutura** | Completo | Supabase Cloud, migrations, RLS, Edge Function (email queue), CI com GitHub Actions |
+O repositório `erp-avizeev2` no GitHub usa uma arquitetura diferente (Express + Prisma + React monorepo na Vercel), enquanto o projeto atual usa React + Supabase (Lovable Cloud). A comparação foca em **funcionalidades e entidades** que existem na V2 e que estão ausentes ou incompletas no projeto atual.
 
 ---
 
-### PENDENTE (Gaps identificados na documentação)
+## Funcionalidades presentes na V2 que FALTAM no projeto atual
 
-| # | Item | Prioridade | Complexidade | Descrição |
-|---|------|-----------|-------------|-----------|
-| 1 | **Cotações de Compra** | Alta | Média | Página `CotacoesCompra.tsx` é apenas um placeholder (EmptyState). Documentação prevê comparação de propostas entre fornecedores com itens, preços e seleção do melhor fornecedor |
-| 2 | **Integração fiscal real (SEFAZ)** | Alta | Muito Alta | Emissão de NF-e via SEFAZ, XML assinado, DANFE. Atualmente o fiscal é apenas controle interno sem integração real |
-| 3 | **Motor tributário completo** | Alta | Alta | Cálculo automático de CFOP, CST, NCM, ICMS, PIS, COFINS, IPI baseado em regras fiscais. Campos existem nas tabelas mas sem lógica de cálculo |
-| 4 | **Conciliação bancária** | Média | Alta | Importação de OFX, matching automático entre extratos e lançamentos financeiros |
-| 5 | **Estorno de NF confirmada** | Média | Média | Reversão de estoque e financeiro ao estornar uma nota fiscal já confirmada |
-| 6 | **Estoque por variação/SKU e múltiplos depósitos** | Média | Alta | Controle de estoque por variações do produto e por local de armazenamento. Hoje é estoque único por produto |
-| 7 | **Exportação Excel (XLSX)** | Baixa | Baixa | Documentação menciona exportação Excel além de CSV/PDF. Apenas CSV e PDF estão implementados |
-| 8 | **Envio de cotação por e-mail** | Média | Média | Envio do PDF da cotação diretamente por e-mail ao cliente. Edge Function de email existe mas não está integrada ao fluxo de cotações |
-| 9 | **Histórico de preços de compra por produto** | Baixa | Baixa | Tabela `produtos_fornecedores` existe mas não há tela dedicada para análise de evolução de custos |
-| 10 | **Valorização do estoque** | Baixa | Média | Relatório de valor total do estoque por método (custo médio, FIFO). Hoje mostra apenas quantidades |
-| 11 | **Auditoria por usuario_criacao/ultima_modificacao** | Baixa | Média | Documentação prevê campos `usuario_criacao_id` e `usuario_ultima_modificacao_id` nas entidades. Hoje existe tabela `auditoria_logs` separada, mas não campos inline |
+### 1. Entidades de dados ausentes
+
+| Entidade V2 | Existe aqui? | O que falta |
+|---|---|---|
+| **Filial** | Nao | V2 suporta multi-filial (empresa > filiais > depósitos). Aqui temos apenas `empresa_config` única |
+| **Deposito** | Nao | V2 tem depósitos vinculados a filiais, com estoque por depósito (`EstoqueSaldo` = produto + depósito). Aqui estoque é único por produto |
+| **CentroCusto** | Nao | Classificação financeira por centro de custo. V2 vincula CP/CR a centros de custo |
+| **NaturezaFinanceira** | Nao | Classificação receita/despesa com código e tipo. V2 vincula a CP/CR |
+| **SolicitacaoCompra** | Nao | Fluxo completo: Solicitação > Cotação > Pedido > Recebimento. Aqui temos apenas Cotações e Compras diretas |
+| **RecebimentoCompra** | Nao | Registro formal de recebimento com depósito destino e impacto em estoque. Aqui a entrada é via NF ou manual |
+| **TransferenciaEstoque** | Nao | Transferência entre depósitos com itens e movimentação automática |
+| **Inventario / InventarioItem** | Nao | Módulo de inventário físico: recontagem, divergência e ajuste automático |
+| **PedidoVenda** (entidade separada) | Parcial | V2 tem Orcamento > PedidoVenda > OrdemVenda como 3 entidades. Aqui temos Orcamento > OrdemVenda (2 etapas) |
+| **Permissao** (granular) | Parcial | V2 tem tabela de permissões por perfil/módulo/ação. Aqui temos roles simples (admin, vendedor, financeiro, estoquista) |
+
+### 2. Funcionalidades de lógica de negócio ausentes
+
+| Funcionalidade V2 | Status aqui |
+|---|---|
+| **Reserva de estoque** ao colocar OV em separação | Nao implementado |
+| **Estorno automático de estoque** ao cancelar NF confirmada | Nao implementado |
+| **Parcelamento financeiro** com geração automática de N parcelas | Nao implementado (campo parcela existe mas sem lógica de geração) |
+| **Estorno de baixa financeira** (reverter pagamento parcial/total) | Nao implementado |
+| **Travas de integridade** (bloqueio de cancelamento com documentos sucessores) | Nao implementado |
+| **Importação de XML de NF-e** com parser estruturado | Nao implementado (fiscal é controle interno) |
+| **De-Para de produtos no XML** (sugestão de vínculo) | Nao implementado |
+| **Relatório de Aging** (faixas de vencimento) | Nao implementado |
+| **Saldo reservado vs saldo disponível** no estoque | Nao implementado |
+
+### 3. Campos presentes na V2 e ausentes aqui
+
+- `usuario_criacao_id` e `usuario_ultima_modificacao_id` em todas as entidades (rastreabilidade inline)
+- `xml_url` e `pdf_url` em notas fiscais
+- `enviado_email` e `data_envio_email` em notas fiscais
+- `saldo_inicial` em contas bancárias
+- `documento_pai_id` em CP/CR (agrupamento de parcelas)
+- `quantidade_reservada` no estoque
 
 ---
 
-### Resumo Quantitativo
+## Plano de Implementação (o que podemos fazer aqui)
 
-- **Módulos documentados**: 10 (Cadastros, Vendas, Compras, Financeiro, Estoque, Fiscal, Dashboard, Relatórios, Usuários, Administração)
-- **Módulos implementados**: 10/10 com funcionalidade base
-- **Funcionalidades core**: ~85% implementadas
-- **Gaps críticos**: 3 (SEFAZ, motor tributário, cotações de compra)
-- **Gaps de evolução**: 8 (conciliação, estorno NF, multi-depósito, Excel, email cotação, histórico preços, valorização estoque, auditoria inline)
+### Sprint 1 -- Alto valor, complexidade moderada
+
+**1.1 Parcelamento financeiro**
+- Adicionar lógica de geração automática de parcelas ao criar lançamento financeiro
+- Campos `parcela_numero` e `parcela_total` já existem na tabela
+- Adicionar campo `documento_pai_id` para agrupamento
+- UI: opção de "Gerar parcelas" no modal de criação com número de parcelas e intervalo
+
+**1.2 Estorno de NF confirmada**
+- Ao cancelar NF com status "confirmada", reverter automaticamente:
+  - Movimentos de estoque gerados pela confirmação
+  - Lançamentos financeiros vinculados
+- Adicionar validação e confirmação antes do estorno
+
+**1.3 Relatório de Aging**
+- Novo tipo de relatório em `Relatorios.tsx`
+- Agrupar contas a pagar/receber por faixas de vencimento (a vencer, 1-30 dias, 31-60, 61-90, 90+)
+- Filtros por tipo (pagar/receber) e período
+
+**1.4 Importação de XML de NF-e**
+- Botão "Importar XML" na tela Fiscal
+- Parser client-side de XML de NF-e (DOMParser no browser)
+- Preencher automaticamente dados da NF (número, série, chave, fornecedor, itens com impostos)
+- Sugestão de vínculo produto por código/descrição (De-Para)
+
+### Sprint 2 -- Estrutural, alta complexidade
+
+**2.1 Depósitos e estoque por depósito**
+- Nova tabela `depositos` (codigo, nome, ativo)
+- Nova tabela `estoque_saldos` (produto_id, deposito_id, quantidade_atual, quantidade_reservada)
+- Migrar estoque atual de campo no produto para tabela de saldos
+- UI: seleção de depósito em movimentações e na tela de estoque
+
+**2.2 Transferência entre depósitos**
+- Tabelas `transferencias_estoque` e `transferencia_estoque_itens`
+- UI: tela ou aba na página de Estoque
+- Movimentação automática (saída no origem, entrada no destino)
+
+**2.3 Inventário físico**
+- Tabelas `inventarios` e `inventario_itens`
+- Fluxo: abrir inventário > registrar contagem física > calcular divergência > gerar ajuste
+- UI: nova aba ou submódulo em Estoque
+
+**2.4 Reserva de estoque em OV**
+- Ao mudar status da OV para "em_separacao", reservar quantidade dos itens
+- Campo `quantidade_reservada` no estoque
+- Validação de disponibilidade (atual - reservada)
+
+### Sprint 3 -- Refinamento
+
+**3.1 Solicitação de Compra**
+- Nova tabela e CRUD
+- Fluxo: Solicitação > Cotação de Compra > Pedido de Compra
+
+**3.2 Recebimento de Compra**
+- Nova tabela com vínculo ao pedido e depósito
+- Impacto automático em estoque ao confirmar
+
+**3.3 Centro de Custo e Natureza Financeira**
+- Novas tabelas de cadastro
+- Vínculo opcional nos lançamentos financeiros
+- UI: novas telas de cadastro + campos nos formulários financeiros
+
+**3.4 Permissões granulares**
+- Tabela de permissões por perfil/módulo/ação
+- Substituir roles simples por verificação granular
+- UI: tela de gestão de perfis e permissões em Administração
+
+**3.5 Rastreabilidade inline**
+- Adicionar `usuario_criacao_id` e `usuario_ultima_modificacao_id` nas tabelas principais
+- Exibir "Criado por" e "Modificado por" nos drawers
 
 ---
 
-### Recomendação de Priorização
+## O que NÃO vale migrar
 
-**Sprint imediato (alto valor, complexidade moderada):**
-1. Implementar Cotações de Compra (comparação de fornecedores)
-2. Exportação XLSX nos relatórios
-3. Envio de cotação por e-mail
+| Item | Motivo |
+|---|---|
+| Backend Express/Prisma | Arquitetura diferente; usamos Supabase |
+| Deploy Vercel monorepo | Lovable tem deploy próprio |
+| JWT auth custom | Usamos Supabase Auth |
+| Multi-empresa/filial | Complexidade alta, baixo valor imediato para operação single-company |
 
-**Sprint seguinte (alto valor, alta complexidade):**
-4. Motor tributário básico (cálculo automático de impostos)
-5. Estorno de NF confirmada com reversão
-6. Valorização do estoque
+---
 
-**Backlog estratégico (requer integrações externas):**
-7. Integração SEFAZ (NF-e real)
-8. Conciliação bancária (OFX)
-9. Múltiplos depósitos
+## Resumo
+
+- **V2 tem ~12 funcionalidades/entidades** que não existem no projeto atual
+- **Sprint 1** (parcelamento, estorno NF, aging, importação XML) traz o maior valor com menor risco
+- **Sprint 2** (depósitos, transferência, inventário, reserva) é estrutural e muda o modelo de estoque
+- **Sprint 3** (solicitação compra, recebimento, centro custo, permissões granulares) completa a paridade
 
