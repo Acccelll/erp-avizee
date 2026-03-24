@@ -9,7 +9,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Edit, Trash2 } from "lucide-react";
 import { SummaryCard } from "@/components/SummaryCard";
 import { PeriodFilter, financialPeriods, type Period } from "@/components/dashboard/PeriodFilter";
-import { periodToDateFrom, periodToDateTo } from "@/lib/periodFilter";
+import { periodToFinancialRange } from "@/lib/periodFilter";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -181,17 +181,19 @@ const Financeiro = () => {
 
   const filteredData = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
-    const dateFrom = periodToDateFrom(period);
-    const dateTo = periodToDateTo(period);
+    const { dateFrom, dateTo } = periodToFinancialRange(period);
     const isOverdueFilter = period === "vencidos";
+    const todayStr = hoje.toISOString().split("T")[0];
 
     return data.filter((l) => {
       const effectiveStatus = getEffectiveStatus(l);
 
-      // Period filter
+      // Period filter (forward-looking for financial)
       if (isOverdueFilter) {
+        // Show all overdue (vencimento before today and not paid)
         if (effectiveStatus !== "vencido") return false;
       } else {
+        // Forward-looking: show items with vencimento between today and today+N
         if (l.data_vencimento < dateFrom) return false;
         if (dateTo && l.data_vencimento > dateTo) return false;
       }

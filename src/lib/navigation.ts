@@ -165,14 +165,9 @@ export const navSections: NavSection[] = [
     icon: BarChart3,
     items: [
       {
-        title: 'Análises',
+        title: 'Relatórios',
         items: [
-          { title: 'Estoque', path: '/relatorios?tipo=estoque' },
-          { title: 'Movimentos de Estoque', path: '/relatorios?tipo=movimentos_estoque', keywords: ['entradas', 'saidas', 'ajustes'] },
-          { title: 'Financeiro', path: '/relatorios?tipo=financeiro' },
-          { title: 'Fluxo de Caixa', path: '/relatorios?tipo=fluxo_caixa' },
-          { title: 'Vendas', path: '/relatorios?tipo=vendas' },
-          { title: 'Compras por Fornecedor', path: '/relatorios?tipo=compras' },
+          { title: 'Relatórios', path: '/relatorios', keywords: ['estoque', 'financeiro', 'vendas', 'compras', 'fluxo', 'movimentos'] },
         ],
       },
     ],

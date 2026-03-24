@@ -695,15 +695,25 @@ const Fiscal = () => {
           <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => { setDrawerOpen(false); remove(selected.id); }}><Trash2 className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Excluir</TooltipContent></Tooltip>
         </> : undefined}
       >
-        {selected && (
+        {selected && (() => {
+          const subtotalProdutos = viewItems.reduce((s: number, i: any) => s + (i.quantidade * i.valor_unitario), 0);
+          const totalImpostosView = Number(selected.icms_valor || 0) + Number(selected.ipi_valor || 0) + Number(selected.pis_valor || 0) + Number(selected.cofins_valor || 0) + Number(selected.icms_st_valor || 0);
+          const condicaoLabel = selected.condicao_pagamento === 'a_vista' ? 'À Vista' : selected.condicao_pagamento === 'a_prazo' ? 'A Prazo' : selected.condicao_pagamento || '—';
+
+          return (
           <div className="space-y-5">
             <ViewSection title="Informações Gerais">
               <div className="grid grid-cols-2 gap-4">
-                <ViewField label="Tipo"><span className="capitalize font-medium">{selected.tipo}</span></ViewField>
-                <ViewField label="Número / Série"><span className="font-mono font-medium">{selected.numero} / {selected.serie}</span></ViewField>
+                <ViewField label="Tipo"><span className="capitalize font-medium">{selected.tipo === 'entrada' ? 'Entrada' : 'Saída'}</span></ViewField>
+                <ViewField label="Número / Série"><span className="font-mono font-medium">{selected.numero} / {selected.serie || '1'}</span></ViewField>
                 <ViewField label="Data Emissão">{formatDate(selected.data_emissao)}</ViewField>
-                <ViewField label="Valor Total"><span className="font-semibold font-mono text-lg">{formatCurrency(Number(selected.valor_total))}</span></ViewField>
+                <ViewField label="Status"><StatusBadge status={selected.status} /></ViewField>
               </div>
+              {selected.chave_acesso && (
+                <div className="mt-3">
+                  <ViewField label="Chave de Acesso"><span className="font-mono text-xs break-all">{selected.chave_acesso}</span></ViewField>
+                </div>
+              )}
             </ViewSection>
 
             <ViewSection title="Parceiro">
@@ -711,29 +721,16 @@ const Fiscal = () => {
                 <ViewField label={selected.tipo === "entrada" ? "Fornecedor" : "Cliente"}>
                   {selected.tipo === "entrada" ? selected.fornecedores?.nome_razao_social || "—" : selected.clientes?.nome_razao_social || "—"}
                 </ViewField>
-                {selected.chave_acesso && (
-                  <ViewField label="Chave de Acesso"><span className="font-mono text-xs break-all">{selected.chave_acesso}</span></ViewField>
+                {selected.ordem_venda_id && selected.ordens_venda && (
+                  <ViewField label="Ordem de Venda"><span className="font-mono font-medium">{selected.ordens_venda.numero}</span></ViewField>
                 )}
               </div>
             </ViewSection>
 
-            {/* Frete, Impostos */}
-            {(Number(selected.frete_valor || 0) > 0 || Number(selected.icms_valor || 0) > 0 || Number(selected.ipi_valor || 0) > 0) && (
-              <ViewSection title="Frete e Impostos">
-                <div className="grid grid-cols-2 gap-4">
-                  {Number(selected.frete_valor || 0) > 0 && <ViewField label="Frete">{formatCurrency(Number(selected.frete_valor))}</ViewField>}
-                  {Number(selected.icms_valor || 0) > 0 && <ViewField label="ICMS">{formatCurrency(Number(selected.icms_valor))}</ViewField>}
-                  {Number(selected.ipi_valor || 0) > 0 && <ViewField label="IPI">{formatCurrency(Number(selected.ipi_valor))}</ViewField>}
-                  {Number(selected.pis_valor || 0) > 0 && <ViewField label="PIS">{formatCurrency(Number(selected.pis_valor))}</ViewField>}
-                  {Number(selected.cofins_valor || 0) > 0 && <ViewField label="COFINS">{formatCurrency(Number(selected.cofins_valor))}</ViewField>}
-                  {Number(selected.icms_st_valor || 0) > 0 && <ViewField label="ICMS-ST">{formatCurrency(Number(selected.icms_st_valor))}</ViewField>}
-                  {Number(selected.desconto_valor || 0) > 0 && <ViewField label="Desconto">{formatCurrency(Number(selected.desconto_valor))}</ViewField>}
-                </div>
-              </ViewSection>
-            )}
-
-            <ViewSection title="Configuração">
+            <ViewSection title="Pagamento">
               <div className="grid grid-cols-2 gap-4">
+                <ViewField label="Condição de Pagamento">{condicaoLabel}</ViewField>
+                <ViewField label="Forma de Pagamento"><span className="capitalize">{selected.forma_pagamento || '—'}</span></ViewField>
                 <ViewField label="Gera Financeiro">
                   <span className={selected.gera_financeiro !== false ? "text-green-600 font-medium" : "text-muted-foreground"}>
                     {selected.gera_financeiro !== false ? "Sim" : "Não"}
@@ -744,12 +741,6 @@ const Fiscal = () => {
                     {selected.movimenta_estoque !== false ? "Sim" : "Não"}
                   </span>
                 </ViewField>
-                {selected.ordem_venda_id && selected.ordens_venda && (
-                  <ViewField label="Ordem de Venda"><span className="font-mono font-medium">{selected.ordens_venda.numero}</span></ViewField>
-                )}
-                {selected.forma_pagamento && (
-                  <ViewField label="Forma de Pagamento"><span className="capitalize">{selected.forma_pagamento}</span></ViewField>
-                )}
               </div>
             </ViewSection>
 
@@ -761,7 +752,10 @@ const Fiscal = () => {
                       <tr className="bg-muted/50 border-b">
                         <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground">Produto</th>
                         <th className="px-3 py-2 text-right text-xs font-semibold text-muted-foreground">Qtd</th>
+                        <th className="px-3 py-2 text-right text-xs font-semibold text-muted-foreground">Vlr. Unit.</th>
                         <th className="px-3 py-2 text-right text-xs font-semibold text-muted-foreground">Total</th>
+                        <th className="px-3 py-2 text-center text-xs font-semibold text-muted-foreground">CST</th>
+                        <th className="px-3 py-2 text-center text-xs font-semibold text-muted-foreground">CFOP</th>
                         <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground">Conta</th>
                       </tr>
                     </thead>
@@ -770,7 +764,10 @@ const Fiscal = () => {
                         <tr key={idx} className="border-b last:border-b-0 hover:bg-muted/20">
                           <td className="px-3 py-2">{i.produtos?.nome || "—"}</td>
                           <td className="px-3 py-2 text-right font-mono">{i.quantidade}</td>
+                          <td className="px-3 py-2 text-right font-mono text-muted-foreground">{formatCurrency(i.valor_unitario)}</td>
                           <td className="px-3 py-2 text-right font-mono font-medium">{formatCurrency(i.quantidade * i.valor_unitario)}</td>
+                          <td className="px-3 py-2 text-center font-mono text-xs">{i.cst || "—"}</td>
+                          <td className="px-3 py-2 text-center font-mono text-xs">{i.cfop || "—"}</td>
                           <td className="px-3 py-2 text-xs text-muted-foreground">{i.contas_contabeis ? `${i.contas_contabeis.codigo}` : "—"}</td>
                         </tr>
                       ))}
@@ -779,6 +776,54 @@ const Fiscal = () => {
                 </div>
               </ViewSection>
             )}
+
+            {/* Resumo Financeiro */}
+            <ViewSection title="Resumo Financeiro">
+              <div className="bg-accent/30 rounded-lg p-4 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Subtotal Produtos</span>
+                  <span className="font-mono">{formatCurrency(subtotalProdutos)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Frete</span>
+                  <span className="font-mono">{Number(selected.frete_valor || 0) > 0 ? formatCurrency(Number(selected.frete_valor)) : '—'}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">ICMS</span>
+                  <span className="font-mono">{Number(selected.icms_valor || 0) > 0 ? formatCurrency(Number(selected.icms_valor)) : '—'}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">IPI</span>
+                  <span className="font-mono">{Number(selected.ipi_valor || 0) > 0 ? formatCurrency(Number(selected.ipi_valor)) : '—'}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">PIS</span>
+                  <span className="font-mono">{Number(selected.pis_valor || 0) > 0 ? formatCurrency(Number(selected.pis_valor)) : '—'}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">COFINS</span>
+                  <span className="font-mono">{Number(selected.cofins_valor || 0) > 0 ? formatCurrency(Number(selected.cofins_valor)) : '—'}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">ICMS-ST</span>
+                  <span className="font-mono">{Number(selected.icms_st_valor || 0) > 0 ? formatCurrency(Number(selected.icms_st_valor)) : '—'}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Outras Despesas</span>
+                  <span className="font-mono">{Number(selected.outras_despesas || 0) > 0 ? formatCurrency(Number(selected.outras_despesas)) : '—'}</span>
+                </div>
+                {Number(selected.desconto_valor || 0) > 0 && (
+                  <div className="flex justify-between text-sm text-destructive">
+                    <span>Desconto</span>
+                    <span className="font-mono">-{formatCurrency(Number(selected.desconto_valor))}</span>
+                  </div>
+                )}
+                <div className="flex justify-between font-bold border-t pt-2 mt-2">
+                  <span>Total da NF</span>
+                  <span className="font-mono text-lg">{formatCurrency(Number(selected.valor_total))}</span>
+                </div>
+              </div>
+            </ViewSection>
 
             {selected.observacoes && (
               <ViewSection title="Observações">
@@ -797,7 +842,8 @@ const Fiscal = () => {
               </Button>
             )}
           </div>
-        )}
+          );
+        })()}
       </ViewDrawer>
     </AppLayout>
   );

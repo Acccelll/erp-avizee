@@ -11,7 +11,7 @@ import { RecentOrcamentos } from "@/components/dashboard/RecentOrcamentos";
 import { RecentCompras } from "@/components/dashboard/RecentCompras";
 import { SummaryPie } from "@/components/dashboard/SummaryPie";
 import { supabase } from "@/integrations/supabase/client";
-import { periodToDateFrom } from "@/lib/periodFilter";
+import { periodToFinancialRange } from "@/lib/periodFilter";
 import { formatCurrency, formatNumber } from "@/lib/format";
 import { Package, Users, TrendingUp, DollarSign } from "lucide-react";
 
@@ -34,17 +34,18 @@ const Dashboard = () => {
   useEffect(() => {
     const load = async () => {
       setLoading(true);
-      const dateFrom = periodToDateFrom(period);
+      const { dateFrom, dateTo } = periodToFinancialRange(period);
       const isVencidos = period === 'vencidos';
       const today = new Date().toISOString().slice(0, 10);
 
-      // Build financial queries based on period
+      // Build financial queries based on period (forward-looking)
       const buildFinQuery = (tipo: string) => {
         let q = (supabase as any).from("financeiro_lancamentos").select("valor").eq("tipo", tipo).eq("ativo", true);
         if (isVencidos) {
-          q = q.eq("status", "vencido").lt("data_vencimento", today);
+          q = q.in("status", ["aberto", "vencido"]).lt("data_vencimento", today);
         } else {
           q = q.eq("status", "aberto").gte("data_vencimento", dateFrom);
+          if (dateTo) q = q.lte("data_vencimento", dateTo);
         }
         return q;
       };
