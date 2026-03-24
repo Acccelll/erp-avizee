@@ -220,6 +220,150 @@ const Fiscal = () => {
     }
   };
 
+  // ── Estorno de NF Confirmada ──
+  const handleEstornar = async (nf: NotaFiscal) => {
+    if (!window.confirm(`Deseja estornar a NF ${nf.numero}? Isso reverterá movimentos de estoque e lançamentos financeiros vinculados.`)) return;
+    try {
+      // 1. Reverse stock movements
+      if (nf.movimenta_estoque !== false) {
+        const { data: movimentos } = await (supabase as any).from("estoque_movimentos")
+          .select("*").eq("documento_id", nf.id).eq("documento_tipo", "fiscal");
+        if (movimentos) {
+          for (const mov of movimentos) {
+            const { data: prod } = await (supabase as any).from("produtos").select("estoque_atual").eq("id", mov.produto_id).single();
+            const saldoAtual = Number(prod?.estoque_atual || 0);
+            const reversao = mov.tipo === "entrada" ? -Number(mov.quantidade) : Number(mov.quantidade);
+            const novoSaldo = saldoAtual + reversao;
+            await (supabase as any).from("estoque_movimentos").insert({
+              produto_id: mov.produto_id, tipo: mov.tipo === "entrada" ? "saida" : "entrada",
+              quantidade: Number(mov.quantidade), saldo_anterior: saldoAtual, saldo_atual: novoSaldo,
+              documento_tipo: "estorno_fiscal", documento_id: nf.id,
+              motivo: `Estorno da NF ${nf.numero}`,
+            });
+            await (supabase as any).from("produtos").update({ estoque_atual: novoSaldo }).eq("id", mov.produto_id);
+          }
+        }
+      }
+
+      // 2. Cancel linked financial entries
+      if (nf.gera_financeiro !== false) {
+        await (supabase as any).from("financeiro_lancamentos")
+          .update({ status: "cancelado" })
+          .or(`nota_fiscal_id.eq.${nf.id},documento_fiscal_id.eq.${nf.id}`);
+      }
+
+      // 3. Reverse OV billing if applicable
+      if (nf.tipo === "saida" && nf.ordem_venda_id) {
+        const { data: nfItens } = await (supabase as any).from("notas_fiscais_itens").select("*").eq("nota_fiscal_id", nf.id);
+        if (nfItens) {
+          const { data: ovItens } = await (supabase as any).from("ordens_venda_itens")
+            .select("id, produto_id, quantidade_faturada").eq("ordem_venda_id", nf.ordem_venda_id);
+          if (ovItens) {
+            for (const nfItem of nfItens) {
+              const ovItem = ovItens.find((oi: any) => oi.produto_id === nfItem.produto_id);
+              if (ovItem) {
+                const newQtd = Math.max(0, (ovItem.quantidade_faturada || 0) - nfItem.quantidade);
+                await (supabase as any).from("ordens_venda_itens").update({ quantidade_faturada: newQtd }).eq("id", ovItem.id);
+              }
+            }
+            // Recalculate OV billing status
+            const { data: updatedItems } = await (supabase as any).from("ordens_venda_itens")
+              .select("quantidade, quantidade_faturada").eq("ordem_venda_id", nf.ordem_venda_id);
+            const totalQ = (updatedItems || []).reduce((s: number, i: any) => s + Number(i.quantidade), 0);
+            const totalF = (updatedItems || []).reduce((s: number, i: any) => s + Number(i.quantidade_faturada || 0), 0);
+            const newSt = totalF >= totalQ ? "total" : totalF > 0 ? "parcial" : "aguardando";
+            await (supabase as any).from("ordens_venda").update({ status_faturamento: newSt }).eq("id", nf.ordem_venda_id);
+          }
+        }
+      }
+
+      // 4. Set NF as cancelled
+      await (supabase as any).from("notas_fiscais").update({ status: "cancelada" }).eq("id", nf.id);
+
+      toast.success(`NF ${nf.numero} estornada! Estoque e financeiro revertidos.`);
+      fetchData();
+    } catch (err: any) {
+      console.error('[fiscal] estornar NF:', err);
+      toast.error("Erro ao estornar nota fiscal.");
+    }
+  };
+
+  // ── Importação de XML de NF-e ──
+  const handleXmlImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      const xmlText = await file.text();
+      const nfe: NFeData = parseNFeXml(xmlText);
+
+      // Try to match emitter to a fornecedor by CNPJ
+      let fornecedorId = "";
+      if (nfe.emitente.cnpj) {
+        const cnpjClean = nfe.emitente.cnpj.replace(/\D/g, "");
+        const matched = fornecedoresCrud.data.find((f: any) =>
+          (f.cpf_cnpj || "").replace(/\D/g, "") === cnpjClean
+        );
+        if (matched) {
+          fornecedorId = matched.id;
+          toast.info(`Fornecedor identificado: ${matched.nome_razao_social}`);
+        } else {
+          toast.info(`Fornecedor CNPJ ${nfe.emitente.cnpj} não encontrado no cadastro. Preencha manualmente.`);
+        }
+      }
+
+      // Map items trying to match by code
+      const mappedItems: GridItem[] = nfe.itens.map((nfeItem) => {
+        const matchedProd = produtosCrud.data.find((p: any) =>
+          p.codigo_interno === nfeItem.codigo || p.sku === nfeItem.codigo
+        );
+        return {
+          produto_id: matchedProd?.id || "",
+          codigo: nfeItem.codigo,
+          descricao: matchedProd?.nome || nfeItem.descricao,
+          quantidade: nfeItem.quantidade,
+          valor_unitario: nfeItem.valorUnitario,
+          valor_total: nfeItem.valorTotal,
+        };
+      });
+
+      setForm({
+        ...emptyForm,
+        tipo: "entrada",
+        numero: nfe.numero,
+        serie: nfe.serie,
+        chave_acesso: nfe.chaveAcesso,
+        data_emissao: nfe.dataEmissao || new Date().toISOString().split("T")[0],
+        fornecedor_id: fornecedorId,
+        frete_valor: nfe.valorFrete,
+        icms_valor: nfe.icmsTotal,
+        ipi_valor: nfe.ipiTotal,
+        pis_valor: nfe.pisTotal,
+        cofins_valor: nfe.cofinsTotal,
+        icms_st_valor: nfe.icmsStTotal,
+        desconto_valor: nfe.valorDesconto,
+        outras_despesas: nfe.valorOutrasDespesas,
+        valor_total: nfe.valorTotal,
+      });
+      setItems(mappedItems);
+      setMode("create");
+      setSelected(null);
+      setItemContaContabil({});
+      setModalOpen(true);
+
+      const unmatchedCount = mappedItems.filter((i) => !i.produto_id).length;
+      if (unmatchedCount > 0) {
+        toast.warning(`${unmatchedCount} item(ns) não foram vinculados automaticamente. Vincule manualmente.`);
+      } else {
+        toast.success("XML importado com sucesso! Todos os itens foram vinculados.");
+      }
+    } catch (err: any) {
+      console.error("[fiscal] XML import:", err);
+      toast.error(`Erro ao importar XML: ${err.message}`);
+    }
+    // Reset input
+    if (xmlInputRef.current) xmlInputRef.current.value = "";
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.numero) { toast.error("Número é obrigatório"); return; }
@@ -301,6 +445,14 @@ const Fiscal = () => {
         searchValue={viewParam === "consulta" ? consultaSearch : undefined}
         onSearchChange={viewParam === "consulta" ? setConsultaSearch : undefined}
         searchPlaceholder="Buscar por número, chave ou parceiro..."
+        extraActions={
+          <>
+            <input ref={xmlInputRef} type="file" accept=".xml" className="hidden" onChange={handleXmlImport} />
+            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => xmlInputRef.current?.click()}>
+              <Upload className="h-3.5 w-3.5" /> Importar XML
+            </Button>
+          </>
+        }
       >
         {/* KPI Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -637,6 +789,11 @@ const Fiscal = () => {
             {selected.status === "pendente" && (
               <Button className="w-full" onClick={() => { handleConfirmar(selected); setDrawerOpen(false); }}>
                 <CheckCircle className="w-4 h-4 mr-2" /> Confirmar Nota Fiscal
+              </Button>
+            )}
+            {selected.status === "confirmada" && (
+              <Button variant="destructive" className="w-full" onClick={() => { handleEstornar(selected); setDrawerOpen(false); }}>
+                <XCircle className="w-4 h-4 mr-2" /> Estornar Nota Fiscal
               </Button>
             )}
           </div>
