@@ -842,7 +842,8 @@ const Fiscal = () => {
               </Button>
             )}
           </div>
-        )}
+          );
+        })()}
       </ViewDrawer>
     </AppLayout>
   );
