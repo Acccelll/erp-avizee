@@ -832,6 +832,7 @@ export type Database = {
           data_vencimento: string
           descricao: string
           documento_fiscal_id: string | null
+          documento_pai_id: string | null
           forma_pagamento: string | null
           fornecedor_id: string | null
           id: string
@@ -857,6 +858,7 @@ export type Database = {
           data_vencimento: string
           descricao: string
           documento_fiscal_id?: string | null
+          documento_pai_id?: string | null
           forma_pagamento?: string | null
           fornecedor_id?: string | null
           id?: string
@@ -882,6 +884,7 @@ export type Database = {
           data_vencimento?: string
           descricao?: string
           documento_fiscal_id?: string | null
+          documento_pai_id?: string | null
           forma_pagamento?: string | null
           fornecedor_id?: string | null
           id?: string
@@ -922,6 +925,13 @@ export type Database = {
             columns: ["documento_fiscal_id"]
             isOneToOne: false
             referencedRelation: "notas_fiscais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "financeiro_lancamentos_documento_pai_id_fkey"
+            columns: ["documento_pai_id"]
+            isOneToOne: false
+            referencedRelation: "financeiro_lancamentos"
             referencedColumns: ["id"]
           },
           {

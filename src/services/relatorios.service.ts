@@ -2,7 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { downloadTextFile } from "@/lib/utils";
 import { formatCurrency, formatDate, formatNumber } from "@/lib/format";
 
-export type TipoRelatorio = "estoque" | "movimentos_estoque" | "financeiro" | "fluxo_caixa" | "vendas" | "compras";
+export type TipoRelatorio = "estoque" | "movimentos_estoque" | "financeiro" | "fluxo_caixa" | "vendas" | "compras" | "aging";
 
 export interface FiltroRelatorio {
   dataInicio?: string;
@@ -230,8 +230,7 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
       };
     }
 
-    case "compras":
-    default: {
+    case "compras": {
       let query = (supabase as any)
         .from("compras")
         .select("numero, data_compra, data_entrega_prevista, data_entrega_real, valor_total, status, fornecedores(nome_razao_social)")
@@ -260,6 +259,60 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
           name: row.fornecedor,
           value: row.valor,
         })),
+      };
+    }
+
+    case "aging":
+    default: {
+      const { data, error } = await (supabase as any)
+        .from("financeiro_lancamentos")
+        .select("tipo, descricao, valor, status, data_vencimento, data_pagamento, clientes(nome_razao_social), fornecedores(nome_razao_social)")
+        .eq("ativo", true)
+        .in("status", ["aberto", "vencido"])
+        .order("data_vencimento", { ascending: true });
+
+      if (error) throw error;
+
+      const hoje = new Date();
+      hoje.setHours(0, 0, 0, 0);
+
+      const rows = (data || []).map((item: any) => {
+        const venc = new Date(item.data_vencimento);
+        const diffDays = Math.floor((hoje.getTime() - venc.getTime()) / (1000 * 60 * 60 * 24));
+        let faixa = "A vencer";
+        if (diffDays > 0 && diffDays <= 30) faixa = "1-30 dias";
+        else if (diffDays > 30 && diffDays <= 60) faixa = "31-60 dias";
+        else if (diffDays > 60 && diffDays <= 90) faixa = "61-90 dias";
+        else if (diffDays > 90) faixa = "90+ dias";
+
+        return {
+          tipo: item.tipo === "receber" ? "Receber" : "Pagar",
+          descricao: item.descricao || "-",
+          parceiro: item.tipo === "receber"
+            ? item.clientes?.nome_razao_social || "-"
+            : item.fornecedores?.nome_razao_social || "-",
+          valor: Number(item.valor || 0),
+          vencimento: item.data_vencimento,
+          diasVencido: diffDays > 0 ? diffDays : 0,
+          faixa,
+        };
+      });
+
+      const faixas = ["A vencer", "1-30 dias", "31-60 dias", "61-90 dias", "90+ dias"];
+      const chartData = faixas.map((f) => ({
+        name: f,
+        value: rows.filter((r) => r.faixa === f).reduce((s, r) => s + r.valor, 0),
+      }));
+
+      return {
+        title: "Aging — Vencidos por faixa",
+        subtitle: "Títulos a pagar e receber agrupados por faixa de vencimento.",
+        rows,
+        chartData,
+        totals: {
+          totalTitulos: rows.length,
+          totalValor: rows.reduce((s, r) => s + r.valor, 0),
+        },
       };
     }
   }
