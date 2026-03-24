@@ -29,6 +29,7 @@ interface Lancamento {
   cliente_id: string; fornecedor_id: string; nota_fiscal_id: string;
   conta_bancaria_id: string; conta_contabil_id: string;
   parcela_numero: number; parcela_total: number;
+  documento_pai_id: string;
   observacoes: string; ativo: boolean;
   clientes?: { nome_razao_social: string }; fornecedores?: { nome_razao_social: string };
   contas_bancarias?: { descricao: string; bancos?: { nome: string } };
