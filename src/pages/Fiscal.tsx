@@ -445,7 +445,7 @@ const Fiscal = () => {
         searchValue={viewParam === "consulta" ? consultaSearch : undefined}
         onSearchChange={viewParam === "consulta" ? setConsultaSearch : undefined}
         searchPlaceholder="Buscar por número, chave ou parceiro..."
-        extraActions={
+        headerActions={
           <>
             <input ref={xmlInputRef} type="file" accept=".xml" className="hidden" onChange={handleXmlImport} />
             <Button variant="outline" size="sm" className="gap-1.5" onClick={() => xmlInputRef.current?.click()}>
