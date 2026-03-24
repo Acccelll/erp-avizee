@@ -45,6 +45,7 @@ const emptyForm: Record<string, any> = {
   tipo: "receber", descricao: "", valor: 0, data_vencimento: new Date().toISOString().split("T")[0],
   data_pagamento: "", status: "aberto", forma_pagamento: "", banco: "", cartao: "",
   cliente_id: "", fornecedor_id: "", conta_bancaria_id: "", conta_contabil_id: "", observacoes: "",
+  gerar_parcelas: false, num_parcelas: 2, intervalo_dias: 30,
 };
 
 const Financeiro = () => {
@@ -110,16 +111,54 @@ const Financeiro = () => {
     }
     setSaving(true);
     try {
-      const payload = {
-        ...form,
+      const basePayload = {
+        tipo: form.tipo, descricao: form.descricao, valor: form.valor,
+        data_vencimento: form.data_vencimento, status: form.status,
+        forma_pagamento: form.forma_pagamento || null, banco: form.banco || null,
+        cartao: form.cartao || null,
         cliente_id: form.cliente_id || null,
         fornecedor_id: form.fornecedor_id || null,
         conta_bancaria_id: form.conta_bancaria_id || null,
         conta_contabil_id: form.conta_contabil_id || null,
         data_pagamento: form.data_pagamento || null,
+        observacoes: form.observacoes || null,
       };
-      if (mode === "create") await create(payload);
-      else if (selected) await update(selected.id, payload);
+
+      if (mode === "create" && form.gerar_parcelas && form.num_parcelas > 1) {
+        // Gerar parcelas automáticas
+        const numP = Number(form.num_parcelas);
+        const intervalo = Number(form.intervalo_dias) || 30;
+        const valorParcela = Number((form.valor / numP).toFixed(2));
+        const resto = Number((form.valor - valorParcela * numP).toFixed(2));
+
+        // Create parent record first
+        const parentPayload = {
+          ...basePayload,
+          descricao: `${form.descricao} (agrupador)`,
+          parcela_numero: 0, parcela_total: numP,
+        };
+        const parentResult = await create(parentPayload);
+        const parentId = parentResult?.id;
+
+        for (let i = 0; i < numP; i++) {
+          const venc = new Date(form.data_vencimento);
+          venc.setDate(venc.getDate() + intervalo * i);
+          await create({
+            ...basePayload,
+            descricao: `${form.descricao} - ${i + 1}/${numP}`,
+            valor: i === numP - 1 ? valorParcela + resto : valorParcela,
+            data_vencimento: venc.toISOString().split("T")[0],
+            parcela_numero: i + 1,
+            parcela_total: numP,
+            documento_pai_id: parentId || null,
+          });
+        }
+        toast.success(`${numP} parcelas geradas com sucesso!`);
+      } else if (mode === "create") {
+        await create(basePayload);
+      } else if (selected) {
+        await update(selected.id, basePayload);
+      }
       setModalOpen(false);
     } catch { }
     setSaving(false);
@@ -399,6 +438,33 @@ const Financeiro = () => {
           {form.status === "pago" && (!form.data_pagamento || !form.forma_pagamento || !form.conta_bancaria_id) && (
             <div className="bg-warning/10 border border-warning/30 rounded-lg p-3 text-sm text-warning">
               ⚠️ Para confirmar como Pago, preencha Data de Pagamento, Forma de Pagamento e Conta Bancária.
+            </div>
+          )}
+
+          {/* Parcelamento */}
+          {mode === "create" && (
+            <div className="space-y-3 rounded-lg border p-4">
+              <label className="flex items-center gap-2 text-sm font-medium cursor-pointer">
+                <input type="checkbox" checked={form.gerar_parcelas} onChange={(e) => setForm({ ...form, gerar_parcelas: e.target.checked })} className="rounded" />
+                Gerar parcelas automaticamente
+              </label>
+              {form.gerar_parcelas && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Nº de Parcelas</Label>
+                    <Input type="number" min={2} max={48} value={form.num_parcelas} onChange={(e) => setForm({ ...form, num_parcelas: Number(e.target.value) })} className="h-9" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Intervalo (dias)</Label>
+                    <Input type="number" min={1} max={365} value={form.intervalo_dias} onChange={(e) => setForm({ ...form, intervalo_dias: Number(e.target.value) })} className="h-9" />
+                  </div>
+                  <div className="col-span-2 text-xs text-muted-foreground">
+                    {form.num_parcelas > 1 && form.valor > 0 && (
+                      <span>{form.num_parcelas}× de <strong>{formatCurrency(form.valor / form.num_parcelas)}</strong> a cada {form.intervalo_dias} dias</span>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
