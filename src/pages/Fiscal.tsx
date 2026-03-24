@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { AppLayout } from "@/components/AppLayout";
 import { ModulePage } from "@/components/ModulePage";
@@ -6,7 +6,7 @@ import { DataTable, StatusBadge } from "@/components/DataTable";
 import { FormModal } from "@/components/FormModal";
 import { ViewDrawer, ViewField, ViewSection } from "@/components/ViewDrawer";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Edit, Trash2 } from "lucide-react";
+import { Edit, Trash2, Upload } from "lucide-react";
 import { SummaryCard } from "@/components/SummaryCard";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
 import { AutocompleteSearch } from "@/components/ui/AutocompleteSearch";
@@ -19,7 +19,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { FileText, DollarSign, CheckCircle, AlertTriangle, Clock } from "lucide-react";
+import { FileText, DollarSign, CheckCircle, AlertTriangle, Clock, XCircle } from "lucide-react";
+import { parseNFeXml, type NFeData } from "@/lib/nfeXmlParser";
 
 interface NotaFiscal {
   id: string; tipo: string; numero: string; serie: string; chave_acesso: string;
