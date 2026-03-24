@@ -64,8 +64,8 @@ const Fiscal = () => {
   const [viewItems, setViewItems] = useState<any[]>([]);
   const [searchParams] = useSearchParams();
   const [consultaSearch, setConsultaSearch] = useState("");
-  // Per-item conta contábil
   const [itemContaContabil, setItemContaContabil] = useState<Record<number, string>>({});
+  const xmlInputRef = useRef<HTMLInputElement>(null);
 
   const valorProdutos = items.reduce((s, i) => s + (i.valor_total || 0), 0);
   const totalImpostos = Number(form.icms_valor || 0) + Number(form.ipi_valor || 0) + Number(form.pis_valor || 0) + Number(form.cofins_valor || 0) + Number(form.icms_st_valor || 0);
