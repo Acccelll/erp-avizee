@@ -1,59 +1,59 @@
 
 
+# Plano: Correção de Filtros, Drawer Fiscal e Menu Relatórios
 
-# Análise Comparativa: ERP AviZee V2 (GitHub) vs. Projeto Atual (Lovable)
+## Problemas identificados
 
-## Contexto
+1. **Dashboard — filtros de período não funcionam corretamente**: A query `buildFinQuery` usa `gte("data_vencimento", dateFrom)` sem limite superior. "Hoje" deveria mostrar apenas contas vencendo hoje; "7 dias" deveria mostrar contas vencendo nos próximos 7 dias; etc. Atualmente busca tudo **a partir** da data, sem teto.
 
-O repositório `erp-avizeev2` no GitHub usa uma arquitetura diferente (Express + Prisma + React monorepo na Vercel), enquanto o projeto atual usa React + Supabase (Lovable Cloud). A comparação foca em **funcionalidades e entidades** que existem na V2 e que estão ausentes ou incompletas no projeto atual.
+2. **Financeiro — mesma lógica incorreta**: O `filteredData` em `Financeiro.tsx` usa `periodToDateFrom` que retorna datas no **passado** (ex: 30 dias atrás). Para contas a pagar/receber, o filtro deveria olhar para **frente** — "30 dias" = contas vencendo nos próximos 30 dias a partir de hoje.
 
----
+3. **Fiscal — drawer incompleto**: O `ViewDrawer` da NF mostra informações gerais mas omite dados como condição de pagamento, valor de produtos (subtotal), e impostos individuais por item (CST, CFOP). O usuário precisa clicar "Editar" para ver detalhes.
 
-## Sprint 1 — ✅ CONCLUÍDO
-
-### 1.1 Parcelamento financeiro ✅
-- Campo `documento_pai_id` adicionado na tabela `financeiro_lancamentos`
-- UI de geração automática de parcelas no modal de criação (nº parcelas + intervalo em dias)
-- Parcelas geradas com `parcela_numero`, `parcela_total` e `documento_pai_id`
-
-### 1.2 Estorno de NF confirmada ✅
-- Botão "Estornar Nota Fiscal" no drawer de NF confirmada
-- Reversão automática de movimentos de estoque (cria movimentos inversos)
-- Cancelamento automático de lançamentos financeiros vinculados
-- Reversão de faturamento da OV vinculada (se aplicável)
-- Confirmação antes do estorno
-
-### 1.3 Relatório de Aging ✅
-- Novo tipo de relatório "Aging" em Relatórios
-- Agrupa títulos abertos/vencidos por faixas: A vencer, 1-30, 31-60, 61-90, 90+ dias
-- Gráfico de barras por faixa de vencimento
-- Exportável em CSV, PDF e Excel
-
-### 1.4 Importação de XML de NF-e ✅
-- Botão "Importar XML" na tela Fiscal
-- Parser client-side completo de XML de NF-e (`src/lib/nfeXmlParser.ts`)
-- Extrai: número, série, chave, emitente, itens com impostos, totais
-- Auto-vincula fornecedor por CNPJ
-- Auto-vincula produtos por código interno/SKU (De-Para)
-- Preenche formulário automaticamente com dados do XML
+4. **Relatórios — submenu desnecessário**: Na navegação, "Relatórios" tem um submenu com links por tipo de relatório. Deveria ser um link direto para `/relatorios` sem submenu.
 
 ---
 
-## Sprint 2 — PENDENTE (Estrutural, alta complexidade)
+## Implementação
 
-| # | Item | Status | Descrição |
-|---|------|--------|-----------|
-| 2.1 | Depósitos e estoque por depósito | Pendente | Tabelas `depositos` + `estoque_saldos`, migração do campo estoque_atual |
-| 2.2 | Transferência entre depósitos | Pendente | CRUD + movimentação automática |
-| 2.3 | Inventário físico | Pendente | Recontagem, divergência, ajuste automático |
-| 2.4 | Reserva de estoque em OV | Pendente | Campo `quantidade_reservada`, validação de disponibilidade |
+### 1. Corrigir lógica de período (Dashboard + Financeiro)
 
-## Sprint 3 — PENDENTE (Refinamento)
+**Conceito**: Os filtros de período para contas financeiras devem olhar **para frente** (vencimentos futuros):
+- "Hoje" = vencendo hoje
+- "7 dias" = vencendo entre hoje e hoje+7
+- "30 dias" = vencendo entre hoje e hoje+30
+- "Vencidos" = vencidos antes de hoje
 
-| # | Item | Status | Descrição |
-|---|------|--------|-----------|
-| 3.1 | Solicitação de Compra | Pendente | Fluxo: Solicitação > Cotação > Pedido |
-| 3.2 | Recebimento de Compra | Pendente | Registro formal com impacto em estoque |
-| 3.3 | Centro de Custo e Natureza Financeira | Pendente | Cadastros + vínculo no financeiro |
-| 3.4 | Permissões granulares | Pendente | Tabela de permissões por perfil/módulo/ação |
-| 3.5 | Rastreabilidade inline | Pendente | Campos usuario_criacao/modificacao nas tabelas |
+**Arquivo `src/lib/periodFilter.ts`**: Criar função `periodToDateRange(period)` que retorna `{ dateFrom, dateTo }` com lógica forward-looking.
+
+**Arquivo `src/pages/Index.tsx`**: Atualizar `buildFinQuery` para usar `gte + lte` com range correto (hoje → hoje+N dias).
+
+**Arquivo `src/pages/Financeiro.tsx`**: Atualizar `filteredData` para usar a mesma lógica forward-looking no client-side filter.
+
+### 2. Completar drawer do Fiscal
+
+**Arquivo `src/pages/Fiscal.tsx`**: Expandir o `ViewDrawer` para incluir:
+- Subtotal de produtos (soma dos itens)
+- Condição de pagamento (à vista / a prazo)
+- Todos os impostos sempre visíveis (mesmo zerados ficam com "—")
+- Para cada item: valor unitário, CST, CFOP além de quantidade e total
+- Resumo financeiro (subtotal, impostos, frete, desconto, total) como bloco consolidado
+
+### 3. Simplificar menu Relatórios
+
+**Arquivo `src/lib/navigation.ts`**: Substituir o bloco `relatorios` com submenu por um link direto simples para `/relatorios`.
+
+**Abordagem**: Mudar a estrutura do `navSections` para que "Relatórios" tenha apenas um item apontando para `/relatorios` sem subgrupos, ou transformar em um link de nível superior como o Dashboard.
+
+---
+
+## Arquivos a editar
+
+| Arquivo | Alteração |
+|---|---|
+| `src/lib/periodFilter.ts` | Nova função `periodToFinancialRange()` com lógica forward-looking |
+| `src/pages/Index.tsx` | Usar range com `gte + lte` no `buildFinQuery` |
+| `src/pages/Financeiro.tsx` | Filtro client-side com lógica forward-looking |
+| `src/pages/Fiscal.tsx` | Expandir ViewDrawer com todos os campos da NF |
+| `src/lib/navigation.ts` | Simplificar seção Relatórios para link direto |
+
