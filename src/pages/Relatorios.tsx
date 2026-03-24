@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { DataTable } from '@/components/DataTable';
 import { PreviewModal } from '@/components/ui/PreviewModal';
-import { BarChart3, Package, Wallet, ShoppingCart, TrendingUp, Truck, Download, RefreshCcw, Hash, AlertTriangle, DollarSign, FileText, Eye, ArrowLeftRight, FileSpreadsheet } from 'lucide-react';
+import { BarChart3, Package, Wallet, ShoppingCart, TrendingUp, Truck, Download, RefreshCcw, Hash, AlertTriangle, DollarSign, FileText, Eye, ArrowLeftRight, FileSpreadsheet, CalendarClock } from 'lucide-react';
 import { ResponsiveContainer, BarChart, XAxis, YAxis, Tooltip, Bar, PieChart, Pie, Cell, Legend } from 'recharts';
 import { carregarRelatorio, exportarCsv, exportarXlsx, formatCellValue, type RelatorioResultado, type TipoRelatorio } from '@/services/relatorios.service';
 import { formatCurrency, formatNumber, formatDate } from '@/lib/format';
@@ -22,6 +22,7 @@ const reportCards: Array<{ type: TipoRelatorio; title: string; description: stri
   { type: 'fluxo_caixa', title: 'Fluxo de Caixa', description: 'Entradas, saídas e saldo', icon: TrendingUp },
   { type: 'vendas', title: 'Vendas', description: 'Ordens por período e faturamento', icon: ShoppingCart },
   { type: 'compras', title: 'Compras', description: 'Consolidado por fornecedor', icon: Truck },
+  { type: 'aging', title: 'Aging', description: 'Vencidos por faixa de dias', icon: CalendarClock },
 ];
 
 const CHART_COLORS = [
