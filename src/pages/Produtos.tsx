@@ -340,11 +340,12 @@ const Produtos = () => {
             </div>
 
             <Tabs defaultValue="geral" className="w-full">
-              <TabsList className="w-full grid grid-cols-5">
+              <TabsList className="w-full grid grid-cols-6">
                 <TabsTrigger value="geral" className="text-xs">Geral</TabsTrigger>
                 <TabsTrigger value="preco" className="text-xs">Preço</TabsTrigger>
                 <TabsTrigger value="estoque" className="text-xs">Estoque</TabsTrigger>
                 <TabsTrigger value="fiscal" className="text-xs">Fiscal</TabsTrigger>
+                <TabsTrigger value="cod_fornecedor" className="text-xs">Cód. Forn.</TabsTrigger>
                 <TabsTrigger value="historico" className="text-xs">Histórico</TabsTrigger>
               </TabsList>
 
@@ -450,6 +451,36 @@ const Produtos = () => {
                   <div><span className="text-xs text-muted-foreground">CFOP Padrão</span><p className="font-mono">{selected.cfop_padrao || "—"}</p></div>
                   <div><span className="text-xs text-muted-foreground">Unidade</span><p>{selected.unidade_medida}</p></div>
                 </div>
+              </TabsContent>
+
+              <TabsContent value="cod_fornecedor" className="space-y-3 mt-3">
+                <h4 className="font-semibold text-sm mb-2">Códigos de Fornecedores (De/Para)</h4>
+                <p className="text-xs text-muted-foreground mb-3">Referências usadas na importação de XML para vínculo automático de produtos.</p>
+                {fornecedoresProd.length === 0 ?
+                  <p className="text-sm text-muted-foreground text-center py-4">Nenhum fornecedor vinculado</p> :
+                  <div className="rounded-lg border overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-muted/50">
+                          <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground">Fornecedor</th>
+                          <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground">Ref. Fornecedor</th>
+                          <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground">Preço Compra</th>
+                          <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground">Lead Time</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {fornecedoresProd.map((f: any, idx: number) => (
+                          <tr key={idx} className={idx % 2 === 0 ? "bg-muted/20" : ""}>
+                            <td className="px-3 py-2 text-xs">{f.fornecedores?.nome_razao_social || "—"}</td>
+                            <td className="px-3 py-2 text-xs font-mono font-medium text-primary">{f.referencia_fornecedor || "—"}</td>
+                            <td className="px-3 py-2 text-xs font-mono text-right">{f.preco_compra ? formatCurrency(f.preco_compra) : "—"}</td>
+                            <td className="px-3 py-2 text-xs text-right">{f.lead_time_dias ? `${f.lead_time_dias} dias` : "—"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                }
               </TabsContent>
 
               <TabsContent value="historico" className="space-y-3 mt-3">
