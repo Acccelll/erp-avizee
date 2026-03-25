@@ -75,9 +75,9 @@ export const OrcamentoPdfTemplate = forwardRef<HTMLDivElement, Props>(({
           <img src="/images/logoavizee.png" alt="AviZee" style={{ height: "36px", marginBottom: "4px" }} />
           <div style={{ fontSize: "9px", color: "#666", marginTop: "2px" }}>AVIZEE EQUIPAMENTOS LTDA</div>
           <div style={{ fontSize: "8px", color: "#888", lineHeight: 1.5 }}>
-            RUA ADA CAROLINE SCARANO, 259 - JOAO ARANHA<br />
+            Diogo Antonio Feijó, 111 - João Aranha<br />
             Fone: (19) 99898-2930<br />
-            PAULÍNIA - SP CEP: 13145-794<br />
+            PAULÍNIA - SP CEP: 13.145-706<br />
             CNPJ: 53.078.538/0001-85
           </div>
         </div>

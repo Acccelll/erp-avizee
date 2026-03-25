@@ -38,11 +38,15 @@ const Dashboard = () => {
       const isVencidos = period === 'vencidos';
       const today = new Date().toISOString().slice(0, 10);
 
+      const isTodos = period === 'todos';
+
       // Build financial queries based on period (forward-looking)
       const buildFinQuery = (tipo: string) => {
         let q = (supabase as any).from("financeiro_lancamentos").select("valor").eq("tipo", tipo).eq("ativo", true);
         if (isVencidos) {
           q = q.in("status", ["aberto", "vencido"]).lt("data_vencimento", today);
+        } else if (isTodos) {
+          q = q.in("status", ["aberto", "vencido"]);
         } else {
           q = q.eq("status", "aberto").gte("data_vencimento", dateFrom);
           if (dateTo) q = q.lte("data_vencimento", dateTo);
@@ -157,11 +161,12 @@ const Dashboard = () => {
       </div>
 
       {/* Financial KPIs with period filter */}
-      <div className="mb-6">
+      <div className="mb-6 rounded-lg border border-border/60 bg-muted/10 p-4">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
           <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Contas a Receber / Pagar</h2>
           <PeriodFilter value={period} onChange={setPeriod} options={financialPeriods} />
         </div>
+        <p className="text-xs text-muted-foreground mb-3">O filtro de período se aplica apenas aos cards abaixo</p>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {kpiCards.map((c) => (
             <SummaryCard
