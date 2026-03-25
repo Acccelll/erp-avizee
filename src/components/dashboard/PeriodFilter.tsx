@@ -2,7 +2,7 @@ import { Button } from '@/components/ui/button';
 import { Calendar } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-export type Period = '7d' | '15d' | '30d' | '90d' | 'year' | 'hoje' | 'vencidos';
+export type Period = '7d' | '15d' | '30d' | '90d' | 'year' | 'hoje' | 'vencidos' | 'todos';
 
 const periods: { value: Period; label: string }[] = [
   { value: 'hoje', label: 'Hoje' },
@@ -13,8 +13,9 @@ const periods: { value: Period; label: string }[] = [
   { value: 'year', label: 'Este ano' },
 ];
 
-/** Extended version with overdue option for financial contexts */
+/** Extended version with overdue + all options for financial contexts */
 export const financialPeriods: { value: Period; label: string }[] = [
+  { value: 'todos', label: 'Todos' },
   { value: 'hoje', label: 'Hoje' },
   { value: '7d', label: '7 dias' },
   { value: '15d', label: '15 dias' },

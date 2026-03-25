@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { formatCurrency } from "@/lib/format";
 import { supabase } from "@/integrations/supabase/client";
@@ -73,6 +74,9 @@ const Financeiro = () => {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [period, setPeriod] = useState<Period>("30d");
+  const [baixaModalOpen, setBaixaModalOpen] = useState(false);
+  const [baixaDate, setBaixaDate] = useState(new Date().toISOString().split("T")[0]);
+  const [baixaProcessing, setBaixaProcessing] = useState(false);
 
   useEffect(() => { if (tipoParam) setFilterTipo(tipoParam); }, [tipoParam]);
 
@@ -189,7 +193,9 @@ const Financeiro = () => {
       const effectiveStatus = getEffectiveStatus(l);
 
       // Period filter (forward-looking for financial)
-      if (isOverdueFilter) {
+      if (period === "todos") {
+        // No date filter - show all
+      } else if (isOverdueFilter) {
         // Show all overdue (vencimento before today and not paid)
         if (effectiveStatus !== "vencido") return false;
       } else {
@@ -242,22 +248,38 @@ const Financeiro = () => {
     return { aVencer, venceHoje, vencido, pagoNoPeriodo, totalAVencer, totalVencido, totalPago, age1_30, age31_60, age61_90, age90plus };
   }, [filteredData, hoje]);
 
-  // Batch payment
-  const handleBatchPayment = async () => {
+  // Batch payment — open modal
+  const openBaixaModal = () => {
     if (selectedIds.length === 0) { toast.error("Selecione os lançamentos para dar baixa"); return; }
+    setBaixaDate(new Date().toISOString().split("T")[0]);
+    setBaixaModalOpen(true);
+  };
+
+  const selectedForBaixa = useMemo(() => {
+    return data.filter(l => selectedIds.includes(l.id));
+  }, [data, selectedIds]);
+
+  const totalBaixa = useMemo(() => {
+    return selectedForBaixa.reduce((s, l) => s + Number(l.valor || 0), 0);
+  }, [selectedForBaixa]);
+
+  const handleConfirmBaixa = async () => {
+    if (!baixaDate) { toast.error("Data de baixa é obrigatória"); return; }
+    setBaixaProcessing(true);
     try {
-      const today = new Date().toISOString().split("T")[0];
       for (const id of selectedIds) {
         await (supabase as any).from("financeiro_lancamentos").update({
-          status: "pago", data_pagamento: today,
+          status: "pago", data_pagamento: baixaDate,
         }).eq("id", id);
       }
       toast.success(`${selectedIds.length} lançamento(s) baixado(s) com sucesso!`);
       setSelectedIds([]);
+      setBaixaModalOpen(false);
       window.location.reload();
     } catch {
       toast.error("Erro ao processar baixa em lote");
     }
+    setBaixaProcessing(false);
   };
 
   const columns = [
@@ -339,7 +361,7 @@ const Financeiro = () => {
           )}
 
           {selectedIds.length > 0 && (
-            <Button size="sm" variant="default" className="ml-auto gap-2" onClick={handleBatchPayment}>
+            <Button size="sm" variant="default" className="ml-auto gap-2" onClick={openBaixaModal}>
               <Download className="w-3.5 h-3.5" /> Baixar {selectedIds.length} selecionado(s)
             </Button>
           )}
@@ -537,6 +559,56 @@ const Financeiro = () => {
           </div>
         )}
       </ViewDrawer>
+
+      {/* Baixa Modal */}
+      <Dialog open={baixaModalOpen} onOpenChange={setBaixaModalOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Confirmar Baixa — {selectedIds.length} título(s)</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="rounded-lg border overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-muted/50">
+                    <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground">Descrição</th>
+                    <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground">Parceiro</th>
+                    <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground">Valor</th>
+                    <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground">Vencimento</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {selectedForBaixa.map((l, idx) => (
+                    <tr key={l.id} className={idx % 2 === 0 ? "bg-muted/20" : ""}>
+                      <td className="px-3 py-2 text-xs">{l.descricao}</td>
+                      <td className="px-3 py-2 text-xs">{l.tipo === "receber" ? l.clientes?.nome_razao_social : l.fornecedores?.nome_razao_social || "—"}</td>
+                      <td className="px-3 py-2 text-xs font-mono text-right font-semibold">{formatCurrency(Number(l.valor))}</td>
+                      <td className="px-3 py-2 text-xs text-right">{new Date(l.data_vencimento).toLocaleDateString("pt-BR")}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t bg-muted/30">
+                    <td colSpan={2} className="px-3 py-2 text-xs font-semibold">Total</td>
+                    <td className="px-3 py-2 text-xs font-mono text-right font-bold text-primary">{formatCurrency(totalBaixa)}</td>
+                    <td />
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+            <div className="space-y-2">
+              <Label>Data de Baixa *</Label>
+              <Input type="date" value={baixaDate} onChange={(e) => setBaixaDate(e.target.value)} required />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBaixaModalOpen(false)} disabled={baixaProcessing}>Cancelar</Button>
+            <Button onClick={handleConfirmBaixa} disabled={baixaProcessing || !baixaDate}>
+              {baixaProcessing ? "Processando..." : "Confirmar Baixa"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 };

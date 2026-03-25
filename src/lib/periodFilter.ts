@@ -11,6 +11,10 @@ export function periodToFinancialRange(period: Period): { dateFrom: string; date
   const now = new Date();
   const today = fmtDate(now);
 
+  if (period === 'todos') {
+    return { dateFrom: '2000-01-01', dateTo: null };
+  }
+
   if (period === 'vencidos') {
     return { dateFrom: '2000-01-01', dateTo: null }; // dateTo handled by status filter
   }
@@ -69,6 +73,9 @@ export function periodToDateFrom(period: Period): string {
       d = new Date(now.getFullYear(), 0, 1);
       break;
     case 'vencidos':
+      d = new Date(2000, 0, 1);
+      break;
+    case 'todos':
       d = new Date(2000, 0, 1);
       break;
     default:

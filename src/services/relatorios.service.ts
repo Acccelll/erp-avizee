@@ -187,6 +187,10 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
         };
       });
 
+      const totalEntradas = rows.reduce((s, r) => s + r.entrada, 0);
+      const totalSaidas = rows.reduce((s, r) => s + r.saida, 0);
+      const saldoFinal = rows.length > 0 ? rows[rows.length - 1].saldo : 0;
+
       return {
         title: "Fluxo de caixa",
         subtitle: "Entradas, saídas e saldo acumulado por período.",
@@ -195,6 +199,11 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
           name: row.data ? formatDate(row.data) : "-",
           value: row.saldo,
         })),
+        totals: {
+          totalEntradas,
+          totalSaidas,
+          saldoFinal,
+        },
       };
     }
 
