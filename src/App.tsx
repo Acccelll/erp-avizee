@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AdminRoute } from "@/components/AdminRoute";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import Index from "./pages/Index";
 import Produtos from "./pages/Produtos";
 import Clientes from "./pages/Clientes";
@@ -48,6 +49,7 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <AuthProvider>
+          <ErrorBoundary>
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
@@ -84,6 +86,7 @@ const App = () => (
             <Route path="/contas-contabeis-plano" element={<ProtectedRoute><ContasContabeis /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
+          </ErrorBoundary>
           </AuthProvider>
         </BrowserRouter>
       </TooltipProvider>
