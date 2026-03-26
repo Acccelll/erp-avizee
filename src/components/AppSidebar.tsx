@@ -141,7 +141,7 @@ export function AppSidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMo
                       if (collapsed) { onToggleCollapsed(); return; }
                       setManualSections((c) => ({ ...c, [section.key]: !isOpen }));
                     }}
-                    className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-medium transition ${
+                    className={`relative flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-medium transition ${
                       sectionActive
                         ? 'text-primary'
                         : 'text-foreground hover:bg-accent'
