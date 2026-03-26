@@ -271,10 +271,26 @@ const OrdensVenda = () => {
                   <CheckCircle className="w-4 h-4" /> Aprovar OV
                 </Button>
               )}
+              {(selected.status === "aprovada" || selected.status === "em_separacao") && selected.status_faturamento !== "total" && (
+                <Button variant="default" onClick={() => { setDrawerOpen(false); setGeneratingNfId(selected.id); }} className="w-full gap-2">
+                  <FileOutput className="w-4 h-4" /> Gerar Nota Fiscal
+                </Button>
+              )}
             </div>
           </div>
         )}
       </ViewDrawer>
+
+      <ConfirmDialog
+        open={!!generatingNfId}
+        onClose={() => setGeneratingNfId(null)}
+        onConfirm={() => {
+          const ov = data.find(o => o.id === generatingNfId);
+          if (ov) handleGenerateNF(ov);
+        }}
+        title="Gerar Nota Fiscal"
+        description={`Deseja gerar uma Nota Fiscal de saída para a OV ${data.find(o => o.id === generatingNfId)?.numero || ""}? Todos os itens serão incluídos.`}
+      />
     </AppLayout>
   );
 };
