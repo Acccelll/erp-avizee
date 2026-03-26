@@ -211,7 +211,8 @@ export function DataTable<T extends Record<string, any>>({
             </PopoverContent>
           </Popover>
         </div>
-      )
+      )}
+      <div className="data-table">
         {loading ? renderSkeleton() : data.length === 0 ? renderEmpty() : isMobile ? (
           <>
             <div className="space-y-3 p-3">
