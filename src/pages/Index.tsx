@@ -10,6 +10,7 @@ import { ComprasConfirmadasDetail } from "@/components/dashboard/ComprasConfirma
 import { RecentOrcamentos } from "@/components/dashboard/RecentOrcamentos";
 import { RecentCompras } from "@/components/dashboard/RecentCompras";
 import { SummaryPie } from "@/components/dashboard/SummaryPie";
+import { DashboardSkeleton } from "@/components/dashboard/DashboardSkeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { periodToFinancialRange } from "@/lib/periodFilter";
 import { formatCurrency, formatNumber } from "@/lib/format";
@@ -150,6 +151,14 @@ const Dashboard = () => {
     { name: "Compras", value: stats.compras || 1, color: "hsl(var(--secondary))" },
     { name: "Fornecedores", value: stats.fornecedores || 1, color: "hsl(var(--success))" },
   ];
+
+  if (loading) {
+    return (
+      <AppLayout>
+        <DashboardSkeleton />
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout>
