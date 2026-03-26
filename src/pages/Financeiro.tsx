@@ -21,7 +21,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { toast } from "sonner";
 import { formatCurrency } from "@/lib/format";
 import { supabase } from "@/integrations/supabase/client";
-import { DollarSign, Clock, AlertTriangle, CheckCircle, CalendarClock, Download } from "lucide-react";
+import { DollarSign, Clock, AlertTriangle, CheckCircle, CalendarClock, Download, List, CalendarDays } from "lucide-react";
+import { FinanceiroCalendar } from "@/components/financeiro/FinanceiroCalendar";
 
 interface Lancamento {
   id: string; tipo: string; descricao: string; valor: number;
@@ -77,6 +78,7 @@ const Financeiro = () => {
   const [baixaModalOpen, setBaixaModalOpen] = useState(false);
   const [baixaDate, setBaixaDate] = useState(new Date().toISOString().split("T")[0]);
   const [baixaProcessing, setBaixaProcessing] = useState(false);
+  const [viewMode, setViewMode] = useState<"lista" | "calendario">("lista");
 
   useEffect(() => { if (tipoParam) setFilterTipo(tipoParam); }, [tipoParam]);
 
@@ -310,9 +312,17 @@ const Financeiro = () => {
       <ModulePage title="Contas a Pagar/Receber" subtitle="Gestão unificada de contas a pagar e receber" addLabel="Novo Lançamento" onAdd={openCreate} count={filteredData.length}
         searchValue={searchTerm} onSearchChange={setSearchTerm} searchPlaceholder="Buscar por descrição ou parceiro...">
 
-        {/* Period filter */}
-        <div className="mb-4">
+        {/* Period filter + view toggle */}
+        <div className="mb-4 flex items-center gap-3 flex-wrap">
           <PeriodFilter value={period} onChange={setPeriod} options={financialPeriods} />
+          <div className="flex gap-1 ml-auto rounded-lg border p-0.5">
+            <Button size="sm" variant={viewMode === "lista" ? "default" : "ghost"} className="h-7 gap-1.5 text-xs" onClick={() => setViewMode("lista")}>
+              <List className="h-3.5 w-3.5" /> Lista
+            </Button>
+            <Button size="sm" variant={viewMode === "calendario" ? "default" : "ghost"} className="h-7 gap-1.5 text-xs" onClick={() => setViewMode("calendario")}>
+              <CalendarDays className="h-3.5 w-3.5" /> Calendário
+            </Button>
+          </div>
         </div>
 
         {/* KPI Summary Cards */}
@@ -367,9 +377,13 @@ const Financeiro = () => {
           )}
         </div>
 
-        <DataTable columns={columns} data={filteredData} loading={loading}
-          selectable selectedIds={selectedIds} onSelectionChange={setSelectedIds}
-          onView={(l) => { setSelected(l); setDrawerOpen(true); }} />
+        {viewMode === "calendario" ? (
+          <FinanceiroCalendar data={filteredData as any} />
+        ) : (
+          <DataTable columns={columns} data={filteredData} loading={loading}
+            selectable selectedIds={selectedIds} onSelectionChange={setSelectedIds}
+            onView={(l) => { setSelected(l); setDrawerOpen(true); }} />
+        )}
       </ModulePage>
 
       <FormModal open={modalOpen} onClose={() => setModalOpen(false)} title={mode === "create" ? "Novo Lançamento" : "Editar Lançamento"} size="lg">

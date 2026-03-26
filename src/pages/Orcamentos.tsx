@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { AppLayout } from "@/components/AppLayout";
 import { ModulePage } from "@/components/ModulePage";
@@ -15,6 +15,8 @@ import { toast } from "sonner";
 import { Copy, ArrowRightCircle, CheckCircle, FileText, DollarSign, Clock, BarChart3 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
+import { Send } from "lucide-react";
 
 interface Orcamento {
   id: string; numero: string; cliente_id: string; data_orcamento: string;
@@ -36,6 +38,18 @@ const Orcamentos = () => {
   const [convertingId, setConvertingId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("todos");
+  const { isAdmin } = useIsAdmin();
+
+  const handleSendForApproval = useCallback(async (orc: Orcamento) => {
+    if (orc.status !== "rascunho") return;
+    try {
+      await (supabase as any).from("orcamentos").update({ status: "confirmado" }).eq("id", orc.id);
+      toast.success(`Cotação ${orc.numero} enviada para aprovação!`);
+      fetchData();
+    } catch {
+      toast.error("Erro ao enviar cotação para aprovação.");
+    }
+  }, [fetchData]);
 
   const kpis = useMemo(() => {
     const total = data.length;
@@ -84,6 +98,10 @@ const Orcamentos = () => {
   };
 
   const handleApprove = async (orc: Orcamento) => {
+    if (!isAdmin) {
+      toast.error("Somente administradores podem aprovar cotações.");
+      return;
+    }
     try {
       await (supabase as any).from("orcamentos").update({ status: "aprovado" }).eq("id", orc.id);
       toast.success(`Cotação ${orc.numero} aprovada!`);
@@ -146,8 +164,13 @@ const Orcamentos = () => {
     {
       key: "acoes_comercial", label: "Ações", sortable: false, render: (o: Orcamento) => (
         <div className="flex gap-1">
-          {(o.status === "rascunho" || o.status === "confirmado") && (
-            <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={(e) => { e.stopPropagation(); handleApprove(o); }}>
+          {o.status === "rascunho" && (
+            <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={(e) => { e.stopPropagation(); handleSendForApproval(o); }}>
+              <Send className="w-3 h-3" /> Enviar p/ Aprovação
+            </Button>
+          )}
+          {o.status === "confirmado" && (
+            <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={(e) => { e.stopPropagation(); handleApprove(o); }} disabled={!isAdmin} title={!isAdmin ? "Somente admins podem aprovar" : ""}>
               <CheckCircle className="w-3 h-3" /> Aprovar
             </Button>
           )}
@@ -226,8 +249,13 @@ const Orcamentos = () => {
 
             <div className="space-y-2 pt-2">
               <Button onClick={() => { setDrawerOpen(false); navigate(`/cotacoes/${selected.id}`); }} className="w-full gap-2">Abrir Cotação</Button>
-              {(selected.status === "rascunho" || selected.status === "confirmado") && (
-                <Button variant="secondary" onClick={() => { setDrawerOpen(false); handleApprove(selected); }} className="w-full gap-2">
+              {selected.status === "rascunho" && (
+                <Button variant="secondary" onClick={() => { setDrawerOpen(false); handleSendForApproval(selected); }} className="w-full gap-2">
+                  <Send className="w-4 h-4" /> Enviar p/ Aprovação
+                </Button>
+              )}
+              {selected.status === "confirmado" && (
+                <Button variant="secondary" onClick={() => { setDrawerOpen(false); handleApprove(selected); }} className="w-full gap-2" disabled={!isAdmin}>
                   <CheckCircle className="w-4 h-4" /> Aprovar Cotação
                 </Button>
               )}
