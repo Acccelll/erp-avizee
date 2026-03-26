@@ -84,6 +84,21 @@ export const SummaryCard = forwardRef<HTMLDivElement, SummaryCardProps>(
             </div>
           )}
         </div>
+        {sparklineData && sparklineData.length > 1 && (
+          <div className="mt-2 h-8">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={sparklineData.map((v) => ({ v }))}>
+                <Line
+                  type="monotone"
+                  dataKey="v"
+                  stroke={variationType === 'negative' ? 'hsl(var(--destructive))' : 'hsl(var(--primary))'}
+                  strokeWidth={1.5}
+                  dot={false}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        )}
       </div>
     );
   }
