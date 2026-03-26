@@ -51,6 +51,7 @@ const OrdensVenda = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("todos");
   const [faturamentoFilter, setFaturamentoFilter] = useState<string>("todos");
+  const [generatingNfId, setGeneratingNfId] = useState<string | null>(null);
 
   // KPIs
   const kpis = useMemo(() => {
@@ -77,6 +78,65 @@ const OrdensVenda = () => {
     } catch (err: any) {
       console.error('[ordens-venda]', err);
       toast.error("Erro ao aprovar ordem de venda.");
+    }
+  };
+
+  const handleGenerateNF = async (ov: OrdemVenda) => {
+    try {
+      const { data: ovItems } = await (supabase as any).from("ordens_venda_itens").select("*").eq("ordem_venda_id", ov.id);
+      const { count } = await (supabase as any).from("notas_fiscais").select("*", { count: "exact", head: true });
+      const nfNumero = String((count || 0) + 1).padStart(6, "0");
+
+      const totalProdutos = (ovItems || []).reduce((s: number, i: any) => s + Number(i.valor_total || 0), 0);
+
+      const { data: newNF, error } = await (supabase as any).from("notas_fiscais").insert({
+        numero: nfNumero,
+        tipo: "saida",
+        data_emissao: new Date().toISOString().split("T")[0],
+        cliente_id: ov.cliente_id,
+        ordem_venda_id: ov.id,
+        valor_total: totalProdutos,
+        status: "pendente",
+        movimenta_estoque: true,
+        gera_financeiro: true,
+        observacoes: `Gerada a partir da OV ${ov.numero}`,
+      }).select().single();
+
+      if (error) throw error;
+
+      if (ovItems && ovItems.length > 0 && newNF) {
+        const nfItems = ovItems.map((i: any) => ({
+          nota_fiscal_id: newNF.id,
+          produto_id: i.produto_id,
+          quantidade: i.quantidade,
+          valor_unitario: i.valor_unitario,
+        }));
+        await (supabase as any).from("notas_fiscais_itens").insert(nfItems);
+      }
+
+      // Update OV faturamento status
+      const totalQtd = (ovItems || []).reduce((s: number, i: any) => s + Number(i.quantidade || 0), 0);
+      const totalFat = (ovItems || []).reduce((s: number, i: any) => s + Number(i.quantidade_faturada || 0), 0);
+      const newFatStatus = (totalFat + totalQtd >= totalQtd * 2) ? "total" : totalFat > 0 ? "parcial" : "total";
+      
+      await (supabase as any).from("ordens_venda").update({ status_faturamento: "total" }).eq("id", ov.id);
+
+      // Update quantities faturadas
+      if (ovItems) {
+        for (const item of ovItems) {
+          await (supabase as any).from("ordens_venda_itens").update({
+            quantidade_faturada: item.quantidade,
+          }).eq("id", item.id);
+        }
+      }
+
+      toast.success(`NF ${nfNumero} gerada a partir da OV ${ov.numero}!`);
+      fetchData();
+    } catch (err: any) {
+      console.error('[ordens-venda] gerar NF:', err);
+      toast.error("Erro ao gerar Nota Fiscal.");
+    } finally {
+      setGeneratingNfId(null);
     }
   };
 
