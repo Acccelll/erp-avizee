@@ -1,11 +1,12 @@
 import { useState, useMemo, useCallback } from 'react';
-import { Eye, Edit, Trash2, Copy, ChevronUp, ChevronDown, ChevronsUpDown, ChevronLeft, ChevronRight, PackageOpen } from 'lucide-react';
+import { Eye, Edit, Trash2, Copy, ChevronUp, ChevronDown, ChevronsUpDown, ChevronLeft, ChevronRight, PackageOpen, Columns3 } from 'lucide-react';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 
