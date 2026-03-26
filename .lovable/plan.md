@@ -1,45 +1,29 @@
 
 
-# Sprint A: Quick Wins
+# Sprint A: Quick Wins ✅
 
-## 1. Corrigir package.json
-Alterar `"name": "vite_react_shadcn_ts"` para `"name": "erp-avizee"` na linha 2.
-
-## 2. Session timeout com feedback
-**Arquivo**: `src/contexts/AuthContext.tsx`
-
-Capturar o parâmetro `_event` no `onAuthStateChange`. Quando `event === 'SIGNED_OUT'` e havia um user anterior (sessao expirou, nao foi logout manual), disparar `toast` com "Sua sessao expirou, faca login novamente". Adicionar flag `isManualSignOut` via ref para distinguir logout voluntario de expiracao.
-
-Alteracoes:
-- Importar `toast` de sonner
-- Adicionar `useRef<boolean>` para `manualSignOut`
-- No `signOut()`, setar `manualSignOut.current = true` antes de chamar `supabase.auth.signOut()`
-- No listener, quando `event === 'SIGNED_OUT'` e `!manualSignOut.current` e havia user anterior, disparar toast de sessao expirada
-- Resetar flag apos uso
-
-## 3. ErrorBoundary global
-**Novo arquivo**: `src/components/ErrorBoundary.tsx`
-
-Class component React com `componentDidCatch`. Renderiza tela amigavel com icone de alerta, mensagem "Algo deu errado", botao "Recarregar pagina" (`window.location.reload()`) e link "Voltar ao Dashboard" (`/`).
-
-**Arquivo**: `src/App.tsx` — envolver `<Routes>` com `<ErrorBoundary>`.
-
-## 4. Busca global categorizada
-**Arquivo**: `src/components/navigation/GlobalSearch.tsx`
-
-Em vez de listar tudo em um unico `CommandGroup "Modulos e paginas"`, agrupar `filteredNavigation` pelo campo `section`. Criar um `CommandGroup` para cada secao (Cadastros, Comercial, Compras, Financeiro, Fiscal, Administracao), com icone correspondente da `navSections`. Usar `CommandSeparator` entre grupos. Mapear icones por secao a partir de `navSections[].icon`.
-
-Importar `navSections` de navigation e usar o `icon` de cada secao no `CommandItem` correspondente (em vez de `FolderKanban` generico para todos).
+## 1. ✅ Corrigir package.json
+## 2. ✅ Session timeout com feedback
+## 3. ✅ ErrorBoundary global
+## 4. ✅ Busca global categorizada
 
 ---
 
-## Arquivos a editar
+# Sprint B: UX Enhancements ✅
 
-| Arquivo | Alteracao |
-|---|---|
-| `package.json` | Nome para `erp-avizee` |
-| `src/contexts/AuthContext.tsx` | Toast de sessao expirada com flag manual |
-| `src/components/ErrorBoundary.tsx` | Novo — class component |
-| `src/App.tsx` | Envolver Routes com ErrorBoundary |
-| `src/components/navigation/GlobalSearch.tsx` | Agrupar resultados por secao com icones |
+## 1. ✅ Sparklines nos KPI cards do Dashboard
+**Arquivo**: `src/components/SummaryCard.tsx`
+Adicionada prop `sparklineData?: number[]` que renderiza um mini LineChart (Recharts) inline sem eixos.
+
+## 2. ✅ Sidebar com badges de alerta
+**Arquivos**: `src/hooks/useSidebarAlerts.ts` (novo), `src/components/AppSidebar.tsx`
+Hook que consulta financeiro vencidos e estoque baixo a cada 5 min. Badges numéricos exibidos nos itens Financeiro e Estoque da sidebar.
+
+## 3. ✅ Skeleton loaders para Dashboard
+**Arquivo**: `src/components/dashboard/DashboardSkeleton.tsx` (novo), `src/pages/Index.tsx`
+Skeleton que espelha o layout real do Dashboard (KPIs, alertas, tabelas, gráfico pie) em vez de spinner.
+
+## 4. ✅ Toggle de colunas visíveis no DataTable
+**Arquivo**: `src/components/DataTable.tsx`
+Adicionada prop `showColumnToggle` que exibe popover com checkboxes para controlar visibilidade de colunas.
 

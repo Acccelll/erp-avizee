@@ -11,6 +11,7 @@ import logoAvizee from '@/assets/logoavizee.png';
 import { Button } from '@/components/ui/button';
 import { navSections, dashboardItem, isPathActive } from '@/lib/navigation';
 import { useIsAdmin } from '@/hooks/useIsAdmin';
+import { useSidebarAlerts } from '@/hooks/useSidebarAlerts';
 
 interface AppSidebarProps {
   collapsed: boolean;
@@ -25,6 +26,12 @@ export function AppSidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMo
   const navigate = useNavigate();
   const currentRoute = `${location.pathname}${location.search}`;
   const { isAdmin } = useIsAdmin();
+  const alerts = useSidebarAlerts();
+
+  const badgeMap: Record<string, number> = useMemo(() => ({
+    financeiro: alerts.financeiroVencidos,
+    estoque: alerts.estoqueBaixo,
+  }), [alerts]);
 
   // Filter out admin-only sections for non-admin users
   const visibleSections = useMemo(
@@ -134,7 +141,7 @@ export function AppSidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMo
                       if (collapsed) { onToggleCollapsed(); return; }
                       setManualSections((c) => ({ ...c, [section.key]: !isOpen }));
                     }}
-                    className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-medium transition ${
+                    className={`relative flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-medium transition ${
                       sectionActive
                         ? 'text-primary'
                         : 'text-foreground hover:bg-accent'
@@ -145,8 +152,18 @@ export function AppSidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMo
                     {!collapsed && (
                       <>
                         <span className="flex-1">{section.title}</span>
+                        {(badgeMap[section.key] ?? 0) > 0 && (
+                          <span className="ml-auto mr-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 text-[10px] font-bold text-destructive-foreground">
+                            {badgeMap[section.key]}
+                          </span>
+                        )}
                         {isOpen ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
                       </>
+                    )}
+                    {collapsed && (badgeMap[section.key] ?? 0) > 0 && (
+                      <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold text-destructive-foreground">
+                        {badgeMap[section.key]}
+                      </span>
                     )}
                   </button>
 

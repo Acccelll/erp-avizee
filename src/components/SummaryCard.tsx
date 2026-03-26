@@ -1,5 +1,6 @@
 import React, { forwardRef } from 'react';
 import { ArrowUpIcon, ArrowDownIcon, LucideIcon } from 'lucide-react';
+import { LineChart, Line, ResponsiveContainer } from 'recharts';
 import { cn } from '@/lib/utils';
 
 export interface SummaryCardProps {
@@ -12,6 +13,8 @@ export interface SummaryCardProps {
   icon?: LucideIcon;
   onClick?: () => void;
   className?: string;
+  /** Optional sparkline data points for an inline mini chart */
+  sparklineData?: number[];
 }
 
 const variantStyles: Record<string, { border: string; iconBg: string; iconColor: string }> = {
@@ -34,6 +37,7 @@ export const SummaryCard = forwardRef<HTMLDivElement, SummaryCardProps>(
       icon: Icon,
       onClick,
       className,
+      sparklineData,
     },
     ref,
   ) {
@@ -80,6 +84,21 @@ export const SummaryCard = forwardRef<HTMLDivElement, SummaryCardProps>(
             </div>
           )}
         </div>
+        {sparklineData && sparklineData.length > 1 && (
+          <div className="mt-2 h-8">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={sparklineData.map((v) => ({ v }))}>
+                <Line
+                  type="monotone"
+                  dataKey="v"
+                  stroke={variationType === 'negative' ? 'hsl(var(--destructive))' : 'hsl(var(--primary))'}
+                  strokeWidth={1.5}
+                  dot={false}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        )}
       </div>
     );
   }

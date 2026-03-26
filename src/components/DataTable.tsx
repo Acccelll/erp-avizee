@@ -1,11 +1,12 @@
 import { useState, useMemo, useCallback } from 'react';
-import { Eye, Edit, Trash2, Copy, ChevronUp, ChevronDown, ChevronsUpDown, ChevronLeft, ChevronRight, PackageOpen } from 'lucide-react';
+import { Eye, Edit, Trash2, Copy, ChevronUp, ChevronDown, ChevronsUpDown, ChevronLeft, ChevronRight, PackageOpen, Columns3 } from 'lucide-react';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 
@@ -32,6 +33,8 @@ interface DataTableProps<T> {
   onSelectionChange?: (ids: string[]) => void;
   emptyTitle?: string;
   emptyDescription?: string;
+  /** Show column visibility toggle */
+  showColumnToggle?: boolean;
 }
 
 type SortDirection = 'asc' | 'desc' | null;
@@ -52,16 +55,29 @@ export function DataTable<T extends Record<string, any>>({
   onSelectionChange,
   emptyTitle = "Nenhum registro encontrado",
   emptyDescription = "Tente ajustar os filtros ou adicione um novo registro.",
+  showColumnToggle = false,
 }: DataTableProps<T>) {
   const isMobile = useIsMobile();
   const [deleteItem, setDeleteItem] = useState<T | null>(null);
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<SortDirection>(null);
   const [currentPage, setCurrentPage] = useState(0);
+  const [hiddenKeys, setHiddenKeys] = useState<Set<string>>(
+    () => new Set(columns.filter((c) => c.hidden).map((c) => c.key)),
+  );
   const hasActions = !!onView;
-  const visibleColumns = columns.filter((c) => !c.hidden);
+  const visibleColumns = columns.filter((c) => !hiddenKeys.has(c.key));
   const primaryColumn = visibleColumns[0];
   const secondaryColumns = visibleColumns.slice(1);
+
+  const toggleColumnVisibility = (key: string) => {
+    setHiddenKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
 
   const handleSort = (key: string) => {
     if (sortKey === key) {
@@ -167,6 +183,35 @@ export function DataTable<T extends Record<string, any>>({
 
   return (
     <>
+      {showColumnToggle && !isMobile && (
+        <div className="flex justify-end mb-2">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs">
+                <Columns3 className="h-3.5 w-3.5" />
+                Colunas
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-52 p-2">
+              <p className="text-xs font-semibold text-muted-foreground mb-2 px-1">Colunas visíveis</p>
+              <div className="space-y-1">
+                {columns.map((col) => (
+                  <label
+                    key={col.key}
+                    className="flex items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-accent cursor-pointer"
+                  >
+                    <Checkbox
+                      checked={!hiddenKeys.has(col.key)}
+                      onCheckedChange={() => toggleColumnVisibility(col.key)}
+                    />
+                    {col.label}
+                  </label>
+                ))}
+              </div>
+            </PopoverContent>
+          </Popover>
+        </div>
+      )}
       <div className="data-table">
         {loading ? renderSkeleton() : data.length === 0 ? renderEmpty() : isMobile ? (
           <>
