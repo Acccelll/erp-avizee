@@ -2,7 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { downloadTextFile } from "@/lib/utils";
 import { formatCurrency, formatDate, formatNumber } from "@/lib/format";
 
-export type TipoRelatorio = "estoque" | "movimentos_estoque" | "financeiro" | "fluxo_caixa" | "vendas" | "compras" | "aging";
+export type TipoRelatorio = "estoque" | "movimentos_estoque" | "financeiro" | "fluxo_caixa" | "vendas" | "compras" | "aging" | "dre";
 
 export interface FiltroRelatorio {
   dataInicio?: string;
@@ -16,6 +16,7 @@ export interface RelatorioResultado<T = Record<string, unknown>> {
   chartData?: Array<{ name: string; value: number }>;
   totals?: Record<string, number>;
   _isQuantityReport?: boolean;
+  _isDreReport?: boolean;
 }
 
 function withDateRange(query: any, column: string, filtros: FiltroRelatorio) {
@@ -268,6 +269,84 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
           name: row.fornecedor,
           value: row.valor,
         })),
+      };
+    }
+
+    case "dre": {
+      let receitaQuery = (supabase as any)
+        .from("financeiro_lancamentos")
+        .select("valor")
+        .eq("ativo", true)
+        .eq("tipo", "receber")
+        .eq("status", "pago");
+      receitaQuery = withDateRange(receitaQuery, "data_pagamento", filtros);
+
+      let pagosQuery = (supabase as any)
+        .from("financeiro_lancamentos")
+        .select("valor, descricao, nota_fiscal_id")
+        .eq("ativo", true)
+        .eq("tipo", "pagar")
+        .eq("status", "pago");
+      pagosQuery = withDateRange(pagosQuery, "data_pagamento", filtros);
+
+      let nfSaidaQuery = (supabase as any)
+        .from("notas_fiscais")
+        .select("icms_valor, pis_valor, cofins_valor, ipi_valor")
+        .eq("ativo", true)
+        .eq("tipo", "saida");
+      nfSaidaQuery = withDateRange(nfSaidaQuery, "data_emissao", filtros);
+
+      const [{ data: receitas }, { data: pagos }, { data: nfSaida }] = await Promise.all([
+        receitaQuery, pagosQuery, nfSaidaQuery,
+      ]);
+
+      if (!receitas && !pagos && !nfSaida) throw new Error("Erro ao carregar dados do DRE");
+
+      const receitaBruta = (receitas || []).reduce((s: number, r: any) => s + Number(r.valor || 0), 0);
+
+      const deducoes = (nfSaida || []).reduce((s: number, nf: any) => {
+        return s + Number(nf.icms_valor || 0) + Number(nf.pis_valor || 0) + Number(nf.cofins_valor || 0) + Number(nf.ipi_valor || 0);
+      }, 0);
+
+      const receitaLiquida = receitaBruta - deducoes;
+
+      const cmv = (pagos || []).filter((p: any) =>
+        p.nota_fiscal_id || (p.descricao || "").toLowerCase().includes("compra")
+      ).reduce((s: number, p: any) => s + Number(p.valor || 0), 0);
+
+      const despesasOp = (pagos || []).filter((p: any) =>
+        !p.nota_fiscal_id && !(p.descricao || "").toLowerCase().includes("compra")
+      ).reduce((s: number, p: any) => s + Number(p.valor || 0), 0);
+
+      const resultado = receitaLiquida - cmv - despesasOp;
+
+      const rows = [
+        { linha: "Receita Bruta", valor: receitaBruta, tipo: "header" },
+        { linha: "(–) Deduções s/ Receita", valor: deducoes, tipo: "deducao" },
+        { linha: "= Receita Líquida", valor: receitaLiquida, tipo: "subtotal" },
+        { linha: "(–) CMV / CPV", valor: cmv, tipo: "deducao" },
+        { linha: "= Lucro Bruto", valor: receitaLiquida - cmv, tipo: "subtotal" },
+        { linha: "(–) Despesas Operacionais", valor: despesasOp, tipo: "deducao" },
+        { linha: "= Resultado do Exercício", valor: resultado, tipo: "resultado" },
+      ];
+
+      return {
+        title: "DRE — Demonstrativo de Resultado",
+        subtitle: "Receitas, deduções, custos e resultado do exercício.",
+        rows,
+        chartData: [
+          { name: "Receita Bruta", value: receitaBruta },
+          { name: "Deduções", value: deducoes },
+          { name: "CMV", value: cmv },
+          { name: "Despesas", value: despesasOp },
+          { name: "Resultado", value: Math.max(0, resultado) },
+        ],
+        totals: {
+          receitaBruta,
+          receitaLiquida,
+          resultado,
+        },
+        _isDreReport: true,
       };
     }
 

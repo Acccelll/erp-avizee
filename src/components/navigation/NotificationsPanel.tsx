@@ -60,7 +60,7 @@ export function NotificationsPanel() {
             .eq('ativo', true),
           (supabase as any)
             .from('produtos')
-            .select('id, estoque_atual, estoque_minimo')
+            .select('id, nome, estoque_atual, estoque_minimo')
             .eq('ativo', true)
             .gt('estoque_minimo', 0),
           (supabase as any)
@@ -78,6 +78,11 @@ export function NotificationsPanel() {
         ]);
 
         const estoqueCritico = (estoque || []).filter((item: any) => Number(item.estoque_atual || 0) <= Number(item.estoque_minimo || 0));
+
+        // Read dismissed alerts from localStorage
+        const dismissedRaw = localStorage.getItem('notifications_dismissed') || '{}';
+        let dismissed: Record<string, boolean> = {};
+        try { dismissed = JSON.parse(dismissedRaw); } catch { dismissed = {}; }
 
         const nextItems: NotificationItem[] = [
           {
@@ -100,6 +105,14 @@ export function NotificationsPanel() {
                 : 'Nenhum alerta de estoque mínimo no momento.',
             time: 'Agora',
           },
+          // Per-product stock alerts
+          ...estoqueCritico.slice(0, 5).filter((item: any) => !dismissed[`estoque-${item.id}`]).map((item: any) => ({
+            id: `estoque-${item.id}`,
+            level: 'warning' as const,
+            title: `${item.nome}`,
+            description: `Estoque: ${Number(item.estoque_atual || 0)} / Mínimo: ${Number(item.estoque_minimo || 0)}`,
+            time: 'Estoque baixo',
+          })),
           {
             id: 'compras-aguardando',
             level: (comprasAguardando || []).length > 0 ? 'info' : 'success',

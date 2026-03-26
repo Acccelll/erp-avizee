@@ -23,6 +23,7 @@ const reportCards: Array<{ type: TipoRelatorio; title: string; description: stri
   { type: 'vendas', title: 'Vendas', description: 'Ordens por período e faturamento', icon: ShoppingCart },
   { type: 'compras', title: 'Compras', description: 'Consolidado por fornecedor', icon: Truck },
   { type: 'aging', title: 'Aging', description: 'Vencidos por faixa de dias', icon: CalendarClock },
+  { type: 'dre', title: 'DRE', description: 'Demonstrativo de resultado', icon: BarChart3 },
 ];
 
 const CHART_COLORS = [
@@ -133,6 +134,7 @@ export default function Relatorios() {
   useEffect(() => { loadData(); }, [tipo]);
 
   const isQtyReport = resultado._isQuantityReport === true;
+  const isDreReport = (resultado as any)._isDreReport === true;
 
   const kpis = useMemo(() => {
     const rows = resultado.rows as any[];
@@ -190,7 +192,7 @@ export default function Relatorios() {
       <ModulePage title="Relatórios" subtitle="Análises gerenciais, exportações e visão consolidada por módulo.">
         <div className="space-y-6">
           {/* Report type selector */}
-          <div className="grid gap-3 grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
+          <div className="grid gap-3 grid-cols-2 md:grid-cols-4 xl:grid-cols-8">
             {reportCards.map((card) => (
               <button
                 key={card.type}
@@ -251,7 +253,29 @@ export default function Relatorios() {
                 <CardDescription>{resultado.subtitle}</CardDescription>
               </CardHeader>
               <CardContent className="p-0">
-                <DataTable columns={columns} data={resultado.rows as Record<string, unknown>[]} loading={loading} />
+                {isDreReport ? (
+                  <div className="p-4">
+                    <table className="w-full text-sm">
+                      <tbody>
+                        {(resultado.rows as any[]).map((row, i) => (
+                          <tr key={i} className={
+                            row.tipo === "header" ? "bg-primary/5 font-bold" :
+                            row.tipo === "subtotal" ? "bg-muted/50 font-semibold border-t" :
+                            row.tipo === "resultado" ? "bg-primary/10 font-bold text-lg border-t-2 border-primary/30" :
+                            "text-muted-foreground"
+                          }>
+                            <td className={`px-4 py-3 ${row.tipo === "deducao" ? "pl-8" : ""}`}>{row.linha}</td>
+                            <td className={`px-4 py-3 text-right font-mono ${row.valor < 0 ? "text-destructive" : ""}`}>
+                              {formatCurrency(row.valor)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <DataTable columns={columns} data={resultado.rows as Record<string, unknown>[]} loading={loading} />
+                )}
               </CardContent>
             </Card>
 
@@ -366,6 +390,9 @@ export default function Relatorios() {
                 {resultado.totals.totalAjustes != null && <span className="font-semibold">Ajustes: {formatNumber(resultado.totals.totalAjustes)}</span>}
                 {resultado.totals.saldoAtual != null && <span className="font-semibold">Saldo Atual: {formatNumber(resultado.totals.saldoAtual)}</span>}
                 {resultado.totals.saldoFinal != null && <span className="font-semibold text-primary">Saldo Final: {formatCurrency(resultado.totals.saldoFinal)}</span>}
+                {resultado.totals.receitaBruta != null && <span className="font-semibold">Receita Bruta: {formatCurrency(resultado.totals.receitaBruta)}</span>}
+                {resultado.totals.receitaLiquida != null && <span className="font-semibold">Receita Líquida: {formatCurrency(resultado.totals.receitaLiquida)}</span>}
+                {resultado.totals.resultado != null && <span className={`font-semibold ${resultado.totals.resultado >= 0 ? 'text-success' : 'text-destructive'}`}>Resultado: {formatCurrency(resultado.totals.resultado)}</span>}
               </div>
             )}
             {!resultado.totals && kpis.totalValue > 0 && <span className="font-semibold text-foreground">Valor consolidado: {formatCurrency(kpis.totalValue)}</span>}
