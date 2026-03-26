@@ -11,6 +11,7 @@ import logoAvizee from '@/assets/logoavizee.png';
 import { Button } from '@/components/ui/button';
 import { navSections, dashboardItem, isPathActive } from '@/lib/navigation';
 import { useIsAdmin } from '@/hooks/useIsAdmin';
+import { useSidebarAlerts } from '@/hooks/useSidebarAlerts';
 
 interface AppSidebarProps {
   collapsed: boolean;
@@ -25,6 +26,12 @@ export function AppSidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMo
   const navigate = useNavigate();
   const currentRoute = `${location.pathname}${location.search}`;
   const { isAdmin } = useIsAdmin();
+  const alerts = useSidebarAlerts();
+
+  const badgeMap: Record<string, number> = useMemo(() => ({
+    financeiro: alerts.financeiroVencidos,
+    estoque: alerts.estoqueBaixo,
+  }), [alerts]);
 
   // Filter out admin-only sections for non-admin users
   const visibleSections = useMemo(
