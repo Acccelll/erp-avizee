@@ -33,6 +33,8 @@ interface DataTableProps<T> {
   onSelectionChange?: (ids: string[]) => void;
   emptyTitle?: string;
   emptyDescription?: string;
+  /** Show column visibility toggle */
+  showColumnToggle?: boolean;
 }
 
 type SortDirection = 'asc' | 'desc' | null;
