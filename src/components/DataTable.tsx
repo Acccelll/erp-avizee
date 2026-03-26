@@ -183,7 +183,35 @@ export function DataTable<T extends Record<string, any>>({
 
   return (
     <>
-      <div className="data-table">
+      {showColumnToggle && !isMobile && (
+        <div className="flex justify-end mb-2">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs">
+                <Columns3 className="h-3.5 w-3.5" />
+                Colunas
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-52 p-2">
+              <p className="text-xs font-semibold text-muted-foreground mb-2 px-1">Colunas visíveis</p>
+              <div className="space-y-1">
+                {columns.map((col) => (
+                  <label
+                    key={col.key}
+                    className="flex items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-accent cursor-pointer"
+                  >
+                    <Checkbox
+                      checked={!hiddenKeys.has(col.key)}
+                      onCheckedChange={() => toggleColumnVisibility(col.key)}
+                    />
+                    {col.label}
+                  </label>
+                ))}
+              </div>
+            </PopoverContent>
+          </Popover>
+        </div>
+      )
         {loading ? renderSkeleton() : data.length === 0 ? renderEmpty() : isMobile ? (
           <>
             <div className="space-y-3 p-3">
