@@ -152,8 +152,18 @@ export function AppSidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMo
                     {!collapsed && (
                       <>
                         <span className="flex-1">{section.title}</span>
+                        {(badgeMap[section.key] ?? 0) > 0 && (
+                          <span className="ml-auto mr-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 text-[10px] font-bold text-destructive-foreground">
+                            {badgeMap[section.key]}
+                          </span>
+                        )}
                         {isOpen ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
                       </>
+                    )}
+                    {collapsed && (badgeMap[section.key] ?? 0) > 0 && (
+                      <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-bold text-destructive-foreground">
+                        {badgeMap[section.key]}
+                      </span>
                     )}
                   </button>
 
