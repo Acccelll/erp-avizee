@@ -178,6 +178,11 @@ const OrdensVenda = () => {
               <CheckCircle className="w-3 h-3" /> Aprovar
             </Button>
           )}
+          {(o.status === "aprovada" || o.status === "em_separacao") && o.status_faturamento !== "total" && (
+            <Button size="sm" variant="default" className="h-7 text-xs gap-1" onClick={(e) => { e.stopPropagation(); setGeneratingNfId(o.id); }}>
+              <FileOutput className="w-3 h-3" /> Gerar NF
+            </Button>
+          )}
         </div>
       ),
     },
