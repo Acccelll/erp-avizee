@@ -6,7 +6,7 @@ import { DataTable, StatusBadge } from "@/components/DataTable";
 import { SummaryCard } from "@/components/SummaryCard";
 import { ViewDrawer } from "@/components/ViewDrawer";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Trash2 } from "lucide-react";
+import { Trash2, FileOutput } from "lucide-react";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -15,6 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatCurrency, formatDate, daysSince, formatNumber } from "@/lib/format";
 import { CheckCircle, Package, FileText, DollarSign, Clock, Truck } from "lucide-react";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 interface OrdemVenda {
   id: string; numero: string; data_emissao: string; cliente_id: string;

@@ -39,6 +39,7 @@ const emptyForm: Record<string, any> = {
 const Fornecedores = () => {
   const { data, loading, create, update, remove, duplicate } = useSupabaseCrud<Fornecedor>({ table: "fornecedores" });
   const { buscarCep, loading: cepLoading } = useViaCep();
+  const { buscarCnpj, loading: cnpjLoading } = useCnpjLookup();
   const [modalOpen, setModalOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selected, setSelected] = useState<Fornecedor | null>(null);
@@ -146,7 +147,23 @@ const Fornecedores = () => {
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             <div className="col-span-2 space-y-2"><Label>Razão Social *</Label><Input value={form.nome_razao_social} onChange={(e) => setForm({ ...form, nome_razao_social: e.target.value })} required /></div>
             <div className="space-y-2"><Label>Nome Fantasia</Label><Input value={form.nome_fantasia} onChange={(e) => setForm({ ...form, nome_fantasia: e.target.value })} /></div>
-            <div className="space-y-2"><Label>CNPJ</Label><MaskedInput mask="cnpj" value={form.cpf_cnpj} onChange={(v) => setForm({ ...form, cpf_cnpj: v })} /></div>
+            <div className="space-y-2"><Label>CNPJ</Label><MaskedInput mask="cnpj" value={form.cpf_cnpj} onChange={(v) => setForm({ ...form, cpf_cnpj: v })} onBlur={async () => {
+              const result = await buscarCnpj(form.cpf_cnpj);
+              if (result) setForm(prev => ({
+                ...prev,
+                nome_razao_social: result.razao_social || prev.nome_razao_social,
+                nome_fantasia: result.nome_fantasia || prev.nome_fantasia,
+                email: result.email || prev.email,
+                telefone: result.telefone || prev.telefone,
+                logradouro: result.logradouro || prev.logradouro,
+                numero: result.numero || prev.numero,
+                complemento: result.complemento || prev.complemento,
+                bairro: result.bairro || prev.bairro,
+                cidade: result.municipio || prev.cidade,
+                uf: result.uf || prev.uf,
+                cep: result.cep || prev.cep,
+              }));
+            }} /></div>
             <div className="space-y-2"><Label>I.E.</Label><Input value={form.inscricao_estadual} onChange={(e) => setForm({ ...form, inscricao_estadual: e.target.value })} /></div>
             <div className="space-y-2"><Label>E-mail</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
             <div className="space-y-2"><Label>Telefone</Label><MaskedInput mask="telefone" value={form.telefone} onChange={(v) => setForm({ ...form, telefone: v })} /></div>
