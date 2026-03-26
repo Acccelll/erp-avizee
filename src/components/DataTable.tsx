@@ -55,16 +55,29 @@ export function DataTable<T extends Record<string, any>>({
   onSelectionChange,
   emptyTitle = "Nenhum registro encontrado",
   emptyDescription = "Tente ajustar os filtros ou adicione um novo registro.",
+  showColumnToggle = false,
 }: DataTableProps<T>) {
   const isMobile = useIsMobile();
   const [deleteItem, setDeleteItem] = useState<T | null>(null);
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<SortDirection>(null);
   const [currentPage, setCurrentPage] = useState(0);
+  const [hiddenKeys, setHiddenKeys] = useState<Set<string>>(
+    () => new Set(columns.filter((c) => c.hidden).map((c) => c.key)),
+  );
   const hasActions = !!onView;
-  const visibleColumns = columns.filter((c) => !c.hidden);
+  const visibleColumns = columns.filter((c) => !hiddenKeys.has(c.key));
   const primaryColumn = visibleColumns[0];
   const secondaryColumns = visibleColumns.slice(1);
+
+  const toggleColumnVisibility = (key: string) => {
+    setHiddenKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
 
   const handleSort = (key: string) => {
     if (sortKey === key) {
