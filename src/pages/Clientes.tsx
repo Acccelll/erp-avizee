@@ -8,6 +8,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Edit, Copy, Trash2 } from "lucide-react";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
 import { useViaCep } from "@/hooks/useViaCep";
+import { useCnpjLookup } from "@/hooks/useCnpjLookup";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -50,6 +51,7 @@ const relacaoOptions = [
 const Clientes = () => {
   const { data, loading, create, update, remove, duplicate } = useSupabaseCrud<Cliente>({ table: "clientes" });
   const { buscarCep, loading: cepLoading } = useViaCep();
+  const { buscarCnpj, loading: cnpjLoading } = useCnpjLookup();
   const [modalOpen, setModalOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selected, setSelected] = useState<Cliente | null>(null);
@@ -200,7 +202,25 @@ const Clientes = () => {
                 <SelectContent><SelectItem value="F">Pessoa Física</SelectItem><SelectItem value="J">Pessoa Jurídica</SelectItem></SelectContent>
               </Select>
             </div>
-            <div className="space-y-2"><Label>CPF/CNPJ</Label><MaskedInput mask="cpf_cnpj" value={form.cpf_cnpj} onChange={(v) => setForm({ ...form, cpf_cnpj: v })} /></div>
+            <div className="space-y-2"><Label>CPF/CNPJ</Label><MaskedInput mask="cpf_cnpj" value={form.cpf_cnpj} onChange={(v) => setForm({ ...form, cpf_cnpj: v })} onBlur={async () => {
+              if (form.tipo_pessoa === "J") {
+                const result = await buscarCnpj(form.cpf_cnpj);
+                if (result) setForm(prev => ({
+                  ...prev,
+                  nome_razao_social: result.razao_social || prev.nome_razao_social,
+                  nome_fantasia: result.nome_fantasia || prev.nome_fantasia,
+                  email: result.email || prev.email,
+                  telefone: result.telefone || prev.telefone,
+                  logradouro: result.logradouro || prev.logradouro,
+                  numero: result.numero || prev.numero,
+                  complemento: result.complemento || prev.complemento,
+                  bairro: result.bairro || prev.bairro,
+                  cidade: result.municipio || prev.cidade,
+                  uf: result.uf || prev.uf,
+                  cep: result.cep || prev.cep,
+                }));
+              }
+            }} /></div>
             <div className="space-y-2"><Label>I.E.</Label><Input value={form.inscricao_estadual} onChange={(e) => setForm({ ...form, inscricao_estadual: e.target.value })} /></div>
             <div className="col-span-2 md:col-span-3 space-y-2"><Label>Nome / Razão Social *</Label><Input value={form.nome_razao_social} onChange={(e) => setForm({ ...form, nome_razao_social: e.target.value })} required /></div>
             <div className="col-span-2 md:col-span-3 space-y-2"><Label>Nome Fantasia</Label><Input value={form.nome_fantasia} onChange={(e) => setForm({ ...form, nome_fantasia: e.target.value })} /></div>

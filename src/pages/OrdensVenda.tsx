@@ -6,7 +6,7 @@ import { DataTable, StatusBadge } from "@/components/DataTable";
 import { SummaryCard } from "@/components/SummaryCard";
 import { ViewDrawer } from "@/components/ViewDrawer";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Trash2 } from "lucide-react";
+import { Trash2, FileOutput } from "lucide-react";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -15,6 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatCurrency, formatDate, daysSince, formatNumber } from "@/lib/format";
 import { CheckCircle, Package, FileText, DollarSign, Clock, Truck } from "lucide-react";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 interface OrdemVenda {
   id: string; numero: string; data_emissao: string; cliente_id: string;
@@ -50,6 +51,7 @@ const OrdensVenda = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("todos");
   const [faturamentoFilter, setFaturamentoFilter] = useState<string>("todos");
+  const [generatingNfId, setGeneratingNfId] = useState<string | null>(null);
 
   // KPIs
   const kpis = useMemo(() => {
@@ -76,6 +78,65 @@ const OrdensVenda = () => {
     } catch (err: any) {
       console.error('[ordens-venda]', err);
       toast.error("Erro ao aprovar ordem de venda.");
+    }
+  };
+
+  const handleGenerateNF = async (ov: OrdemVenda) => {
+    try {
+      const { data: ovItems } = await (supabase as any).from("ordens_venda_itens").select("*").eq("ordem_venda_id", ov.id);
+      const { count } = await (supabase as any).from("notas_fiscais").select("*", { count: "exact", head: true });
+      const nfNumero = String((count || 0) + 1).padStart(6, "0");
+
+      const totalProdutos = (ovItems || []).reduce((s: number, i: any) => s + Number(i.valor_total || 0), 0);
+
+      const { data: newNF, error } = await (supabase as any).from("notas_fiscais").insert({
+        numero: nfNumero,
+        tipo: "saida",
+        data_emissao: new Date().toISOString().split("T")[0],
+        cliente_id: ov.cliente_id,
+        ordem_venda_id: ov.id,
+        valor_total: totalProdutos,
+        status: "pendente",
+        movimenta_estoque: true,
+        gera_financeiro: true,
+        observacoes: `Gerada a partir da OV ${ov.numero}`,
+      }).select().single();
+
+      if (error) throw error;
+
+      if (ovItems && ovItems.length > 0 && newNF) {
+        const nfItems = ovItems.map((i: any) => ({
+          nota_fiscal_id: newNF.id,
+          produto_id: i.produto_id,
+          quantidade: i.quantidade,
+          valor_unitario: i.valor_unitario,
+        }));
+        await (supabase as any).from("notas_fiscais_itens").insert(nfItems);
+      }
+
+      // Update OV faturamento status
+      const totalQtd = (ovItems || []).reduce((s: number, i: any) => s + Number(i.quantidade || 0), 0);
+      const totalFat = (ovItems || []).reduce((s: number, i: any) => s + Number(i.quantidade_faturada || 0), 0);
+      const newFatStatus = (totalFat + totalQtd >= totalQtd * 2) ? "total" : totalFat > 0 ? "parcial" : "total";
+      
+      await (supabase as any).from("ordens_venda").update({ status_faturamento: "total" }).eq("id", ov.id);
+
+      // Update quantities faturadas
+      if (ovItems) {
+        for (const item of ovItems) {
+          await (supabase as any).from("ordens_venda_itens").update({
+            quantidade_faturada: item.quantidade,
+          }).eq("id", item.id);
+        }
+      }
+
+      toast.success(`NF ${nfNumero} gerada a partir da OV ${ov.numero}!`);
+      fetchData();
+    } catch (err: any) {
+      console.error('[ordens-venda] gerar NF:', err);
+      toast.error("Erro ao gerar Nota Fiscal.");
+    } finally {
+      setGeneratingNfId(null);
     }
   };
 
@@ -115,6 +176,11 @@ const OrdensVenda = () => {
           {o.status === "pendente" && (
             <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={(e) => { e.stopPropagation(); handleApprove(o); }}>
               <CheckCircle className="w-3 h-3" /> Aprovar
+            </Button>
+          )}
+          {(o.status === "aprovada" || o.status === "em_separacao") && o.status_faturamento !== "total" && (
+            <Button size="sm" variant="default" className="h-7 text-xs gap-1" onClick={(e) => { e.stopPropagation(); setGeneratingNfId(o.id); }}>
+              <FileOutput className="w-3 h-3" /> Gerar NF
             </Button>
           )}
         </div>
@@ -205,10 +271,26 @@ const OrdensVenda = () => {
                   <CheckCircle className="w-4 h-4" /> Aprovar OV
                 </Button>
               )}
+              {(selected.status === "aprovada" || selected.status === "em_separacao") && selected.status_faturamento !== "total" && (
+                <Button variant="default" onClick={() => { setDrawerOpen(false); setGeneratingNfId(selected.id); }} className="w-full gap-2">
+                  <FileOutput className="w-4 h-4" /> Gerar Nota Fiscal
+                </Button>
+              )}
             </div>
           </div>
         )}
       </ViewDrawer>
+
+      <ConfirmDialog
+        open={!!generatingNfId}
+        onClose={() => setGeneratingNfId(null)}
+        onConfirm={() => {
+          const ov = data.find(o => o.id === generatingNfId);
+          if (ov) handleGenerateNF(ov);
+        }}
+        title="Gerar Nota Fiscal"
+        description={`Deseja gerar uma Nota Fiscal de saída para a OV ${data.find(o => o.id === generatingNfId)?.numero || ""}? Todos os itens serão incluídos.`}
+      />
     </AppLayout>
   );
 };
