@@ -310,12 +310,18 @@ export default function OrcamentoForm() {
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 <div className="md:col-span-2 space-y-1.5">
                   <Label className="text-xs">Buscar Cliente</Label>
-                  <AutocompleteSearch
-                    options={clienteOptions}
-                    value={clienteId}
-                    onChange={handleClienteChange}
-                    placeholder="Buscar por nome ou CNPJ..."
-                  />
+                  <div className="flex gap-2">
+                    <AutocompleteSearch
+                      options={clienteOptions}
+                      value={clienteId}
+                      onChange={handleClienteChange}
+                      placeholder="Buscar por nome ou CNPJ..."
+                      className="flex-1"
+                    />
+                    <Button type="button" variant="outline" size="icon" className="h-10 w-10 shrink-0" onClick={() => setQuickAddOpen(true)} title="Cadastrar novo cliente">
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
                 <div className="space-y-1.5"><Label className="text-xs">Código</Label><Input value={clienteSnapshot.codigo} readOnly className="bg-accent/30 font-mono text-xs" /></div>
               </div>
