@@ -118,16 +118,18 @@ const Dashboard = () => {
       value: formatCurrency(stats.totalReceber),
       icon: TrendingUp,
       path: "/financeiro?tipo=receber",
-      variation: `${formatNumber(stats.contasReceber)} em aberto`,
-      variationType: "positive" as const,
+      variation: stats.contasVencidas > 0
+        ? `${formatNumber(stats.contasReceber)} em aberto · ${formatNumber(stats.contasVencidas)} vencida(s)`
+        : `${formatNumber(stats.contasReceber)} em aberto`,
+      variationType: stats.contasVencidas > 0 ? ("negative" as const) : ("positive" as const),
     },
     {
       title: "Contas a Pagar",
       value: formatCurrency(stats.totalPagar),
       icon: DollarSign,
       path: "/financeiro?tipo=pagar",
-      variation: stats.contasVencidas > 0 ? `${formatNumber(stats.contasVencidas)} vencidas` : "Nenhuma vencida",
-      variationType: stats.contasVencidas > 0 ? ("negative" as const) : ("positive" as const),
+      variation: `${formatNumber(stats.contasPagar)} em aberto`,
+      variationType: stats.contasPagar > 0 ? ("neutral" as const) : ("positive" as const),
     },
     {
       title: "Produtos Ativos",
