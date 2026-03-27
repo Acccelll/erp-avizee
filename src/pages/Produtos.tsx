@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { AppLayout } from "@/components/AppLayout";
-import { ModulePage } from "@/components/ModulePage";
 import { DataTable, StatusBadge } from "@/components/DataTable";
 import { FormModal } from "@/components/FormModal";
-import { ViewDrawer } from "@/components/ViewDrawer";
+import { ViewDrawerV2, ViewField, ViewSection } from "@/components/ViewDrawerV2";
+import { AdvancedFilterBar, type FilterChip } from "@/components/AdvancedFilterBar";
+import { RelationalLink } from "@/components/ui/RelationalLink";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Edit, Copy } from "lucide-react";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
