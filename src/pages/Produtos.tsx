@@ -17,6 +17,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Plus, Trash2, RefreshCw, Package, TrendingUp, AlertTriangle, Archive, FileText, History } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/format";
+import { FiscalAutocomplete } from "@/components/ui/FiscalAutocomplete";
+import { cfopCodes, cstIcmsCodes } from "@/lib/fiscalData";
 
 interface Produto {
   id: string;sku: string;codigo_interno: string;nome: string;descricao: string;
@@ -55,8 +57,16 @@ const Produtos = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [tipoFilter, setTipoFilter] = useState<"todos" | "simples" | "composto">("todos");
   const [estoqueFilter, setEstoqueFilter] = useState<"todos" | "baixo" | "ok">("todos");
+  const [grupoFilter, setGrupoFilter] = useState<string>("todos");
+  const [grupos, setGrupos] = useState<{id: string; nome: string}[]>([]);
   const [movimentos, setMovimentos] = useState<any[]>([]);
   const [fornecedoresProd, setFornecedoresProd] = useState<any[]>([]);
+
+  useEffect(() => {
+    supabase.from("grupos_produto").select("id, nome").eq("ativo", true).order("nome").then(({ data: g }) => {
+      if (g) setGrupos(g);
+    });
+  }, []);
 
   const produtosDisponiveis = data.filter((p) => !selected || p.id !== selected.id);
 
@@ -174,10 +184,11 @@ const Produtos = () => {
       if (tipoFilter === "simples" && isComposto) return false;
       if (estoqueFilter === "baixo" && !baixoEstoque) return false;
       if (estoqueFilter === "ok" && baixoEstoque) return false;
+      if (grupoFilter !== "todos" && p.grupo_id !== grupoFilter) return false;
       if (!query) return true;
       return [p.nome, p.sku, p.codigo_interno, p.descricao, p.ncm].filter(Boolean).join(" ").toLowerCase().includes(query);
     });
-  }, [data, estoqueFilter, searchTerm, tipoFilter]);
+  }, [data, estoqueFilter, searchTerm, tipoFilter, grupoFilter]);
 
   const columns = [
   { key: "sku", label: "SKU", render: (p: Produto) => <span className="font-mono text-xs font-medium text-primary">{p.sku || "—"}</span> },
@@ -203,7 +214,7 @@ const Produtos = () => {
     <AppLayout>
       <ModulePage title="Produtos" subtitle="Cadastro e gestão de produtos" addLabel="Novo Produto" onAdd={openCreate} count={filteredData.length}
       searchValue={searchTerm} onSearchChange={setSearchTerm} searchPlaceholder="Buscar por nome, SKU ou código..."
-      filters={<><Select value={tipoFilter} onValueChange={(v: any) => setTipoFilter(v)}><SelectTrigger className="h-9 w-[170px]"><SelectValue placeholder="Tipo" /></SelectTrigger><SelectContent><SelectItem value="todos">Todos os tipos</SelectItem><SelectItem value="simples">Somente simples</SelectItem><SelectItem value="composto">Somente compostos</SelectItem></SelectContent></Select><Select value={estoqueFilter} onValueChange={(v: any) => setEstoqueFilter(v)}><SelectTrigger className="h-9 w-[190px]"><SelectValue placeholder="Estoque" /></SelectTrigger><SelectContent><SelectItem value="todos">Todo o estoque</SelectItem><SelectItem value="baixo">Abaixo do mínimo</SelectItem><SelectItem value="ok">Estoque normal</SelectItem></SelectContent></Select></>}>
+      filters={<><Select value={tipoFilter} onValueChange={(v: any) => setTipoFilter(v)}><SelectTrigger className="h-9 w-[170px]"><SelectValue placeholder="Tipo" /></SelectTrigger><SelectContent><SelectItem value="todos">Todos os tipos</SelectItem><SelectItem value="simples">Somente simples</SelectItem><SelectItem value="composto">Somente compostos</SelectItem></SelectContent></Select><Select value={estoqueFilter} onValueChange={(v: any) => setEstoqueFilter(v)}><SelectTrigger className="h-9 w-[190px]"><SelectValue placeholder="Estoque" /></SelectTrigger><SelectContent><SelectItem value="todos">Todo o estoque</SelectItem><SelectItem value="baixo">Abaixo do mínimo</SelectItem><SelectItem value="ok">Estoque normal</SelectItem></SelectContent></Select><Select value={grupoFilter} onValueChange={setGrupoFilter}><SelectTrigger className="h-9 w-[180px]"><SelectValue placeholder="Grupo" /></SelectTrigger><SelectContent><SelectItem value="todos">Todos os grupos</SelectItem>{grupos.map((g) => <SelectItem key={g.id} value={g.id}>{g.nome}</SelectItem>)}</SelectContent></Select></>}>
         
         <DataTable columns={columns} data={filteredData} loading={loading}
         onView={openView} />
@@ -244,8 +255,8 @@ const Produtos = () => {
           {/* Fiscal */}
           <h3 className="font-semibold text-sm pt-2 border-t flex items-center gap-2"><FileText className="w-4 h-4" /> Dados Fiscais</h3>
           <div className="grid grid-cols-3 gap-4">
-            <div className="space-y-2"><Label>CST</Label><Input value={form.cst} onChange={(e) => setForm({ ...form, cst: e.target.value })} placeholder="Ex: 000" /></div>
-            <div className="space-y-2"><Label>CFOP Padrão</Label><Input value={form.cfop_padrao} onChange={(e) => setForm({ ...form, cfop_padrao: e.target.value })} placeholder="Ex: 5102" /></div>
+            <div className="space-y-2"><Label>CST</Label><FiscalAutocomplete data={cstIcmsCodes} value={form.cst} onChange={(v) => setForm({ ...form, cst: v })} placeholder="Ex: 000" /></div>
+            <div className="space-y-2"><Label>CFOP Padrão</Label><FiscalAutocomplete data={cfopCodes} value={form.cfop_padrao} onChange={(v) => setForm({ ...form, cfop_padrao: v })} placeholder="Ex: 5102" /></div>
             <div className="space-y-2"><Label>NCM</Label><Input value={form.ncm} onChange={(e) => setForm({ ...form, ncm: e.target.value })} /></div>
           </div>
 
