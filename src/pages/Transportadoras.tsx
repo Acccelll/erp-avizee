@@ -6,6 +6,7 @@ import { FormModal } from "@/components/FormModal";
 import { ViewDrawer } from "@/components/ViewDrawer";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Edit, Trash2 } from "lucide-react";
+import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,10 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MaskedInput } from "@/components/ui/MaskedInput";
 import { toast } from "sonner";
-import { Truck } from "lucide-react";
-import { useState as useLocalState } from "react";
 
-// Local state since no DB table yet - ready for future migration
 interface Transportadora {
   id: string;
   nome_razao_social: string;
@@ -34,26 +32,6 @@ interface Transportadora {
   created_at: string;
 }
 
-// Mock data store (will be replaced with useSupabaseCrud when table exists)
-const useMockTransportadoras = () => {
-  const [items, setItems] = useState<Transportadora[]>([]);
-  const create = (payload: any) => {
-    const item = { ...payload, id: crypto.randomUUID(), ativo: true, created_at: new Date().toISOString() };
-    setItems(prev => [...prev, item]);
-    toast.success("Transportadora cadastrada!");
-    return item;
-  };
-  const update = (id: string, payload: any) => {
-    setItems(prev => prev.map(i => i.id === id ? { ...i, ...payload } : i));
-    toast.success("Transportadora atualizada!");
-  };
-  const remove = (id: string) => {
-    setItems(prev => prev.filter(i => i.id !== id));
-    toast.success("Transportadora removida!");
-  };
-  return { data: items, loading: false, create, update, remove };
-};
-
 const emptyForm: Record<string, any> = {
   nome_razao_social: "", nome_fantasia: "", cpf_cnpj: "", contato: "",
   telefone: "", email: "", cidade: "", uf: "", modalidade: "rodoviario",
@@ -61,7 +39,7 @@ const emptyForm: Record<string, any> = {
 };
 
 export default function Transportadoras() {
-  const { data, loading, create, update, remove } = useMockTransportadoras();
+  const { data, loading, create, update, remove } = useSupabaseCrud<Transportadora>({ table: "transportadoras" });
   const [modalOpen, setModalOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selected, setSelected] = useState<Transportadora | null>(null);
@@ -89,9 +67,11 @@ export default function Transportadoras() {
     e.preventDefault();
     if (!form.nome_razao_social) { toast.error("Razão Social é obrigatória"); return; }
     setSaving(true);
-    if (mode === "create") create(form);
-    else if (selected) update(selected.id, form);
-    setModalOpen(false);
+    try {
+      if (mode === "create") await create(form);
+      else if (selected) await update(selected.id, form);
+      setModalOpen(false);
+    } catch {}
     setSaving(false);
   };
 
@@ -116,8 +96,7 @@ export default function Transportadoras() {
     <AppLayout>
       <ModulePage title="Transportadoras" subtitle="Cadastro de transportadoras e logística" addLabel="Nova Transportadora" onAdd={openCreate} count={filteredData.length}
         searchValue={searchTerm} onSearchChange={setSearchTerm} searchPlaceholder="Buscar por nome ou CNPJ...">
-        <DataTable columns={columns} data={filteredData} loading={loading}
-          onView={openView} />
+        <DataTable columns={columns} data={filteredData} loading={loading} onView={openView} />
       </ModulePage>
 
       <FormModal open={modalOpen} onClose={() => setModalOpen(false)} title={mode === "create" ? "Nova Transportadora" : "Editar Transportadora"} size="lg">
@@ -161,23 +140,14 @@ export default function Transportadoras() {
       >
         {selected && (
           <div className="space-y-5">
-            {/* Header with identity */}
             <div>
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="font-semibold text-lg truncate">{selected.nome_razao_social}</h3>
-                  <StatusBadge status={selected.ativo ? "Ativo" : "Inativo"} />
-                </div>
-                {selected.nome_fantasia && (
-                  <p className="text-sm text-muted-foreground truncate">{selected.nome_fantasia}</p>
-                )}
-                {selected.cpf_cnpj && (
-                  <p className="text-xs text-muted-foreground font-mono mt-0.5">{selected.cpf_cnpj}</p>
-                )}
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="font-semibold text-lg truncate">{selected.nome_razao_social}</h3>
+                <StatusBadge status={selected.ativo ? "Ativo" : "Inativo"} />
               </div>
+              {selected.nome_fantasia && <p className="text-sm text-muted-foreground truncate">{selected.nome_fantasia}</p>}
+              {selected.cpf_cnpj && <p className="text-xs text-muted-foreground font-mono mt-0.5">{selected.cpf_cnpj}</p>}
             </div>
-
-            {/* KPI Cards */}
             <div className="grid grid-cols-3 gap-3">
               <div className="rounded-lg border bg-card p-4 text-center space-y-1">
                 <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Modalidade</p>
@@ -192,8 +162,6 @@ export default function Transportadoras() {
                 <p className="font-semibold text-sm text-foreground">{selected.cidade ? `${selected.cidade}/${selected.uf}` : "—"}</p>
               </div>
             </div>
-
-            {/* Details */}
             <div className="grid grid-cols-2 gap-x-4 gap-y-3">
               {[
                 { label: "CNPJ", value: selected.cpf_cnpj, mono: true },

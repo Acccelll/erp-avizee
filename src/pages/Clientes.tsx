@@ -36,7 +36,7 @@ interface GrupoEconomico {id: string;nome: string;}
 const emptyCliente: Record<string, any> = {
   tipo_pessoa: "J", nome_razao_social: "", nome_fantasia: "", cpf_cnpj: "",
   inscricao_estadual: "", email: "", telefone: "", celular: "", contato: "",
-  prazo_padrao: 30, limite_credito: 0,
+  prazo_padrao: 30, limite_credito: 0, forma_pagamento_padrao: "", prazo_preferencial: 0,
   logradouro: "", numero: "", complemento: "", bairro: "", cidade: "", uf: "", cep: "", pais: "Brasil",
   observacoes: "", grupo_economico_id: "", tipo_relacao_grupo: "independente", caixa_postal: ""
 };
@@ -71,6 +71,7 @@ const Clientes = () => {
   const [saldoAberto, setSaldoAberto] = useState(0);
   const [titulosVencidos, setTitulosVencidos] = useState(0);
   const [ultimaCompra, setUltimaCompra] = useState<string | null>(null);
+  const [transportadorasCliente, setTransportadorasCliente] = useState<any[]>([]);
 
   useEffect(() => {
     supabase.from("grupos_economicos").select("id, nome").eq("ativo", true).order("nome").then(({ data: g }: any) => setGrupos(g || []));
@@ -84,6 +85,8 @@ const Clientes = () => {
       cpf_cnpj: c.cpf_cnpj || "", inscricao_estadual: c.inscricao_estadual || "",
       email: c.email || "", telefone: c.telefone || "", celular: c.celular || "", contato: c.contato || "",
       prazo_padrao: c.prazo_padrao || 30, limite_credito: c.limite_credito || 0,
+      forma_pagamento_padrao: (c as any).forma_pagamento_padrao || "",
+      prazo_preferencial: (c as any).prazo_preferencial || 0,
       logradouro: c.logradouro || "", numero: c.numero || "", complemento: c.complemento || "",
       bairro: c.bairro || "", cidade: c.cidade || "", uf: c.uf || "", cep: c.cep || "",
       pais: c.pais || "Brasil", observacoes: c.observacoes || "",
@@ -95,7 +98,7 @@ const Clientes = () => {
 
   const openView = async (c: Cliente) => {
     setSelected(c);setDrawerOpen(true);
-    const [comRes, empRes, titulosRes, orcRes] = await Promise.all([
+    const [comRes, empRes, titulosRes, orcRes, transpRes] = await Promise.all([
     supabase.from("cliente_registros_comunicacao").select("*").eq("cliente_id", c.id).order("data_hora", { ascending: false }),
     c.grupo_economico_id ? supabase.from("clientes").
     select("id, nome_razao_social, nome_fantasia, cpf_cnpj, tipo_relacao_grupo, cidade, uf").
@@ -106,20 +109,20 @@ const Clientes = () => {
     order("data_vencimento", { ascending: false }).limit(50),
     supabase.from("orcamentos").
     select("data_orcamento").eq("cliente_id", c.id).eq("ativo", true).
-    order("data_orcamento", { ascending: false }).limit(1)]
-    );
+    order("data_orcamento", { ascending: false }).limit(1),
+    supabase.from("cliente_transportadoras" as any).
+    select("*, transportadoras:transportadora_id(nome_razao_social, modalidade, prazo_medio)").
+    eq("cliente_id", c.id).eq("ativo", true).order("prioridade")
+    ]);
     setComRecords(comRes.data || []);
     setEmpresasGrupo(empRes.data || []);
+    setTransportadorasCliente(transpRes.data || []);
 
     const titulos = titulosRes.data || [];
     setPmvTitulos(titulos);
-
-    // Saldo em aberto
     const aberto = titulos.filter((t: any) => t.status === "aberto" || t.status === "vencido");
     setSaldoAberto(aberto.reduce((s: number, t: any) => s + Number(t.valor || 0), 0));
     setTitulosVencidos(aberto.filter((t: any) => t.status === "vencido").length);
-
-    // PMV
     const pagos = titulos.filter((t: any) => t.data_pagamento);
     if (pagos.length > 0) {
       const totalDias = pagos.reduce((acc: number, t: any) => {
@@ -129,8 +132,6 @@ const Clientes = () => {
       }, 0);
       setPmv(Math.round(totalDias / pagos.length));
     } else {setPmv(null);}
-
-    // Última compra/cotação
     setUltimaCompra(orcRes.data?.[0]?.data_orcamento || null);
   };
 
