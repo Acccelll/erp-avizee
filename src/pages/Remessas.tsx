@@ -5,7 +5,7 @@ import { DataTable, StatusBadge } from "@/components/DataTable";
 import { FormModal } from "@/components/FormModal";
 import { ViewDrawerV2 } from "@/components/ViewDrawerV2";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Edit, Trash2, Plus, MapPin, Package as PackageIcon, Truck } from "lucide-react";
+import { Edit, Trash2, Plus, MapPin, Package as PackageIcon, Truck, Search } from "lucide-react";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
