@@ -134,6 +134,24 @@ const Fiscal = () => {
     setViewItems(itens || []);
   };
 
+  const openDanfe = async (n: NotaFiscal) => {
+    const { data: itens } = await supabase.from("notas_fiscais_itens")
+      .select("*, produtos(nome, sku)").eq("nota_fiscal_id", n.id);
+    const { data: empresa } = await supabase.from("empresa_config").select("*").limit(1).single();
+    setDanfeData({
+      numero: n.numero, serie: n.serie, chave_acesso: n.chave_acesso,
+      data_emissao: n.data_emissao, tipo: n.tipo, status: n.status,
+      emitente: n.tipo === "saida" && empresa ? { nome: empresa.razao_social, cnpj: empresa.cnpj, endereco: empresa.logradouro, cidade: empresa.cidade, uf: empresa.uf } : (n.fornecedores ? { nome: n.fornecedores.nome_razao_social, cnpj: n.fornecedores.cpf_cnpj } : undefined),
+      destinatario: n.tipo === "saida" && n.clientes ? { nome: n.clientes.nome_razao_social } : (empresa ? { nome: empresa.razao_social, cnpj: empresa.cnpj } : undefined),
+      itens: (itens || []).map((i: any) => ({ descricao: i.produtos?.nome || "", quantidade: i.quantidade, valor_unitario: i.valor_unitario, cfop: i.cfop, cst: i.cst, icms_valor: i.icms_valor, ipi_valor: i.ipi_valor, pis_valor: i.pis_valor, cofins_valor: i.cofins_valor })),
+      valor_total: n.valor_total, frete_valor: n.frete_valor, icms_valor: n.icms_valor,
+      ipi_valor: n.ipi_valor, pis_valor: n.pis_valor, cofins_valor: n.cofins_valor,
+      desconto_valor: n.desconto_valor, outras_despesas: n.outras_despesas,
+      observacoes: n.observacoes, forma_pagamento: n.forma_pagamento, condicao_pagamento: n.condicao_pagamento,
+    });
+    setDanfeOpen(true);
+  };
+
   const handleConfirmar = async (nf: NotaFiscal) => {
     try {
       await supabase.from("notas_fiscais").update({ status: "confirmada" }).eq("id", nf.id);
