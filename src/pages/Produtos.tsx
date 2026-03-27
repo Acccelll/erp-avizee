@@ -127,7 +127,7 @@ const Produtos = () => {
     select("tipo, quantidade, motivo, created_at, saldo_anterior, saldo_atual").
     eq("produto_id", p.id).order("created_at", { ascending: false }).limit(20),
     supabase.from("produtos_fornecedores").
-    select("preco_compra, lead_time_dias, referencia_fornecedor, fornecedores:fornecedor_id(nome_razao_social)").
+    select("preco_compra, lead_time_dias, referencia_fornecedor, eh_principal, unidade_fornecedor, fornecedores:fornecedor_id(nome_razao_social)").
     eq("produto_id", p.id)]
     );
     setHistorico(nfRes.data || []);
