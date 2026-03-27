@@ -13,7 +13,7 @@ const periods: { value: Period; label: string }[] = [
   { value: 'year', label: 'Este ano' },
 ];
 
-/** Extended version with overdue + all options for financial contexts */
+/** Extended version for financial contexts (vencidos moved to badge on cards) */
 export const financialPeriods: { value: Period; label: string }[] = [
   { value: 'todos', label: 'Todos' },
   { value: 'hoje', label: 'Hoje' },
@@ -21,7 +21,6 @@ export const financialPeriods: { value: Period; label: string }[] = [
   { value: '15d', label: '15 dias' },
   { value: '30d', label: '30 dias' },
   { value: '90d', label: '90 dias' },
-  { value: 'vencidos', label: 'Vencidos' },
 ];
 
 interface PeriodFilterProps {
