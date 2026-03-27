@@ -63,6 +63,9 @@ const Produtos = () => {
   const [grupos, setGrupos] = useState<{id: string; nome: string}[]>([]);
   const [movimentos, setMovimentos] = useState<any[]>([]);
   const [fornecedoresProd, setFornecedoresProd] = useState<any[]>([]);
+  const [fornecedoresList, setFornecedoresList] = useState<any[]>([]);
+  const [addFornOpen, setAddFornOpen] = useState(false);
+  const [fornForm, setFornForm] = useState({ fornecedor_id: "", referencia_fornecedor: "", preco_compra: 0, lead_time_dias: 0, unidade_fornecedor: "UN", eh_principal: false });
 
   useEffect(() => {
     supabase.from("grupos_produto").select("id, nome").eq("ativo", true).order("nome").then(({ data: g }) => {
