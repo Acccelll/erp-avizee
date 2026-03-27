@@ -320,9 +320,10 @@ const Clientes = () => {
             </div>
 
             <Tabs defaultValue="cadastro" className="w-full">
-              <TabsList className="w-full grid grid-cols-5">
+              <TabsList className="w-full grid grid-cols-6">
                 <TabsTrigger value="cadastro" className="text-xs">Cadastro</TabsTrigger>
                 <TabsTrigger value="financeiro" className="text-xs">Financeiro</TabsTrigger>
+                <TabsTrigger value="transp" className="text-xs">Transp.</TabsTrigger>
                 <TabsTrigger value="endereco" className="text-xs">Endereço</TabsTrigger>
                 <TabsTrigger value="grupo" className="text-xs">Grupo</TabsTrigger>
                 <TabsTrigger value="historico" className="text-xs">Histórico</TabsTrigger>
@@ -341,6 +342,9 @@ const Clientes = () => {
               </TabsContent>
 
               <TabsContent value="financeiro" className="space-y-3 mt-3">
+                <div className="flex justify-end mb-1">
+                  <RelationalLink to={`/financeiro?tipo=receber`}>Ver todos os títulos →</RelationalLink>
+                </div>
                 <div className="rounded-lg border bg-muted/30 p-3">
                   <span className="text-xs text-muted-foreground flex items-center gap-1"><Clock className="w-3 h-3" /> PMV — Prazo Médio de Vencimento</span>
                   {pmv !== null ?
@@ -372,6 +376,27 @@ const Clientes = () => {
                     </div>
                   </div>
               }
+              </TabsContent>
+
+              <TabsContent value="transp" className="space-y-3 mt-3">
+                {transportadorasCliente.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-6">Nenhuma transportadora vinculada</p>
+                ) : (
+                  <div className="space-y-1 max-h-[300px] overflow-y-auto">
+                    {transportadorasCliente.map((ct: any, idx: number) => (
+                      <div key={idx} className="flex items-center justify-between py-2 px-2 rounded-md hover:bg-muted/30 border-b last:border-b-0">
+                        <div className="min-w-0 flex-1">
+                          <RelationalLink to="/transportadoras">{(ct.transportadoras as any)?.nome_razao_social || "—"}</RelationalLink>
+                          <div className="flex gap-2 text-xs text-muted-foreground mt-0.5">
+                            {ct.modalidade && <span>{ct.modalidade}</span>}
+                            {ct.prazo_medio && <span>• {ct.prazo_medio}</span>}
+                          </div>
+                        </div>
+                        <span className="text-xs text-muted-foreground">P{ct.prioridade || 1}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </TabsContent>
 
               <TabsContent value="endereco" className="space-y-3 mt-3">

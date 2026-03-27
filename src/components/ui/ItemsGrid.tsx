@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, Trash2 } from "lucide-react";
+import { AutocompleteSearch } from "@/components/ui/AutocompleteSearch";
 
 export interface GridItem {
   id?: string;
@@ -53,6 +54,13 @@ export function ItemsGrid({ items, onChange, produtos, title = "Itens", readOnly
 
   const total = items.reduce((s, i) => s + (i.valor_total || 0), 0);
 
+  const produtoOptions = produtos.map((p: any) => ({
+    id: p.id,
+    label: p.nome,
+    sublabel: [p.sku, p.unidade_medida].filter(Boolean).join(" • "),
+    searchTerms: [p.sku, p.codigo_interno, p.referencia_fornecedor].filter(Boolean),
+  }));
+
   return (
     <div className="bg-card rounded-xl border shadow-soft overflow-hidden">
       <div className="flex items-center justify-between p-4 border-b">
@@ -87,10 +95,13 @@ export function ItemsGrid({ items, onChange, produtos, title = "Itens", readOnly
                   {readOnly ? (
                     <span className="text-sm">{item.descricao}</span>
                   ) : (
-                    <select className="w-full h-8 text-xs border rounded-md px-2 bg-background" value={item.produto_id} onChange={(e) => updateItem(idx, "produto_id", e.target.value)}>
-                      <option value="">Selecione produto...</option>
-                      {produtos.map((p: any) => <option key={p.id} value={p.id}>{p.nome}</option>)}
-                    </select>
+                    <AutocompleteSearch
+                      options={produtoOptions}
+                      value={item.produto_id}
+                      onChange={(id) => updateItem(idx, "produto_id", id)}
+                      placeholder="Buscar produto (nome, SKU)..."
+                      className="min-w-[200px]"
+                    />
                   )}
                 </td>
                 <td className="px-3 py-2">

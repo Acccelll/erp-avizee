@@ -1,12 +1,14 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AppLayout } from "@/components/AppLayout";
 import { ModulePage } from "@/components/ModulePage";
 import { DataTable, StatusBadge } from "@/components/DataTable";
 import { FormModal } from "@/components/FormModal";
-import { ViewDrawer } from "@/components/ViewDrawer";
+import { ViewDrawerV2, ViewField, ViewSection } from "@/components/ViewDrawerV2";
+import { RelationalLink } from "@/components/ui/RelationalLink";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Edit, Trash2 } from "lucide-react";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -47,6 +49,7 @@ export default function Transportadoras() {
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [clientesVinculados, setClientesVinculados] = useState<any[]>([]);
 
   const openCreate = () => { setMode("create"); setForm({...emptyForm}); setSelected(null); setModalOpen(true); };
   const openEdit = (t: Transportadora) => {
@@ -61,7 +64,13 @@ export default function Transportadoras() {
     });
     setModalOpen(true);
   };
-  const openView = (t: Transportadora) => { setSelected(t); setDrawerOpen(true); };
+  const openView = async (t: Transportadora) => {
+    setSelected(t); setDrawerOpen(true);
+    const { data: ct } = await supabase.from("cliente_transportadoras" as any)
+      .select("*, clientes:cliente_id(nome_razao_social, cpf_cnpj, cidade, uf)")
+      .eq("transportadora_id", t.id).eq("ativo", true);
+    setClientesVinculados(ct || []);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -132,58 +141,76 @@ export default function Transportadoras() {
         </form>
       </FormModal>
 
-      <ViewDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} title="Detalhes da Transportadora"
+      <ViewDrawerV2
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        title={selected?.nome_razao_social || "Detalhes da Transportadora"}
+        badge={selected ? <StatusBadge status={selected.ativo ? "Ativo" : "Inativo"} /> : undefined}
         actions={selected ? <>
           <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setDrawerOpen(false); openEdit(selected); }}><Edit className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Editar</TooltipContent></Tooltip>
           <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => { setDrawerOpen(false); remove(selected.id); }}><Trash2 className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Excluir</TooltipContent></Tooltip>
         </> : undefined}
-      >
-        {selected && (
-          <div className="space-y-5">
-            <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="font-semibold text-lg truncate">{selected.nome_razao_social}</h3>
-                <StatusBadge status={selected.ativo ? "Ativo" : "Inativo"} />
-              </div>
-              {selected.nome_fantasia && <p className="text-sm text-muted-foreground truncate">{selected.nome_fantasia}</p>}
-              {selected.cpf_cnpj && <p className="text-xs text-muted-foreground font-mono mt-0.5">{selected.cpf_cnpj}</p>}
+        summary={selected ? (
+          <div className="grid grid-cols-3 gap-3">
+            <div className="rounded-lg border bg-card p-3 text-center space-y-1">
+              <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Modalidade</p>
+              <p className="font-semibold text-sm text-foreground">{modalidadeLabel[selected.modalidade] || "—"}</p>
             </div>
-            <div className="grid grid-cols-3 gap-3">
-              <div className="rounded-lg border bg-card p-4 text-center space-y-1">
-                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Modalidade</p>
-                <p className="font-semibold text-sm text-foreground">{modalidadeLabel[selected.modalidade] || "—"}</p>
-              </div>
-              <div className="rounded-lg border bg-card p-4 text-center space-y-1">
-                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Prazo Médio</p>
-                <p className="font-mono font-bold text-sm text-foreground">{selected.prazo_medio || "—"}</p>
-              </div>
-              <div className="rounded-lg border bg-card p-4 text-center space-y-1">
-                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Cidade/UF</p>
-                <p className="font-semibold text-sm text-foreground">{selected.cidade ? `${selected.cidade}/${selected.uf}` : "—"}</p>
-              </div>
+            <div className="rounded-lg border bg-card p-3 text-center space-y-1">
+              <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Prazo Médio</p>
+              <p className="font-mono font-bold text-sm text-foreground">{selected.prazo_medio || "—"}</p>
             </div>
-            <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-              {[
-                { label: "CNPJ", value: selected.cpf_cnpj, mono: true },
-                { label: "Contato", value: selected.contato },
-                { label: "Telefone", value: selected.telefone },
-                { label: "E-mail", value: selected.email },
-              ].map((field, i) => (
-                <div key={i}>
-                  <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-0.5">{field.label}</p>
-                  <p className={`text-sm ${field.mono ? "font-mono" : ""}`}>{field.value || "—"}</p>
-                </div>
-              ))}
+            <div className="rounded-lg border bg-card p-3 text-center space-y-1">
+              <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Clientes</p>
+              <p className="font-mono font-bold text-sm text-foreground">{clientesVinculados.length}</p>
             </div>
-            {selected.observacoes && (
-              <div className="border-t pt-3">
-                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-0.5">Observações</p>
-                <p className="text-sm text-muted-foreground">{selected.observacoes}</p>
-              </div>
-            )}
           </div>
-        )}
-      </ViewDrawer>
+        ) : undefined}
+        tabs={[
+          { value: "dados", label: "Dados", content: selected ? (
+            <div className="space-y-4">
+              <ViewSection title="Contato">
+                <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                  <ViewField label="CNPJ"><span className="font-mono">{selected.cpf_cnpj || "—"}</span></ViewField>
+                  <ViewField label="Contato">{selected.contato || "—"}</ViewField>
+                  <ViewField label="Telefone">{selected.telefone || "—"}</ViewField>
+                  <ViewField label="E-mail">{selected.email || "—"}</ViewField>
+                  <ViewField label="Cidade/UF">{selected.cidade ? `${selected.cidade}/${selected.uf}` : "—"}</ViewField>
+                </div>
+              </ViewSection>
+              {selected.observacoes && (
+                <ViewSection title="Observações">
+                  <p className="text-sm text-muted-foreground">{selected.observacoes}</p>
+                </ViewSection>
+              )}
+            </div>
+          ) : null },
+          { value: "clientes", label: `Clientes (${clientesVinculados.length})`, content: (
+            <div className="space-y-2">
+              {clientesVinculados.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-6">Nenhum cliente vinculado</p>
+              ) : (
+                <div className="space-y-1 max-h-[350px] overflow-y-auto">
+                  {clientesVinculados.map((ct: any, idx: number) => (
+                    <div key={idx} className="flex items-center justify-between py-2 px-2 rounded-md hover:bg-muted/30 border-b last:border-b-0">
+                      <div className="min-w-0 flex-1">
+                        <RelationalLink to="/clientes">
+                          {ct.clientes?.nome_razao_social || "—"}
+                        </RelationalLink>
+                        <p className="text-xs text-muted-foreground font-mono">{ct.clientes?.cpf_cnpj || ""}</p>
+                      </div>
+                      <div className="text-right text-xs text-muted-foreground">
+                        {ct.modalidade && <span className="mr-2">{ct.modalidade}</span>}
+                        {ct.prazo_medio && <span>{ct.prazo_medio}</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )},
+        ]}
+      />
     </AppLayout>
   );
 }

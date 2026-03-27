@@ -127,7 +127,7 @@ const Produtos = () => {
     select("tipo, quantidade, motivo, created_at, saldo_anterior, saldo_atual").
     eq("produto_id", p.id).order("created_at", { ascending: false }).limit(20),
     supabase.from("produtos_fornecedores").
-    select("preco_compra, lead_time_dias, referencia_fornecedor, fornecedores:fornecedor_id(nome_razao_social)").
+    select("preco_compra, lead_time_dias, referencia_fornecedor, eh_principal, unidade_fornecedor, fornecedores:fornecedor_id(nome_razao_social)").
     eq("produto_id", p.id)]
     );
     setHistorico(nfRes.data || []);
@@ -474,10 +474,64 @@ const Produtos = () => {
               </TabsContent>
 
               <TabsContent value="cod_fornecedor" className="space-y-3 mt-3">
-                <h4 className="font-semibold text-sm mb-2">Códigos de Fornecedores (De/Para)</h4>
-                <p className="text-xs text-muted-foreground mb-3">Referências usadas na importação de XML para vínculo automático de produtos.</p>
-                {fornecedoresProd.length === 0 ?
+                <div className="flex items-center justify-between mb-2">
+                  <div>
+                    <h4 className="font-semibold text-sm">Códigos de Fornecedores (De/Para)</h4>
+                    <p className="text-xs text-muted-foreground">Referências usadas na importação de XML para vínculo automático de produtos.</p>
+                  </div>
+                  <Button size="sm" variant="outline" className="gap-1" onClick={() => { setAddFornOpen(true); setFornForm({ fornecedor_id: "", referencia_fornecedor: "", preco_compra: 0, lead_time_dias: 0, unidade_fornecedor: "UN", eh_principal: false }); }}>
+                    <Plus className="w-3 h-3" /> Adicionar
+                  </Button>
+                </div>
+
+                {addFornOpen && (
+                  <div className="rounded-lg border bg-accent/30 p-3 space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Fornecedor *</Label>
+                        <Select value={fornForm.fornecedor_id} onValueChange={(v) => setFornForm({ ...fornForm, fornecedor_id: v })}>
+                          <SelectTrigger className="h-8"><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                          <SelectContent>{fornecedoresList.map((f: any) => <SelectItem key={f.id} value={f.id}>{f.nome_razao_social}</SelectItem>)}</SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1"><Label className="text-xs">Ref. Fornecedor</Label><Input className="h-8 text-xs font-mono" value={fornForm.referencia_fornecedor} onChange={(e) => setFornForm({ ...fornForm, referencia_fornecedor: e.target.value })} placeholder="Código do forn." /></div>
+                      <div className="space-y-1"><Label className="text-xs">Preço Compra</Label><Input className="h-8 text-xs" type="number" step="0.01" value={fornForm.preco_compra || ""} onChange={(e) => setFornForm({ ...fornForm, preco_compra: Number(e.target.value) })} /></div>
+                      <div className="space-y-1"><Label className="text-xs">Lead Time (dias)</Label><Input className="h-8 text-xs" type="number" value={fornForm.lead_time_dias || ""} onChange={(e) => setFornForm({ ...fornForm, lead_time_dias: Number(e.target.value) })} /></div>
+                      <div className="space-y-1"><Label className="text-xs">UN Fornecedor</Label><Input className="h-8 text-xs" value={fornForm.unidade_fornecedor} onChange={(e) => setFornForm({ ...fornForm, unidade_fornecedor: e.target.value })} /></div>
+                      <div className="flex items-end">
+                        <label className="flex items-center gap-2 text-xs cursor-pointer h-8">
+                          <input type="checkbox" checked={fornForm.eh_principal} onChange={(e) => setFornForm({ ...fornForm, eh_principal: e.target.checked })} className="rounded" />
+                          Principal
+                        </label>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={async () => {
+                        if (!fornForm.fornecedor_id || !selected) { toast.error("Fornecedor é obrigatório"); return; }
+                        const { error } = await supabase.from("produtos_fornecedores").insert({
+                          produto_id: selected.id, fornecedor_id: fornForm.fornecedor_id,
+                          referencia_fornecedor: fornForm.referencia_fornecedor || null,
+                          preco_compra: fornForm.preco_compra || null,
+                          lead_time_dias: fornForm.lead_time_dias || null,
+                          unidade_fornecedor: fornForm.unidade_fornecedor || "UN",
+                          eh_principal: fornForm.eh_principal,
+                        } as any);
+                        if (error) { toast.error("Erro ao salvar: " + error.message); return; }
+                        toast.success("Fornecedor vinculado!");
+                        setAddFornOpen(false);
+                        const { data: updated } = await supabase.from("produtos_fornecedores")
+                          .select("preco_compra, lead_time_dias, referencia_fornecedor, eh_principal, unidade_fornecedor, fornecedores:fornecedor_id(nome_razao_social)")
+                          .eq("produto_id", selected.id);
+                        setFornecedoresProd(updated || []);
+                      }}>Salvar</Button>
+                      <Button size="sm" variant="ghost" onClick={() => setAddFornOpen(false)}>Cancelar</Button>
+                    </div>
+                  </div>
+                )}
+
+                {fornecedoresProd.length === 0 && !addFornOpen ?
                   <p className="text-sm text-muted-foreground text-center py-4">Nenhum fornecedor vinculado</p> :
+                  fornecedoresProd.length > 0 && (
                   <div className="rounded-lg border overflow-hidden">
                     <table className="w-full text-sm">
                       <thead>
@@ -486,20 +540,25 @@ const Produtos = () => {
                           <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground">Ref. Fornecedor</th>
                           <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground">Preço Compra</th>
                           <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground">Lead Time</th>
+                          <th className="text-center px-3 py-2 text-xs font-semibold text-muted-foreground">Princ.</th>
                         </tr>
                       </thead>
                       <tbody>
                         {fornecedoresProd.map((f: any, idx: number) => (
                           <tr key={idx} className={idx % 2 === 0 ? "bg-muted/20" : ""}>
-                            <td className="px-3 py-2 text-xs">{f.fornecedores?.nome_razao_social || "—"}</td>
+                            <td className="px-3 py-2 text-xs">
+                              <RelationalLink to="/fornecedores">{f.fornecedores?.nome_razao_social || "—"}</RelationalLink>
+                            </td>
                             <td className="px-3 py-2 text-xs font-mono font-medium text-primary">{f.referencia_fornecedor || "—"}</td>
                             <td className="px-3 py-2 text-xs font-mono text-right">{f.preco_compra ? formatCurrency(f.preco_compra) : "—"}</td>
                             <td className="px-3 py-2 text-xs text-right">{f.lead_time_dias ? `${f.lead_time_dias} dias` : "—"}</td>
+                            <td className="px-3 py-2 text-xs text-center">{f.eh_principal ? "★" : ""}</td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
                   </div>
+                  )
                 }
               </TabsContent>
 
