@@ -182,10 +182,11 @@ const Produtos = () => {
       if (tipoFilter === "simples" && isComposto) return false;
       if (estoqueFilter === "baixo" && !baixoEstoque) return false;
       if (estoqueFilter === "ok" && baixoEstoque) return false;
+      if (grupoFilter !== "todos" && p.grupo_id !== grupoFilter) return false;
       if (!query) return true;
       return [p.nome, p.sku, p.codigo_interno, p.descricao, p.ncm].filter(Boolean).join(" ").toLowerCase().includes(query);
     });
-  }, [data, estoqueFilter, searchTerm, tipoFilter]);
+  }, [data, estoqueFilter, searchTerm, tipoFilter, grupoFilter]);
 
   const columns = [
   { key: "sku", label: "SKU", render: (p: Produto) => <span className="font-mono text-xs font-medium text-primary">{p.sku || "—"}</span> },
