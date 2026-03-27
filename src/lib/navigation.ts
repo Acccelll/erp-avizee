@@ -117,13 +117,14 @@ export const navSections: NavSection[] = [
   },
   {
     key: 'estoque',
-    title: 'Estoque',
+    title: 'Estoque & Logística',
     icon: Warehouse,
     items: [
       {
-        title: 'Controle de estoque',
+        title: 'Controle',
         items: [
           { title: 'Posição Atual', path: '/estoque', keywords: ['saldo', 'inventario'] },
+          { title: 'Remessas', path: '/remessas', keywords: ['rastreio', 'entrega', 'logistica', 'correios'] },
         ],
       },
     ],
@@ -215,6 +216,7 @@ export const headerIcons: Record<string, LucideIcon> = {
   '/pedidos-compra': ShoppingCart,
   '/produtos': Package,
   '/estoque': Warehouse,
+  '/remessas': Truck,
   '/clientes': Users,
   '/fornecedores': Truck,
   '/transportadoras': Truck,
@@ -244,6 +246,7 @@ const baseRouteLabels: Record<string, string> = {
   '/pedidos-compra': 'Pedidos de Compra',
   '/produtos': 'Produtos',
   '/estoque': 'Estoque',
+  '/remessas': 'Remessas',
   '/clientes': 'Clientes',
   '/fornecedores': 'Fornecedores',
   '/transportadoras': 'Transportadoras',

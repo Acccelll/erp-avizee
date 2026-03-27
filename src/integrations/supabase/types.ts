@@ -2044,6 +2044,123 @@ export type Database = {
         }
         Relationships: []
       }
+      remessa_eventos: {
+        Row: {
+          created_at: string
+          data_hora: string
+          descricao: string
+          id: string
+          local: string | null
+          remessa_id: string
+        }
+        Insert: {
+          created_at?: string
+          data_hora?: string
+          descricao: string
+          id?: string
+          local?: string | null
+          remessa_id: string
+        }
+        Update: {
+          created_at?: string
+          data_hora?: string
+          descricao?: string
+          id?: string
+          local?: string | null
+          remessa_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "remessa_eventos_remessa_id_fkey"
+            columns: ["remessa_id"]
+            isOneToOne: false
+            referencedRelation: "remessas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      remessas: {
+        Row: {
+          ativo: boolean
+          cliente_id: string | null
+          codigo_rastreio: string | null
+          created_at: string
+          data_postagem: string | null
+          id: string
+          observacoes: string | null
+          ordem_venda_id: string | null
+          peso: number | null
+          previsao_entrega: string | null
+          servico: string | null
+          status_transporte: string
+          transportadora_id: string | null
+          updated_at: string
+          usuario_id: string | null
+          valor_frete: number | null
+          volumes: number | null
+        }
+        Insert: {
+          ativo?: boolean
+          cliente_id?: string | null
+          codigo_rastreio?: string | null
+          created_at?: string
+          data_postagem?: string | null
+          id?: string
+          observacoes?: string | null
+          ordem_venda_id?: string | null
+          peso?: number | null
+          previsao_entrega?: string | null
+          servico?: string | null
+          status_transporte?: string
+          transportadora_id?: string | null
+          updated_at?: string
+          usuario_id?: string | null
+          valor_frete?: number | null
+          volumes?: number | null
+        }
+        Update: {
+          ativo?: boolean
+          cliente_id?: string | null
+          codigo_rastreio?: string | null
+          created_at?: string
+          data_postagem?: string | null
+          id?: string
+          observacoes?: string | null
+          ordem_venda_id?: string | null
+          peso?: number | null
+          previsao_entrega?: string | null
+          servico?: string | null
+          status_transporte?: string
+          transportadora_id?: string | null
+          updated_at?: string
+          usuario_id?: string | null
+          valor_frete?: number | null
+          volumes?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "remessas_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "remessas_ordem_venda_id_fkey"
+            columns: ["ordem_venda_id"]
+            isOneToOne: false
+            referencedRelation: "ordens_venda"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "remessas_transportadora_id_fkey"
+            columns: ["transportadora_id"]
+            isOneToOne: false
+            referencedRelation: "transportadoras"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       suppressed_emails: {
         Row: {
           created_at: string
