@@ -15,7 +15,8 @@ import { OrcamentoPdfTemplate } from "@/components/Orcamento/OrcamentoPdfTemplat
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ArrowLeft, Save, Eye, FileText, Copy } from "lucide-react";
+import { ArrowLeft, Save, Eye, FileText, Copy, Plus } from "lucide-react";
+import { QuickAddClientModal } from "@/components/QuickAddClientModal";
 import { useIsMobile } from "@/hooks/use-mobile";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
