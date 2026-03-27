@@ -151,6 +151,47 @@ export default function Remessas() {
     toast.success(`Status atualizado para ${statusMap[newStatus]?.label || newStatus}`);
   };
 
+  const handleRastrear = async (remessa: Remessa) => {
+    if (!remessa.codigo_rastreio) { toast.error("Sem código de rastreio"); return; }
+    try {
+      toast.info("Consultando rastreio...");
+      const { data: result, error } = await supabase.functions.invoke("correios-api", {
+        body: null,
+        headers: { "Content-Type": "application/json" },
+      });
+      // Use query params approach
+      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+      const url = `https://${projectId}.supabase.co/functions/v1/correios-api?action=rastrear&codigo=${remessa.codigo_rastreio}`;
+      const res = await fetch(url, {
+        headers: { "Content-Type": "application/json", apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || "" },
+      });
+      const tracking = await res.json();
+      if (tracking.error) { toast.error(tracking.error); return; }
+
+      // Save events from tracking response
+      const eventos = tracking.objetos?.[0]?.eventos || [];
+      for (const ev of eventos) {
+        const descricao = ev.descricao || ev.tipo || "Evento";
+        const local = ev.unidade?.endereco?.cidade || ev.unidade?.nome || "";
+        const dataHora = ev.dtHrCriado || new Date().toISOString();
+        await supabase.from("remessa_eventos" as any).upsert({
+          remessa_id: remessa.id,
+          descricao,
+          local: local || null,
+          data_hora: dataHora,
+        } as any, { onConflict: "remessa_id,data_hora,descricao" }).select();
+      }
+
+      toast.success(`${eventos.length} evento(s) atualizado(s)`);
+      // Refresh events
+      const { data: updatedEvents } = await supabase.from("remessa_eventos" as any).select("*").eq("remessa_id", remessa.id).order("data_hora", { ascending: false });
+      setEventos((updatedEvents as any) || []);
+    } catch (err: any) {
+      console.error("[rastrear]", err);
+      toast.error("Erro ao consultar rastreio. Verifique as credenciais dos Correios.");
+    }
+  };
+
   const filteredData = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
     if (!q) return data;
