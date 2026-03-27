@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { AppLayout } from "@/components/AppLayout";
 import { DataTable, StatusBadge } from "@/components/DataTable";
+import { ModulePage } from "@/components/ModulePage";
 import { FormModal } from "@/components/FormModal";
 import { ViewDrawerV2, ViewField, ViewSection } from "@/components/ViewDrawerV2";
 import { AdvancedFilterBar, type FilterChip } from "@/components/AdvancedFilterBar";
