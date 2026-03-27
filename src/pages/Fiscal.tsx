@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { FileText, DollarSign, CheckCircle, AlertTriangle, Clock, XCircle } from "lucide-react";
 import { parseNFeXml, type NFeData } from "@/lib/nfeXmlParser";
+import { DanfeViewer } from "@/components/DanfeViewer";
 
 interface NotaFiscal {
   id: string; tipo: string; numero: string; serie: string; chave_acesso: string;
@@ -66,6 +67,8 @@ const Fiscal = () => {
   const [consultaSearch, setConsultaSearch] = useState("");
   const [itemContaContabil, setItemContaContabil] = useState<Record<number, string>>({});
   const xmlInputRef = useRef<HTMLInputElement>(null);
+  const [danfeOpen, setDanfeOpen] = useState(false);
+  const [danfeData, setDanfeData] = useState<any>(null);
 
   const valorProdutos = items.reduce((s, i) => s + (i.valor_total || 0), 0);
   const totalImpostos = Number(form.icms_valor || 0) + Number(form.ipi_valor || 0) + Number(form.pis_valor || 0) + Number(form.cofins_valor || 0) + Number(form.icms_st_valor || 0);
