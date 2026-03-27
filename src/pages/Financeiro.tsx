@@ -520,6 +520,9 @@ const Financeiro = () => {
 
       <ViewDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} title="Detalhes do Lançamento"
         actions={selected ? <>
+          {getEffectiveStatus(selected) !== "pago" && getEffectiveStatus(selected) !== "cancelado" && (
+            <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-primary hover:text-primary" onClick={() => { setBaixaParcialTarget(selected); setBaixaParcialOpen(true); }}><CreditCard className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Registrar Baixa</TooltipContent></Tooltip>
+          )}
           <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setDrawerOpen(false); openEdit(selected); }}><Edit className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Editar</TooltipContent></Tooltip>
           <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => { setDrawerOpen(false); remove(selected.id); }}><Trash2 className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Excluir</TooltipContent></Tooltip>
         </> : undefined}
@@ -541,6 +544,11 @@ const Financeiro = () => {
             <ViewSection title="Valores e datas">
               <div className="grid grid-cols-2 gap-4">
                 <ViewField label="Valor"><span className="font-semibold mono">{formatCurrency(Number(selected.valor))}</span></ViewField>
+                <ViewField label="Saldo Restante">
+                  <span className="font-semibold mono">
+                    {formatCurrency(selected.saldo_restante != null ? Number(selected.saldo_restante) : Number(selected.valor))}
+                  </span>
+                </ViewField>
                 <ViewField label="Vencimento">{new Date(selected.data_vencimento).toLocaleDateString("pt-BR")}</ViewField>
               </div>
               {selected.data_pagamento && (
