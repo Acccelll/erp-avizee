@@ -44,12 +44,12 @@ const FluxoCaixa = () => {
     const load = async () => {
       setLoading(true);
       const [{ data: lancs }, { data: contas }] = await Promise.all([
-        (supabase as any).from("financeiro_lancamentos")
+        supabase.from("financeiro_lancamentos")
           .select("id, tipo, valor, status, data_vencimento, data_pagamento, conta_bancaria_id, descricao, contas_bancarias(descricao, bancos(nome))")
           .eq("ativo", true)
           .gte("data_vencimento", dataInicio)
           .lte("data_vencimento", dataFim),
-        (supabase as any).from("contas_bancarias").select("*, bancos(nome)").eq("ativo", true),
+        supabase.from("contas_bancarias").select("*, bancos(nome)").eq("ativo", true),
       ]);
       setLancamentos(lancs || []);
       setContasBancarias(contas || []);

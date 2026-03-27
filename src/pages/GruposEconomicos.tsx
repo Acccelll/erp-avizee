@@ -57,7 +57,7 @@ const GruposEconomicos = () => {
 
   const openView = async (g: GrupoEconomico) => {
     setSelected(g); setDrawerOpen(true);
-    const { data: clientes } = await (supabase as any)
+    const { data: clientes } = await supabase
       .from("clientes")
       .select("id, nome_razao_social, nome_fantasia, cpf_cnpj, tipo_relacao_grupo, cidade, uf")
       .eq("grupo_economico_id", g.id).eq("ativo", true);
@@ -66,7 +66,7 @@ const GruposEconomicos = () => {
     // Consolidate financials across all group clients
     const clienteIds = (clientes || []).map((c: any) => c.id);
     if (clienteIds.length > 0) {
-      const { data: titulos } = await (supabase as any)
+      const { data: titulos } = await supabase
         .from("financeiro_lancamentos")
         .select("valor, status")
         .in("cliente_id", clienteIds)

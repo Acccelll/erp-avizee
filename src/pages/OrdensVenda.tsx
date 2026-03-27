@@ -64,13 +64,13 @@ const OrdensVenda = () => {
 
   const handleView = async (ov: OrdemVenda) => {
     setSelected(ov); setDrawerOpen(true); setLoadingItems(true);
-    const { data: items } = await (supabase as any).from("ordens_venda_itens").select("*, produtos(nome)").eq("ordem_venda_id", ov.id);
+    const { data: items } = await supabase.from("ordens_venda_itens").select("*, produtos(nome)").eq("ordem_venda_id", ov.id);
     setOvItems(items || []); setLoadingItems(false);
   };
 
   const handleApprove = async (ov: OrdemVenda) => {
     try {
-      await (supabase as any).from("ordens_venda").update({
+      await supabase.from("ordens_venda").update({
         status: "aprovada", data_aprovacao: new Date().toISOString().split("T")[0],
       }).eq("id", ov.id);
       toast.success(`OV ${ov.numero} aprovada!`);
@@ -83,13 +83,13 @@ const OrdensVenda = () => {
 
   const handleGenerateNF = async (ov: OrdemVenda) => {
     try {
-      const { data: ovItems } = await (supabase as any).from("ordens_venda_itens").select("*").eq("ordem_venda_id", ov.id);
-      const { count } = await (supabase as any).from("notas_fiscais").select("*", { count: "exact", head: true });
+      const { data: ovItems } = await supabase.from("ordens_venda_itens").select("*").eq("ordem_venda_id", ov.id);
+      const { count } = await supabase.from("notas_fiscais").select("*", { count: "exact", head: true });
       const nfNumero = String((count || 0) + 1).padStart(6, "0");
 
       const totalProdutos = (ovItems || []).reduce((s: number, i: any) => s + Number(i.valor_total || 0), 0);
 
-      const { data: newNF, error } = await (supabase as any).from("notas_fiscais").insert({
+      const { data: newNF, error } = await supabase.from("notas_fiscais").insert({
         numero: nfNumero,
         tipo: "saida",
         data_emissao: new Date().toISOString().split("T")[0],
@@ -111,7 +111,7 @@ const OrdensVenda = () => {
           quantidade: i.quantidade,
           valor_unitario: i.valor_unitario,
         }));
-        await (supabase as any).from("notas_fiscais_itens").insert(nfItems);
+        await supabase.from("notas_fiscais_itens").insert(nfItems);
       }
 
       // Update OV faturamento status
@@ -119,12 +119,12 @@ const OrdensVenda = () => {
       const totalFat = (ovItems || []).reduce((s: number, i: any) => s + Number(i.quantidade_faturada || 0), 0);
       const newFatStatus = (totalFat + totalQtd >= totalQtd * 2) ? "total" : totalFat > 0 ? "parcial" : "total";
       
-      await (supabase as any).from("ordens_venda").update({ status_faturamento: "total" }).eq("id", ov.id);
+      await supabase.from("ordens_venda").update({ status_faturamento: "total" }).eq("id", ov.id);
 
       // Update quantities faturadas
       if (ovItems) {
         for (const item of ovItems) {
-          await (supabase as any).from("ordens_venda_itens").update({
+          await supabase.from("ordens_venda_itens").update({
             quantidade_faturada: item.quantidade,
           }).eq("id", item.id);
         }

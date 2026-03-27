@@ -14,13 +14,13 @@ export function useSidebarAlerts() {
       const today = new Date().toISOString().slice(0, 10);
 
       const [{ count: vencidos }, { data: estMin }] = await Promise.all([
-        (supabase as any)
+        supabase
           .from('financeiro_lancamentos')
           .select('*', { count: 'exact', head: true })
           .eq('ativo', true)
           .in('status', ['aberto', 'vencido'])
           .lt('data_vencimento', today),
-        (supabase as any)
+        supabase
           .from('produtos')
           .select('estoque_atual, estoque_minimo')
           .eq('ativo', true)

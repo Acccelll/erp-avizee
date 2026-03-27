@@ -43,7 +43,7 @@ const Dashboard = () => {
 
       // Build financial queries based on period (forward-looking)
       const buildFinQuery = (tipo: string) => {
-        let q = (supabase as any).from("financeiro_lancamentos").select("valor").eq("tipo", tipo).eq("ativo", true);
+        let q = supabase.from("financeiro_lancamentos").select("valor").eq("tipo", tipo as any).eq("ativo", true);
         if (isVencidos) {
           q = q.in("status", ["aberto", "vencido"]).lt("data_vencimento", today);
         } else if (isTodos) {
@@ -70,24 +70,24 @@ const Dashboard = () => {
         { data: compAguardando },
         { data: estMin },
       ] = await Promise.all([
-        (supabase as any).from("produtos").select("*", { count: "exact", head: true }).eq("ativo", true),
-        (supabase as any).from("clientes").select("*", { count: "exact", head: true }).eq("ativo", true),
-        (supabase as any).from("fornecedores").select("*", { count: "exact", head: true }).eq("ativo", true),
-        (supabase as any).from("orcamentos").select("*", { count: "exact", head: true }).eq("ativo", true).gte("data_orcamento", dateFrom),
-        (supabase as any).from("compras").select("*", { count: "exact", head: true }).eq("ativo", true).gte("data_compra", dateFrom),
+        supabase.from("produtos").select("*", { count: "exact", head: true }).eq("ativo", true),
+        supabase.from("clientes").select("*", { count: "exact", head: true }).eq("ativo", true),
+        supabase.from("fornecedores").select("*", { count: "exact", head: true }).eq("ativo", true),
+        supabase.from("orcamentos").select("*", { count: "exact", head: true }).eq("ativo", true).gte("data_orcamento", dateFrom),
+        supabase.from("compras").select("*", { count: "exact", head: true }).eq("ativo", true).gte("data_compra", dateFrom),
         buildFinQuery("receber"),
         buildFinQuery("pagar"),
-        (supabase as any).from("financeiro_lancamentos").select("valor").eq("status", "vencido").eq("ativo", true),
-        (supabase as any).from("orcamentos").select("id, numero, valor_total, status, data_orcamento, clientes(nome_razao_social)").eq("ativo", true).gte("data_orcamento", dateFrom).order("created_at", { ascending: false }).limit(5),
-        (supabase as any).from("compras").select("numero, valor_total, status, data_compra, fornecedores(nome_razao_social)").eq("ativo", true).gte("data_compra", dateFrom).order("created_at", { ascending: false }).limit(5),
-        (supabase as any).from("ordens_venda")
+        supabase.from("financeiro_lancamentos").select("valor").eq("status", "vencido").eq("ativo", true),
+        supabase.from("orcamentos").select("id, numero, valor_total, status, data_orcamento, clientes(nome_razao_social)").eq("ativo", true).gte("data_orcamento", dateFrom).order("created_at", { ascending: false }).limit(5),
+        supabase.from("compras").select("numero, valor_total, status, data_compra, fornecedores(nome_razao_social)").eq("ativo", true).gte("data_compra", dateFrom).order("created_at", { ascending: false }).limit(5),
+        supabase.from("ordens_venda")
           .select("id, numero, valor_total, data_emissao, data_prometida_despacho, prazo_despacho_dias, status, status_faturamento, clientes(nome_razao_social)")
           .eq("ativo", true)
           .in("status", ["aprovada", "em_separacao"])
           .in("status_faturamento", ["aguardando", "parcial"])
           .order("data_emissao", { ascending: true }).limit(15),
-        (supabase as any).from("compras").select("id, numero, valor_total, data_compra, data_entrega_prevista, fornecedores(nome_razao_social)").eq("ativo", true).eq("status", "confirmado").is("data_entrega_real", null).order("data_entrega_prevista", { ascending: true }).limit(10),
-        (supabase as any).from("produtos").select("id, nome, codigo_interno, estoque_atual, estoque_minimo, unidade_medida").eq("ativo", true).not("estoque_minimo", "is", null).limit(100),
+        supabase.from("compras").select("id, numero, valor_total, data_compra, data_entrega_prevista, fornecedores(nome_razao_social)").eq("ativo", true).eq("status", "confirmado").is("data_entrega_real", null).order("data_entrega_prevista", { ascending: true }).limit(10),
+        supabase.from("produtos").select("id, nome, codigo_interno, estoque_atual, estoque_minimo, unidade_medida").eq("ativo", true).not("estoque_minimo", "is", null).limit(100),
       ]);
 
       setStats({

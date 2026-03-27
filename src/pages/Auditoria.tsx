@@ -40,7 +40,7 @@ export default function Auditoria() {
   useEffect(() => {
     const load = async () => {
       setLoading(true);
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from("auditoria_logs")
         .select("*")
         .order("created_at", { ascending: false })

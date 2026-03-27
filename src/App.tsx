@@ -1,7 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
-import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
@@ -39,13 +38,21 @@ import FormasPagamento from "./pages/FormasPagamento";
 import CotacoesCompra from "./pages/CotacoesCompra";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5,
+      gcTime: 1000 * 60 * 10,
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider>
       <TooltipProvider>
-        <Toaster />
         <Sonner />
         <BrowserRouter>
           <AuthProvider>
@@ -64,9 +71,9 @@ const App = () => (
             <Route path="/grupos-economicos" element={<ProtectedRoute><GruposEconomicos /></ProtectedRoute>} />
             <Route path="/compras" element={<ProtectedRoute><Compras /></ProtectedRoute>} />
             <Route path="/cotacoes-compra" element={<ProtectedRoute><CotacoesCompra /></ProtectedRoute>} />
-            <Route path="/cotacoes" element={<ProtectedRoute><Orcamentos /></ProtectedRoute>} />
-            <Route path="/cotacoes/novo" element={<ProtectedRoute><OrcamentoForm /></ProtectedRoute>} />
-            <Route path="/cotacoes/:id" element={<ProtectedRoute><OrcamentoForm /></ProtectedRoute>} />
+            <Route path="/cotacoes" element={<Navigate to="/orcamentos" replace />} />
+            <Route path="/cotacoes/novo" element={<Navigate to="/orcamentos/novo" replace />} />
+            <Route path="/cotacoes/:id" element={<Navigate to="/orcamentos/:id" replace />} />
             <Route path="/orcamentos" element={<ProtectedRoute><Orcamentos /></ProtectedRoute>} />
             <Route path="/orcamentos/novo" element={<ProtectedRoute><OrcamentoForm /></ProtectedRoute>} />
             <Route path="/orcamentos/:id" element={<ProtectedRoute><OrcamentoForm /></ProtectedRoute>} />

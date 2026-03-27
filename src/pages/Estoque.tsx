@@ -70,7 +70,7 @@ const Estoque = () => {
       const saldo_atual = form.tipo === "ajuste" ? form.quantidade : saldo_anterior + qty;
 
       await create({ ...form, quantidade: Math.abs(qty), saldo_anterior, saldo_atual, documento_tipo: "manual" });
-      await (supabase as any).from("produtos").update({ estoque_atual: saldo_atual }).eq("id", form.produto_id);
+      await supabase.from("produtos").update({ estoque_atual: saldo_atual }).eq("id", form.produto_id);
       produtosCrud.fetchData();
       setModalOpen(false);
       setForm({ produto_id: "", tipo: "entrada", quantidade: 0, motivo: "" });
