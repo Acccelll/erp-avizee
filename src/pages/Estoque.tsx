@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { AppLayout } from "@/components/AppLayout";
 import { ModulePage } from "@/components/ModulePage";
 import { DataTable, StatusBadge } from "@/components/DataTable";
@@ -6,6 +6,7 @@ import { SummaryCard } from "@/components/SummaryCard";
 import { FormModal } from "@/components/FormModal";
 import { ViewDrawer } from "@/components/ViewDrawer";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,14 +15,20 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { formatNumber } from "@/lib/format";
-import { AlertTriangle, ArrowUpCircle, ArrowDownCircle, RotateCcw, TrendingDown } from "lucide-react";
+import { formatNumber, formatCurrency } from "@/lib/format";
+import { AlertTriangle, ArrowUpCircle, ArrowDownCircle, RotateCcw, TrendingDown, Package } from "lucide-react";
 
 interface Movimento {
   id: string; produto_id: string; tipo: string; quantidade: number;
   saldo_anterior: number; saldo_atual: number; motivo: string;
   documento_tipo: string; documento_id: string; created_at: string;
   produtos?: { nome: string; sku: string };
+}
+
+interface ProdutoPosicao {
+  id: string; nome: string; sku: string; codigo_interno: string;
+  unidade_medida: string; estoque_atual: number; estoque_minimo: number;
+  preco_venda: number;
 }
 
 const Estoque = () => {
@@ -37,10 +44,16 @@ const Estoque = () => {
   const [filterTipo, setFilterTipo] = useState("todos");
   const [dataInicio, setDataInicio] = useState("");
   const [dataFim, setDataFim] = useState("");
-  const [abaixoMinimo, setAbaixoMinimo] = useState<any[]>([]);
+  const [searchPosicao, setSearchPosicao] = useState("");
 
-  // KPI stats
-  const kpis = (() => {
+  // Produtos abaixo do mínimo
+  const abaixoMinimo = useMemo(() =>
+    produtosCrud.data.filter((p: any) => p.ativo && p.estoque_minimo > 0 && Number(p.estoque_atual || 0) <= Number(p.estoque_minimo)),
+    [produtosCrud.data]
+  );
+
+  // KPIs
+  const kpis = useMemo(() => {
     const entradas = data.filter(m => m.tipo === "entrada");
     const saidas = data.filter(m => m.tipo === "saida");
     const ajustes = data.filter(m => m.tipo === "ajuste");
@@ -50,13 +63,24 @@ const Estoque = () => {
       totalAjustes: ajustes.length,
       abaixoMinimo: abaixoMinimo.length,
     };
-  })();
+  }, [data, abaixoMinimo]);
 
-  useEffect(() => {
-    const low = produtosCrud.data.filter((p: any) =>
-      p.ativo && p.estoque_minimo > 0 && Number(p.estoque_atual || 0) <= Number(p.estoque_minimo)
+  // Posição atual
+  const posicaoAtual = useMemo(() => {
+    const items = produtosCrud.data.filter((p: any) => p.ativo) as ProdutoPosicao[];
+    if (!searchPosicao) return items;
+    const q = searchPosicao.toLowerCase();
+    return items.filter(p =>
+      p.nome?.toLowerCase().includes(q) || p.sku?.toLowerCase().includes(q) || p.codigo_interno?.toLowerCase().includes(q)
     );
-    setAbaixoMinimo(low);
+  }, [produtosCrud.data, searchPosicao]);
+
+  const posicaoKpis = useMemo(() => {
+    const items = produtosCrud.data.filter((p: any) => p.ativo);
+    const totalItens = items.length;
+    const totalEstoque = items.reduce((s: number, p: any) => s + Number(p.estoque_atual || 0), 0);
+    const valorEstoque = items.reduce((s: number, p: any) => s + (Number(p.estoque_atual || 0) * Number(p.preco_venda || 0)), 0);
+    return { totalItens, totalEstoque, valorEstoque };
   }, [produtosCrud.data]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -87,11 +111,11 @@ const Estoque = () => {
 
   const origemLabel = (m: Movimento) => {
     if (!m.documento_tipo) return "—";
-    const labels: Record<string, string> = { manual: "Manual", fiscal: "Fiscal", compra: "Compra", venda: "Venda", ajuste: "Ajuste" };
+    const labels: Record<string, string> = { manual: "Manual", fiscal: "Fiscal", compra: "Compra", venda: "Venda", ajuste: "Ajuste", estorno_fiscal: "Estorno" };
     return labels[m.documento_tipo] || m.documento_tipo;
   };
 
-  const columns = [
+  const movColumns = [
     { key: "produto", label: "Produto", render: (m: Movimento) => (
       <div><span className="font-medium">{(m as any).produtos?.nome || "—"}</span><br/><span className="text-xs text-muted-foreground font-mono">{(m as any).produtos?.sku}</span></div>
     )},
@@ -107,9 +131,23 @@ const Estoque = () => {
     { key: "created_at", label: "Data", render: (m: Movimento) => new Date(m.created_at).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" }) },
   ];
 
+  const posColumns = [
+    { key: "nome", label: "Produto", render: (p: ProdutoPosicao) => (
+      <div><span className="font-medium">{p.nome}</span>{p.sku && <><br/><span className="text-xs text-muted-foreground font-mono">{p.sku}</span></>}</div>
+    )},
+    { key: "unidade", label: "Unid.", render: (p: ProdutoPosicao) => p.unidade_medida || "UN" },
+    { key: "estoque_atual", label: "Saldo", render: (p: ProdutoPosicao) => {
+      const baixo = p.estoque_minimo > 0 && Number(p.estoque_atual || 0) <= p.estoque_minimo;
+      return <span className={`font-semibold font-mono ${baixo ? "text-destructive" : ""}`}>{formatNumber(Number(p.estoque_atual || 0))}</span>;
+    }},
+    { key: "estoque_minimo", label: "Mín.", render: (p: ProdutoPosicao) => <span className="font-mono text-muted-foreground">{p.estoque_minimo > 0 ? formatNumber(p.estoque_minimo) : "—"}</span> },
+    { key: "preco_venda", label: "Preço Unit.", render: (p: ProdutoPosicao) => <span className="font-mono">{formatCurrency(Number(p.preco_venda || 0))}</span> },
+    { key: "valor_estoque", label: "Valor Est.", render: (p: ProdutoPosicao) => <span className="font-mono font-medium">{formatCurrency(Number(p.estoque_atual || 0) * Number(p.preco_venda || 0))}</span> },
+  ];
+
   return (
     <AppLayout>
-      <ModulePage title="Estoque" subtitle="Entradas, saídas e ajustes com rastreabilidade por origem." addLabel="Nova Movimentação" onAdd={() => setModalOpen(true)} count={filteredData.length}>
+      <ModulePage title="Estoque" subtitle="Posição atual e histórico de movimentações" addLabel="Nova Movimentação" onAdd={() => setModalOpen(true)} count={undefined}>
 
         {/* KPI Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -137,34 +175,60 @@ const Estoque = () => {
           </Card>
         )}
 
-        {/* Filters */}
-        <div className="flex flex-wrap items-end gap-3 mb-4">
-          <div className="flex gap-1">
-            {["todos", "entrada", "saida", "ajuste"].map(t => (
-              <Button key={t} size="sm" variant={filterTipo === t ? "default" : "outline"} onClick={() => setFilterTipo(t)} className="capitalize">
-                {t === "todos" ? "Todos" : t === "saida" ? "Saída" : t}
-              </Button>
-            ))}
-          </div>
-          <div className="flex items-end gap-2 ml-auto">
-            <div className="space-y-1">
-              <Label className="text-xs">De</Label>
-              <Input type="date" value={dataInicio} onChange={e => setDataInicio(e.target.value)} className="h-8 w-36 text-xs" />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Até</Label>
-              <Input type="date" value={dataFim} onChange={e => setDataFim(e.target.value)} className="h-8 w-36 text-xs" />
-            </div>
-            {(dataInicio || dataFim) && (
-              <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => { setDataInicio(""); setDataFim(""); }}>
-                Limpar
-              </Button>
-            )}
-          </div>
-        </div>
+        {/* Tabs: Posição Atual vs Movimentação */}
+        <Tabs defaultValue="posicao" className="w-full">
+          <TabsList className="mb-4">
+            <TabsTrigger value="posicao" className="gap-1.5"><Package className="h-3.5 w-3.5" />Posição Atual</TabsTrigger>
+            <TabsTrigger value="movimentacao" className="gap-1.5"><RotateCcw className="h-3.5 w-3.5" />Movimentação</TabsTrigger>
+          </TabsList>
 
-        <DataTable columns={columns} data={filteredData} loading={loading}
-          onView={(m) => { setSelected(m); setDrawerOpen(true); }} />
+          <TabsContent value="posicao">
+            <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <Input
+                value={searchPosicao}
+                onChange={(e) => setSearchPosicao(e.target.value)}
+                placeholder="Buscar produto por nome, SKU ou código..."
+                className="sm:max-w-sm"
+              />
+              <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                <span>{posicaoKpis.totalItens} produtos</span>
+                <span className="font-mono font-medium">{formatNumber(posicaoKpis.totalEstoque)} unid.</span>
+                <span className="font-mono font-semibold text-foreground">{formatCurrency(posicaoKpis.valorEstoque)}</span>
+              </div>
+            </div>
+            <DataTable columns={posColumns} data={posicaoAtual} loading={produtosCrud.loading} />
+          </TabsContent>
+
+          <TabsContent value="movimentacao">
+            {/* Filters */}
+            <div className="flex flex-wrap items-end gap-3 mb-4">
+              <div className="flex gap-1">
+                {["todos", "entrada", "saida", "ajuste"].map(t => (
+                  <Button key={t} size="sm" variant={filterTipo === t ? "default" : "outline"} onClick={() => setFilterTipo(t)} className="capitalize">
+                    {t === "todos" ? "Todos" : t === "saida" ? "Saída" : t}
+                  </Button>
+                ))}
+              </div>
+              <div className="flex items-end gap-2 ml-auto">
+                <div className="space-y-1">
+                  <Label className="text-xs">De</Label>
+                  <Input type="date" value={dataInicio} onChange={e => setDataInicio(e.target.value)} className="h-8 w-36 text-xs" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Até</Label>
+                  <Input type="date" value={dataFim} onChange={e => setDataFim(e.target.value)} className="h-8 w-36 text-xs" />
+                </div>
+                {(dataInicio || dataFim) && (
+                  <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => { setDataInicio(""); setDataFim(""); }}>Limpar</Button>
+                )}
+              </div>
+            </div>
+            <p className="text-sm text-muted-foreground mb-2">{filteredData.length} movimentação(ões)</p>
+            <DataTable columns={movColumns} data={filteredData} loading={loading}
+              onView={(m) => { setSelected(m); setDrawerOpen(true); }} />
+          </TabsContent>
+        </Tabs>
+
       </ModulePage>
 
       <FormModal open={modalOpen} onClose={() => setModalOpen(false)} title="Nova Movimentação" size="md">

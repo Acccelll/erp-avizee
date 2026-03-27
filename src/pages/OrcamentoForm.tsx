@@ -440,6 +440,16 @@ export default function OrcamentoForm() {
         </div>
       )}
 
+      <QuickAddClientModal
+        open={quickAddOpen}
+        onClose={() => setQuickAddOpen(false)}
+        onCreated={async (newId) => {
+          // Reload clients list and select the new one
+          const { data: freshClientes } = await supabase.from("clientes").select("*").eq("ativo", true).order("nome_razao_social");
+          setClientes(freshClientes || []);
+          handleClienteChange(newId);
+        }}
+      />
     </AppLayout>
   );
 }
