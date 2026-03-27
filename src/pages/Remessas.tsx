@@ -5,7 +5,7 @@ import { DataTable, StatusBadge } from "@/components/DataTable";
 import { FormModal } from "@/components/FormModal";
 import { ViewDrawerV2 } from "@/components/ViewDrawerV2";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Edit, Trash2, Plus, MapPin, Package as PackageIcon, Truck } from "lucide-react";
+import { Edit, Trash2, Plus, MapPin, Package as PackageIcon, Truck, Search } from "lucide-react";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -149,6 +149,47 @@ export default function Remessas() {
     await update(remessa.id, { status_transporte: newStatus } as any);
     if (selected?.id === remessa.id) setSelected({ ...remessa, status_transporte: newStatus });
     toast.success(`Status atualizado para ${statusMap[newStatus]?.label || newStatus}`);
+  };
+
+  const handleRastrear = async (remessa: Remessa) => {
+    if (!remessa.codigo_rastreio) { toast.error("Sem código de rastreio"); return; }
+    try {
+      toast.info("Consultando rastreio...");
+      const { data: result, error } = await supabase.functions.invoke("correios-api", {
+        body: null,
+        headers: { "Content-Type": "application/json" },
+      });
+      // Use query params approach
+      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+      const url = `https://${projectId}.supabase.co/functions/v1/correios-api?action=rastrear&codigo=${remessa.codigo_rastreio}`;
+      const res = await fetch(url, {
+        headers: { "Content-Type": "application/json", apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || "" },
+      });
+      const tracking = await res.json();
+      if (tracking.error) { toast.error(tracking.error); return; }
+
+      // Save events from tracking response
+      const eventos = tracking.objetos?.[0]?.eventos || [];
+      for (const ev of eventos) {
+        const descricao = ev.descricao || ev.tipo || "Evento";
+        const local = ev.unidade?.endereco?.cidade || ev.unidade?.nome || "";
+        const dataHora = ev.dtHrCriado || new Date().toISOString();
+        await supabase.from("remessa_eventos" as any).upsert({
+          remessa_id: remessa.id,
+          descricao,
+          local: local || null,
+          data_hora: dataHora,
+        } as any, { onConflict: "remessa_id,data_hora,descricao" }).select();
+      }
+
+      toast.success(`${eventos.length} evento(s) atualizado(s)`);
+      // Refresh events
+      const { data: updatedEvents } = await supabase.from("remessa_eventos" as any).select("*").eq("remessa_id", remessa.id).order("data_hora", { ascending: false });
+      setEventos((updatedEvents as any) || []);
+    } catch (err: any) {
+      console.error("[rastrear]", err);
+      toast.error("Erro ao consultar rastreio. Verifique as credenciais dos Correios.");
+    }
   };
 
   const filteredData = useMemo(() => {
@@ -318,19 +359,28 @@ export default function Remessas() {
             ) : null,
           },
         ]}
-        footer={selected && selected.status_transporte !== "entregue" ? (
+        footer={selected ? (
           <div className="flex gap-2 flex-wrap">
-            {selected.status_transporte === "pendente" && (
-              <Button size="sm" onClick={() => handleStatusChange(selected, "postado")}><Truck className="h-4 w-4 mr-1" /> Marcar como Postado</Button>
+            {selected.codigo_rastreio && (
+              <Button size="sm" variant="outline" onClick={() => handleRastrear(selected)}>
+                <Search className="h-4 w-4 mr-1" /> Rastrear Correios
+              </Button>
             )}
-            {selected.status_transporte === "postado" && (
-              <Button size="sm" onClick={() => handleStatusChange(selected, "em_transito")}><Truck className="h-4 w-4 mr-1" /> Em Trânsito</Button>
-            )}
-            {(selected.status_transporte === "em_transito" || selected.status_transporte === "postado") && (
-              <Button size="sm" variant="outline" onClick={() => handleStatusChange(selected, "entregue")}><PackageIcon className="h-4 w-4 mr-1" /> Entregue</Button>
-            )}
-            {selected.status_transporte !== "devolvido" && (
-              <Button size="sm" variant="destructive" onClick={() => handleStatusChange(selected, "devolvido")}>Devolvido</Button>
+            {selected.status_transporte !== "entregue" && (
+              <>
+                {selected.status_transporte === "pendente" && (
+                  <Button size="sm" onClick={() => handleStatusChange(selected, "postado")}><Truck className="h-4 w-4 mr-1" /> Marcar como Postado</Button>
+                )}
+                {selected.status_transporte === "postado" && (
+                  <Button size="sm" onClick={() => handleStatusChange(selected, "em_transito")}><Truck className="h-4 w-4 mr-1" /> Em Trânsito</Button>
+                )}
+                {(selected.status_transporte === "em_transito" || selected.status_transporte === "postado") && (
+                  <Button size="sm" variant="outline" onClick={() => handleStatusChange(selected, "entregue")}><PackageIcon className="h-4 w-4 mr-1" /> Entregue</Button>
+                )}
+                {selected.status_transporte !== "devolvido" && (
+                  <Button size="sm" variant="destructive" onClick={() => handleStatusChange(selected, "devolvido")}>Devolvido</Button>
+                )}
+              </>
             )}
           </div>
         ) : undefined}

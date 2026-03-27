@@ -124,8 +124,59 @@ const PedidosCompra = () => {
     setSaving(false);
   };
 
-  const darEntrada = (p: PedidoCompra) => {
-    // Navigate to Fiscal with pre-filled data
+  const darEntrada = async (p: PedidoCompra) => {
+    // 1. Load items for this purchase order
+    const { data: itens } = await supabase.from("pedidos_compra_itens" as any).select("*, produtos(nome, sku, estoque_atual)").eq("pedido_compra_id", p.id);
+    if (!itens || itens.length === 0) {
+      toast.error("Pedido sem itens para dar entrada.");
+      return;
+    }
+
+    try {
+      // 2. Generate stock movements (entrada) for each item
+      for (const item of itens as any[]) {
+        const saldoAnterior = Number(item.produtos?.estoque_atual || 0);
+        const qtd = Number(item.quantidade || 0);
+        await supabase.from("estoque_movimentos").insert({
+          produto_id: item.produto_id,
+          tipo: "entrada" as any,
+          quantidade: qtd,
+          saldo_anterior: saldoAnterior,
+          saldo_atual: saldoAnterior + qtd,
+          documento_tipo: "pedido_compra",
+          documento_id: p.id,
+          motivo: `Entrada via PC ${p.numero}`,
+        });
+        // Update product stock
+        await supabase.from("produtos").update({ estoque_atual: saldoAnterior + qtd }).eq("id", item.produto_id);
+      }
+
+      // 3. Generate financial entry (conta a pagar)
+      const valorTotal = Number(p.valor_total || 0);
+      if (valorTotal > 0) {
+        await supabase.from("financeiro_lancamentos").insert({
+          tipo: "pagar" as any,
+          descricao: `PC ${p.numero} — ${p.fornecedores?.nome_razao_social || "Fornecedor"}`,
+          valor: valorTotal,
+          saldo_restante: valorTotal,
+          data_vencimento: p.data_entrega_prevista || new Date().toISOString().split("T")[0],
+          status: "aberto" as any,
+          fornecedor_id: p.fornecedor_id || null,
+        });
+      }
+
+      // 4. Update purchase order status to "concluido"
+      await supabase.from("pedidos_compra" as any).update({ status: "concluido" } as any).eq("id", p.id);
+
+      toast.success("Entrada realizada! Estoque atualizado e financeiro gerado.");
+      setDrawerOpen(false);
+      fetchData();
+    } catch (err: any) {
+      console.error("[darEntrada]", err);
+      toast.error("Erro ao processar entrada.");
+    }
+
+    // Also navigate to fiscal for NF registration
     navigate(`/fiscal?tipo=entrada&fornecedor_id=${p.fornecedor_id || ""}&pedido_compra=${p.numero}`);
   };
 
