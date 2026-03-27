@@ -15,7 +15,8 @@ import { OrcamentoPdfTemplate } from "@/components/Orcamento/OrcamentoPdfTemplat
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ArrowLeft, Save, Eye, FileText, Copy } from "lucide-react";
+import { ArrowLeft, Save, Eye, FileText, Copy, Plus } from "lucide-react";
+import { QuickAddClientModal } from "@/components/QuickAddClientModal";
 import { useIsMobile } from "@/hooks/use-mobile";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
@@ -65,6 +66,7 @@ export default function OrcamentoForm() {
   const [prazoEntrega, setPrazoEntrega] = useState("");
   const [freteTipo, setFreteTipo] = useState("");
   const [modalidade, setModalidade] = useState("");
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
 
   const totalProdutos = items.reduce((sum, i) => sum + (i.valor_total || 0), 0);
   const valorTotal = totalProdutos - desconto + impostoSt + impostoIpi + freteValor + outrasDespesas;
@@ -308,12 +310,18 @@ export default function OrcamentoForm() {
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 <div className="md:col-span-2 space-y-1.5">
                   <Label className="text-xs">Buscar Cliente</Label>
-                  <AutocompleteSearch
-                    options={clienteOptions}
-                    value={clienteId}
-                    onChange={handleClienteChange}
-                    placeholder="Buscar por nome ou CNPJ..."
-                  />
+                  <div className="flex gap-2">
+                    <AutocompleteSearch
+                      options={clienteOptions}
+                      value={clienteId}
+                      onChange={handleClienteChange}
+                      placeholder="Buscar por nome ou CNPJ..."
+                      className="flex-1"
+                    />
+                    <Button type="button" variant="outline" size="icon" className="h-10 w-10 shrink-0" onClick={() => setQuickAddOpen(true)} title="Cadastrar novo cliente">
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
                 <div className="space-y-1.5"><Label className="text-xs">Código</Label><Input value={clienteSnapshot.codigo} readOnly className="bg-accent/30 font-mono text-xs" /></div>
               </div>
@@ -432,6 +440,16 @@ export default function OrcamentoForm() {
         </div>
       )}
 
+      <QuickAddClientModal
+        open={quickAddOpen}
+        onClose={() => setQuickAddOpen(false)}
+        onCreated={async (newId) => {
+          // Reload clients list and select the new one
+          const { data: freshClientes } = await supabase.from("clientes").select("*").eq("ativo", true).order("nome_razao_social");
+          setClientes(freshClientes || []);
+          handleClienteChange(newId);
+        }}
+      />
     </AppLayout>
   );
 }

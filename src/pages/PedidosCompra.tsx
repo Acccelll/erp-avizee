@@ -4,7 +4,9 @@ import { ModulePage } from "@/components/ModulePage";
 import { DataTable, StatusBadge } from "@/components/DataTable";
 import { SummaryCard } from "@/components/SummaryCard";
 import { FormModal } from "@/components/FormModal";
-import { ViewDrawer } from "@/components/ViewDrawer";
+import { ViewDrawerV2 } from "@/components/ViewDrawerV2";
+import { ViewField, ViewSection } from "@/components/ViewDrawer";
+import { RelationalLink } from "@/components/ui/RelationalLink";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Edit, Trash2, FileInput } from "lucide-react";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
@@ -185,51 +187,110 @@ const PedidosCompra = () => {
         </form>
       </FormModal>
 
-      <ViewDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} title="Detalhes do Pedido de Compra"
-        actions={selected ? <>
-          {(selected.status === "aprovado" || selected.status === "pendente") && (
-            <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => { setDrawerOpen(false); darEntrada(selected); }}><FileInput className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Dar Entrada (NF)</TooltipContent></Tooltip>
-          )}
-          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setDrawerOpen(false); openEdit(selected); }}><Edit className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Editar</TooltipContent></Tooltip>
-          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={async () => { setDrawerOpen(false); await supabase.from("pedidos_compra" as any).update({ ativo: false } as any).eq("id", selected.id); fetchData(); toast.success("Removido!"); }}><Trash2 className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Excluir</TooltipContent></Tooltip>
-        </> : undefined}
-      >
-        {selected && (
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div><span className="text-xs text-muted-foreground">Número</span><p className="font-medium font-mono">{selected.numero}</p></div>
-              <div><span className="text-xs text-muted-foreground">Status</span><StatusBadge status={selected.status} label={statusLabels[selected.status] || selected.status} /></div>
-            </div>
-            <div><span className="text-xs text-muted-foreground">Fornecedor</span><p>{selected.fornecedores?.nome_razao_social || "—"}</p></div>
-            <div className="grid grid-cols-2 gap-4">
-              <div><span className="text-xs text-muted-foreground">Data Pedido</span><p>{new Date(selected.data_pedido).toLocaleDateString("pt-BR")}</p></div>
-              <div><span className="text-xs text-muted-foreground">Valor Total</span><p className="font-semibold font-mono">{formatCurrency(Number(selected.valor_total || 0))}</p></div>
-            </div>
-            {selected.data_entrega_prevista && (
-              <div><span className="text-xs text-muted-foreground">Entrega Prevista</span><p>{new Date(selected.data_entrega_prevista).toLocaleDateString("pt-BR")}</p></div>
-            )}
-            {viewItems.length > 0 && (
-              <div className="border-t pt-3">
-                <h4 className="mb-2 text-sm font-semibold">Itens ({viewItems.length})</h4>
-                <div className="space-y-1">
-                  {viewItems.map((i: any, idx: number) => (
-                    <div key={idx} className="flex justify-between border-b py-1 text-sm last:border-b-0">
-                      <span>{i.produtos?.nome || "—"} × {i.quantidade}</span>
-                      <span className="font-mono font-semibold">{formatCurrency(Number(i.valor_total))}</span>
-                    </div>
-                  ))}
-                </div>
+      {selected && (() => {
+        const tabDados = (
+          <div className="space-y-5">
+            <ViewSection title="Informações">
+              <div className="grid grid-cols-2 gap-4">
+                <ViewField label="Número"><span className="font-mono font-medium">{selected.numero}</span></ViewField>
+                <ViewField label="Status"><StatusBadge status={selected.status} label={statusLabels[selected.status] || selected.status} /></ViewField>
+                <ViewField label="Data Pedido">{new Date(selected.data_pedido).toLocaleDateString("pt-BR")}</ViewField>
+                <ViewField label="Valor Total"><span className="font-semibold font-mono">{formatCurrency(Number(selected.valor_total || 0))}</span></ViewField>
               </div>
+            </ViewSection>
+            <ViewSection title="Fornecedor">
+              <ViewField label="Fornecedor">
+                {selected.fornecedor_id ? (
+                  <RelationalLink to={`/fornecedores`}>
+                    {selected.fornecedores?.nome_razao_social || "—"}
+                  </RelationalLink>
+                ) : "—"}
+              </ViewField>
+            </ViewSection>
+            {selected.data_entrega_prevista && (
+              <ViewSection title="Entrega">
+                <ViewField label="Entrega Prevista">{new Date(selected.data_entrega_prevista).toLocaleDateString("pt-BR")}</ViewField>
+              </ViewSection>
             )}
             {selected.observacoes && (
-              <div className="border-t pt-3">
-                <span className="text-xs text-muted-foreground">Observações</span>
-                <p className="text-sm">{selected.observacoes}</p>
-              </div>
+              <ViewSection title="Observações">
+                <p className="text-sm text-muted-foreground">{selected.observacoes}</p>
+              </ViewSection>
             )}
           </div>
-        )}
-      </ViewDrawer>
+        );
+
+        const tabItens = (
+          <div className="space-y-3">
+            {viewItems.length > 0 ? (
+              <div className="rounded-lg border overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-muted/50 border-b">
+                      <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground">Produto</th>
+                      <th className="px-3 py-2 text-right text-xs font-semibold text-muted-foreground">Qtd</th>
+                      <th className="px-3 py-2 text-right text-xs font-semibold text-muted-foreground">Vlr. Unit.</th>
+                      <th className="px-3 py-2 text-right text-xs font-semibold text-muted-foreground">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {viewItems.map((i: any, idx: number) => (
+                      <tr key={idx} className="border-b last:border-b-0 hover:bg-muted/20">
+                        <td className="px-3 py-2">{i.produtos?.nome || "—"}</td>
+                        <td className="px-3 py-2 text-right font-mono">{i.quantidade}</td>
+                        <td className="px-3 py-2 text-right font-mono text-muted-foreground">{formatCurrency(Number(i.valor_unitario))}</td>
+                        <td className="px-3 py-2 text-right font-mono font-medium">{formatCurrency(Number(i.valor_total))}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-4">Nenhum item</p>
+            )}
+          </div>
+        );
+
+        const drawerFooter = (selected.status === "aprovado" || selected.status === "pendente") ? (
+          <Button className="w-full" onClick={() => { setDrawerOpen(false); darEntrada(selected); }}>
+            <FileInput className="w-4 h-4 mr-2" /> Dar Entrada (NF)
+          </Button>
+        ) : undefined;
+
+        return (
+          <ViewDrawerV2
+            open={drawerOpen}
+            onClose={() => setDrawerOpen(false)}
+            title={`PC ${selected.numero}`}
+            badge={<StatusBadge status={selected.status} label={statusLabels[selected.status] || selected.status} />}
+            actions={<>
+              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setDrawerOpen(false); openEdit(selected); }}><Edit className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Editar</TooltipContent></Tooltip>
+              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={async () => { setDrawerOpen(false); await supabase.from("pedidos_compra" as any).update({ ativo: false } as any).eq("id", selected.id); fetchData(); toast.success("Removido!"); }}><Trash2 className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Excluir</TooltipContent></Tooltip>
+            </>}
+            summary={
+              <div className="grid grid-cols-3 gap-3">
+                <div className="bg-accent/30 rounded-lg p-3 text-center">
+                  <p className="text-xs text-muted-foreground">Itens</p>
+                  <p className="font-semibold text-sm font-mono">{viewItems.length}</p>
+                </div>
+                <div className="bg-accent/30 rounded-lg p-3 text-center">
+                  <p className="text-xs text-muted-foreground">Status</p>
+                  <p className="font-semibold text-sm capitalize">{statusLabels[selected.status] || selected.status}</p>
+                </div>
+                <div className="bg-accent/30 rounded-lg p-3 text-center">
+                  <p className="text-xs text-muted-foreground">Total</p>
+                  <p className="font-semibold text-sm font-mono">{formatCurrency(Number(selected.valor_total || 0))}</p>
+                </div>
+              </div>
+            }
+            tabs={[
+              { value: "dados", label: "Dados", content: tabDados },
+              { value: "itens", label: `Itens (${viewItems.length})`, content: tabItens },
+            ]}
+            footer={drawerFooter}
+          />
+        );
+      })()}
     </AppLayout>
   );
 };
