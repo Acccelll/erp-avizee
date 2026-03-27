@@ -2,7 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { downloadTextFile } from "@/lib/utils";
 import { formatCurrency, formatDate, formatNumber } from "@/lib/format";
 
-export type TipoRelatorio = "estoque" | "movimentos_estoque" | "financeiro" | "fluxo_caixa" | "vendas" | "compras" | "aging" | "dre";
+export type TipoRelatorio = "estoque" | "movimentos_estoque" | "financeiro" | "fluxo_caixa" | "vendas" | "compras" | "aging" | "dre" | "curva_abc" | "margem_produtos";
 
 export interface FiltroRelatorio {
   dataInicio?: string;
@@ -400,6 +400,105 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
         totals: {
           totalTitulos: rows.length,
           totalValor: rows.reduce((s, r) => s + r.valor, 0),
+        },
+      };
+    }
+
+    case "curva_abc": {
+      let query = supabase
+        .from("orcamentos_itens")
+        .select("produto_id, valor_total, descricao_snapshot, codigo_snapshot, orcamentos!inner(ativo, status)")
+        .order("valor_total", { ascending: false });
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      // Aggregate by product
+      const prodMap = new Map<string, { produto: string; codigo: string; total: number }>();
+      for (const item of data || []) {
+        const orc = item.orcamentos as any;
+        if (!orc?.ativo) continue;
+        const key = item.produto_id;
+        const existing = prodMap.get(key) || { produto: item.descricao_snapshot || '-', codigo: item.codigo_snapshot || '-', total: 0 };
+        existing.total += Number(item.valor_total || 0);
+        prodMap.set(key, existing);
+      }
+
+      const sorted = Array.from(prodMap.values()).sort((a, b) => b.total - a.total);
+      const grandTotal = sorted.reduce((s, r) => s + r.total, 0);
+
+      let acumulado = 0;
+      const rows = sorted.map((item, i) => {
+        acumulado += item.total;
+        const pctAcum = grandTotal > 0 ? (acumulado / grandTotal) * 100 : 0;
+        const classe = pctAcum <= 80 ? 'A' : pctAcum <= 95 ? 'B' : 'C';
+        return {
+          posicao: i + 1,
+          codigo: item.codigo,
+          produto: item.produto,
+          faturamento: item.total,
+          percentual: grandTotal > 0 ? ((item.total / grandTotal) * 100) : 0,
+          acumulado: pctAcum,
+          classe,
+        };
+      });
+
+      const classA = rows.filter(r => r.classe === 'A');
+      const classB = rows.filter(r => r.classe === 'B');
+      const classC = rows.filter(r => r.classe === 'C');
+
+      return {
+        title: "Curva ABC de Produtos",
+        subtitle: "Classificação de produtos por participação no faturamento.",
+        rows,
+        chartData: [
+          { name: `A (${classA.length} itens)`, value: classA.reduce((s, r) => s + r.faturamento, 0) },
+          { name: `B (${classB.length} itens)`, value: classB.reduce((s, r) => s + r.faturamento, 0) },
+          { name: `C (${classC.length} itens)`, value: classC.reduce((s, r) => s + r.faturamento, 0) },
+        ],
+        totals: { grandTotal },
+      };
+    }
+
+    case "margem_produtos": {
+      const { data, error } = await supabase
+        .from("produtos")
+        .select("codigo_interno, nome, preco_custo, preco_venda, estoque_atual, unidade_medida")
+        .eq("ativo", true)
+        .order("nome");
+
+      if (error) throw error;
+
+      const rows = (data || []).map((item: any) => {
+        const custo = Number(item.preco_custo || 0);
+        const venda = Number(item.preco_venda || 0);
+        const margem = venda > 0 ? ((venda - custo) / venda) * 100 : 0;
+        const markup = custo > 0 ? ((venda - custo) / custo) * 100 : 0;
+        return {
+          codigo: item.codigo_interno || "-",
+          produto: item.nome,
+          unidade: item.unidade_medida || "UN",
+          custUnit: custo,
+          vendaUnit: venda,
+          lucroUnit: venda - custo,
+          margem: Number(margem.toFixed(1)),
+          markup: Number(markup.toFixed(1)),
+          estoque: Number(item.estoque_atual || 0),
+        };
+      });
+
+      const sorted = [...rows].sort((a, b) => b.margem - a.margem);
+
+      return {
+        title: "Análise de Margem de Produtos",
+        subtitle: "Margem e markup por produto ativo.",
+        rows: sorted,
+        chartData: sorted.slice(0, 8).map(r => ({
+          name: r.produto.substring(0, 20),
+          value: r.margem,
+        })),
+        totals: {
+          mediaMargemPct: rows.length > 0 ? Number((rows.reduce((s, r) => s + r.margem, 0) / rows.length).toFixed(1)) : 0,
         },
       };
     }

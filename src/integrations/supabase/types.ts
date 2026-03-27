@@ -1323,6 +1323,7 @@ export type Database = {
           peso_total: number | null
           prazo_entrega: string | null
           prazo_pagamento: string | null
+          public_token: string | null
           quantidade_total: number | null
           status: Database["public"]["Enums"]["status_pedido"]
           updated_at: string
@@ -1351,6 +1352,7 @@ export type Database = {
           peso_total?: number | null
           prazo_entrega?: string | null
           prazo_pagamento?: string | null
+          public_token?: string | null
           quantidade_total?: number | null
           status?: Database["public"]["Enums"]["status_pedido"]
           updated_at?: string
@@ -1379,6 +1381,7 @@ export type Database = {
           peso_total?: number | null
           prazo_entrega?: string | null
           prazo_pagamento?: string | null
+          public_token?: string | null
           quantidade_total?: number | null
           status?: Database["public"]["Enums"]["status_pedido"]
           updated_at?: string

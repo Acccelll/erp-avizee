@@ -142,8 +142,20 @@ export function NotificationsPanel() {
     };
 
     loadNotifications();
+
+    // Realtime subscription for financial changes
+    const channel = supabase
+      .channel('notifications-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'financeiro_lancamentos' },
+        () => { loadNotifications(); }
+      )
+      .subscribe();
+
     return () => {
       mounted = false;
+      supabase.removeChannel(channel);
     };
   }, []);
 
