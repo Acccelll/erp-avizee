@@ -85,8 +85,8 @@ const Financeiro = () => {
   useEffect(() => {
     const load = async () => {
       const [{ data: contas }, { data: contabeis }] = await Promise.all([
-        (supabase as any).from("contas_bancarias").select("*, bancos(nome)").eq("ativo", true),
-        (supabase as any).from("contas_contabeis").select("id, codigo, descricao").eq("ativo", true).eq("aceita_lancamento", true).order("codigo"),
+        supabase.from("contas_bancarias").select("*, bancos(nome)").eq("ativo", true),
+        supabase.from("contas_contabeis").select("id, codigo, descricao").eq("ativo", true).eq("aceita_lancamento", true).order("codigo"),
       ]);
       setContasBancarias(contas || []);
       setContasContabeis(contabeis || []);
@@ -270,7 +270,7 @@ const Financeiro = () => {
     setBaixaProcessing(true);
     try {
       for (const id of selectedIds) {
-        await (supabase as any).from("financeiro_lancamentos").update({
+        await supabase.from("financeiro_lancamentos").update({
           status: "pago", data_pagamento: baixaDate,
         }).eq("id", id);
       }

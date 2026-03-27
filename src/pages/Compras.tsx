@@ -100,7 +100,7 @@ const Compras = () => {
       frete_valor: c.frete_valor || 0, impostos_valor: c.impostos_valor || 0,
       observacoes: c.observacoes || "", status: c.status,
     });
-    const { data: itens } = await (supabase as any).from("compras_itens").select("*, produtos(nome, sku)").eq("compra_id", c.id);
+    const { data: itens } = await supabase.from("compras_itens").select("*, produtos(nome, sku)").eq("compra_id", c.id);
     setItems((itens || []).map((i: any) => ({
       id: i.id, produto_id: i.produto_id, codigo: i.produtos?.sku || "",
       descricao: i.produtos?.nome || "", quantidade: i.quantidade,
@@ -111,7 +111,7 @@ const Compras = () => {
 
   const openView = async (c: Compra) => {
     setSelected(c); setDrawerOpen(true);
-    const { data: itens } = await (supabase as any).from("compras_itens").select("*, produtos(nome, sku)").eq("compra_id", c.id);
+    const { data: itens } = await supabase.from("compras_itens").select("*, produtos(nome, sku)").eq("compra_id", c.id);
     setViewItems(itens || []);
   };
 
@@ -125,19 +125,19 @@ const Compras = () => {
       const payload = { ...form, status, fornecedor_id: form.fornecedor_id || null, valor_produtos: valorProdutos, valor_total: valorTotal };
       let compraId = selected?.id;
       if (mode === "create") {
-        const { data: newC, error } = await (supabase as any).from("compras").insert(payload).select().single();
+        const { data: newC, error } = await supabase.from("compras").insert(payload).select().single();
         if (error) throw error;
         compraId = newC.id;
       } else if (selected) {
-        await (supabase as any).from("compras").update(payload).eq("id", selected.id);
-        await (supabase as any).from("compras_itens").delete().eq("compra_id", selected.id);
+        await supabase.from("compras").update(payload).eq("id", selected.id);
+        await supabase.from("compras_itens").delete().eq("compra_id", selected.id);
       }
       if (items.length > 0 && compraId) {
         const itemsPayload = items.filter((i) => i.produto_id).map((i) => ({
           compra_id: compraId, produto_id: i.produto_id, quantidade: i.quantidade,
           valor_unitario: i.valor_unitario, valor_total: i.valor_total,
         }));
-        if (itemsPayload.length > 0) await (supabase as any).from("compras_itens").insert(itemsPayload);
+        if (itemsPayload.length > 0) await supabase.from("compras_itens").insert(itemsPayload);
       }
       toast.success(isCotacoesView ? "Cotação de compra salva!" : "Compra salva!");
       setModalOpen(false); fetchData();

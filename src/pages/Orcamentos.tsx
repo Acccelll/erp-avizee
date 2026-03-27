@@ -43,7 +43,7 @@ const Orcamentos = () => {
   const handleSendForApproval = useCallback(async (orc: Orcamento) => {
     if (orc.status !== "rascunho") return;
     try {
-      await (supabase as any).from("orcamentos").update({ status: "confirmado" }).eq("id", orc.id);
+      await supabase.from("orcamentos").update({ status: "confirmado" }).eq("id", orc.id);
       toast.success(`Cotação ${orc.numero} enviada para aprovação!`);
       fetchData();
     } catch {
@@ -62,10 +62,10 @@ const Orcamentos = () => {
 
   const handleDuplicate = async (orc: Orcamento) => {
     try {
-      const { data: items } = await (supabase as any).from("orcamentos_itens").select("*").eq("orcamento_id", orc.id);
-      const { count } = await (supabase as any).from("orcamentos").select("*", { count: "exact", head: true });
+      const { data: items } = await supabase.from("orcamentos_itens").select("*").eq("orcamento_id", orc.id);
+      const { count } = await supabase.from("orcamentos").select("*", { count: "exact", head: true });
       const newNumero = `COT${String((count || 0) + 1).padStart(6, "0")}`;
-      const { data: newOrc, error } = await (supabase as any).from("orcamentos").insert({
+      const { data: newOrc, error } = await supabase.from("orcamentos").insert({
         numero: newNumero, data_orcamento: new Date().toISOString().split("T")[0],
         status: "rascunho", cliente_id: orc.cliente_id, validade: null,
         observacoes: orc.observacoes, desconto: (orc as any).desconto || 0,
@@ -86,7 +86,7 @@ const Orcamentos = () => {
           valor_unitario: i.valor_unitario, valor_total: i.valor_total,
           peso_unitario: i.peso_unitario, peso_total: i.peso_total,
         }));
-        await (supabase as any).from("orcamentos_itens").insert(newItems);
+        await supabase.from("orcamentos_itens").insert(newItems);
       }
       toast.success(`Cotação duplicada: ${newNumero}`);
       fetchData();
@@ -103,7 +103,7 @@ const Orcamentos = () => {
       return;
     }
     try {
-      await (supabase as any).from("orcamentos").update({ status: "aprovado" }).eq("id", orc.id);
+      await supabase.from("orcamentos").update({ status: "aprovado" }).eq("id", orc.id);
       toast.success(`Cotação ${orc.numero} aprovada!`);
       fetchData();
     } catch (err: any) {
@@ -113,10 +113,10 @@ const Orcamentos = () => {
 
   const handleConvertToOV = async (orc: Orcamento) => {
     try {
-      const { data: items } = await (supabase as any).from("orcamentos_itens").select("*").eq("orcamento_id", orc.id);
-      const { count } = await (supabase as any).from("ordens_venda").select("*", { count: "exact", head: true });
+      const { data: items } = await supabase.from("orcamentos_itens").select("*").eq("orcamento_id", orc.id);
+      const { count } = await supabase.from("ordens_venda").select("*", { count: "exact", head: true });
       const ovNumero = `OV${String((count || 0) + 1).padStart(6, "0")}`;
-      const { data: newOV, error } = await (supabase as any).from("ordens_venda").insert({
+      const { data: newOV, error } = await supabase.from("ordens_venda").insert({
         numero: ovNumero, data_emissao: new Date().toISOString().split("T")[0],
         cliente_id: orc.cliente_id, cotacao_id: orc.id,
         status: "pendente", status_faturamento: "aguardando",
@@ -132,9 +132,9 @@ const Orcamentos = () => {
           peso_unitario: i.peso_unitario, peso_total: i.peso_total,
           quantidade_faturada: 0,
         }));
-        await (supabase as any).from("ordens_venda_itens").insert(ovItems);
+        await supabase.from("ordens_venda_itens").insert(ovItems);
       }
-      await (supabase as any).from("orcamentos").update({ status: "convertido" }).eq("id", orc.id);
+      await supabase.from("orcamentos").update({ status: "convertido" }).eq("id", orc.id);
       toast.success(`Ordem de Venda ${ovNumero} criada!`);
       fetchData();
       navigate(`/ordens-venda`);

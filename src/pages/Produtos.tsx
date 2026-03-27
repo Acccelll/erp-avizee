@@ -82,7 +82,7 @@ const Produtos = () => {
       peso: p.peso || 0, eh_composto: p.eh_composto || false
     });
     if (p.eh_composto) {
-      const { data: comp } = await (supabase as any).from("produto_composicoes").
+      const { data: comp } = await supabase.from("produto_composicoes").
       select("id, produto_filho_id, quantidade, ordem, produtos:produto_filho_id(nome, sku, preco_custo)").
       eq("produto_pai_id", p.id).order("ordem");
       setEditComposicao((comp || []).map((c: any) => ({
@@ -98,16 +98,16 @@ const Produtos = () => {
   const openView = async (p: Produto) => {
     setSelected(p);setDrawerOpen(true);
     const [nfRes, compRes, movRes, fornRes] = await Promise.all([
-    (supabase as any).from("notas_fiscais_itens").
+    supabase.from("notas_fiscais_itens").
     select("quantidade, valor_unitario, notas_fiscais(numero, tipo, data_emissao, fornecedores(nome_razao_social))").
     eq("produto_id", p.id).limit(20),
-    p.eh_composto ? (supabase as any).from("produto_composicoes").
+    p.eh_composto ? supabase.from("produto_composicoes").
     select("quantidade, ordem, produtos:produto_filho_id(nome, sku, preco_custo)").
     eq("produto_pai_id", p.id).order("ordem") : Promise.resolve({ data: [] }),
-    (supabase as any).from("estoque_movimentos").
+    supabase.from("estoque_movimentos").
     select("tipo, quantidade, motivo, created_at, saldo_anterior, saldo_atual").
     eq("produto_id", p.id).order("created_at", { ascending: false }).limit(20),
-    (supabase as any).from("produtos_fornecedores").
+    supabase.from("produtos_fornecedores").
     select("preco_compra, lead_time_dias, referencia_fornecedor, fornecedores:fornecedor_id(nome_razao_social)").
     eq("produto_id", p.id)]
     );
@@ -143,10 +143,10 @@ const Produtos = () => {
       if (selected) {await update(selected.id, payload);produtoId = selected.id;} else
       {return;}
       if (form.eh_composto) {
-        await (supabase as any).from("produto_composicoes").delete().eq("produto_pai_id", produtoId);
+        await supabase.from("produto_composicoes").delete().eq("produto_pai_id", produtoId);
         if (editComposicao.length > 0) {
           const rows = editComposicao.map((c, i) => ({ produto_pai_id: produtoId, produto_filho_id: c.produto_filho_id, quantidade: c.quantidade, ordem: i + 1 }));
-          const { error } = await (supabase as any).from("produto_composicoes").insert(rows);
+          const { error } = await supabase.from("produto_composicoes").insert(rows);
           if (error) {console.error('[produtos] composição:', error);toast.error("Erro ao salvar composição. Tente novamente.");}
         }
       }
@@ -157,7 +157,7 @@ const Produtos = () => {
 
   const recalcularCusto = async (p: Produto) => {
     if (!p.eh_composto) return;
-    const { data: comp } = await (supabase as any).from("produto_composicoes").
+    const { data: comp } = await supabase.from("produto_composicoes").
     select("quantidade, produtos:produto_filho_id(preco_custo)").
     eq("produto_pai_id", p.id);
     const custo = (comp || []).reduce((s: number, c: any) => s + c.quantidade * (c.produtos?.preco_custo || 0), 0);

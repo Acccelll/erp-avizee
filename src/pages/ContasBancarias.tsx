@@ -37,8 +37,8 @@ const ContasBancarias = () => {
   const fetchData = async () => {
     setLoading(true);
     const [{ data: b }, { data: c }] = await Promise.all([
-      (supabase as any).from("bancos").select("*").eq("ativo", true).order("nome"),
-      (supabase as any).from("contas_bancarias").select("*, bancos(nome, tipo)").eq("ativo", true).order("created_at", { ascending: false }),
+      supabase.from("bancos").select("*").eq("ativo", true).order("nome"),
+      supabase.from("contas_bancarias").select("*, bancos(nome, tipo)").eq("ativo", true).order("created_at", { ascending: false }),
     ]);
     setBancos(b || []);
     setContas(c || []);
@@ -67,11 +67,11 @@ const ContasBancarias = () => {
     setSaving(true);
     try {
       if (mode === "create") {
-        const { error } = await (supabase as any).from("contas_bancarias").insert(form);
+        const { error } = await supabase.from("contas_bancarias").insert(form);
         if (error) throw error;
         toast.success("Conta criada com sucesso!");
       } else if (selected) {
-        const { error } = await (supabase as any).from("contas_bancarias").update(form).eq("id", selected.id);
+        const { error } = await supabase.from("contas_bancarias").update(form).eq("id", selected.id);
         if (error) throw error;
         toast.success("Conta atualizada com sucesso!");
       }
@@ -82,7 +82,7 @@ const ContasBancarias = () => {
   };
 
   const handleDelete = async (c: ContaBancaria) => {
-    const { error } = await (supabase as any).from("contas_bancarias").update({ ativo: false }).eq("id", c.id);
+    const { error } = await supabase.from("contas_bancarias").update({ ativo: false }).eq("id", c.id);
     if (error) { toast.error("Erro ao remover conta."); return; }
     toast.success("Conta removida!");
     fetchData();

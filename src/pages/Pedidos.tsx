@@ -24,10 +24,10 @@ export default function Pedidos() {
       setLoading(true);
       try {
         const [{ data: cotacoes }, { data: ovs }] = await Promise.all([
-          (supabase as any).from('orcamentos')
+          supabase.from('orcamentos')
             .select('id, numero, valor_total, status, clientes(nome_razao_social)')
             .eq('ativo', true).in('status', ['confirmado', 'aprovado']).order('created_at', { ascending: false }),
-          (supabase as any).from('ordens_venda')
+          supabase.from('ordens_venda')
             .select('id, numero, valor_total, status, status_faturamento, clientes(nome_razao_social)')
             .eq('ativo', true).in('status', ['pendente', 'aprovada', 'em_separacao']).order('created_at', { ascending: false }),
         ]);

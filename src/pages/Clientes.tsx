@@ -73,7 +73,7 @@ const Clientes = () => {
   const [ultimaCompra, setUltimaCompra] = useState<string | null>(null);
 
   useEffect(() => {
-    (supabase as any).from("grupos_economicos").select("id, nome").eq("ativo", true).order("nome").then(({ data: g }: any) => setGrupos(g || []));
+    supabase.from("grupos_economicos").select("id, nome").eq("ativo", true).order("nome").then(({ data: g }: any) => setGrupos(g || []));
   }, []);
 
   const openCreate = () => {setMode("create");setForm({ ...emptyCliente });setSelected(null);setModalOpen(true);};
@@ -96,15 +96,15 @@ const Clientes = () => {
   const openView = async (c: Cliente) => {
     setSelected(c);setDrawerOpen(true);
     const [comRes, empRes, titulosRes, orcRes] = await Promise.all([
-    (supabase as any).from("cliente_registros_comunicacao").select("*").eq("cliente_id", c.id).order("data_hora", { ascending: false }),
-    c.grupo_economico_id ? (supabase as any).from("clientes").
+    supabase.from("cliente_registros_comunicacao").select("*").eq("cliente_id", c.id).order("data_hora", { ascending: false }),
+    c.grupo_economico_id ? supabase.from("clientes").
     select("id, nome_razao_social, nome_fantasia, cpf_cnpj, tipo_relacao_grupo, cidade, uf").
     eq("grupo_economico_id", c.grupo_economico_id).eq("ativo", true).neq("id", c.id) : Promise.resolve({ data: [] }),
-    (supabase as any).from("financeiro_lancamentos").
+    supabase.from("financeiro_lancamentos").
     select("id, descricao, data_vencimento, data_pagamento, valor, status").
     eq("cliente_id", c.id).eq("tipo", "receber").eq("ativo", true).
     order("data_vencimento", { ascending: false }).limit(50),
-    (supabase as any).from("orcamentos").
+    supabase.from("orcamentos").
     select("data_orcamento").eq("cliente_id", c.id).eq("ativo", true).
     order("data_orcamento", { ascending: false }).limit(1)]
     );
@@ -149,9 +149,9 @@ const Clientes = () => {
 
   const addComunicacao = async () => {
     if (!selected || !comForm.assunto) {toast.error("Assunto é obrigatório");return;}
-    await (supabase as any).from("cliente_registros_comunicacao").insert({ cliente_id: selected.id, ...comForm, data_hora: new Date().toISOString() });
+    await supabase.from("cliente_registros_comunicacao").insert({ cliente_id: selected.id, ...comForm, data_hora: new Date().toISOString() });
     toast.success("Registro adicionado!");
-    const { data: records } = await (supabase as any).from("cliente_registros_comunicacao").select("*").eq("cliente_id", selected.id).order("data_hora", { ascending: false });
+    const { data: records } = await supabase.from("cliente_registros_comunicacao").select("*").eq("cliente_id", selected.id).order("data_hora", { ascending: false });
     setComRecords(records || []);
     setComForm({ canal: "", assunto: "", descricao: "" });
     setComOpen(false);

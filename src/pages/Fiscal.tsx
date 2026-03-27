@@ -74,8 +74,8 @@ const Fiscal = () => {
   useEffect(() => {
     const load = async () => {
       const [{ data: ovs }, { data: contas }] = await Promise.all([
-        (supabase as any).from("ordens_venda").select("id, numero, cliente_id, clientes(nome_razao_social)").eq("ativo", true).in("status", ["aprovada", "em_separacao"]).order("numero"),
-        (supabase as any).from("contas_contabeis").select("id, codigo, descricao").eq("ativo", true).eq("aceita_lancamento", true).order("codigo"),
+        supabase.from("ordens_venda").select("id, numero, cliente_id, clientes(nome_razao_social)").eq("ativo", true).in("status", ["aprovada", "em_separacao"]).order("numero"),
+        supabase.from("contas_contabeis").select("id, codigo, descricao").eq("ativo", true).eq("aceita_lancamento", true).order("codigo"),
       ]);
       setOrdensVenda(ovs || []);
       setContasContabeis(contas || []);
@@ -108,7 +108,7 @@ const Fiscal = () => {
       pis_valor: n.pis_valor || 0, cofins_valor: n.cofins_valor || 0, icms_st_valor: n.icms_st_valor || 0,
       desconto_valor: n.desconto_valor || 0, outras_despesas: n.outras_despesas || 0,
     });
-    const { data: itens } = await (supabase as any).from("notas_fiscais_itens")
+    const { data: itens } = await supabase.from("notas_fiscais_itens")
       .select("*, produtos(nome, sku)").eq("nota_fiscal_id", n.id);
     const loadedItems = (itens || []).map((i: any) => ({
       id: i.id, produto_id: i.produto_id, codigo: i.produtos?.sku || "",
@@ -126,28 +126,28 @@ const Fiscal = () => {
 
   const openView = async (n: NotaFiscal) => {
     setSelected(n); setDrawerOpen(true);
-    const { data: itens } = await (supabase as any).from("notas_fiscais_itens")
+    const { data: itens } = await supabase.from("notas_fiscais_itens")
       .select("*, produtos(nome, sku), contas_contabeis(codigo, descricao)").eq("nota_fiscal_id", n.id);
     setViewItems(itens || []);
   };
 
   const handleConfirmar = async (nf: NotaFiscal) => {
     try {
-      await (supabase as any).from("notas_fiscais").update({ status: "confirmada" }).eq("id", nf.id);
-      const { data: itens } = await (supabase as any).from("notas_fiscais_itens").select("*").eq("nota_fiscal_id", nf.id);
+      await supabase.from("notas_fiscais").update({ status: "confirmada" }).eq("id", nf.id);
+      const { data: itens } = await supabase.from("notas_fiscais_itens").select("*").eq("nota_fiscal_id", nf.id);
 
       if (nf.movimenta_estoque !== false && itens) {
         for (const item of itens) {
-          const { data: prod } = await (supabase as any).from("produtos").select("estoque_atual").eq("id", item.produto_id).single();
+          const { data: prod } = await supabase.from("produtos").select("estoque_atual").eq("id", item.produto_id).single();
           const saldo_anterior = Number(prod?.estoque_atual || 0);
           const qty = nf.tipo === "entrada" ? item.quantidade : -item.quantidade;
           const saldo_atual = saldo_anterior + qty;
-          await (supabase as any).from("estoque_movimentos").insert({
+          await supabase.from("estoque_movimentos").insert({
             produto_id: item.produto_id, tipo: nf.tipo === "entrada" ? "entrada" : "saida",
             quantidade: item.quantidade, saldo_anterior, saldo_atual,
             documento_tipo: "fiscal", documento_id: nf.id,
           });
-          await (supabase as any).from("produtos").update({ estoque_atual: saldo_atual }).eq("id", item.produto_id);
+          await supabase.from("produtos").update({ estoque_atual: saldo_atual }).eq("id", item.produto_id);
         }
       }
 
@@ -157,7 +157,7 @@ const Fiscal = () => {
         // Use total NF including frete and taxes
         const valorFin = Number(nf.valor_total || 0);
         if (isAVista) {
-          await (supabase as any).from("financeiro_lancamentos").insert({
+          await supabase.from("financeiro_lancamentos").insert({
             tipo: tipo_fin, descricao: `NF ${nf.numero}`,
             valor: valorFin, data_vencimento: nf.data_emissao,
             data_pagamento: nf.data_emissao, status: "pago",
@@ -171,7 +171,7 @@ const Fiscal = () => {
           for (let i = 0; i < numParcelas; i++) {
             const venc = new Date(nf.data_emissao);
             venc.setDate(venc.getDate() + 30 * (i + 1));
-            await (supabase as any).from("financeiro_lancamentos").insert({
+            await supabase.from("financeiro_lancamentos").insert({
               tipo: tipo_fin, descricao: `NF ${nf.numero} - Parcela ${i + 1}/${numParcelas}`,
               valor: valorFin / numParcelas, data_vencimento: venc.toISOString().split("T")[0],
               status: "aberto",
@@ -199,22 +199,22 @@ const Fiscal = () => {
 
   const updateOVFaturamento = async (ordemVendaId: string, nfItens: any[]) => {
     try {
-      const { data: ovItens } = await (supabase as any).from("ordens_venda_itens")
+      const { data: ovItens } = await supabase.from("ordens_venda_itens")
         .select("id, produto_id, quantidade, quantidade_faturada").eq("ordem_venda_id", ordemVendaId);
       if (!ovItens) return;
       for (const nfItem of nfItens) {
         const ovItem = ovItens.find((oi: any) => oi.produto_id === nfItem.produto_id);
         if (ovItem) {
-          await (supabase as any).from("ordens_venda_itens")
+          await supabase.from("ordens_venda_itens")
             .update({ quantidade_faturada: (ovItem.quantidade_faturada || 0) + nfItem.quantidade }).eq("id", ovItem.id);
         }
       }
-      const { data: updatedItems } = await (supabase as any).from("ordens_venda_itens")
+      const { data: updatedItems } = await supabase.from("ordens_venda_itens")
         .select("quantidade, quantidade_faturada").eq("ordem_venda_id", ordemVendaId);
       const totalQtd = (updatedItems || []).reduce((s: number, i: any) => s + Number(i.quantidade), 0);
       const totalFaturado = (updatedItems || []).reduce((s: number, i: any) => s + Number(i.quantidade_faturada || 0), 0);
       const newStatus = totalFaturado >= totalQtd ? "total" : totalFaturado > 0 ? "parcial" : "aguardando";
-      await (supabase as any).from("ordens_venda").update({ status_faturamento: newStatus }).eq("id", ordemVendaId);
+      await supabase.from("ordens_venda").update({ status_faturamento: newStatus }).eq("id", ordemVendaId);
     } catch (err: any) {
       console.error("Erro ao atualizar faturamento OV:", err);
     }
@@ -226,59 +226,59 @@ const Fiscal = () => {
     try {
       // 1. Reverse stock movements
       if (nf.movimenta_estoque !== false) {
-        const { data: movimentos } = await (supabase as any).from("estoque_movimentos")
+        const { data: movimentos } = await supabase.from("estoque_movimentos")
           .select("*").eq("documento_id", nf.id).eq("documento_tipo", "fiscal");
         if (movimentos) {
           for (const mov of movimentos) {
-            const { data: prod } = await (supabase as any).from("produtos").select("estoque_atual").eq("id", mov.produto_id).single();
+            const { data: prod } = await supabase.from("produtos").select("estoque_atual").eq("id", mov.produto_id).single();
             const saldoAtual = Number(prod?.estoque_atual || 0);
             const reversao = mov.tipo === "entrada" ? -Number(mov.quantidade) : Number(mov.quantidade);
             const novoSaldo = saldoAtual + reversao;
-            await (supabase as any).from("estoque_movimentos").insert({
+            await supabase.from("estoque_movimentos").insert({
               produto_id: mov.produto_id, tipo: mov.tipo === "entrada" ? "saida" : "entrada",
               quantidade: Number(mov.quantidade), saldo_anterior: saldoAtual, saldo_atual: novoSaldo,
               documento_tipo: "estorno_fiscal", documento_id: nf.id,
               motivo: `Estorno da NF ${nf.numero}`,
             });
-            await (supabase as any).from("produtos").update({ estoque_atual: novoSaldo }).eq("id", mov.produto_id);
+            await supabase.from("produtos").update({ estoque_atual: novoSaldo }).eq("id", mov.produto_id);
           }
         }
       }
 
       // 2. Cancel linked financial entries
       if (nf.gera_financeiro !== false) {
-        await (supabase as any).from("financeiro_lancamentos")
+        await supabase.from("financeiro_lancamentos")
           .update({ status: "cancelado" })
           .or(`nota_fiscal_id.eq.${nf.id},documento_fiscal_id.eq.${nf.id}`);
       }
 
       // 3. Reverse OV billing if applicable
       if (nf.tipo === "saida" && nf.ordem_venda_id) {
-        const { data: nfItens } = await (supabase as any).from("notas_fiscais_itens").select("*").eq("nota_fiscal_id", nf.id);
+        const { data: nfItens } = await supabase.from("notas_fiscais_itens").select("*").eq("nota_fiscal_id", nf.id);
         if (nfItens) {
-          const { data: ovItens } = await (supabase as any).from("ordens_venda_itens")
+          const { data: ovItens } = await supabase.from("ordens_venda_itens")
             .select("id, produto_id, quantidade_faturada").eq("ordem_venda_id", nf.ordem_venda_id);
           if (ovItens) {
             for (const nfItem of nfItens) {
               const ovItem = ovItens.find((oi: any) => oi.produto_id === nfItem.produto_id);
               if (ovItem) {
                 const newQtd = Math.max(0, (ovItem.quantidade_faturada || 0) - nfItem.quantidade);
-                await (supabase as any).from("ordens_venda_itens").update({ quantidade_faturada: newQtd }).eq("id", ovItem.id);
+                await supabase.from("ordens_venda_itens").update({ quantidade_faturada: newQtd }).eq("id", ovItem.id);
               }
             }
             // Recalculate OV billing status
-            const { data: updatedItems } = await (supabase as any).from("ordens_venda_itens")
+            const { data: updatedItems } = await supabase.from("ordens_venda_itens")
               .select("quantidade, quantidade_faturada").eq("ordem_venda_id", nf.ordem_venda_id);
             const totalQ = (updatedItems || []).reduce((s: number, i: any) => s + Number(i.quantidade), 0);
             const totalF = (updatedItems || []).reduce((s: number, i: any) => s + Number(i.quantidade_faturada || 0), 0);
             const newSt = totalF >= totalQ ? "total" : totalF > 0 ? "parcial" : "aguardando";
-            await (supabase as any).from("ordens_venda").update({ status_faturamento: newSt }).eq("id", nf.ordem_venda_id);
+            await supabase.from("ordens_venda").update({ status_faturamento: newSt }).eq("id", nf.ordem_venda_id);
           }
         }
       }
 
       // 4. Set NF as cancelled
-      await (supabase as any).from("notas_fiscais").update({ status: "cancelada" }).eq("id", nf.id);
+      await supabase.from("notas_fiscais").update({ status: "cancelada" }).eq("id", nf.id);
 
       toast.success(`NF ${nf.numero} estornada! Estoque e financeiro revertidos.`);
       fetchData();
@@ -379,12 +379,12 @@ const Fiscal = () => {
       };
       let nfId = selected?.id;
       if (mode === "create") {
-        const { data: newNf, error } = await (supabase as any).from("notas_fiscais").insert(payload).select().single();
+        const { data: newNf, error } = await supabase.from("notas_fiscais").insert(payload).select().single();
         if (error) throw error;
         nfId = newNf.id;
       } else if (selected) {
-        await (supabase as any).from("notas_fiscais").update(payload).eq("id", selected.id);
-        await (supabase as any).from("notas_fiscais_itens").delete().eq("nota_fiscal_id", selected.id);
+        await supabase.from("notas_fiscais").update(payload).eq("id", selected.id);
+        await supabase.from("notas_fiscais_itens").delete().eq("nota_fiscal_id", selected.id);
       }
       if (items.length > 0 && nfId) {
         const itemsPayload = items.filter(i => i.produto_id).map((i, idx) => ({
@@ -392,7 +392,7 @@ const Fiscal = () => {
           conta_contabil_id: itemContaContabil[idx] || null,
         }));
         if (itemsPayload.length > 0) {
-          await (supabase as any).from("notas_fiscais_itens").insert(itemsPayload);
+          await supabase.from("notas_fiscais_itens").insert(itemsPayload);
         }
       }
       toast.success("Nota fiscal salva!");

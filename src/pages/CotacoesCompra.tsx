@@ -177,14 +177,14 @@ export default function CotacoesCompra() {
       };
       let cotacaoId = selected?.id;
       if (mode === "create") {
-        const { data: newC, error } = await (supabase as any).from("cotacoes_compra").insert(payload).select().single();
+        const { data: newC, error } = await supabase.from("cotacoes_compra").insert(payload).select().single();
         if (error) throw error;
         cotacaoId = newC.id;
       } else if (selected) {
-        const { error } = await (supabase as any).from("cotacoes_compra").update(payload).eq("id", selected.id);
+        const { error } = await supabase.from("cotacoes_compra").update(payload).eq("id", selected.id);
         if (error) throw error;
         // Delete old items (cascade deletes propostas too)
-        await (supabase as any).from("cotacoes_compra_itens").delete().eq("cotacao_compra_id", selected.id);
+        await supabase.from("cotacoes_compra_itens").delete().eq("cotacao_compra_id", selected.id);
       }
       if (cotacaoId && localItems.length > 0) {
         const itemsPayload = localItems.filter((i) => i.produto_id).map((i) => ({
@@ -193,7 +193,7 @@ export default function CotacoesCompra() {
           quantidade: i.quantidade,
           unidade: i.unidade,
         }));
-        await (supabase as any).from("cotacoes_compra_itens").insert(itemsPayload);
+        await supabase.from("cotacoes_compra_itens").insert(itemsPayload);
       }
       toast.success("Cotação de compra salva!");
       setModalOpen(false);
@@ -220,7 +220,7 @@ export default function CotacoesCompra() {
   const handleAddProposal = async (itemId: string) => {
     if (!proposalForm.fornecedor_id || !selected) return;
     try {
-      await (supabase as any).from("cotacoes_compra_propostas").insert({
+      await supabase.from("cotacoes_compra_propostas").insert({
         cotacao_compra_id: selected.id,
         item_id: itemId,
         fornecedor_id: proposalForm.fornecedor_id,
@@ -270,7 +270,7 @@ export default function CotacoesCompra() {
 
   const handleDeleteProposal = async (propostaId: string) => {
     if (!selected) return;
-    await (supabase as any).from("cotacoes_compra_propostas").delete().eq("id", propostaId);
+    await supabase.from("cotacoes_compra_propostas").delete().eq("id", propostaId);
     toast.success("Proposta removida");
     const { data: propostas } = await (supabase as any)
       .from("cotacoes_compra_propostas")
@@ -281,7 +281,7 @@ export default function CotacoesCompra() {
 
   const handleFinalize = async () => {
     if (!selected) return;
-    await (supabase as any).from("cotacoes_compra").update({ status: "finalizada" }).eq("id", selected.id);
+    await supabase.from("cotacoes_compra").update({ status: "finalizada" }).eq("id", selected.id);
     toast.success("Cotação finalizada!");
     setDrawerOpen(false);
     fetchData();

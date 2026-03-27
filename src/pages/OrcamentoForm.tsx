@@ -74,14 +74,14 @@ export default function OrcamentoForm() {
   useEffect(() => {
     const loadData = async () => {
       const [clientesRes, produtosRes] = await Promise.all([
-        (supabase as any).from("clientes").select("*").eq("ativo", true).order("nome_razao_social"),
-        (supabase as any).from("produtos").select("*").eq("ativo", true).order("nome"),
+        supabase.from("clientes").select("*").eq("ativo", true).order("nome_razao_social"),
+        supabase.from("produtos").select("*").eq("ativo", true).order("nome"),
       ]);
       setClientes(clientesRes.data || []);
       setProdutos(produtosRes.data || []);
 
       if (isEdit) {
-        const { data: orc } = await (supabase as any).from("orcamentos").select("*").eq("id", id).single();
+        const { data: orc } = await supabase.from("orcamentos").select("*").eq("id", id).single();
         if (orc) {
           setNumero(orc.numero); setDataOrcamento(orc.data_orcamento); setStatus(orc.status);
           setClienteId(orc.cliente_id || ""); setObservacoes(orc.observacoes || "");
@@ -92,11 +92,11 @@ export default function OrcamentoForm() {
           setPrazoEntrega(orc.prazo_entrega || ""); setFreteTipo(orc.frete_tipo || "");
           setModalidade(orc.modalidade || "");
           if (orc.cliente_snapshot) setClienteSnapshot(orc.cliente_snapshot);
-          const { data: itensData } = await (supabase as any).from("orcamentos_itens").select("*").eq("orcamento_id", id);
+          const { data: itensData } = await supabase.from("orcamentos_itens").select("*").eq("orcamento_id", id);
           if (itensData) setItems(itensData);
         }
       } else {
-        const { count } = await (supabase as any).from("orcamentos").select("*", { count: "exact", head: true });
+        const { count } = await supabase.from("orcamentos").select("*", { count: "exact", head: true });
         setNumero(`COT${String((count || 0) + 1).padStart(6, "0")}`);
       }
     };
@@ -133,10 +133,10 @@ export default function OrcamentoForm() {
 
       let orcId = id;
       if (isEdit) {
-        await (supabase as any).from("orcamentos").update(payload).eq("id", id);
-        await (supabase as any).from("orcamentos_itens").delete().eq("orcamento_id", id);
+        await supabase.from("orcamentos").update(payload).eq("id", id);
+        await supabase.from("orcamentos_itens").delete().eq("orcamento_id", id);
       } else {
-        const { data: newOrc, error } = await (supabase as any).from("orcamentos").insert(payload).select().single();
+        const { data: newOrc, error } = await supabase.from("orcamentos").insert(payload).select().single();
         if (error) throw error;
         orcId = newOrc.id;
       }
@@ -148,7 +148,7 @@ export default function OrcamentoForm() {
           quantidade: i.quantidade, unidade: i.unidade, valor_unitario: i.valor_unitario,
           valor_total: i.valor_total, peso_unitario: i.peso_unitario || 0, peso_total: i.peso_total || 0,
         }));
-        if (itemsPayload.length > 0) await (supabase as any).from("orcamentos_itens").insert(itemsPayload);
+        if (itemsPayload.length > 0) await supabase.from("orcamentos_itens").insert(itemsPayload);
       }
 
       toast.success("Cotação salva com sucesso!");
@@ -163,7 +163,7 @@ export default function OrcamentoForm() {
   const handleDuplicate = async () => {
     if (!id) { toast.error("Salve o orçamento antes de duplicar"); return; }
     try {
-      const { count } = await (supabase as any).from("orcamentos").select("*", { count: "exact", head: true });
+      const { count } = await supabase.from("orcamentos").select("*", { count: "exact", head: true });
       const newNumero = `COT${String((count || 0) + 1).padStart(6, "0")}`;
       const payload = {
         numero: newNumero, data_orcamento: new Date().toISOString().split("T")[0], status: "rascunho",
@@ -173,7 +173,7 @@ export default function OrcamentoForm() {
         pagamento, prazo_pagamento: prazoPagamento, prazo_entrega: prazoEntrega,
         frete_tipo: freteTipo, modalidade, cliente_snapshot: clienteSnapshot,
       };
-      const { data: newOrc, error } = await (supabase as any).from("orcamentos").insert(payload).select().single();
+      const { data: newOrc, error } = await supabase.from("orcamentos").insert(payload).select().single();
       if (error) throw error;
 
       if (items.length > 0) {
@@ -183,7 +183,7 @@ export default function OrcamentoForm() {
           quantidade: i.quantidade, unidade: i.unidade, valor_unitario: i.valor_unitario,
           valor_total: i.valor_total, peso_unitario: i.peso_unitario || 0, peso_total: i.peso_total || 0,
         }));
-        await (supabase as any).from("orcamentos_itens").insert(itemsPayload);
+        await supabase.from("orcamentos_itens").insert(itemsPayload);
       }
 
       toast.success(`Duplicado: ${newNumero}`);
