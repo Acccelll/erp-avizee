@@ -862,10 +862,14 @@ const Fiscal = () => {
                 <XCircle className="w-4 h-4 mr-2" /> Estornar Nota Fiscal
               </Button>
             )}
+            <Button variant="outline" className="w-full" onClick={() => { setDrawerOpen(false); openDanfe(selected); }}>
+              <FileText className="w-4 h-4 mr-2" /> Visualizar DANFE
+            </Button>
           </div>
           );
         })()}
       </ViewDrawer>
+      <DanfeViewer open={danfeOpen} onClose={() => setDanfeOpen(false)} data={danfeData} />
     </AppLayout>
   );
 };
