@@ -17,11 +17,14 @@ import { toast } from 'sonner';
 
 const reportCards: Array<{ type: TipoRelatorio; title: string; description: string; icon: typeof Package }> = [
   { type: 'estoque', title: 'Estoque', description: 'Posição atual, custo e alertas', icon: Package },
+  { type: 'estoque_minimo', title: 'Estoque Mínimo', description: 'Produtos abaixo do estoque mínimo', icon: AlertTriangle },
   { type: 'movimentos_estoque', title: 'Movimentos de Estoque', description: 'Entradas, saídas e ajustes por período', icon: ArrowLeftRight },
   { type: 'financeiro', title: 'Financeiro', description: 'Contas a pagar e receber', icon: Wallet },
   { type: 'fluxo_caixa', title: 'Fluxo de Caixa', description: 'Entradas, saídas e saldo', icon: TrendingUp },
   { type: 'vendas', title: 'Vendas', description: 'Ordens por período e faturamento', icon: ShoppingCart },
+  { type: 'vendas_cliente', title: 'Vendas/Cliente', description: 'Ranking de clientes por volume', icon: ShoppingCart },
   { type: 'compras', title: 'Compras', description: 'Consolidado por fornecedor', icon: Truck },
+  { type: 'compras_fornecedor', title: 'Compras/Fornecedor', description: 'Ranking de fornecedores por volume', icon: Truck },
   { type: 'aging', title: 'Aging', description: 'Vencidos por faixa de dias', icon: CalendarClock },
   { type: 'dre', title: 'DRE', description: 'Demonstrativo de resultado', icon: BarChart3 },
   { type: 'curva_abc', title: 'Curva ABC', description: 'Classificação de produtos por faturamento', icon: TrendingUp },
