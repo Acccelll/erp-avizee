@@ -4,7 +4,8 @@ import { ModulePage } from "@/components/ModulePage";
 import { DataTable, StatusBadge } from "@/components/DataTable";
 import { SummaryCard } from "@/components/SummaryCard";
 import { FormModal } from "@/components/FormModal";
-import { ViewDrawer } from "@/components/ViewDrawer";
+import { ViewDrawerV2, ViewField, ViewSection } from "@/components/ViewDrawerV2";
+import { RelationalLink } from "@/components/ui/RelationalLink";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -417,7 +418,7 @@ export default function CotacoesCompra() {
       </FormModal>
 
       {/* View Drawer with Comparison */}
-      <ViewDrawer
+      <ViewDrawerV2
         open={drawerOpen}
         onClose={() => { setDrawerOpen(false); setAddingProposal(null); }}
         title="Cotação de Compra"
@@ -602,7 +603,7 @@ export default function CotacoesCompra() {
             )}
           </div>
         )}
-      </ViewDrawer>
+      </ViewDrawerV2>
     </AppLayout>
   );
 }

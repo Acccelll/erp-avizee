@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { AppLayout } from "@/components/AppLayout";
-import { ModulePage } from "@/components/ModulePage";
 import { DataTable, StatusBadge } from "@/components/DataTable";
+import { ModulePage } from "@/components/ModulePage";
 import { FormModal } from "@/components/FormModal";
-import { ViewDrawer } from "@/components/ViewDrawer";
+import { ViewDrawerV2, ViewField, ViewSection } from "@/components/ViewDrawerV2";
+import { AdvancedFilterBar, type FilterChip } from "@/components/AdvancedFilterBar";
+import { RelationalLink } from "@/components/ui/RelationalLink";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Edit, Copy } from "lucide-react";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
@@ -61,10 +63,17 @@ const Produtos = () => {
   const [grupos, setGrupos] = useState<{id: string; nome: string}[]>([]);
   const [movimentos, setMovimentos] = useState<any[]>([]);
   const [fornecedoresProd, setFornecedoresProd] = useState<any[]>([]);
+  const [fornecedoresList, setFornecedoresList] = useState<any[]>([]);
+  const [addFornOpen, setAddFornOpen] = useState(false);
+  const [fornForm, setFornForm] = useState({ fornecedor_id: "", referencia_fornecedor: "", preco_compra: 0, lead_time_dias: 0, unidade_fornecedor: "UN", eh_principal: false });
 
   useEffect(() => {
-    supabase.from("grupos_produto").select("id, nome").eq("ativo", true).order("nome").then(({ data: g }) => {
+    Promise.all([
+      supabase.from("grupos_produto").select("id, nome").eq("ativo", true).order("nome"),
+      supabase.from("fornecedores").select("id, nome_razao_social").eq("ativo", true).order("nome_razao_social"),
+    ]).then(([{ data: g }, { data: f }]) => {
       if (g) setGrupos(g);
+      if (f) setFornecedoresList(f);
     });
   }, []);
 
@@ -305,7 +314,7 @@ const Produtos = () => {
       </FormModal>
 
       {/* View Drawer with Tabs */}
-      <ViewDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} title="Detalhes do Produto"
+      <ViewDrawerV2 open={drawerOpen} onClose={() => setDrawerOpen(false)} title="Detalhes do Produto"
       actions={selected ? <>
           <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {setDrawerOpen(false);openEdit(selected);}}><Edit className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Editar</TooltipContent></Tooltip>
           <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {setDrawerOpen(false);duplicate(selected);}}><Copy className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Duplicar</TooltipContent></Tooltip>
@@ -517,7 +526,7 @@ const Produtos = () => {
             </Tabs>
           </div>
         }
-      </ViewDrawer>
+      </ViewDrawerV2>
     </AppLayout>);
 
 };
