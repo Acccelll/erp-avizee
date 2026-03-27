@@ -359,19 +359,28 @@ export default function Remessas() {
             ) : null,
           },
         ]}
-        footer={selected && selected.status_transporte !== "entregue" ? (
+        footer={selected ? (
           <div className="flex gap-2 flex-wrap">
-            {selected.status_transporte === "pendente" && (
-              <Button size="sm" onClick={() => handleStatusChange(selected, "postado")}><Truck className="h-4 w-4 mr-1" /> Marcar como Postado</Button>
+            {selected.codigo_rastreio && (
+              <Button size="sm" variant="outline" onClick={() => handleRastrear(selected)}>
+                <Search className="h-4 w-4 mr-1" /> Rastrear Correios
+              </Button>
             )}
-            {selected.status_transporte === "postado" && (
-              <Button size="sm" onClick={() => handleStatusChange(selected, "em_transito")}><Truck className="h-4 w-4 mr-1" /> Em Trânsito</Button>
-            )}
-            {(selected.status_transporte === "em_transito" || selected.status_transporte === "postado") && (
-              <Button size="sm" variant="outline" onClick={() => handleStatusChange(selected, "entregue")}><PackageIcon className="h-4 w-4 mr-1" /> Entregue</Button>
-            )}
-            {selected.status_transporte !== "devolvido" && (
-              <Button size="sm" variant="destructive" onClick={() => handleStatusChange(selected, "devolvido")}>Devolvido</Button>
+            {selected.status_transporte !== "entregue" && (
+              <>
+                {selected.status_transporte === "pendente" && (
+                  <Button size="sm" onClick={() => handleStatusChange(selected, "postado")}><Truck className="h-4 w-4 mr-1" /> Marcar como Postado</Button>
+                )}
+                {selected.status_transporte === "postado" && (
+                  <Button size="sm" onClick={() => handleStatusChange(selected, "em_transito")}><Truck className="h-4 w-4 mr-1" /> Em Trânsito</Button>
+                )}
+                {(selected.status_transporte === "em_transito" || selected.status_transporte === "postado") && (
+                  <Button size="sm" variant="outline" onClick={() => handleStatusChange(selected, "entregue")}><PackageIcon className="h-4 w-4 mr-1" /> Entregue</Button>
+                )}
+                {selected.status_transporte !== "devolvido" && (
+                  <Button size="sm" variant="destructive" onClick={() => handleStatusChange(selected, "devolvido")}>Devolvido</Button>
+                )}
+              </>
             )}
           </div>
         ) : undefined}
