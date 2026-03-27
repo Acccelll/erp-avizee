@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -21,16 +21,18 @@ export function useSupabaseCrud<T extends Record<string, any>>({
 }: UseCrudOptions) {
   const [data, setData] = useState<T[]>([]);
   const [loading, setLoading] = useState(true);
+  const filterRef = useRef(filter);
+  filterRef.current = filter;
 
   const fetchData = useCallback(async () => {
     setLoading(true);
-    let query = (supabase as any).from(table).select(select).order(orderBy, { ascending });
+    let query = supabase.from(table as any).select(select).order(orderBy, { ascending });
 
     if (hasAtivo) {
       query = query.eq("ativo", true);
     }
 
-    for (const f of filter) {
+    for (const f of filterRef.current) {
       query = query.eq(f.column, f.value);
     }
 
@@ -42,14 +44,14 @@ export function useSupabaseCrud<T extends Record<string, any>>({
       setData(result || []);
     }
     setLoading(false);
-  }, [table, select, orderBy, ascending, JSON.stringify(filter), hasAtivo]);
+  }, [table, select, orderBy, ascending, hasAtivo]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
   const create = async (record: Partial<T>) => {
-    const { data: result, error } = await (supabase as any).from(table).insert(record).select().single();
+    const { data: result, error } = await supabase.from(table as any).insert(record as any).select().single();
     if (error) {
       console.error(`[crud] Erro ao criar em ${table}:`, error);
       toast.error("Erro ao criar registro. Tente novamente.");
@@ -61,7 +63,7 @@ export function useSupabaseCrud<T extends Record<string, any>>({
   };
 
   const update = async (id: string, record: Partial<T>) => {
-    const { data: result, error } = await (supabase as any).from(table).update(record).eq("id", id).select().single();
+    const { data: result, error } = await supabase.from(table as any).update(record as any).eq("id", id).select().single();
     if (error) {
       console.error(`[crud] Erro ao atualizar em ${table}:`, error);
       toast.error("Erro ao atualizar registro. Tente novamente.");
@@ -74,10 +76,10 @@ export function useSupabaseCrud<T extends Record<string, any>>({
 
   const remove = async (id: string, soft = true) => {
     if (soft && hasAtivo) {
-      const { error } = await (supabase as any).from(table).update({ ativo: false }).eq("id", id);
+      const { error } = await supabase.from(table as any).update({ ativo: false } as any).eq("id", id);
       if (error) { console.error(`[crud] Erro ao remover de ${table}:`, error); toast.error("Erro ao remover registro. Tente novamente."); throw error; }
     } else {
-      const { error } = await (supabase as any).from(table).delete().eq("id", id);
+      const { error } = await supabase.from(table as any).delete().eq("id", id);
       if (error) { console.error(`[crud] Erro ao remover de ${table}:`, error); toast.error("Erro ao remover registro. Tente novamente."); throw error; }
     }
     toast.success("Registro removido com sucesso!");
