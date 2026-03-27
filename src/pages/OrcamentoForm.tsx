@@ -66,6 +66,7 @@ export default function OrcamentoForm() {
   const [prazoEntrega, setPrazoEntrega] = useState("");
   const [freteTipo, setFreteTipo] = useState("");
   const [modalidade, setModalidade] = useState("");
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
 
   const totalProdutos = items.reduce((sum, i) => sum + (i.valor_total || 0), 0);
   const valorTotal = totalProdutos - desconto + impostoSt + impostoIpi + freteValor + outrasDespesas;
