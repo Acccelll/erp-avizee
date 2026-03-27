@@ -80,6 +80,8 @@ const Financeiro = () => {
   const [baixaDate, setBaixaDate] = useState(new Date().toISOString().split("T")[0]);
   const [baixaProcessing, setBaixaProcessing] = useState(false);
   const [viewMode, setViewMode] = useState<"lista" | "calendario">("lista");
+  const [baixaParcialOpen, setBaixaParcialOpen] = useState(false);
+  const [baixaParcialTarget, setBaixaParcialTarget] = useState<Lancamento | null>(null);
 
   useEffect(() => { if (tipoParam) setFilterTipo(tipoParam); }, [tipoParam]);
 
