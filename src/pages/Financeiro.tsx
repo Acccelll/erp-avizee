@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { AppLayout } from "@/components/AppLayout";
+import { AdvancedFilterBar, type FilterChip } from "@/components/AdvancedFilterBar";
 import { ModulePage } from "@/components/ModulePage";
 import { DataTable, StatusBadge } from "@/components/DataTable";
 import { FormModal } from "@/components/FormModal";
@@ -311,10 +312,28 @@ const Financeiro = () => {
     { key: "status", label: "Status", render: (l: Lancamento) => <StatusBadge status={getEffectiveStatus(l)} /> },
   ];
 
+  const finActiveFilters = useMemo(() => {
+    const chips: FilterChip[] = [];
+    if (filterTipo !== "todos") chips.push({ key: "tipo", label: "Tipo", value: filterTipo, displayValue: filterTipo === "receber" ? "A Receber" : "A Pagar" });
+    if (filterStatus !== "todos") chips.push({ key: "status", label: "Status", value: filterStatus, displayValue: filterStatus.charAt(0).toUpperCase() + filterStatus.slice(1) });
+    if (filterBanco !== "todos") {
+      const banco = contasBancarias.find(c => c.id === filterBanco);
+      chips.push({ key: "banco", label: "Banco", value: filterBanco, displayValue: banco ? `${banco.bancos?.nome} - ${banco.descricao}` : filterBanco });
+    }
+    return chips;
+  }, [filterTipo, filterStatus, filterBanco, contasBancarias]);
+
+  const handleRemoveFinFilter = (key: string) => {
+    if (key === "tipo") setFilterTipo("todos");
+    if (key === "status") setFilterStatus("todos");
+    if (key === "banco") setFilterBanco("todos");
+  };
+
+  const handleClearAllFinFilters = () => { setFilterTipo("todos"); setFilterStatus("todos"); setFilterBanco("todos"); };
+
   return (
     <AppLayout>
-      <ModulePage title="Contas a Pagar/Receber" subtitle="Gestão unificada de contas a pagar e receber" addLabel="Novo Lançamento" onAdd={openCreate} count={filteredData.length}
-        searchValue={searchTerm} onSearchChange={setSearchTerm} searchPlaceholder="Buscar por descrição ou parceiro...">
+      <ModulePage title="Contas a Pagar/Receber" subtitle="Gestão unificada de contas a pagar e receber" addLabel="Novo Lançamento" onAdd={openCreate}>
 
         {/* Period filter + view toggle */}
         <div className="mb-4 flex items-center gap-3 flex-wrap">
@@ -337,34 +356,42 @@ const Financeiro = () => {
           <SummaryCard title="Pagos" value={kpis.pagoNoPeriodo.toString()} subtitle={formatCurrency(kpis.totalPago)} icon={CheckCircle} variant="success" onClick={() => setFilterStatus("pago")} />
         </div>
 
-        {/* Aging block removed per user request */}
-
-        {/* Filter bars */}
-        <div className="flex flex-wrap gap-2 mb-4">
-          <div className="flex gap-1 mr-4">
-            {[
-              { key: "todos", label: "Todos", className: "" },
-              { key: "receber", label: "A Receber", className: filterTipo === "receber" ? "bg-success/10 border-success/40 text-success hover:bg-success/20" : "" },
-              { key: "pagar", label: "A Pagar", className: filterTipo === "pagar" ? "bg-destructive/10 border-destructive/40 text-destructive hover:bg-destructive/20" : "" },
-            ].map(t => (
-              <Button key={t.key} size="sm" variant={filterTipo === t.key ? "outline" : "outline"} onClick={() => setFilterTipo(t.key)}
-                className={filterTipo === t.key ? t.className || "bg-primary text-primary-foreground hover:bg-primary/90" : ""}>
-                {t.label}
-              </Button>
-            ))}
-          </div>
-          <div className="flex gap-1 mr-4">
-            {["todos", "aberto", "pago", "vencido", "cancelado"].map(s => (
-              <Button key={s} size="sm" variant={filterStatus === s ? "default" : "outline"} onClick={() => setFilterStatus(s)} className="capitalize">
-                {s === "todos" ? "Todos" : s}
-              </Button>
-            ))}
-          </div>
+        {/* AdvancedFilterBar */}
+        <AdvancedFilterBar
+          searchValue={searchTerm}
+          onSearchChange={setSearchTerm}
+          searchPlaceholder="Buscar por descrição ou parceiro..."
+          activeFilters={finActiveFilters}
+          onRemoveFilter={handleRemoveFinFilter}
+          onClearAll={handleClearAllFinFilters}
+          count={filteredData.length}
+          extra={selectedIds.length > 0 ? (
+            <Button size="sm" variant="default" className="gap-2" onClick={openBaixaModal}>
+              <Download className="w-3.5 h-3.5" /> Baixar {selectedIds.length} selecionado(s)
+            </Button>
+          ) : undefined}
+        >
+          <Select value={filterTipo} onValueChange={setFilterTipo}>
+            <SelectTrigger className="h-9 w-[150px]"><SelectValue placeholder="Tipo" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos os tipos</SelectItem>
+              <SelectItem value="receber">A Receber</SelectItem>
+              <SelectItem value="pagar">A Pagar</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={filterStatus} onValueChange={setFilterStatus}>
+            <SelectTrigger className="h-9 w-[150px]"><SelectValue placeholder="Status" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos os status</SelectItem>
+              <SelectItem value="aberto">Aberto</SelectItem>
+              <SelectItem value="pago">Pago</SelectItem>
+              <SelectItem value="vencido">Vencido</SelectItem>
+              <SelectItem value="cancelado">Cancelado</SelectItem>
+            </SelectContent>
+          </Select>
           {contasBancarias.length > 0 && (
             <Select value={filterBanco} onValueChange={setFilterBanco}>
-              <SelectTrigger className="w-[200px] h-9">
-                <SelectValue placeholder="Filtrar banco..." />
-              </SelectTrigger>
+              <SelectTrigger className="h-9 w-[200px]"><SelectValue placeholder="Banco" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="todos">Todos os bancos</SelectItem>
                 {contasBancarias.map(c => (
@@ -373,13 +400,7 @@ const Financeiro = () => {
               </SelectContent>
             </Select>
           )}
-
-          {selectedIds.length > 0 && (
-            <Button size="sm" variant="default" className="ml-auto gap-2" onClick={openBaixaModal}>
-              <Download className="w-3.5 h-3.5" /> Baixar {selectedIds.length} selecionado(s)
-            </Button>
-          )}
-        </div>
+        </AdvancedFilterBar>
 
         {viewMode === "calendario" ? (
           <FinanceiroCalendar data={filteredData as any} />

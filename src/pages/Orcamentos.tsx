@@ -187,6 +187,12 @@ const Orcamentos = () => {
   const convertingOrc = data.find(o => o.id === convertingId);
   const statusOptions = ["todos", "rascunho", "confirmado", "aprovado", "convertido", "cancelado", "faturado"];
 
+  const orcActiveFilters = useMemo(() => {
+    const chips: FilterChip[] = [];
+    if (statusFilter !== "todos") chips.push({ key: "status", label: "Status", value: statusFilter, displayValue: statusLabels[statusFilter] || statusFilter });
+    return chips;
+  }, [statusFilter]);
+
   return (
     <AppLayout>
       <ModulePage
@@ -194,11 +200,6 @@ const Orcamentos = () => {
         subtitle="Criação e emissão de propostas comerciais"
         addLabel="Nova Cotação"
         onAdd={() => navigate("/cotacoes/novo")}
-        count={filteredData.length}
-        searchValue={searchTerm}
-        onSearchChange={setSearchTerm}
-        searchPlaceholder="Buscar por número da cotação ou cliente..."
-        filters={<Select value={statusFilter} onValueChange={setStatusFilter}><SelectTrigger className="h-9 w-[190px]"><SelectValue placeholder="Status" /></SelectTrigger><SelectContent>{statusOptions.map((status) => (<SelectItem key={status} value={status}>{status === "todos" ? "Todos os status" : statusLabels[status] || status}</SelectItem>))}</SelectContent></Select>}
       >
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <SummaryCard title="Total de Cotações" value={String(kpis.total)} icon={FileText} variationType="neutral" variation="registros" />
@@ -206,6 +207,24 @@ const Orcamentos = () => {
           <SummaryCard title="Aprovadas" value={String(kpis.approved)} icon={Clock} variationType="positive" variation="aguardando OV" />
           <SummaryCard title="Taxa de Conversão" value={`${kpis.conversionRate}%`} icon={BarChart3} variationType="positive" variation="cotações → OV" />
         </div>
+
+        <AdvancedFilterBar
+          searchValue={searchTerm}
+          onSearchChange={setSearchTerm}
+          searchPlaceholder="Buscar por número da cotação ou cliente..."
+          activeFilters={orcActiveFilters}
+          onRemoveFilter={() => setStatusFilter("todos")}
+          count={filteredData.length}
+        >
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="h-9 w-[190px]"><SelectValue placeholder="Status" /></SelectTrigger>
+            <SelectContent>
+              {statusOptions.map((status) => (
+                <SelectItem key={status} value={status}>{status === "todos" ? "Todos os status" : statusLabels[status] || status}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </AdvancedFilterBar>
 
         <DataTable columns={columns} data={filteredData} loading={loading}
           onView={(o) => { setSelected(o); setDrawerOpen(true); }}

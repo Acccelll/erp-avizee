@@ -185,12 +185,49 @@ const Clientes = () => {
   { key: "ativo", label: "Status", render: (c: Cliente) => <StatusBadge status={c.ativo ? "Ativo" : "Inativo"} /> }];
 
 
+  const cliActiveFilters = useMemo(() => {
+    const chips: FilterChip[] = [];
+    if (tipoFilter !== "todos") chips.push({ key: "tipo", label: "Tipo", value: tipoFilter, displayValue: tipoFilter === "J" ? "Pessoa Jurídica" : "Pessoa Física" });
+    if (grupoFilter !== "todos") chips.push({ key: "grupo", label: "Grupo", value: grupoFilter, displayValue: grupoFilter === "com_grupo" ? "Com grupo" : "Sem grupo" });
+    return chips;
+  }, [tipoFilter, grupoFilter]);
+
+  const handleRemoveCliFilter = (key: string) => {
+    if (key === "tipo") setTipoFilter("todos");
+    if (key === "grupo") setGrupoFilter("todos");
+  };
+
   return (
     <AppLayout>
-      <ModulePage title="Clientes" subtitle="Cadastro e gestão de clientes" addLabel="Novo Cliente" onAdd={openCreate} count={filteredData.length}
-      searchValue={searchTerm} onSearchChange={setSearchTerm} searchPlaceholder="Buscar por nome, CNPJ, e-mail ou cidade..."
-      filters={<><Select value={tipoFilter} onValueChange={(v: any) => setTipoFilter(v)}><SelectTrigger className="h-9 w-[170px]"><SelectValue placeholder="Tipo" /></SelectTrigger><SelectContent><SelectItem value="todos">Todos os tipos</SelectItem><SelectItem value="J">Pessoa jurídica</SelectItem><SelectItem value="F">Pessoa física</SelectItem></SelectContent></Select><Select value={grupoFilter} onValueChange={(v: any) => setGrupoFilter(v)}><SelectTrigger className="h-9 w-[190px]"><SelectValue placeholder="Grupo econômico" /></SelectTrigger><SelectContent><SelectItem value="todos">Todos os grupos</SelectItem><SelectItem value="com_grupo">Com grupo econômico</SelectItem><SelectItem value="sem_grupo">Sem grupo econômico</SelectItem></SelectContent></Select></>}>
+      <ModulePage title="Clientes" subtitle="Cadastro e gestão de clientes" addLabel="Novo Cliente" onAdd={openCreate}>
         
+        <AdvancedFilterBar
+          searchValue={searchTerm}
+          onSearchChange={setSearchTerm}
+          searchPlaceholder="Buscar por nome, CNPJ, e-mail ou cidade..."
+          activeFilters={cliActiveFilters}
+          onRemoveFilter={handleRemoveCliFilter}
+          onClearAll={() => { setTipoFilter("todos"); setGrupoFilter("todos"); }}
+          count={filteredData.length}
+        >
+          <Select value={tipoFilter} onValueChange={(v: any) => setTipoFilter(v)}>
+            <SelectTrigger className="h-9 w-[170px]"><SelectValue placeholder="Tipo" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos os tipos</SelectItem>
+              <SelectItem value="J">Pessoa jurídica</SelectItem>
+              <SelectItem value="F">Pessoa física</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={grupoFilter} onValueChange={(v: any) => setGrupoFilter(v)}>
+            <SelectTrigger className="h-9 w-[190px]"><SelectValue placeholder="Grupo econômico" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos os grupos</SelectItem>
+              <SelectItem value="com_grupo">Com grupo econômico</SelectItem>
+              <SelectItem value="sem_grupo">Sem grupo econômico</SelectItem>
+            </SelectContent>
+          </Select>
+        </AdvancedFilterBar>
+
         <DataTable columns={columns} data={filteredData} loading={loading}
         onView={openView} />
       </ModulePage>
