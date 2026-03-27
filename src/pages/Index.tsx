@@ -10,6 +10,7 @@ import { ComprasConfirmadasDetail } from "@/components/dashboard/ComprasConfirma
 import { RecentOrcamentos } from "@/components/dashboard/RecentOrcamentos";
 import { RecentCompras } from "@/components/dashboard/RecentCompras";
 import { SummaryPie } from "@/components/dashboard/SummaryPie";
+import { FluxoCaixaChart } from "@/components/dashboard/FluxoCaixaChart";
 import { DashboardSkeleton } from "@/components/dashboard/DashboardSkeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { periodToFinancialRange } from "@/lib/periodFilter";
@@ -212,7 +213,10 @@ const Dashboard = () => {
         <SummaryPie data={stockPie} />
       </div>
 
-      <RecentCompras items={recentCompras} loading={loading} />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+        <FluxoCaixaChart />
+        <RecentCompras items={recentCompras} loading={loading} />
+      </div>
     </AppLayout>
   );
 };

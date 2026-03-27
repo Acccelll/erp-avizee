@@ -36,6 +36,7 @@ import NotFound from "./pages/NotFound";
 import Transportadoras from "./pages/Transportadoras";
 import FormasPagamento from "./pages/FormasPagamento";
 import CotacoesCompra from "./pages/CotacoesCompra";
+import OrcamentoPublico from "./pages/OrcamentoPublico";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 
 const queryClient = new QueryClient({
@@ -58,6 +59,7 @@ const App = () => (
           <AuthProvider>
           <ErrorBoundary>
           <Routes>
+            <Route path="/orcamento-publico" element={<OrcamentoPublico />} />
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />

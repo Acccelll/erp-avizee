@@ -24,6 +24,8 @@ const reportCards: Array<{ type: TipoRelatorio; title: string; description: stri
   { type: 'compras', title: 'Compras', description: 'Consolidado por fornecedor', icon: Truck },
   { type: 'aging', title: 'Aging', description: 'Vencidos por faixa de dias', icon: CalendarClock },
   { type: 'dre', title: 'DRE', description: 'Demonstrativo de resultado', icon: BarChart3 },
+  { type: 'curva_abc', title: 'Curva ABC', description: 'Classificação de produtos por faturamento', icon: TrendingUp },
+  { type: 'margem_produtos', title: 'Margem', description: 'Análise de margem por produto', icon: DollarSign },
 ];
 
 const CHART_COLORS = [

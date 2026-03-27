@@ -54,8 +54,8 @@ export default function OrcamentoPublico() {
     const load = async () => {
       setLoading(true);
 
-      const { data: orc, error: orcError } = await supabase
-        .from('orcamentos')
+      const { data: orc, error: orcError } = await (supabase
+        .from('orcamentos') as any)
         .select('id, numero, data_orcamento, validade, valor_total, observacoes, status, prazo_entrega, prazo_pagamento, frete_tipo, cliente_snapshot, public_token')
         .eq('public_token', token)
         .eq('ativo', true)
