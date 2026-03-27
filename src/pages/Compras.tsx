@@ -249,34 +249,43 @@ const Compras = () => {
           <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setDrawerOpen(false); openEdit(selected); }}><Edit className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Editar</TooltipContent></Tooltip>
           <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => { setDrawerOpen(false); remove(selected.id); }}><Trash2 className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Excluir</TooltipContent></Tooltip>
         </> : undefined}
-      >
-        {selected && (
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div><span className="text-xs text-muted-foreground">Número</span><p className="font-medium font-mono">{selected.numero}</p></div>
-              <div><span className="text-xs text-muted-foreground">Status</span><StatusBadge status={selected.status} label={statusLabels[selected.status] || selected.status} /></div>
-            </div>
-            <div><span className="text-xs text-muted-foreground">Fornecedor</span><p>{(selected as any).fornecedores?.nome_razao_social || "—"}</p></div>
-            <div className="grid grid-cols-2 gap-4">
-              <div><span className="text-xs text-muted-foreground">Data Compra</span><p>{new Date(selected.data_compra).toLocaleDateString("pt-BR")}</p></div>
-              <div><span className="text-xs text-muted-foreground">Valor Total</span><p className="font-semibold font-mono">{formatCurrency(Number(selected.valor_total || 0))}</p></div>
-            </div>
-            {viewItems.length > 0 && (
-              <div className="border-t pt-3">
-                <h4 className="mb-2 text-sm font-semibold">Itens ({viewItems.length})</h4>
-                <div className="space-y-1">
-                  {viewItems.map((i: any, idx: number) => (
-                    <div key={idx} className="flex justify-between border-b py-1 text-sm last:border-b-0">
-                      <span>{i.produtos?.nome || "—"} × {i.quantidade}</span>
-                      <span className="font-mono font-semibold">{formatCurrency(Number(i.valor_total))}</span>
-                    </div>
-                  ))}
-                </div>
+        badge={selected ? <StatusBadge status={selected.status} label={statusLabels[selected.status] || selected.status} /> : undefined}
+        tabs={selected ? [
+          { value: "dados", label: "Dados", content: (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <ViewField label="Número"><span className="font-mono">{selected.numero}</span></ViewField>
+                <ViewField label="Data Compra">{new Date(selected.data_compra).toLocaleDateString("pt-BR")}</ViewField>
               </div>
-            )}
-          </div>
-        )}
-      </ViewDrawerV2>
+              <ViewField label="Fornecedor">
+                {(selected as any).fornecedores?.nome_razao_social ? (
+                  <RelationalLink to="/fornecedores">{(selected as any).fornecedores.nome_razao_social}</RelationalLink>
+                ) : "—"}
+              </ViewField>
+              <div className="grid grid-cols-2 gap-4">
+                <ViewField label="Valor Total"><span className="font-semibold font-mono">{formatCurrency(Number(selected.valor_total || 0))}</span></ViewField>
+                <ViewField label="Frete"><span className="font-mono">{formatCurrency(Number(selected.frete_valor || 0))}</span></ViewField>
+              </div>
+              {selected.observacoes && <ViewField label="Observações">{selected.observacoes}</ViewField>}
+            </div>
+          )},
+          { value: "itens", label: `Itens (${viewItems.length})`, content: (
+            <div className="space-y-1">
+              {viewItems.length === 0 ? <p className="text-sm text-muted-foreground text-center py-4">Nenhum item</p> :
+                viewItems.map((i: any, idx: number) => (
+                  <div key={idx} className="flex justify-between border-b py-2 text-sm last:border-b-0">
+                    <div>
+                      <RelationalLink to="/produtos">{i.produtos?.nome || "—"}</RelationalLink>
+                      <p className="text-xs text-muted-foreground font-mono">{i.produtos?.sku || "—"} × {i.quantidade}</p>
+                    </div>
+                    <span className="font-mono font-semibold">{formatCurrency(Number(i.valor_total))}</span>
+                  </div>
+                ))
+              }
+            </div>
+          )},
+        ] : undefined}
+      />
     </AppLayout>
   );
 };

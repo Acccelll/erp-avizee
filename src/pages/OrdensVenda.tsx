@@ -215,30 +215,40 @@ const OrdensVenda = () => {
         actions={selected ? <>
           <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => { setDrawerOpen(false); remove(selected.id); }}><Trash2 className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Excluir</TooltipContent></Tooltip>
         </> : undefined}
-      >
-        {selected && (
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div><span className="text-xs text-muted-foreground">Nº OV</span><p className="font-medium mono">{selected.numero}</p></div>
-              <div><span className="text-xs text-muted-foreground">Cotação Origem</span><p className="mono text-sm">{selected.orcamentos?.numero || "—"}</p></div>
-            </div>
-            <div><span className="text-xs text-muted-foreground">Cliente</span><p>{selected.clientes?.nome_razao_social || "—"}</p></div>
-            <div className="grid grid-cols-2 gap-4">
-              <div><span className="text-xs text-muted-foreground">Emissão</span><p>{formatDate(selected.data_emissao)}</p></div>
-              <div><span className="text-xs text-muted-foreground">Aprovação</span><p>{selected.data_aprovacao ? formatDate(selected.data_aprovacao) : "—"}</p></div>
-            </div>
-            <div><span className="text-xs text-muted-foreground">Valor Total</span><p className="font-semibold mono text-lg">{formatCurrency(Number(selected.valor_total || 0))}</p></div>
-            <div className="grid grid-cols-2 gap-4">
-              <div><span className="text-xs text-muted-foreground">Status Comercial</span><StatusBadge status={selected.status} label={statusComercialLabels[selected.status]} /></div>
-              <div>
-                <span className="text-xs text-muted-foreground">Faturamento</span>
-                <Badge variant="outline" className={`mt-1 ${statusFaturamentoColors[selected.status_faturamento] || ""}`}>
-                  {statusFaturamentoLabels[selected.status_faturamento] || selected.status_faturamento}
-                </Badge>
+        badge={selected ? <StatusBadge status={selected.status} label={statusComercialLabels[selected.status]} /> : undefined}
+        tabs={selected ? [
+          { value: "dados", label: "Dados", content: (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <ViewField label="Nº OV"><span className="font-mono">{selected.numero}</span></ViewField>
+                <ViewField label="Cotação Origem">
+                  {selected.orcamentos?.numero ? (
+                    <RelationalLink to="/orcamentos" mono>{selected.orcamentos.numero}</RelationalLink>
+                  ) : "—"}
+                </ViewField>
               </div>
+              <ViewField label="Cliente">
+                {selected.clientes?.nome_razao_social ? (
+                  <RelationalLink to="/clientes">{selected.clientes.nome_razao_social}</RelationalLink>
+                ) : "—"}
+              </ViewField>
+              <div className="grid grid-cols-2 gap-4">
+                <ViewField label="Emissão">{formatDate(selected.data_emissao)}</ViewField>
+                <ViewField label="Aprovação">{selected.data_aprovacao ? formatDate(selected.data_aprovacao) : "—"}</ViewField>
+              </div>
+              <ViewField label="Valor Total"><span className="font-semibold mono text-lg">{formatCurrency(Number(selected.valor_total || 0))}</span></ViewField>
+              <div className="grid grid-cols-2 gap-4">
+                <ViewField label="Faturamento">
+                  <Badge variant="outline" className={`${statusFaturamentoColors[selected.status_faturamento] || ""}`}>
+                    {statusFaturamentoLabels[selected.status_faturamento] || selected.status_faturamento}
+                  </Badge>
+                </ViewField>
+              </div>
+              {selected.observacoes && <ViewField label="Observações">{selected.observacoes}</ViewField>}
             </div>
-            <div className="pt-2">
-              <h4 className="font-semibold text-sm mb-2 flex items-center gap-2"><Package className="w-4 h-4" /> Itens</h4>
+          )},
+          { value: "itens", label: "Itens", content: (
+            <div>
               {loadingItems ? (
                 <div className="flex justify-center py-4"><div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" /></div>
               ) : ovItems.length === 0 ? (
@@ -248,7 +258,7 @@ const OrdensVenda = () => {
                   {ovItems.map((item: any) => (
                     <div key={item.id} className="flex justify-between items-center py-2 px-3 bg-accent/20 rounded-lg text-sm">
                       <div>
-                        <p className="font-medium">{item.descricao_snapshot || item.produtos?.nome || "—"}</p>
+                        <RelationalLink to="/produtos">{item.descricao_snapshot || item.produtos?.nome || "—"}</RelationalLink>
                         <p className="text-xs text-muted-foreground mono">{item.codigo_snapshot || "—"} • {item.quantidade} {item.unidade}</p>
                       </div>
                       <div className="text-right">
@@ -260,27 +270,23 @@ const OrdensVenda = () => {
                 </div>
               )}
             </div>
-            {selected.observacoes && (
-              <div className="pt-2">
-                <span className="text-xs text-muted-foreground">Observações</span>
-                <p className="text-sm mt-1">{selected.observacoes}</p>
-              </div>
+          )},
+        ] : undefined}
+        footer={selected ? (
+          <div className="space-y-2">
+            {selected.status === "pendente" && (
+              <Button onClick={() => { setDrawerOpen(false); handleApprove(selected); }} className="w-full gap-2">
+                <CheckCircle className="w-4 h-4" /> Aprovar OV
+              </Button>
             )}
-            <div className="pt-2 space-y-2">
-              {selected.status === "pendente" && (
-                <Button onClick={() => { setDrawerOpen(false); handleApprove(selected); }} className="w-full gap-2">
-                  <CheckCircle className="w-4 h-4" /> Aprovar OV
-                </Button>
-              )}
-              {(selected.status === "aprovada" || selected.status === "em_separacao") && selected.status_faturamento !== "total" && (
-                <Button variant="default" onClick={() => { setDrawerOpen(false); setGeneratingNfId(selected.id); }} className="w-full gap-2">
-                  <FileOutput className="w-4 h-4" /> Gerar Nota Fiscal
-                </Button>
-              )}
-            </div>
+            {(selected.status === "aprovada" || selected.status === "em_separacao") && selected.status_faturamento !== "total" && (
+              <Button variant="default" onClick={() => { setDrawerOpen(false); setGeneratingNfId(selected.id); }} className="w-full gap-2">
+                <FileOutput className="w-4 h-4" /> Gerar Nota Fiscal
+              </Button>
+            )}
           </div>
-        )}
-      </ViewDrawerV2>
+        ) : undefined}
+      />
 
       <ConfirmDialog
         open={!!generatingNfId}

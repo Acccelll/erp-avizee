@@ -527,64 +527,81 @@ const Financeiro = () => {
           <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setDrawerOpen(false); openEdit(selected); }}><Edit className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Editar</TooltipContent></Tooltip>
           <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => { setDrawerOpen(false); remove(selected.id); }}><Trash2 className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Excluir</TooltipContent></Tooltip>
         </> : undefined}
-      >
-        {selected && (
-          <div className="space-y-4">
-            <ViewSection title="Informações gerais">
-              <div className="grid grid-cols-2 gap-4">
-                <ViewField label="Tipo">
-                  <Badge variant="outline" className={selected.tipo === "receber" ? "border-success/40 text-success" : "border-destructive/40 text-destructive"}>
-                    {selected.tipo === "receber" ? "A Receber" : "A Pagar"}
-                  </Badge>
-                </ViewField>
-                <ViewField label="Status"><StatusBadge status={getEffectiveStatus(selected)} /></ViewField>
-              </div>
-              <ViewField label="Descrição">{selected.descricao}</ViewField>
-            </ViewSection>
-
-            <ViewSection title="Valores e datas">
-              <div className="grid grid-cols-2 gap-4">
-                <ViewField label="Valor"><span className="font-semibold mono">{formatCurrency(Number(selected.valor))}</span></ViewField>
-                <ViewField label="Saldo Restante">
-                  <span className="font-semibold mono">
-                    {formatCurrency(selected.saldo_restante != null ? Number(selected.saldo_restante) : Number(selected.valor))}
-                  </span>
-                </ViewField>
-                <ViewField label="Vencimento">{new Date(selected.data_vencimento).toLocaleDateString("pt-BR")}</ViewField>
-              </div>
-              {selected.data_pagamento && (
-                <ViewField label="Data Pagamento">{new Date(selected.data_pagamento).toLocaleDateString("pt-BR")}</ViewField>
-              )}
-            </ViewSection>
-
-            <ViewSection title="Detalhes">
-              <div className="grid grid-cols-2 gap-4">
-                <ViewField label="Forma">{selected.forma_pagamento || "—"}</ViewField>
-                <ViewField label="Banco/Conta">
-                  {selected.contas_bancarias ? `${selected.contas_bancarias.bancos?.nome} - ${selected.contas_bancarias.descricao}` : "—"}
-                </ViewField>
-              </div>
-              {selected.parcela_numero && (
-                <ViewField label="Parcela"><span className="mono">{selected.parcela_numero}/{selected.parcela_total}</span></ViewField>
-              )}
-              <div className="grid grid-cols-2 gap-4">
-                <ViewField label="Parceiro">
-                  {selected.tipo === "receber" ? selected.clientes?.nome_razao_social : selected.fornecedores?.nome_razao_social || "—"}
-                </ViewField>
-                {selected.nota_fiscal_id && (
-                  <ViewField label="Origem"><Badge variant="outline" className="text-xs">NF vinculada</Badge></ViewField>
-                )}
-              </div>
-            </ViewSection>
-
-            {selected.observacoes && (
-              <ViewSection title="Observações">
-                <p className="text-sm">{selected.observacoes}</p>
+        badge={selected ? <StatusBadge status={getEffectiveStatus(selected)} /> : undefined}
+        tabs={selected ? [
+          { value: "dados", label: "Dados", content: (
+            <div className="space-y-4">
+              <ViewSection title="Informações gerais">
+                <div className="grid grid-cols-2 gap-4">
+                  <ViewField label="Tipo">
+                    <Badge variant="outline" className={selected.tipo === "receber" ? "border-success/40 text-success" : "border-destructive/40 text-destructive"}>
+                      {selected.tipo === "receber" ? "A Receber" : "A Pagar"}
+                    </Badge>
+                  </ViewField>
+                  <ViewField label="Status"><StatusBadge status={getEffectiveStatus(selected)} /></ViewField>
+                </div>
+                <ViewField label="Descrição">{selected.descricao}</ViewField>
               </ViewSection>
-            )}
-          </div>
-        )}
-      </ViewDrawerV2>
+
+              <ViewSection title="Valores e datas">
+                <div className="grid grid-cols-2 gap-4">
+                  <ViewField label="Valor"><span className="font-semibold mono">{formatCurrency(Number(selected.valor))}</span></ViewField>
+                  <ViewField label="Saldo Restante">
+                    <span className="font-semibold mono">
+                      {formatCurrency(selected.saldo_restante != null ? Number(selected.saldo_restante) : Number(selected.valor))}
+                    </span>
+                  </ViewField>
+                  <ViewField label="Vencimento">{new Date(selected.data_vencimento).toLocaleDateString("pt-BR")}</ViewField>
+                </div>
+                {selected.data_pagamento && (
+                  <ViewField label="Data Pagamento">{new Date(selected.data_pagamento).toLocaleDateString("pt-BR")}</ViewField>
+                )}
+              </ViewSection>
+            </div>
+          )},
+          { value: "detalhes", label: "Detalhes", content: (
+            <div className="space-y-4">
+              <ViewSection title="Pagamento">
+                <div className="grid grid-cols-2 gap-4">
+                  <ViewField label="Forma">{selected.forma_pagamento || "—"}</ViewField>
+                  <ViewField label="Banco/Conta">
+                    {selected.contas_bancarias ? (
+                      <RelationalLink to="/contas-bancarias">{selected.contas_bancarias.bancos?.nome} - {selected.contas_bancarias.descricao}</RelationalLink>
+                    ) : "—"}
+                  </ViewField>
+                </div>
+                {selected.parcela_numero && (
+                  <ViewField label="Parcela"><span className="mono">{selected.parcela_numero}/{selected.parcela_total}</span></ViewField>
+                )}
+              </ViewSection>
+              <ViewSection title="Vínculos">
+                <div className="grid grid-cols-2 gap-4">
+                  <ViewField label="Parceiro">
+                    {selected.tipo === "receber" && selected.clientes?.nome_razao_social ? (
+                      <RelationalLink to="/clientes">{selected.clientes.nome_razao_social}</RelationalLink>
+                    ) : selected.tipo === "pagar" && selected.fornecedores?.nome_razao_social ? (
+                      <RelationalLink to="/fornecedores">{selected.fornecedores.nome_razao_social}</RelationalLink>
+                    ) : "—"}
+                  </ViewField>
+                  {selected.nota_fiscal_id && (
+                    <ViewField label="Origem"><RelationalLink to="/fiscal">NF vinculada</RelationalLink></ViewField>
+                  )}
+                </div>
+                {selected.contas_contabeis && (
+                  <ViewField label="Conta Contábil">
+                    <RelationalLink to="/contas-contabeis">{selected.contas_contabeis.codigo} - {selected.contas_contabeis.descricao}</RelationalLink>
+                  </ViewField>
+                )}
+              </ViewSection>
+              {selected.observacoes && (
+                <ViewSection title="Observações">
+                  <p className="text-sm">{selected.observacoes}</p>
+                </ViewSection>
+              )}
+            </div>
+          )},
+        ] : undefined}
+      />
 
       {/* Baixa Modal */}
       <Dialog open={baixaModalOpen} onOpenChange={setBaixaModalOpen}>
