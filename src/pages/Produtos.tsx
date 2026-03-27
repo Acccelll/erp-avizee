@@ -139,7 +139,7 @@ const Produtos = () => {
     try {
       const payload = { ...form, preco_custo: form.eh_composto ? custoComposto : form.preco_custo };
       let produtoId: string;
-      if (mode === "create") {const result = await create(payload);produtoId = result.id;} else
+      if (mode === "create") {const result = await create(payload);produtoId = (result as any).id;} else
       if (selected) {await update(selected.id, payload);produtoId = selected.id;} else
       {return;}
       if (form.eh_composto) {

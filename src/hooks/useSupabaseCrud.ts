@@ -41,7 +41,7 @@ export function useSupabaseCrud<T extends Record<string, any>>({
       console.error(`[crud] Erro ao carregar ${table}:`, error);
       toast.error("Erro ao carregar dados. Tente novamente.");
     } else {
-      setData((result as T[]) || []);
+      setData((result as unknown as T[]) || []);
     }
     setLoading(false);
   }, [table, select, orderBy, ascending, hasAtivo]);

@@ -145,7 +145,7 @@ const Financeiro = () => {
           parcela_numero: 0, parcela_total: numP,
         };
         const parentResult = await create(parentPayload);
-        const parentId = parentResult?.id;
+        const parentId = (parentResult as any)?.id;
 
         for (let i = 0; i < numP; i++) {
           const venc = new Date(form.data_vencimento);
