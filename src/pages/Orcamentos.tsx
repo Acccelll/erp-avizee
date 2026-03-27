@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Copy, ArrowRightCircle, CheckCircle, FileText, DollarSign, Clock, BarChart3 } from "lucide-react";
+import { Copy, ArrowRightCircle, CheckCircle, FileText, DollarSign, Clock, BarChart3, Link2 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
@@ -266,6 +266,16 @@ const Orcamentos = () => {
               )}
               <Button variant="outline" onClick={() => { setDrawerOpen(false); handleDuplicate(selected); }} className="w-full gap-2">
                 <Copy className="w-4 h-4" /> Duplicar
+              </Button>
+              <Button variant="outline" onClick={async () => {
+                const token = crypto.randomUUID();
+                await (supabase.from('orcamentos') as any).update({ public_token: token }).eq('id', selected.id);
+                const url = `${window.location.origin}/orcamento-publico?token=${token}`;
+                await navigator.clipboard.writeText(url);
+                toast.success('Link público copiado para a área de transferência!');
+                fetchData();
+              }} className="w-full gap-2">
+                <Link2 className="w-4 h-4" /> Gerar Link Público
               </Button>
             </div>
           </div>
