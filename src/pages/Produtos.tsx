@@ -55,8 +55,16 @@ const Produtos = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [tipoFilter, setTipoFilter] = useState<"todos" | "simples" | "composto">("todos");
   const [estoqueFilter, setEstoqueFilter] = useState<"todos" | "baixo" | "ok">("todos");
+  const [grupoFilter, setGrupoFilter] = useState<string>("todos");
+  const [grupos, setGrupos] = useState<{id: string; nome: string}[]>([]);
   const [movimentos, setMovimentos] = useState<any[]>([]);
   const [fornecedoresProd, setFornecedoresProd] = useState<any[]>([]);
+
+  useEffect(() => {
+    supabase.from("grupos_produto").select("id, nome").eq("ativo", true).order("nome").then(({ data: g }) => {
+      if (g) setGrupos(g);
+    });
+  }, []);
 
   const produtosDisponiveis = data.filter((p) => !selected || p.id !== selected.id);
 
