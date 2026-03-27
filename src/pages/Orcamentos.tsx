@@ -5,6 +5,7 @@ import { ModulePage } from "@/components/ModulePage";
 import { DataTable, StatusBadge } from "@/components/DataTable";
 import { SummaryCard } from "@/components/SummaryCard";
 import { ViewDrawer, ViewField, ViewSection } from "@/components/ViewDrawer";
+import { AdvancedFilterBar, type FilterChip } from "@/components/AdvancedFilterBar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Edit, Trash2 } from "lucide-react";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
