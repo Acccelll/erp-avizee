@@ -68,8 +68,12 @@ const Produtos = () => {
   const [fornForm, setFornForm] = useState({ fornecedor_id: "", referencia_fornecedor: "", preco_compra: 0, lead_time_dias: 0, unidade_fornecedor: "UN", eh_principal: false });
 
   useEffect(() => {
-    supabase.from("grupos_produto").select("id, nome").eq("ativo", true).order("nome").then(({ data: g }) => {
+    Promise.all([
+      supabase.from("grupos_produto").select("id, nome").eq("ativo", true).order("nome"),
+      supabase.from("fornecedores").select("id, nome_razao_social").eq("ativo", true).order("nome_razao_social"),
+    ]).then(([{ data: g }, { data: f }]) => {
       if (g) setGrupos(g);
+      if (f) setFornecedoresList(f);
     });
   }, []);
 
