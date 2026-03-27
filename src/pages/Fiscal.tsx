@@ -379,7 +379,7 @@ const Fiscal = () => {
       };
       let nfId = selected?.id;
       if (mode === "create") {
-        const { data: newNf, error } = await supabase.from("notas_fiscais").insert(payload).select().single();
+        const { data: newNf, error } = await supabase.from("notas_fiscais").insert(payload as any).select().single();
         if (error) throw error;
         nfId = newNf.id;
       } else if (selected) {

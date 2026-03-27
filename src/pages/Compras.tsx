@@ -125,7 +125,7 @@ const Compras = () => {
       const payload = { ...form, status, fornecedor_id: form.fornecedor_id || null, valor_produtos: valorProdutos, valor_total: valorTotal };
       let compraId = selected?.id;
       if (mode === "create") {
-        const { data: newC, error } = await supabase.from("compras").insert(payload).select().single();
+        const { data: newC, error } = await supabase.from("compras").insert(payload as any).select().single();
         if (error) throw error;
         compraId = newC.id;
       } else if (selected) {

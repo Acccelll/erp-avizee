@@ -43,7 +43,7 @@ const Dashboard = () => {
 
       // Build financial queries based on period (forward-looking)
       const buildFinQuery = (tipo: string) => {
-        let q = supabase.from("financeiro_lancamentos").select("valor").eq("tipo", tipo).eq("ativo", true);
+        let q = supabase.from("financeiro_lancamentos").select("valor").eq("tipo", tipo as any).eq("ativo", true);
         if (isVencidos) {
           q = q.in("status", ["aberto", "vencido"]).lt("data_vencimento", today);
         } else if (isTodos) {

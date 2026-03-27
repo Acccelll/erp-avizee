@@ -91,7 +91,7 @@ export default function OrcamentoForm() {
           setPagamento(orc.pagamento || ""); setPrazoPagamento(orc.prazo_pagamento || "");
           setPrazoEntrega(orc.prazo_entrega || ""); setFreteTipo(orc.frete_tipo || "");
           setModalidade(orc.modalidade || "");
-          if (orc.cliente_snapshot) setClienteSnapshot(orc.cliente_snapshot);
+          if (orc.cliente_snapshot) setClienteSnapshot(orc.cliente_snapshot as any);
           const { data: itensData } = await supabase.from("orcamentos_itens").select("*").eq("orcamento_id", id);
           if (itensData) setItems(itensData);
         }
@@ -133,10 +133,10 @@ export default function OrcamentoForm() {
 
       let orcId = id;
       if (isEdit) {
-        await supabase.from("orcamentos").update(payload).eq("id", id);
+        await supabase.from("orcamentos").update(payload as any).eq("id", id);
         await supabase.from("orcamentos_itens").delete().eq("orcamento_id", id);
       } else {
-        const { data: newOrc, error } = await supabase.from("orcamentos").insert(payload).select().single();
+        const { data: newOrc, error } = await supabase.from("orcamentos").insert(payload as any).select().single();
         if (error) throw error;
         orcId = newOrc.id;
       }
@@ -173,7 +173,7 @@ export default function OrcamentoForm() {
         pagamento, prazo_pagamento: prazoPagamento, prazo_entrega: prazoEntrega,
         frete_tipo: freteTipo, modalidade, cliente_snapshot: clienteSnapshot,
       };
-      const { data: newOrc, error } = await supabase.from("orcamentos").insert(payload).select().single();
+      const { data: newOrc, error } = await supabase.from("orcamentos").insert(payload as any).select().single();
       if (error) throw error;
 
       if (items.length > 0) {
