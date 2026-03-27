@@ -707,67 +707,63 @@ const Fiscal = () => {
         </form>
       </FormModal>
 
-      <ViewDrawer
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        title={`NF ${selected?.numero || ""}`}
-        badge={selected ? <StatusBadge status={selected.status} /> : undefined}
-        actions={selected ? <>
-          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setDrawerOpen(false); openEdit(selected); }}><Edit className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Editar</TooltipContent></Tooltip>
-          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => { setDrawerOpen(false); remove(selected.id); }}><Trash2 className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Excluir</TooltipContent></Tooltip>
-        </> : undefined}
-      >
-        {selected && (() => {
+      {selected && (() => {
           const subtotalProdutos = viewItems.reduce((s: number, i: any) => s + (i.quantidade * i.valor_unitario), 0);
           const totalImpostosView = Number(selected.icms_valor || 0) + Number(selected.ipi_valor || 0) + Number(selected.pis_valor || 0) + Number(selected.cofins_valor || 0) + Number(selected.icms_st_valor || 0);
           const condicaoLabel = selected.condicao_pagamento === 'a_vista' ? 'À Vista' : selected.condicao_pagamento === 'a_prazo' ? 'A Prazo' : selected.condicao_pagamento || '—';
 
-          return (
-          <div className="space-y-5">
-            <ViewSection title="Informações Gerais">
-              <div className="grid grid-cols-2 gap-4">
-                <ViewField label="Tipo"><span className="capitalize font-medium">{selected.tipo === 'entrada' ? 'Entrada' : 'Saída'}</span></ViewField>
-                <ViewField label="Número / Série"><span className="font-mono font-medium">{selected.numero} / {selected.serie || '1'}</span></ViewField>
-                <ViewField label="Data Emissão">{formatDate(selected.data_emissao)}</ViewField>
-                <ViewField label="Status"><StatusBadge status={selected.status} /></ViewField>
-              </div>
-              {selected.chave_acesso && (
-                <div className="mt-3">
-                  <ViewField label="Chave de Acesso"><span className="font-mono text-xs break-all">{selected.chave_acesso}</span></ViewField>
+          const tabResumo = (
+            <div className="space-y-5">
+              <ViewSection title="Informações Gerais">
+                <div className="grid grid-cols-2 gap-4">
+                  <ViewField label="Tipo"><span className="capitalize font-medium">{selected.tipo === 'entrada' ? 'Entrada' : 'Saída'}</span></ViewField>
+                  <ViewField label="Número / Série"><span className="font-mono font-medium">{selected.numero} / {selected.serie || '1'}</span></ViewField>
+                  <ViewField label="Data Emissão">{formatDate(selected.data_emissao)}</ViewField>
+                  <ViewField label="Status"><StatusBadge status={selected.status} /></ViewField>
                 </div>
-              )}
-            </ViewSection>
-
-            <ViewSection title="Parceiro">
-              <div className="grid grid-cols-2 gap-4">
-                <ViewField label={selected.tipo === "entrada" ? "Fornecedor" : "Cliente"}>
-                  {selected.tipo === "entrada" ? selected.fornecedores?.nome_razao_social || "—" : selected.clientes?.nome_razao_social || "—"}
-                </ViewField>
-                {selected.ordem_venda_id && selected.ordens_venda && (
-                  <ViewField label="Ordem de Venda"><span className="font-mono font-medium">{selected.ordens_venda.numero}</span></ViewField>
+                {selected.chave_acesso && (
+                  <div className="mt-3">
+                    <ViewField label="Chave de Acesso"><span className="font-mono text-xs break-all">{selected.chave_acesso}</span></ViewField>
+                  </div>
                 )}
-              </div>
-            </ViewSection>
+              </ViewSection>
+              <ViewSection title="Parceiro">
+                <div className="grid grid-cols-2 gap-4">
+                  <ViewField label={selected.tipo === "entrada" ? "Fornecedor" : "Cliente"}>
+                    {selected.tipo === "entrada" ? selected.fornecedores?.nome_razao_social || "—" : selected.clientes?.nome_razao_social || "—"}
+                  </ViewField>
+                  {selected.ordem_venda_id && selected.ordens_venda && (
+                    <ViewField label="Ordem de Venda"><span className="font-mono font-medium">{selected.ordens_venda.numero}</span></ViewField>
+                  )}
+                </div>
+              </ViewSection>
+              <ViewSection title="Pagamento">
+                <div className="grid grid-cols-2 gap-4">
+                  <ViewField label="Condição">{condicaoLabel}</ViewField>
+                  <ViewField label="Forma"><span className="capitalize">{selected.forma_pagamento || '—'}</span></ViewField>
+                  <ViewField label="Gera Financeiro">
+                    <span className={selected.gera_financeiro !== false ? "text-green-600 font-medium" : "text-muted-foreground"}>
+                      {selected.gera_financeiro !== false ? "Sim" : "Não"}
+                    </span>
+                  </ViewField>
+                  <ViewField label="Mov. Estoque">
+                    <span className={selected.movimenta_estoque !== false ? "text-green-600 font-medium" : "text-muted-foreground"}>
+                      {selected.movimenta_estoque !== false ? "Sim" : "Não"}
+                    </span>
+                  </ViewField>
+                </div>
+              </ViewSection>
+              {selected.observacoes && (
+                <ViewSection title="Observações">
+                  <p className="text-sm text-muted-foreground">{selected.observacoes}</p>
+                </ViewSection>
+              )}
+            </div>
+          );
 
-            <ViewSection title="Pagamento">
-              <div className="grid grid-cols-2 gap-4">
-                <ViewField label="Condição de Pagamento">{condicaoLabel}</ViewField>
-                <ViewField label="Forma de Pagamento"><span className="capitalize">{selected.forma_pagamento || '—'}</span></ViewField>
-                <ViewField label="Gera Financeiro">
-                  <span className={selected.gera_financeiro !== false ? "text-green-600 font-medium" : "text-muted-foreground"}>
-                    {selected.gera_financeiro !== false ? "Sim" : "Não"}
-                  </span>
-                </ViewField>
-                <ViewField label="Movimenta Estoque">
-                  <span className={selected.movimenta_estoque !== false ? "text-green-600 font-medium" : "text-muted-foreground"}>
-                    {selected.movimenta_estoque !== false ? "Sim" : "Não"}
-                  </span>
-                </ViewField>
-              </div>
-            </ViewSection>
-
-            {viewItems.length > 0 && (
-              <ViewSection title={`Itens (${viewItems.length})`}>
+          const tabItens = (
+            <div className="space-y-4">
+              {viewItems.length > 0 ? (
                 <div className="rounded-lg border overflow-hidden">
                   <table className="w-full text-sm">
                     <thead>
@@ -778,7 +774,6 @@ const Fiscal = () => {
                         <th className="px-3 py-2 text-right text-xs font-semibold text-muted-foreground">Total</th>
                         <th className="px-3 py-2 text-center text-xs font-semibold text-muted-foreground">CST</th>
                         <th className="px-3 py-2 text-center text-xs font-semibold text-muted-foreground">CFOP</th>
-                        <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground">Conta</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -790,86 +785,116 @@ const Fiscal = () => {
                           <td className="px-3 py-2 text-right font-mono font-medium">{formatCurrency(i.quantidade * i.valor_unitario)}</td>
                           <td className="px-3 py-2 text-center font-mono text-xs">{i.cst || "—"}</td>
                           <td className="px-3 py-2 text-center font-mono text-xs">{i.cfop || "—"}</td>
-                          <td className="px-3 py-2 text-xs text-muted-foreground">{i.contas_contabeis ? `${i.contas_contabeis.codigo}` : "—"}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
-              </ViewSection>
-            )}
-
-            {/* Resumo Financeiro */}
-            <ViewSection title="Resumo Financeiro">
-              <div className="bg-accent/30 rounded-lg p-4 space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Subtotal Produtos</span>
-                  <span className="font-mono">{formatCurrency(subtotalProdutos)}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Frete</span>
-                  <span className="font-mono">{Number(selected.frete_valor || 0) > 0 ? formatCurrency(Number(selected.frete_valor)) : '—'}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">ICMS</span>
-                  <span className="font-mono">{Number(selected.icms_valor || 0) > 0 ? formatCurrency(Number(selected.icms_valor)) : '—'}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">IPI</span>
-                  <span className="font-mono">{Number(selected.ipi_valor || 0) > 0 ? formatCurrency(Number(selected.ipi_valor)) : '—'}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">PIS</span>
-                  <span className="font-mono">{Number(selected.pis_valor || 0) > 0 ? formatCurrency(Number(selected.pis_valor)) : '—'}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">COFINS</span>
-                  <span className="font-mono">{Number(selected.cofins_valor || 0) > 0 ? formatCurrency(Number(selected.cofins_valor)) : '—'}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">ICMS-ST</span>
-                  <span className="font-mono">{Number(selected.icms_st_valor || 0) > 0 ? formatCurrency(Number(selected.icms_st_valor)) : '—'}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Outras Despesas</span>
-                  <span className="font-mono">{Number(selected.outras_despesas || 0) > 0 ? formatCurrency(Number(selected.outras_despesas)) : '—'}</span>
-                </div>
-                {Number(selected.desconto_valor || 0) > 0 && (
-                  <div className="flex justify-between text-sm text-destructive">
-                    <span>Desconto</span>
-                    <span className="font-mono">-{formatCurrency(Number(selected.desconto_valor))}</span>
-                  </div>
-                )}
-                <div className="flex justify-between font-bold border-t pt-2 mt-2">
-                  <span>Total da NF</span>
-                  <span className="font-mono text-lg">{formatCurrency(Number(selected.valor_total))}</span>
-                </div>
-              </div>
-            </ViewSection>
-
-            {selected.observacoes && (
-              <ViewSection title="Observações">
-                <p className="text-sm text-muted-foreground">{selected.observacoes}</p>
-              </ViewSection>
-            )}
-
-            {selected.status === "pendente" && (
-              <Button className="w-full" onClick={() => { handleConfirmar(selected); setDrawerOpen(false); }}>
-                <CheckCircle className="w-4 h-4 mr-2" /> Confirmar Nota Fiscal
-              </Button>
-            )}
-            {selected.status === "confirmada" && (
-              <Button variant="destructive" className="w-full" onClick={() => { handleEstornar(selected); setDrawerOpen(false); }}>
-                <XCircle className="w-4 h-4 mr-2" /> Estornar Nota Fiscal
-              </Button>
-            )}
-            <Button variant="outline" className="w-full" onClick={() => { setDrawerOpen(false); openDanfe(selected); }}>
-              <FileText className="w-4 h-4 mr-2" /> Visualizar DANFE
-            </Button>
-          </div>
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-4">Nenhum item</p>
+              )}
+            </div>
           );
-        })()}
-      </ViewDrawer>
+
+          const tabImpostos = (
+            <div className="bg-accent/30 rounded-lg p-4 space-y-2">
+              <div className="flex justify-between text-sm"><span className="text-muted-foreground">Subtotal Produtos</span><span className="font-mono">{formatCurrency(subtotalProdutos)}</span></div>
+              <div className="flex justify-between text-sm"><span className="text-muted-foreground">Frete</span><span className="font-mono">{Number(selected.frete_valor || 0) > 0 ? formatCurrency(Number(selected.frete_valor)) : '—'}</span></div>
+              <div className="flex justify-between text-sm"><span className="text-muted-foreground">ICMS</span><span className="font-mono">{Number(selected.icms_valor || 0) > 0 ? formatCurrency(Number(selected.icms_valor)) : '—'}</span></div>
+              <div className="flex justify-between text-sm"><span className="text-muted-foreground">IPI</span><span className="font-mono">{Number(selected.ipi_valor || 0) > 0 ? formatCurrency(Number(selected.ipi_valor)) : '—'}</span></div>
+              <div className="flex justify-between text-sm"><span className="text-muted-foreground">PIS</span><span className="font-mono">{Number(selected.pis_valor || 0) > 0 ? formatCurrency(Number(selected.pis_valor)) : '—'}</span></div>
+              <div className="flex justify-between text-sm"><span className="text-muted-foreground">COFINS</span><span className="font-mono">{Number(selected.cofins_valor || 0) > 0 ? formatCurrency(Number(selected.cofins_valor)) : '—'}</span></div>
+              <div className="flex justify-between text-sm"><span className="text-muted-foreground">ICMS-ST</span><span className="font-mono">{Number(selected.icms_st_valor || 0) > 0 ? formatCurrency(Number(selected.icms_st_valor)) : '—'}</span></div>
+              <div className="flex justify-between text-sm"><span className="text-muted-foreground">Outras Despesas</span><span className="font-mono">{Number(selected.outras_despesas || 0) > 0 ? formatCurrency(Number(selected.outras_despesas)) : '—'}</span></div>
+              {Number(selected.desconto_valor || 0) > 0 && (
+                <div className="flex justify-between text-sm text-destructive"><span>Desconto</span><span className="font-mono">-{formatCurrency(Number(selected.desconto_valor))}</span></div>
+              )}
+              <div className="flex justify-between font-bold border-t pt-2 mt-2">
+                <span>Total da NF</span>
+                <span className="font-mono text-lg">{formatCurrency(Number(selected.valor_total))}</span>
+              </div>
+            </div>
+          );
+
+          const tabVinculos = (
+            <div className="space-y-4">
+              <ViewSection title="Vínculos">
+                <div className="grid grid-cols-2 gap-4">
+                  <ViewField label="Ordem de Venda">{selected.ordens_venda?.numero || "—"}</ViewField>
+                  <ViewField label={selected.tipo === "entrada" ? "Fornecedor" : "Cliente"}>
+                    {selected.tipo === "entrada" ? selected.fornecedores?.nome_razao_social || "—" : selected.clientes?.nome_razao_social || "—"}
+                  </ViewField>
+                </div>
+              </ViewSection>
+              {viewItems.some((i: any) => i.contas_contabeis) && (
+                <ViewSection title="Contas Contábeis por Item">
+                  <div className="space-y-1">
+                    {viewItems.filter((i: any) => i.contas_contabeis).map((i: any, idx: number) => (
+                      <div key={idx} className="flex justify-between text-sm">
+                        <span className="text-muted-foreground truncate">{i.produtos?.nome || `Item ${idx + 1}`}</span>
+                        <span className="font-mono text-xs">{i.contas_contabeis.codigo}</span>
+                      </div>
+                    ))}
+                  </div>
+                </ViewSection>
+              )}
+            </div>
+          );
+
+          const drawerFooter = (
+            <div className="space-y-2">
+              {selected.status === "pendente" && (
+                <Button className="w-full" onClick={() => { handleConfirmar(selected); setDrawerOpen(false); }}>
+                  <CheckCircle className="w-4 h-4 mr-2" /> Confirmar Nota Fiscal
+                </Button>
+              )}
+              {selected.status === "confirmada" && (
+                <Button variant="destructive" className="w-full" onClick={() => { handleEstornar(selected); setDrawerOpen(false); }}>
+                  <XCircle className="w-4 h-4 mr-2" /> Estornar Nota Fiscal
+                </Button>
+              )}
+              <Button variant="outline" className="w-full" onClick={() => { setDrawerOpen(false); openDanfe(selected); }}>
+                <FileText className="w-4 h-4 mr-2" /> Visualizar DANFE
+              </Button>
+            </div>
+          );
+
+          return (
+            <ViewDrawerV2
+              open={drawerOpen}
+              onClose={() => setDrawerOpen(false)}
+              title={`NF ${selected.numero}`}
+              badge={<StatusBadge status={selected.status} />}
+              actions={<>
+                <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setDrawerOpen(false); openEdit(selected); }}><Edit className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Editar</TooltipContent></Tooltip>
+                <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => { setDrawerOpen(false); remove(selected.id); }}><Trash2 className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Excluir</TooltipContent></Tooltip>
+              </>}
+              summary={
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="bg-accent/30 rounded-lg p-3 text-center">
+                    <p className="text-xs text-muted-foreground">Tipo</p>
+                    <p className="font-semibold text-sm capitalize">{selected.tipo === 'entrada' ? 'Entrada' : 'Saída'}</p>
+                  </div>
+                  <div className="bg-accent/30 rounded-lg p-3 text-center">
+                    <p className="text-xs text-muted-foreground">Itens</p>
+                    <p className="font-semibold text-sm font-mono">{viewItems.length}</p>
+                  </div>
+                  <div className="bg-accent/30 rounded-lg p-3 text-center">
+                    <p className="text-xs text-muted-foreground">Total</p>
+                    <p className="font-semibold text-sm font-mono">{formatCurrency(Number(selected.valor_total))}</p>
+                  </div>
+                </div>
+              }
+              tabs={[
+                { value: "resumo", label: "Resumo", content: tabResumo },
+                { value: "itens", label: `Itens (${viewItems.length})`, content: tabItens },
+                { value: "impostos", label: "Impostos", content: tabImpostos },
+                { value: "vinculos", label: "Vínculos", content: tabVinculos },
+              ]}
+              footer={drawerFooter}
+            />
+          );
+      })()}
       <DanfeViewer open={danfeOpen} onClose={() => setDanfeOpen(false)} data={danfeData} />
     </AppLayout>
   );
