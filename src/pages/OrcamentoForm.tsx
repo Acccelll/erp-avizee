@@ -115,8 +115,12 @@ export default function OrcamentoForm() {
         bairro: c.bairro || "", cidade: c.cidade || "", uf: c.uf || "",
         cep: c.cep || "", codigo: c.id?.substring(0, 6) || "",
       });
+      // Auto-fill payment preferences from client
+      if (c.forma_pagamento_padrao && !pagamento) setPagamento(c.forma_pagamento_padrao);
+      if (c.prazo_preferencial && !prazoPagamento) setPrazoPagamento(`${c.prazo_preferencial} dias`);
+      if (c.prazo_padrao && !prazoPagamento && !c.prazo_preferencial) setPrazoPagamento(`${c.prazo_padrao} dias`);
     }
-  }, [clientes]);
+  }, [clientes, pagamento, prazoPagamento]);
 
   const handleSave = async () => {
     if (!numero) { toast.error("Número é obrigatório"); return; }

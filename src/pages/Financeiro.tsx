@@ -6,7 +6,7 @@ import { DataTable, StatusBadge } from "@/components/DataTable";
 import { FormModal } from "@/components/FormModal";
 import { ViewDrawer, ViewField, ViewSection } from "@/components/ViewDrawer";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Edit, Trash2 } from "lucide-react";
+import { Edit, Trash2, CreditCard } from "lucide-react";
 import { SummaryCard } from "@/components/SummaryCard";
 import { PeriodFilter, financialPeriods, type Period } from "@/components/dashboard/PeriodFilter";
 import { periodToFinancialRange } from "@/lib/periodFilter";
@@ -23,6 +23,7 @@ import { formatCurrency } from "@/lib/format";
 import { supabase } from "@/integrations/supabase/client";
 import { DollarSign, Clock, AlertTriangle, CheckCircle, CalendarClock, Download, List, CalendarDays } from "lucide-react";
 import { FinanceiroCalendar } from "@/components/financeiro/FinanceiroCalendar";
+import { BaixaParcialDialog } from "@/components/financeiro/BaixaParcialDialog";
 
 interface Lancamento {
   id: string; tipo: string; descricao: string; valor: number;
@@ -31,7 +32,7 @@ interface Lancamento {
   cliente_id: string; fornecedor_id: string; nota_fiscal_id: string;
   conta_bancaria_id: string; conta_contabil_id: string;
   parcela_numero: number; parcela_total: number;
-  documento_pai_id: string;
+  documento_pai_id: string; saldo_restante: number | null;
   observacoes: string; ativo: boolean;
   clientes?: { nome_razao_social: string }; fornecedores?: { nome_razao_social: string };
   contas_bancarias?: { descricao: string; bancos?: { nome: string } };
@@ -79,6 +80,8 @@ const Financeiro = () => {
   const [baixaDate, setBaixaDate] = useState(new Date().toISOString().split("T")[0]);
   const [baixaProcessing, setBaixaProcessing] = useState(false);
   const [viewMode, setViewMode] = useState<"lista" | "calendario">("lista");
+  const [baixaParcialOpen, setBaixaParcialOpen] = useState(false);
+  const [baixaParcialTarget, setBaixaParcialTarget] = useState<Lancamento | null>(null);
 
   useEffect(() => { if (tipoParam) setFilterTipo(tipoParam); }, [tipoParam]);
 
@@ -517,6 +520,9 @@ const Financeiro = () => {
 
       <ViewDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} title="Detalhes do Lançamento"
         actions={selected ? <>
+          {getEffectiveStatus(selected) !== "pago" && getEffectiveStatus(selected) !== "cancelado" && (
+            <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-primary hover:text-primary" onClick={() => { setBaixaParcialTarget(selected); setBaixaParcialOpen(true); }}><CreditCard className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Registrar Baixa</TooltipContent></Tooltip>
+          )}
           <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setDrawerOpen(false); openEdit(selected); }}><Edit className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Editar</TooltipContent></Tooltip>
           <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => { setDrawerOpen(false); remove(selected.id); }}><Trash2 className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Excluir</TooltipContent></Tooltip>
         </> : undefined}
@@ -538,6 +544,11 @@ const Financeiro = () => {
             <ViewSection title="Valores e datas">
               <div className="grid grid-cols-2 gap-4">
                 <ViewField label="Valor"><span className="font-semibold mono">{formatCurrency(Number(selected.valor))}</span></ViewField>
+                <ViewField label="Saldo Restante">
+                  <span className="font-semibold mono">
+                    {formatCurrency(selected.saldo_restante != null ? Number(selected.saldo_restante) : Number(selected.valor))}
+                  </span>
+                </ViewField>
                 <ViewField label="Vencimento">{new Date(selected.data_vencimento).toLocaleDateString("pt-BR")}</ViewField>
               </div>
               {selected.data_pagamento && (
@@ -623,6 +634,14 @@ const Financeiro = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <BaixaParcialDialog
+        open={baixaParcialOpen}
+        onClose={() => setBaixaParcialOpen(false)}
+        lancamento={baixaParcialTarget}
+        contasBancarias={contasBancarias}
+        onSuccess={() => { window.location.reload(); }}
+      />
     </AppLayout>
   );
 };

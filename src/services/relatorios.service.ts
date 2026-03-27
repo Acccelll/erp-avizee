@@ -2,7 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { downloadTextFile } from "@/lib/utils";
 import { formatCurrency, formatDate, formatNumber } from "@/lib/format";
 
-export type TipoRelatorio = "estoque" | "movimentos_estoque" | "financeiro" | "fluxo_caixa" | "vendas" | "compras" | "aging" | "dre" | "curva_abc" | "margem_produtos";
+export type TipoRelatorio = "estoque" | "movimentos_estoque" | "financeiro" | "fluxo_caixa" | "vendas" | "compras" | "aging" | "dre" | "curva_abc" | "margem_produtos" | "estoque_minimo" | "vendas_cliente" | "compras_fornecedor";
 
 export interface FiltroRelatorio {
   dataInicio?: string;
@@ -500,6 +500,102 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
         totals: {
           mediaMargemPct: rows.length > 0 ? Number((rows.reduce((s, r) => s + r.margem, 0) / rows.length).toFixed(1)) : 0,
         },
+      };
+    }
+
+    case "estoque_minimo": {
+      const { data, error } = await supabase
+        .from("produtos")
+        .select("codigo_interno, nome, unidade_medida, estoque_atual, estoque_minimo, preco_custo")
+        .eq("ativo", true)
+        .order("nome");
+      if (error) throw error;
+
+      const rows = (data || [])
+        .filter((p: any) => Number(p.estoque_atual || 0) <= Number(p.estoque_minimo || 0) && Number(p.estoque_minimo || 0) > 0)
+        .map((p: any) => ({
+          codigo: p.codigo_interno || "-",
+          produto: p.nome,
+          unidade: p.unidade_medida || "UN",
+          estoqueAtual: Number(p.estoque_atual || 0),
+          estoqueMinimo: Number(p.estoque_minimo || 0),
+          deficit: Number(p.estoque_minimo || 0) - Number(p.estoque_atual || 0),
+          custoReposicao: (Number(p.estoque_minimo || 0) - Number(p.estoque_atual || 0)) * Number(p.preco_custo || 0),
+        }));
+
+      return {
+        title: "Estoque Abaixo do Mínimo",
+        subtitle: "Produtos com estoque atual igual ou inferior ao mínimo definido.",
+        rows,
+        chartData: rows.slice(0, 8).map(r => ({ name: r.produto.substring(0, 20), value: r.deficit })),
+        totals: { totalItens: rows.length, custoTotal: rows.reduce((s, r) => s + r.custoReposicao, 0) },
+        _isQuantityReport: true,
+      };
+    }
+
+    case "vendas_cliente": {
+      let query = supabase
+        .from("ordens_venda")
+        .select("valor_total, clientes(nome_razao_social, cpf_cnpj)")
+        .eq("ativo", true);
+      query = withDateRange(query, "data_emissao", filtros);
+      const { data, error } = await query;
+      if (error) throw error;
+
+      const map = new Map<string, { cliente: string; cnpj: string; total: number; qtd: number }>();
+      for (const ov of data || []) {
+        const c = (ov as any).clientes;
+        const nome = c?.nome_razao_social || "Sem cliente";
+        const key = nome;
+        const existing = map.get(key) || { cliente: nome, cnpj: c?.cpf_cnpj || "-", total: 0, qtd: 0 };
+        existing.total += Number((ov as any).valor_total || 0);
+        existing.qtd += 1;
+        map.set(key, existing);
+      }
+
+      const rows = Array.from(map.values()).sort((a, b) => b.total - a.total).map((r, i) => ({
+        posicao: i + 1, cliente: r.cliente, cnpj: r.cnpj, pedidos: r.qtd, valorTotal: r.total,
+        ticketMedio: r.qtd > 0 ? r.total / r.qtd : 0,
+      }));
+
+      return {
+        title: "Vendas por Cliente",
+        subtitle: "Ranking de clientes por volume de vendas.",
+        rows,
+        chartData: rows.slice(0, 8).map(r => ({ name: r.cliente.substring(0, 20), value: r.valorTotal })),
+      };
+    }
+
+    case "compras_fornecedor": {
+      let query = supabase
+        .from("compras")
+        .select("valor_total, fornecedores(nome_razao_social, cpf_cnpj)")
+        .eq("ativo", true);
+      query = withDateRange(query, "data_compra", filtros);
+      const { data, error } = await query;
+      if (error) throw error;
+
+      const map = new Map<string, { fornecedor: string; cnpj: string; total: number; qtd: number }>();
+      for (const c of data || []) {
+        const f = (c as any).fornecedores;
+        const nome = f?.nome_razao_social || "Sem fornecedor";
+        const key = nome;
+        const existing = map.get(key) || { fornecedor: nome, cnpj: f?.cpf_cnpj || "-", total: 0, qtd: 0 };
+        existing.total += Number((c as any).valor_total || 0);
+        existing.qtd += 1;
+        map.set(key, existing);
+      }
+
+      const rows = Array.from(map.values()).sort((a, b) => b.total - a.total).map((r, i) => ({
+        posicao: i + 1, fornecedor: r.fornecedor, cnpj: r.cnpj, pedidos: r.qtd, valorTotal: r.total,
+        ticketMedio: r.qtd > 0 ? r.total / r.qtd : 0,
+      }));
+
+      return {
+        title: "Compras por Fornecedor",
+        subtitle: "Ranking de fornecedores por volume de compras.",
+        rows,
+        chartData: rows.slice(0, 8).map(r => ({ name: r.fornecedor.substring(0, 20), value: r.valorTotal })),
       };
     }
   }
