@@ -233,36 +233,24 @@ export default function Remessas() {
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         title={selected?.codigo_rastreio ? `Remessa ${selected.codigo_rastreio}` : "Detalhes da Remessa"}
-        subtitle={selected ? (clienteMap[selected.cliente_id || ""] || "Sem cliente") : ""}
-        summaryItems={summaryItems}
         actions={selected ? <>
           <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setDrawerOpen(false); openEdit(selected); }}><Edit className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Editar</TooltipContent></Tooltip>
           <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => { setDrawerOpen(false); remove(selected.id); }}><Trash2 className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Excluir</TooltipContent></Tooltip>
         </> : undefined}
-        tabs={[
-          { value: "dados", label: "Dados" },
-          { value: "eventos", label: "Eventos" },
-        ]}
-        footer={selected && selected.status_transporte !== "entregue" ? (
-          <div className="flex gap-2 flex-wrap">
-            {selected.status_transporte === "pendente" && (
-              <Button size="sm" onClick={() => handleStatusChange(selected, "postado")}><Truck className="h-4 w-4 mr-1" /> Marcar como Postado</Button>
-            )}
-            {selected.status_transporte === "postado" && (
-              <Button size="sm" onClick={() => handleStatusChange(selected, "em_transito")}><Truck className="h-4 w-4 mr-1" /> Em Trânsito</Button>
-            )}
-            {(selected.status_transporte === "em_transito" || selected.status_transporte === "postado") && (
-              <Button size="sm" variant="outline" onClick={() => handleStatusChange(selected, "entregue")}><PackageIcon className="h-4 w-4 mr-1" /> Entregue</Button>
-            )}
-            {selected.status_transporte !== "devolvido" && (
-              <Button size="sm" variant="destructive" onClick={() => handleStatusChange(selected, "devolvido")}>Devolvido</Button>
-            )}
+        summary={selected ? (
+          <div className="grid grid-cols-4 gap-3">
+            {summaryItems.map((s, i) => (
+              <div key={i} className="rounded-lg border bg-card p-3 text-center space-y-1">
+                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">{s.label}</p>
+                <p className="font-semibold text-sm">{s.value}</p>
+              </div>
+            ))}
           </div>
         ) : undefined}
-      >
-        {(tab) => selected && (
-          <>
-            {tab === "dados" && (
+        tabs={[
+          {
+            value: "dados", label: "Dados",
+            content: selected ? (
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                   {[
@@ -289,10 +277,12 @@ export default function Remessas() {
                   </div>
                 )}
               </div>
-            )}
-            {tab === "eventos" && (
+            ) : null,
+          },
+          {
+            value: "eventos", label: "Eventos",
+            content: selected ? (
               <div className="space-y-4">
-                {/* Add event form */}
                 <div className="rounded-lg border bg-card p-3 space-y-3">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Novo Evento</p>
                   <div className="grid grid-cols-2 gap-3">
@@ -303,8 +293,6 @@ export default function Remessas() {
                     <Plus className="h-3.5 w-3.5 mr-1" />{savingEvento ? "Salvando..." : "Adicionar"}
                   </Button>
                 </div>
-
-                {/* Events timeline */}
                 {eventos.length === 0 ? (
                   <p className="text-sm text-muted-foreground text-center py-6">Nenhum evento registrado</p>
                 ) : (
@@ -327,10 +315,26 @@ export default function Remessas() {
                   </div>
                 )}
               </div>
+            ) : null,
+          },
+        ]}
+        footer={selected && selected.status_transporte !== "entregue" ? (
+          <div className="flex gap-2 flex-wrap">
+            {selected.status_transporte === "pendente" && (
+              <Button size="sm" onClick={() => handleStatusChange(selected, "postado")}><Truck className="h-4 w-4 mr-1" /> Marcar como Postado</Button>
             )}
-          </>
-        )}
-      </ViewDrawerV2>
+            {selected.status_transporte === "postado" && (
+              <Button size="sm" onClick={() => handleStatusChange(selected, "em_transito")}><Truck className="h-4 w-4 mr-1" /> Em Trânsito</Button>
+            )}
+            {(selected.status_transporte === "em_transito" || selected.status_transporte === "postado") && (
+              <Button size="sm" variant="outline" onClick={() => handleStatusChange(selected, "entregue")}><PackageIcon className="h-4 w-4 mr-1" /> Entregue</Button>
+            )}
+            {selected.status_transporte !== "devolvido" && (
+              <Button size="sm" variant="destructive" onClick={() => handleStatusChange(selected, "devolvido")}>Devolvido</Button>
+            )}
+          </div>
+        ) : undefined}
+      />
     </AppLayout>
   );
 }
