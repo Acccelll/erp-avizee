@@ -418,7 +418,7 @@ export default function CotacoesCompra() {
       </FormModal>
 
       {/* View Drawer with Comparison */}
-      <ViewDrawer
+      <ViewDrawerV2
         open={drawerOpen}
         onClose={() => { setDrawerOpen(false); setAddingProposal(null); }}
         title="Cotação de Compra"
