@@ -98,7 +98,7 @@ const Clientes = () => {
 
   const openView = async (c: Cliente) => {
     setSelected(c);setDrawerOpen(true);
-    const [comRes, empRes, titulosRes, orcRes] = await Promise.all([
+    const [comRes, empRes, titulosRes, orcRes, transpRes] = await Promise.all([
     supabase.from("cliente_registros_comunicacao").select("*").eq("cliente_id", c.id).order("data_hora", { ascending: false }),
     c.grupo_economico_id ? supabase.from("clientes").
     select("id, nome_razao_social, nome_fantasia, cpf_cnpj, tipo_relacao_grupo, cidade, uf").
@@ -109,20 +109,20 @@ const Clientes = () => {
     order("data_vencimento", { ascending: false }).limit(50),
     supabase.from("orcamentos").
     select("data_orcamento").eq("cliente_id", c.id).eq("ativo", true).
-    order("data_orcamento", { ascending: false }).limit(1)]
-    );
+    order("data_orcamento", { ascending: false }).limit(1),
+    supabase.from("cliente_transportadoras" as any).
+    select("*, transportadoras:transportadora_id(nome_razao_social, modalidade, prazo_medio)").
+    eq("cliente_id", c.id).eq("ativo", true).order("prioridade")
+    ]);
     setComRecords(comRes.data || []);
     setEmpresasGrupo(empRes.data || []);
+    setTransportadorasCliente(transpRes.data || []);
 
     const titulos = titulosRes.data || [];
     setPmvTitulos(titulos);
-
-    // Saldo em aberto
     const aberto = titulos.filter((t: any) => t.status === "aberto" || t.status === "vencido");
     setSaldoAberto(aberto.reduce((s: number, t: any) => s + Number(t.valor || 0), 0));
     setTitulosVencidos(aberto.filter((t: any) => t.status === "vencido").length);
-
-    // PMV
     const pagos = titulos.filter((t: any) => t.data_pagamento);
     if (pagos.length > 0) {
       const totalDias = pagos.reduce((acc: number, t: any) => {
@@ -132,8 +132,6 @@ const Clientes = () => {
       }, 0);
       setPmv(Math.round(totalDias / pagos.length));
     } else {setPmv(null);}
-
-    // Última compra/cotação
     setUltimaCompra(orcRes.data?.[0]?.data_orcamento || null);
   };
 
