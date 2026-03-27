@@ -603,7 +603,7 @@ export default function CotacoesCompra() {
             )}
           </div>
         )}
-      </ViewDrawer>
+      </ViewDrawerV2>
     </AppLayout>
   );
 }

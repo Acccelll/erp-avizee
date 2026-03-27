@@ -519,7 +519,7 @@ const Financeiro = () => {
         </form>
       </FormModal>
 
-      <ViewDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} title="Detalhes do Lançamento"
+      <ViewDrawerV2 open={drawerOpen} onClose={() => setDrawerOpen(false)} title="Detalhes do Lançamento"
         actions={selected ? <>
           {getEffectiveStatus(selected) !== "pago" && getEffectiveStatus(selected) !== "cancelado" && (
             <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-primary hover:text-primary" onClick={() => { setBaixaParcialTarget(selected); setBaixaParcialOpen(true); }}><CreditCard className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Registrar Baixa</TooltipContent></Tooltip>
@@ -584,7 +584,7 @@ const Financeiro = () => {
             )}
           </div>
         )}
-      </ViewDrawer>
+      </ViewDrawerV2>
 
       {/* Baixa Modal */}
       <Dialog open={baixaModalOpen} onOpenChange={setBaixaModalOpen}>

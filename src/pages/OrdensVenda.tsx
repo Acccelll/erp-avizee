@@ -211,7 +211,7 @@ const OrdensVenda = () => {
         <DataTable columns={columns} data={filteredData} loading={loading} onView={handleView} />
       </ModulePage>
 
-      <ViewDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} title="Detalhes da Ordem de Venda"
+      <ViewDrawerV2 open={drawerOpen} onClose={() => setDrawerOpen(false)} title="Detalhes da Ordem de Venda"
         actions={selected ? <>
           <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => { setDrawerOpen(false); remove(selected.id); }}><Trash2 className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Excluir</TooltipContent></Tooltip>
         </> : undefined}
@@ -280,7 +280,7 @@ const OrdensVenda = () => {
             </div>
           </div>
         )}
-      </ViewDrawer>
+      </ViewDrawerV2>
 
       <ConfirmDialog
         open={!!generatingNfId}
