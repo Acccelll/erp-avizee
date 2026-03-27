@@ -53,23 +53,23 @@ export function NotificationsPanel() {
           { data: comprasAguardando },
           { data: ovsAguardando },
         ] = await Promise.all([
-          (supabase as any)
+          supabase
             .from('financeiro_lancamentos')
             .select('id')
             .eq('status', 'vencido')
             .eq('ativo', true),
-          (supabase as any)
+          supabase
             .from('produtos')
             .select('id, nome, estoque_atual, estoque_minimo')
             .eq('ativo', true)
             .gt('estoque_minimo', 0),
-          (supabase as any)
+          supabase
             .from('compras')
             .select('id')
             .eq('ativo', true)
             .eq('status', 'confirmado')
             .is('data_entrega_real', null),
-          (supabase as any)
+          supabase
             .from('ordens_venda')
             .select('id')
             .eq('ativo', true)

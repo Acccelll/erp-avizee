@@ -36,7 +36,7 @@ function withDateRange(query: any, column: string, filtros: FiltroRelatorio) {
 export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRelatorio = {}): Promise<RelatorioResultado> {
   switch (tipo) {
     case "estoque": {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from("produtos")
         .select("codigo_interno, nome, unidade_medida, estoque_atual, estoque_minimo, preco_custo, preco_venda")
         .eq("ativo", true)
@@ -83,7 +83,7 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
     }
 
     case "movimentos_estoque": {
-      let query = (supabase as any)
+      let query = supabase
         .from("estoque_movimentos")
         .select("tipo, quantidade, saldo_anterior, saldo_atual, documento_tipo, motivo, created_at, produtos(nome, codigo_interno)")
         .order("created_at", { ascending: false });
@@ -129,7 +129,7 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
     }
 
     case "financeiro": {
-      let query = (supabase as any)
+      let query = supabase
         .from("financeiro_lancamentos")
         .select("tipo, descricao, valor, status, data_vencimento, data_pagamento, banco, forma_pagamento")
         .eq("ativo", true)
@@ -162,7 +162,7 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
     }
 
     case "fluxo_caixa": {
-      let query = (supabase as any)
+      let query = supabase
         .from("financeiro_lancamentos")
         .select("tipo, descricao, valor, status, data_vencimento, data_pagamento")
         .eq("ativo", true)
@@ -209,7 +209,7 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
     }
 
     case "vendas": {
-      let query = (supabase as any)
+      let query = supabase
         .from("ordens_venda")
         .select("numero, data_emissao, valor_total, status, status_faturamento, clientes(nome_razao_social)")
         .eq("ativo", true)
@@ -241,7 +241,7 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
     }
 
     case "compras": {
-      let query = (supabase as any)
+      let query = supabase
         .from("compras")
         .select("numero, data_compra, data_entrega_prevista, data_entrega_real, valor_total, status, fornecedores(nome_razao_social)")
         .eq("ativo", true)
@@ -273,7 +273,7 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
     }
 
     case "dre": {
-      let receitaQuery = (supabase as any)
+      let receitaQuery = supabase
         .from("financeiro_lancamentos")
         .select("valor")
         .eq("ativo", true)
@@ -281,7 +281,7 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
         .eq("status", "pago");
       receitaQuery = withDateRange(receitaQuery, "data_pagamento", filtros);
 
-      let pagosQuery = (supabase as any)
+      let pagosQuery = supabase
         .from("financeiro_lancamentos")
         .select("valor, descricao, nota_fiscal_id")
         .eq("ativo", true)
@@ -289,7 +289,7 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
         .eq("status", "pago");
       pagosQuery = withDateRange(pagosQuery, "data_pagamento", filtros);
 
-      let nfSaidaQuery = (supabase as any)
+      let nfSaidaQuery = supabase
         .from("notas_fiscais")
         .select("icms_valor, pis_valor, cofins_valor, ipi_valor")
         .eq("ativo", true)
@@ -352,7 +352,7 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
 
     case "aging":
     default: {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from("financeiro_lancamentos")
         .select("tipo, descricao, valor, status, data_vencimento, data_pagamento, clientes(nome_razao_social), fornecedores(nome_razao_social)")
         .eq("ativo", true)

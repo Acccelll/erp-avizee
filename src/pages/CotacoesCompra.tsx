@@ -129,7 +129,7 @@ export default function CotacoesCompra() {
       observacoes: c.observacoes || "",
       status: c.status,
     });
-    const { data: itens } = await (supabase as any)
+    const { data: itens } = await supabase
       .from("cotacoes_compra_itens")
       .select("*, produtos(nome, codigo_interno, sku)")
       .eq("cotacao_compra_id", c.id);
@@ -149,11 +149,11 @@ export default function CotacoesCompra() {
     setSelected(c);
     setDrawerOpen(true);
     const [{ data: itens }, { data: propostas }] = await Promise.all([
-      (supabase as any)
+      supabase
         .from("cotacoes_compra_itens")
         .select("*, produtos(nome, codigo_interno, sku)")
         .eq("cotacao_compra_id", c.id),
-      (supabase as any)
+      supabase
         .from("cotacoes_compra_propostas")
         .select("*, fornecedores(nome_razao_social)")
         .eq("cotacao_compra_id", c.id),
@@ -233,7 +233,7 @@ export default function CotacoesCompra() {
       setAddingProposal(null);
       setProposalForm({ fornecedor_id: "", preco_unitario: 0, prazo_entrega_dias: "", observacoes: "" });
       // Reload propostas
-      const { data: propostas } = await (supabase as any)
+      const { data: propostas } = await supabase
         .from("cotacoes_compra_propostas")
         .select("*, fornecedores(nome_razao_social)")
         .eq("cotacao_compra_id", selected.id);
@@ -247,18 +247,18 @@ export default function CotacoesCompra() {
     if (!selected) return;
     try {
       // Deselect all proposals for this item first
-      await (supabase as any)
+      await supabase
         .from("cotacoes_compra_propostas")
         .update({ selecionado: false })
         .eq("cotacao_compra_id", selected.id)
         .eq("item_id", itemId);
       // Select the chosen one
-      await (supabase as any)
+      await supabase
         .from("cotacoes_compra_propostas")
         .update({ selecionado: true })
         .eq("id", propostaId);
       toast.success("Fornecedor selecionado!");
-      const { data: propostas } = await (supabase as any)
+      const { data: propostas } = await supabase
         .from("cotacoes_compra_propostas")
         .select("*, fornecedores(nome_razao_social)")
         .eq("cotacao_compra_id", selected.id);
@@ -272,7 +272,7 @@ export default function CotacoesCompra() {
     if (!selected) return;
     await supabase.from("cotacoes_compra_propostas").delete().eq("id", propostaId);
     toast.success("Proposta removida");
-    const { data: propostas } = await (supabase as any)
+    const { data: propostas } = await supabase
       .from("cotacoes_compra_propostas")
       .select("*, fornecedores(nome_razao_social)")
       .eq("cotacao_compra_id", selected.id);
