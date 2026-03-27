@@ -1,6 +1,7 @@
 import React, { forwardRef } from 'react';
 import { ArrowUpIcon, ArrowDownIcon, LucideIcon } from 'lucide-react';
 import { LineChart, Line, ResponsiveContainer } from 'recharts';
+import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 
 export interface SummaryCardProps {
@@ -13,8 +14,8 @@ export interface SummaryCardProps {
   icon?: LucideIcon;
   onClick?: () => void;
   className?: string;
-  /** Optional sparkline data points for an inline mini chart */
   sparklineData?: number[];
+  loading?: boolean;
 }
 
 const variantStyles: Record<string, { border: string; iconBg: string; iconColor: string }> = {
@@ -38,9 +39,24 @@ export const SummaryCard = forwardRef<HTMLDivElement, SummaryCardProps>(
       onClick,
       className,
       sparklineData,
+      loading,
     },
     ref,
   ) {
+    if (loading) {
+      return (
+        <div ref={ref} className={cn('stat-card', className)}>
+          <div className="flex items-start justify-between">
+            <div className="min-w-0 flex-1 space-y-2">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-7 w-32" />
+              <Skeleton className="h-3 w-20" />
+            </div>
+            <Skeleton className="h-11 w-11 rounded-lg" />
+          </div>
+        </div>
+      );
+    }
     const variationColors = {
       positive: 'text-success',
       negative: 'text-destructive',
