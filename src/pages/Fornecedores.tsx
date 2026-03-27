@@ -134,12 +134,34 @@ const Fornecedores = () => {
   { key: "ativo", label: "Status", render: (f: Fornecedor) => <StatusBadge status={f.ativo ? "Ativo" : "Inativo"} /> }];
 
 
+  const fornActiveFilters = useMemo(() => {
+    const chips: FilterChip[] = [];
+    if (tipoFilter !== "todos") chips.push({ key: "tipo", label: "Tipo", value: tipoFilter, displayValue: tipoFilter === "J" ? "Pessoa Jurídica" : "Pessoa Física" });
+    return chips;
+  }, [tipoFilter]);
+
   return (
     <AppLayout>
-      <ModulePage title="Fornecedores" subtitle="Cadastro e gestão de fornecedores" addLabel="Novo Fornecedor" onAdd={openCreate} count={filteredData.length}
-      searchValue={searchTerm} onSearchChange={setSearchTerm} searchPlaceholder="Buscar por razão social, CNPJ ou cidade..."
-      filters={<Select value={tipoFilter} onValueChange={(v: any) => setTipoFilter(v)}><SelectTrigger className="h-9 w-[170px]"><SelectValue placeholder="Tipo" /></SelectTrigger><SelectContent><SelectItem value="todos">Todos os tipos</SelectItem><SelectItem value="J">Pessoa jurídica</SelectItem><SelectItem value="F">Pessoa física</SelectItem></SelectContent></Select>}>
+      <ModulePage title="Fornecedores" subtitle="Cadastro e gestão de fornecedores" addLabel="Novo Fornecedor" onAdd={openCreate}>
         
+        <AdvancedFilterBar
+          searchValue={searchTerm}
+          onSearchChange={setSearchTerm}
+          searchPlaceholder="Buscar por razão social, CNPJ ou cidade..."
+          activeFilters={fornActiveFilters}
+          onRemoveFilter={() => setTipoFilter("todos")}
+          count={filteredData.length}
+        >
+          <Select value={tipoFilter} onValueChange={(v: any) => setTipoFilter(v)}>
+            <SelectTrigger className="h-9 w-[170px]"><SelectValue placeholder="Tipo" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos os tipos</SelectItem>
+              <SelectItem value="J">Pessoa jurídica</SelectItem>
+              <SelectItem value="F">Pessoa física</SelectItem>
+            </SelectContent>
+          </Select>
+        </AdvancedFilterBar>
+
         <DataTable columns={columns} data={filteredData} loading={loading}
         onView={openView} />
       </ModulePage>

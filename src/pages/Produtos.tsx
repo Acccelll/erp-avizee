@@ -219,12 +219,61 @@ const Produtos = () => {
 
   const selectedMargem = selected && (selected.preco_custo || 0) > 0 ? (selected.preco_venda / (selected.preco_custo || 1) - 1) * 100 : 0;
 
+  const prodActiveFilters = useMemo(() => {
+    const chips: FilterChip[] = [];
+    if (tipoFilter !== "todos") chips.push({ key: "tipo", label: "Tipo", value: tipoFilter, displayValue: tipoFilter === "simples" ? "Simples" : "Composto" });
+    if (estoqueFilter !== "todos") chips.push({ key: "estoque", label: "Estoque", value: estoqueFilter, displayValue: estoqueFilter === "baixo" ? "Abaixo do mínimo" : "Normal" });
+    if (grupoFilter !== "todos") {
+      const g = grupos.find(g => g.id === grupoFilter);
+      chips.push({ key: "grupo", label: "Grupo", value: grupoFilter, displayValue: g?.nome || grupoFilter });
+    }
+    return chips;
+  }, [tipoFilter, estoqueFilter, grupoFilter, grupos]);
+
+  const handleRemoveProdFilter = (key: string) => {
+    if (key === "tipo") setTipoFilter("todos");
+    if (key === "estoque") setEstoqueFilter("todos");
+    if (key === "grupo") setGrupoFilter("todos");
+  };
+
   return (
     <AppLayout>
-      <ModulePage title="Produtos" subtitle="Cadastro e gestão de produtos" addLabel="Novo Produto" onAdd={openCreate} count={filteredData.length}
-      searchValue={searchTerm} onSearchChange={setSearchTerm} searchPlaceholder="Buscar por nome, SKU ou código..."
-      filters={<><Select value={tipoFilter} onValueChange={(v: any) => setTipoFilter(v)}><SelectTrigger className="h-9 w-[170px]"><SelectValue placeholder="Tipo" /></SelectTrigger><SelectContent><SelectItem value="todos">Todos os tipos</SelectItem><SelectItem value="simples">Somente simples</SelectItem><SelectItem value="composto">Somente compostos</SelectItem></SelectContent></Select><Select value={estoqueFilter} onValueChange={(v: any) => setEstoqueFilter(v)}><SelectTrigger className="h-9 w-[190px]"><SelectValue placeholder="Estoque" /></SelectTrigger><SelectContent><SelectItem value="todos">Todo o estoque</SelectItem><SelectItem value="baixo">Abaixo do mínimo</SelectItem><SelectItem value="ok">Estoque normal</SelectItem></SelectContent></Select><Select value={grupoFilter} onValueChange={setGrupoFilter}><SelectTrigger className="h-9 w-[180px]"><SelectValue placeholder="Grupo" /></SelectTrigger><SelectContent><SelectItem value="todos">Todos os grupos</SelectItem>{grupos.map((g) => <SelectItem key={g.id} value={g.id}>{g.nome}</SelectItem>)}</SelectContent></Select></>}>
+      <ModulePage title="Produtos" subtitle="Cadastro e gestão de produtos" addLabel="Novo Produto" onAdd={openCreate}>
         
+        <AdvancedFilterBar
+          searchValue={searchTerm}
+          onSearchChange={setSearchTerm}
+          searchPlaceholder="Buscar por nome, SKU ou código..."
+          activeFilters={prodActiveFilters}
+          onRemoveFilter={handleRemoveProdFilter}
+          onClearAll={() => { setTipoFilter("todos"); setEstoqueFilter("todos"); setGrupoFilter("todos"); }}
+          count={filteredData.length}
+        >
+          <Select value={tipoFilter} onValueChange={(v: any) => setTipoFilter(v)}>
+            <SelectTrigger className="h-9 w-[170px]"><SelectValue placeholder="Tipo" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos os tipos</SelectItem>
+              <SelectItem value="simples">Somente simples</SelectItem>
+              <SelectItem value="composto">Somente compostos</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={estoqueFilter} onValueChange={(v: any) => setEstoqueFilter(v)}>
+            <SelectTrigger className="h-9 w-[190px]"><SelectValue placeholder="Estoque" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todo o estoque</SelectItem>
+              <SelectItem value="baixo">Abaixo do mínimo</SelectItem>
+              <SelectItem value="ok">Estoque normal</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={grupoFilter} onValueChange={setGrupoFilter}>
+            <SelectTrigger className="h-9 w-[180px]"><SelectValue placeholder="Grupo" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos os grupos</SelectItem>
+              {grupos.map((g) => <SelectItem key={g.id} value={g.id}>{g.nome}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </AdvancedFilterBar>
+
         <DataTable columns={columns} data={filteredData} loading={loading}
         onView={openView} />
       </ModulePage>
