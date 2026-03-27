@@ -17,6 +17,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Plus, Trash2, RefreshCw, Package, TrendingUp, AlertTriangle, Archive, FileText, History } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/format";
+import { FiscalAutocomplete } from "@/components/ui/FiscalAutocomplete";
+import { cfopCodes, cstIcmsCodes } from "@/lib/fiscalData";
 
 interface Produto {
   id: string;sku: string;codigo_interno: string;nome: string;descricao: string;
@@ -253,8 +255,8 @@ const Produtos = () => {
           {/* Fiscal */}
           <h3 className="font-semibold text-sm pt-2 border-t flex items-center gap-2"><FileText className="w-4 h-4" /> Dados Fiscais</h3>
           <div className="grid grid-cols-3 gap-4">
-            <div className="space-y-2"><Label>CST</Label><Input value={form.cst} onChange={(e) => setForm({ ...form, cst: e.target.value })} placeholder="Ex: 000" /></div>
-            <div className="space-y-2"><Label>CFOP Padrão</Label><Input value={form.cfop_padrao} onChange={(e) => setForm({ ...form, cfop_padrao: e.target.value })} placeholder="Ex: 5102" /></div>
+            <div className="space-y-2"><Label>CST</Label><FiscalAutocomplete data={cstIcmsCodes} value={form.cst} onChange={(v) => setForm({ ...form, cst: v })} placeholder="Ex: 000" /></div>
+            <div className="space-y-2"><Label>CFOP Padrão</Label><FiscalAutocomplete data={cfopCodes} value={form.cfop_padrao} onChange={(v) => setForm({ ...form, cfop_padrao: v })} placeholder="Ex: 5102" /></div>
             <div className="space-y-2"><Label>NCM</Label><Input value={form.ncm} onChange={(e) => setForm({ ...form, ncm: e.target.value })} /></div>
           </div>
 
