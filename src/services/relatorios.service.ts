@@ -2,7 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { downloadTextFile } from "@/lib/utils";
 import { formatCurrency, formatDate, formatNumber } from "@/lib/format";
 
-export type TipoRelatorio = "estoque" | "movimentos_estoque" | "financeiro" | "fluxo_caixa" | "vendas" | "compras" | "aging" | "dre" | "curva_abc" | "margem_produtos" | "estoque_minimo" | "vendas_cliente" | "compras_fornecedor";
+export type TipoRelatorio = "estoque" | "movimentos_estoque" | "financeiro" | "fluxo_caixa" | "vendas" | "compras" | "aging" | "dre" | "curva_abc" | "margem_produtos" | "estoque_minimo" | "vendas_cliente" | "compras_fornecedor" | "divergencias";
 
 export interface FiltroRelatorio {
   dataInicio?: string;
@@ -596,6 +596,68 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
         subtitle: "Ranking de fornecedores por volume de compras.",
         rows,
         chartData: rows.slice(0, 8).map(r => ({ name: r.fornecedor.substring(0, 20), value: r.valorTotal })),
+      };
+    }
+
+    case "divergencias": {
+      // Pedidos de compra sem NF
+      const { data: pedidos } = await supabase
+        .from("pedidos_compra" as any)
+        .select("numero, fornecedor_id, valor_total, status, fornecedores(nome_razao_social)")
+        .eq("ativo", true)
+        .in("status", ["pendente", "aprovado"]);
+
+      // Notas fiscais sem financeiro
+      const { data: nfs } = await supabase
+        .from("notas_fiscais")
+        .select("numero, tipo, valor_total, data_emissao, fornecedor_id, cliente_id")
+        .eq("ativo", true)
+        .eq("gera_financeiro", true);
+
+      const { data: financeiro } = await supabase
+        .from("financeiro_lancamentos")
+        .select("documento_fiscal_id, nota_fiscal_id")
+        .eq("ativo", true);
+
+      const nfIdsComFinanceiro = new Set(
+        (financeiro || []).map((f: any) => f.documento_fiscal_id || f.nota_fiscal_id).filter(Boolean)
+      );
+
+      const nfsSemFinanceiro = (nfs || []).filter((nf: any) => !nfIdsComFinanceiro.has(nf.id));
+
+      const rows: any[] = [];
+
+      for (const pc of pedidos || []) {
+        rows.push({
+          tipo: "Pedido s/ NF",
+          referencia: (pc as any).numero,
+          parceiro: (pc as any).fornecedores?.nome_razao_social || "-",
+          valor: Number((pc as any).valor_total || 0),
+          status: (pc as any).status,
+          observacao: "Pedido de compra sem nota fiscal vinculada",
+        });
+      }
+
+      for (const nf of nfsSemFinanceiro) {
+        rows.push({
+          tipo: "NF s/ Financeiro",
+          referencia: nf.numero,
+          parceiro: "-",
+          valor: Number(nf.valor_total || 0),
+          status: nf.tipo,
+          observacao: "Nota fiscal com flag financeiro mas sem lançamento",
+        });
+      }
+
+      return {
+        title: "Divergências",
+        subtitle: "Pedidos sem nota fiscal e notas sem lançamento financeiro.",
+        rows,
+        chartData: [
+          { name: "Pedidos s/ NF", value: (pedidos || []).length },
+          { name: "NF s/ Financeiro", value: nfsSemFinanceiro.length },
+        ],
+        totals: { total: rows.length },
       };
     }
   }

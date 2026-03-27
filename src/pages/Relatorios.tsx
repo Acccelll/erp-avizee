@@ -29,6 +29,7 @@ const reportCards: Array<{ type: TipoRelatorio; title: string; description: stri
   { type: 'dre', title: 'DRE', description: 'Demonstrativo de resultado', icon: BarChart3 },
   { type: 'curva_abc', title: 'Curva ABC', description: 'Classificação de produtos por faturamento', icon: TrendingUp },
   { type: 'margem_produtos', title: 'Margem', description: 'Análise de margem por produto', icon: DollarSign },
+  { type: 'divergencias', title: 'Divergências', description: 'Pedidos sem NF, NF sem financeiro', icon: AlertTriangle },
 ];
 
 const CHART_COLORS = [
