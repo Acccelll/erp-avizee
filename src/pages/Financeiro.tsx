@@ -6,7 +6,7 @@ import { DataTable, StatusBadge } from "@/components/DataTable";
 import { FormModal } from "@/components/FormModal";
 import { ViewDrawer, ViewField, ViewSection } from "@/components/ViewDrawer";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Edit, Trash2 } from "lucide-react";
+import { Edit, Trash2, CreditCard } from "lucide-react";
 import { SummaryCard } from "@/components/SummaryCard";
 import { PeriodFilter, financialPeriods, type Period } from "@/components/dashboard/PeriodFilter";
 import { periodToFinancialRange } from "@/lib/periodFilter";
@@ -23,6 +23,7 @@ import { formatCurrency } from "@/lib/format";
 import { supabase } from "@/integrations/supabase/client";
 import { DollarSign, Clock, AlertTriangle, CheckCircle, CalendarClock, Download, List, CalendarDays } from "lucide-react";
 import { FinanceiroCalendar } from "@/components/financeiro/FinanceiroCalendar";
+import { BaixaParcialDialog } from "@/components/financeiro/BaixaParcialDialog";
 
 interface Lancamento {
   id: string; tipo: string; descricao: string; valor: number;
@@ -31,7 +32,7 @@ interface Lancamento {
   cliente_id: string; fornecedor_id: string; nota_fiscal_id: string;
   conta_bancaria_id: string; conta_contabil_id: string;
   parcela_numero: number; parcela_total: number;
-  documento_pai_id: string;
+  documento_pai_id: string; saldo_restante: number | null;
   observacoes: string; ativo: boolean;
   clientes?: { nome_razao_social: string }; fornecedores?: { nome_razao_social: string };
   contas_bancarias?: { descricao: string; bancos?: { nome: string } };
