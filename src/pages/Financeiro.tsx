@@ -634,6 +634,14 @@ const Financeiro = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <BaixaParcialDialog
+        open={baixaParcialOpen}
+        onClose={() => setBaixaParcialOpen(false)}
+        lancamento={baixaParcialTarget}
+        contasBancarias={contasBancarias}
+        onSuccess={() => { window.location.reload(); }}
+      />
     </AppLayout>
   );
 };
