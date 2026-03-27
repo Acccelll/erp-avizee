@@ -36,7 +36,7 @@ interface GrupoEconomico {id: string;nome: string;}
 const emptyCliente: Record<string, any> = {
   tipo_pessoa: "J", nome_razao_social: "", nome_fantasia: "", cpf_cnpj: "",
   inscricao_estadual: "", email: "", telefone: "", celular: "", contato: "",
-  prazo_padrao: 30, limite_credito: 0,
+  prazo_padrao: 30, limite_credito: 0, forma_pagamento_padrao: "", prazo_preferencial: 0,
   logradouro: "", numero: "", complemento: "", bairro: "", cidade: "", uf: "", cep: "", pais: "Brasil",
   observacoes: "", grupo_economico_id: "", tipo_relacao_grupo: "independente", caixa_postal: ""
 };
@@ -71,6 +71,7 @@ const Clientes = () => {
   const [saldoAberto, setSaldoAberto] = useState(0);
   const [titulosVencidos, setTitulosVencidos] = useState(0);
   const [ultimaCompra, setUltimaCompra] = useState<string | null>(null);
+  const [transportadorasCliente, setTransportadorasCliente] = useState<any[]>([]);
 
   useEffect(() => {
     supabase.from("grupos_economicos").select("id, nome").eq("ativo", true).order("nome").then(({ data: g }: any) => setGrupos(g || []));
@@ -84,6 +85,8 @@ const Clientes = () => {
       cpf_cnpj: c.cpf_cnpj || "", inscricao_estadual: c.inscricao_estadual || "",
       email: c.email || "", telefone: c.telefone || "", celular: c.celular || "", contato: c.contato || "",
       prazo_padrao: c.prazo_padrao || 30, limite_credito: c.limite_credito || 0,
+      forma_pagamento_padrao: (c as any).forma_pagamento_padrao || "",
+      prazo_preferencial: (c as any).prazo_preferencial || 0,
       logradouro: c.logradouro || "", numero: c.numero || "", complemento: c.complemento || "",
       bairro: c.bairro || "", cidade: c.cidade || "", uf: c.uf || "", cep: c.cep || "",
       pais: c.pais || "Brasil", observacoes: c.observacoes || "",
