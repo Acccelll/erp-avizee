@@ -7,7 +7,8 @@ import { FormModal } from "@/components/FormModal";
 import { ViewField, ViewSection } from "@/components/ViewDrawer";
 import { ViewDrawerV2 } from "@/components/ViewDrawerV2";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Edit, Trash2, Upload } from "lucide-react";
+import { Edit, Trash2, Upload, ArrowLeftRight } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { SummaryCard } from "@/components/SummaryCard";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
 import { AutocompleteSearch } from "@/components/ui/AutocompleteSearch";
@@ -30,6 +31,7 @@ interface NotaFiscal {
   valor_total: number; status: string; forma_pagamento: string; condicao_pagamento: string;
   observacoes: string; ativo: boolean; movimenta_estoque: boolean; gera_financeiro: boolean;
   ordem_venda_id: string | null; conta_contabil_id: string | null;
+  modelo_documento: string; nf_referenciada_id: string | null; tipo_operacao: string;
   frete_valor: number; icms_valor: number; ipi_valor: number; pis_valor: number;
   cofins_valor: number; icms_st_valor: number; desconto_valor: number; outras_despesas: number;
   fornecedores?: { nome_razao_social: string; cpf_cnpj: string };
@@ -41,9 +43,13 @@ const emptyForm: Record<string, any> = {
   tipo: "entrada", numero: "", serie: "1", chave_acesso: "", data_emissao: new Date().toISOString().split("T")[0],
   fornecedor_id: "", cliente_id: "", valor_total: 0, status: "pendente", observacoes: "",
   movimenta_estoque: true, gera_financeiro: true, forma_pagamento: "", condicao_pagamento: "a_vista",
-  ordem_venda_id: "", conta_contabil_id: "",
+  ordem_venda_id: "", conta_contabil_id: "", modelo_documento: "55",
   frete_valor: 0, icms_valor: 0, ipi_valor: 0, pis_valor: 0, cofins_valor: 0,
   icms_st_valor: 0, desconto_valor: 0, outras_despesas: 0,
+};
+
+const modeloLabels: Record<string, string> = {
+  '55': 'NF-e', '65': 'NFC-e', '57': 'CT-e', '67': 'CT-e OS', 'nfse': 'NFS-e', 'outro': 'Outro'
 };
 
 const Fiscal = () => {
