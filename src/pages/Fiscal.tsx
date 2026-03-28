@@ -961,6 +961,11 @@ const Fiscal = () => {
                   <CheckCircle className="w-4 h-4 mr-2" /> Confirmar Nota Fiscal
                 </Button>
               )}
+              {selected.status === "confirmada" && selected.tipo === "saida" && (selected.tipo_operacao || "normal") === "normal" && (
+                <Button variant="outline" className="w-full gap-2" onClick={() => { setDrawerOpen(false); openDevolucao(selected); }}>
+                  <ArrowLeftRight className="w-4 h-4" /> Gerar Nota de Devolução
+                </Button>
+              )}
               {selected.status === "confirmada" && (
                 <Button variant="destructive" className="w-full" onClick={() => { handleEstornar(selected); setDrawerOpen(false); }}>
                   <XCircle className="w-4 h-4 mr-2" /> Estornar Nota Fiscal
@@ -979,6 +984,9 @@ const Fiscal = () => {
               title={`NF ${selected.numero}`}
               badge={<StatusBadge status={selected.status} />}
               actions={<>
+                {selected.status === "confirmada" && selected.tipo === "saida" && (selected.tipo_operacao || "normal") === "normal" && (
+                  <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-warning hover:text-warning" onClick={() => { setDrawerOpen(false); openDevolucao(selected); }}><ArrowLeftRight className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Gerar Devolução</TooltipContent></Tooltip>
+                )}
                 <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setDrawerOpen(false); openEdit(selected); }}><Edit className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Editar</TooltipContent></Tooltip>
                 <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => { setDrawerOpen(false); remove(selected.id); }}><Trash2 className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Excluir</TooltipContent></Tooltip>
               </>}
@@ -1008,6 +1016,99 @@ const Fiscal = () => {
             />
           );
       })()}
+
+      {/* B.2 — Modal de Devolução */}
+      <Dialog open={devolucaoModalOpen} onOpenChange={setDevolucaoModalOpen}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Gerar Nota de Devolução</DialogTitle>
+          </DialogHeader>
+          {devolucaoNF && (
+            <div className="space-y-5">
+              {/* NF Original info */}
+              <div className="grid grid-cols-4 gap-3 rounded-lg border bg-muted/30 p-4">
+                <div>
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">NF Original</span>
+                  <p className="mt-0.5 text-sm font-mono font-semibold">{devolucaoNF.numero}</p>
+                </div>
+                <div>
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Cliente</span>
+                  <p className="mt-0.5 text-sm font-medium">{devolucaoNF.clientes?.nome_razao_social || "—"}</p>
+                </div>
+                <div>
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Data</span>
+                  <p className="mt-0.5 text-sm">{formatDate(devolucaoNF.data_emissao)}</p>
+                </div>
+                <div>
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Valor Total</span>
+                  <p className="mt-0.5 text-sm font-mono font-semibold">{formatCurrency(Number(devolucaoNF.valor_total))}</p>
+                </div>
+              </div>
+
+              {/* Items table */}
+              <div className="rounded-lg border overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-muted/50">
+                      <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground">Produto</th>
+                      <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground">Qtd Original</th>
+                      <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground">Qtd Devolver</th>
+                      <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground">Vlr Unit.</th>
+                      <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground">Subtotal</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {devolucaoItens.map((item: any, idx: number) => (
+                      <tr key={idx} className={idx % 2 === 0 ? "bg-muted/20" : ""}>
+                        <td className="px-3 py-2 text-xs">{item.nome}</td>
+                        <td className="px-3 py-2 text-xs text-right font-mono">{item.quantidade}</td>
+                        <td className="px-3 py-2 text-right">
+                          <Input type="number" min={0} max={item.quantidade} step={1}
+                            className="h-7 w-20 text-xs text-right ml-auto"
+                            value={item.qtd_devolver}
+                            onChange={(e) => {
+                              const val = Math.min(Number(e.target.value), item.quantidade);
+                              setDevolucaoItens(prev => prev.map((it: any, i: number) => i === idx ? { ...it, qtd_devolver: Math.max(0, val) } : it));
+                            }}
+                          />
+                        </td>
+                        <td className="px-3 py-2 text-xs text-right font-mono">{formatCurrency(Number(item.valor_unitario))}</td>
+                        <td className="px-3 py-2 text-xs text-right font-mono font-semibold">
+                          {formatCurrency((item.qtd_devolver || 0) * Number(item.valor_unitario))}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="border-t bg-muted/30">
+                      <td colSpan={4} className="px-3 py-2 text-xs font-semibold">Total da Devolução</td>
+                      <td className="px-3 py-2 text-xs font-mono text-right font-bold text-primary">{formatCurrency(valorTotalDevolucao)}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Data da Devolução *</Label>
+                  <Input type="date" value={dataDevolucao} onChange={(e) => setDataDevolucao(e.target.value)} />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Motivo da Devolução *</Label>
+                <Textarea value={motivoDevolucao} onChange={(e) => setMotivoDevolucao(e.target.value)} rows={2} placeholder="Descreva o motivo da devolução..." />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDevolucaoModalOpen(false)} disabled={devolucaoProcessing}>Cancelar</Button>
+            <Button onClick={handleDevolucao} disabled={devolucaoProcessing || valorTotalDevolucao <= 0}>
+              {devolucaoProcessing ? "Processando..." : "Confirmar Devolução"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <DanfeViewer open={danfeOpen} onClose={() => setDanfeOpen(false)} data={danfeData} />
     </AppLayout>
   );
