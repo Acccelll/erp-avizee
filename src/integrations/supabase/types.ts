@@ -106,8 +106,10 @@ export type Database = {
       }
       caixa_movimentos: {
         Row: {
+          conta_bancaria_id: string | null
           created_at: string
           descricao: string
+          forma_pagamento: string | null
           id: string
           referencia_id: string | null
           referencia_tipo: string | null
@@ -118,8 +120,10 @@ export type Database = {
           valor: number
         }
         Insert: {
+          conta_bancaria_id?: string | null
           created_at?: string
           descricao: string
+          forma_pagamento?: string | null
           id?: string
           referencia_id?: string | null
           referencia_tipo?: string | null
@@ -130,8 +134,10 @@ export type Database = {
           valor: number
         }
         Update: {
+          conta_bancaria_id?: string | null
           created_at?: string
           descricao?: string
+          forma_pagamento?: string | null
           id?: string
           referencia_id?: string | null
           referencia_tipo?: string | null
@@ -141,7 +147,15 @@ export type Database = {
           usuario_id?: string | null
           valor?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "caixa_movimentos_conta_bancaria_id_fkey"
+            columns: ["conta_bancaria_id"]
+            isOneToOne: false
+            referencedRelation: "contas_bancarias"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       cliente_registros_comunicacao: {
         Row: {
@@ -963,9 +977,11 @@ export type Database = {
           saldo_restante: number | null
           status: Database["public"]["Enums"]["status_financeiro"]
           tipo: Database["public"]["Enums"]["tipo_financeiro"]
+          tipo_baixa: string | null
           updated_at: string
           usuario_id: string | null
           valor: number
+          valor_pago: number | null
         }
         Insert: {
           ativo?: boolean
@@ -990,9 +1006,11 @@ export type Database = {
           saldo_restante?: number | null
           status?: Database["public"]["Enums"]["status_financeiro"]
           tipo: Database["public"]["Enums"]["tipo_financeiro"]
+          tipo_baixa?: string | null
           updated_at?: string
           usuario_id?: string | null
           valor: number
+          valor_pago?: number | null
         }
         Update: {
           ativo?: boolean
@@ -1017,9 +1035,11 @@ export type Database = {
           saldo_restante?: number | null
           status?: Database["public"]["Enums"]["status_financeiro"]
           tipo?: Database["public"]["Enums"]["tipo_financeiro"]
+          tipo_baixa?: string | null
           updated_at?: string
           usuario_id?: string | null
           valor?: number
+          valor_pago?: number | null
         }
         Relationships: [
           {
