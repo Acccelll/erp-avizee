@@ -7,7 +7,8 @@ import { FormModal } from "@/components/FormModal";
 import { ViewField, ViewSection } from "@/components/ViewDrawer";
 import { ViewDrawerV2 } from "@/components/ViewDrawerV2";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Edit, Trash2, Upload } from "lucide-react";
+import { Edit, Trash2, Upload, ArrowLeftRight } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { SummaryCard } from "@/components/SummaryCard";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
 import { AutocompleteSearch } from "@/components/ui/AutocompleteSearch";
@@ -30,6 +31,7 @@ interface NotaFiscal {
   valor_total: number; status: string; forma_pagamento: string; condicao_pagamento: string;
   observacoes: string; ativo: boolean; movimenta_estoque: boolean; gera_financeiro: boolean;
   ordem_venda_id: string | null; conta_contabil_id: string | null;
+  modelo_documento: string; nf_referenciada_id: string | null; tipo_operacao: string;
   frete_valor: number; icms_valor: number; ipi_valor: number; pis_valor: number;
   cofins_valor: number; icms_st_valor: number; desconto_valor: number; outras_despesas: number;
   fornecedores?: { nome_razao_social: string; cpf_cnpj: string };
@@ -41,9 +43,13 @@ const emptyForm: Record<string, any> = {
   tipo: "entrada", numero: "", serie: "1", chave_acesso: "", data_emissao: new Date().toISOString().split("T")[0],
   fornecedor_id: "", cliente_id: "", valor_total: 0, status: "pendente", observacoes: "",
   movimenta_estoque: true, gera_financeiro: true, forma_pagamento: "", condicao_pagamento: "a_vista",
-  ordem_venda_id: "", conta_contabil_id: "",
+  ordem_venda_id: "", conta_contabil_id: "", modelo_documento: "55",
   frete_valor: 0, icms_valor: 0, ipi_valor: 0, pis_valor: 0, cofins_valor: 0,
   icms_st_valor: 0, desconto_valor: 0, outras_despesas: 0,
+};
+
+const modeloLabels: Record<string, string> = {
+  '55': 'NF-e', '65': 'NFC-e', '57': 'CT-e', '67': 'CT-e OS', 'nfse': 'NFS-e', 'outro': 'Outro'
 };
 
 const Fiscal = () => {
@@ -70,6 +76,14 @@ const Fiscal = () => {
   const xmlInputRef = useRef<HTMLInputElement>(null);
   const [danfeOpen, setDanfeOpen] = useState(false);
   const [danfeData, setDanfeData] = useState<any>(null);
+  const [filterModelo, setFilterModelo] = useState("todos");
+  // B.2 — Devolução
+  const [devolucaoModalOpen, setDevolucaoModalOpen] = useState(false);
+  const [devolucaoNF, setDevolucaoNF] = useState<NotaFiscal | null>(null);
+  const [devolucaoItens, setDevolucaoItens] = useState<any[]>([]);
+  const [dataDevolucao, setDataDevolucao] = useState(new Date().toISOString().split("T")[0]);
+  const [motivoDevolucao, setMotivoDevolucao] = useState("");
+  const [devolucaoProcessing, setDevolucaoProcessing] = useState(false);
 
   const valorProdutos = items.reduce((s, i) => s + (i.valor_total || 0), 0);
   const totalImpostos = Number(form.icms_valor || 0) + Number(form.ipi_valor || 0) + Number(form.pis_valor || 0) + Number(form.cofins_valor || 0) + Number(form.icms_st_valor || 0);
@@ -108,6 +122,7 @@ const Fiscal = () => {
       movimenta_estoque: n.movimenta_estoque !== false, gera_financeiro: n.gera_financeiro !== false,
       forma_pagamento: n.forma_pagamento || "", condicao_pagamento: n.condicao_pagamento || "a_vista",
       ordem_venda_id: n.ordem_venda_id || "", conta_contabil_id: n.conta_contabil_id || "",
+      modelo_documento: n.modelo_documento || "55",
       frete_valor: n.frete_valor || 0, icms_valor: n.icms_valor || 0, ipi_valor: n.ipi_valor || 0,
       pis_valor: n.pis_valor || 0, cofins_valor: n.cofins_valor || 0, icms_st_valor: n.icms_st_valor || 0,
       desconto_valor: n.desconto_valor || 0, outras_despesas: n.outras_despesas || 0,
@@ -433,12 +448,13 @@ const Fiscal = () => {
     const query = consultaSearch.trim().toLowerCase();
     return data.filter((n) => {
       if (tipoParam && n.tipo !== tipoParam) return false;
+      if (filterModelo !== "todos" && (n.modelo_documento || "55") !== filterModelo) return false;
       if (viewParam !== "consulta" || !query) return true;
       const parceiro = n.tipo === "entrada" ? n.fornecedores?.nome_razao_social : n.clientes?.nome_razao_social;
       const haystack = [n.numero, n.serie, n.chave_acesso, parceiro, n.ordens_venda?.numero].filter(Boolean).join(" ").toLowerCase();
       return haystack.includes(query);
     });
-  }, [consultaSearch, data, tipoParam, viewParam]);
+  }, [consultaSearch, data, tipoParam, viewParam, filterModelo]);
 
   const fiscalSubtitle = viewParam === "consulta"
     ? "Consulta rápida de documentos fiscais e chaves de acesso"
@@ -446,18 +462,89 @@ const Fiscal = () => {
     : tipoParam === "saida" ? "Notas fiscais de saída e faturamento"
     : "Notas fiscais, faturas e documentos";
 
+  // B.2 — Devolução helpers
+  const calcularCfopDevolucao = (cfopOriginal: string | null) => {
+    if (!cfopOriginal) return "5201";
+    return cfopOriginal.startsWith("6") ? "6201" : "5201";
+  };
+
+  const openDevolucao = async (nf: NotaFiscal) => {
+    const { data: itens } = await supabase.from("notas_fiscais_itens")
+      .select("*, produtos(nome, sku)").eq("nota_fiscal_id", nf.id);
+    setDevolucaoNF(nf);
+    setDevolucaoItens((itens || []).map((i: any) => ({
+      ...i, qtd_devolver: 0, nome: i.produtos?.nome || "—",
+    })));
+    setDataDevolucao(new Date().toISOString().split("T")[0]);
+    setMotivoDevolucao("");
+    setDevolucaoModalOpen(true);
+  };
+
+  const handleDevolucao = async () => {
+    if (!devolucaoNF) return;
+    const itensDevolver = devolucaoItens.filter((i: any) => i.qtd_devolver > 0);
+    if (itensDevolver.length === 0) { toast.error("Selecione ao menos um item para devolver"); return; }
+    if (!motivoDevolucao.trim()) { toast.error("Informe o motivo da devolução"); return; }
+    setDevolucaoProcessing(true);
+    try {
+      const valorDevolucao = itensDevolver.reduce((s: number, i: any) => s + i.qtd_devolver * Number(i.valor_unitario), 0);
+      const { data: nfDev, error } = await supabase.from("notas_fiscais").insert({
+        tipo: "entrada", tipo_operacao: "devolucao", nf_referenciada_id: devolucaoNF.id,
+        modelo_documento: devolucaoNF.modelo_documento || "55",
+        numero: `DEV-${devolucaoNF.numero}`, serie: devolucaoNF.serie,
+        data_emissao: dataDevolucao, cliente_id: devolucaoNF.cliente_id,
+        valor_total: valorDevolucao, status: "confirmada",
+        movimenta_estoque: true, gera_financeiro: false,
+        observacoes: `Devolução da NF ${devolucaoNF.numero}. Motivo: ${motivoDevolucao}`,
+        ativo: true,
+      } as any).select().single();
+      if (error) throw error;
+
+      for (const item of itensDevolver) {
+        await supabase.from("notas_fiscais_itens").insert({
+          nota_fiscal_id: nfDev.id, produto_id: item.produto_id,
+          quantidade: item.qtd_devolver, valor_unitario: item.valor_unitario,
+          cfop: calcularCfopDevolucao(item.cfop),
+        });
+        // Reverse stock
+        const { data: prod } = await supabase.from("produtos").select("estoque_atual").eq("id", item.produto_id).single();
+        const saldoAnterior = Number(prod?.estoque_atual || 0);
+        const novoEstoque = saldoAnterior + item.qtd_devolver;
+        await supabase.from("estoque_movimentos").insert({
+          produto_id: item.produto_id, tipo: "entrada",
+          quantidade: item.qtd_devolver, saldo_anterior: saldoAnterior, saldo_atual: novoEstoque,
+          documento_tipo: "devolucao", documento_id: nfDev.id,
+          motivo: `Devolução da NF ${devolucaoNF.numero}`,
+        });
+        await supabase.from("produtos").update({ estoque_atual: novoEstoque }).eq("id", item.produto_id);
+      }
+
+      toast.success("Nota de devolução criada e estoque revertido!");
+      setDevolucaoModalOpen(false);
+      fetchData();
+    } catch (err: any) {
+      console.error("[fiscal] devolução:", err);
+      toast.error("Erro ao gerar devolução");
+    }
+    setDevolucaoProcessing(false);
+  };
+
+  const valorTotalDevolucao = devolucaoItens.reduce((s: number, i: any) => s + (i.qtd_devolver || 0) * Number(i.valor_unitario), 0);
+
   const columns = [
     { key: "tipo", label: "Tipo", render: (n: NotaFiscal) => n.tipo === "entrada" ? "Entrada" : "Saída" },
+    { key: "modelo", label: "Modelo", render: (n: NotaFiscal) => (
+      <span className="text-xs font-mono font-medium">{modeloLabels[n.modelo_documento || '55'] || n.modelo_documento}</span>
+    )},
     { key: "numero", label: "Número", render: (n: NotaFiscal) => <span className="font-mono text-xs font-medium text-primary">{n.numero}</span> },
     { key: "parceiro", label: "Parceiro", render: (n: NotaFiscal) => n.tipo === "entrada" ? n.fornecedores?.nome_razao_social || "—" : n.clientes?.nome_razao_social || "—" },
     { key: "ov", label: "OV", render: (n: NotaFiscal) => n.ordens_venda?.numero ? <span className="font-mono text-xs">{n.ordens_venda.numero}</span> : "—" },
     { key: "data_emissao", label: "Emissão", render: (n: NotaFiscal) => formatDate(n.data_emissao) },
     { key: "valor_total", label: "Total", render: (n: NotaFiscal) => <span className="font-semibold font-mono">{formatCurrency(Number(n.valor_total))}</span> },
-    { key: "gera_fin", label: "Gera Fin.", render: (n: NotaFiscal) => (
-      <span className={`text-xs font-medium ${n.gera_financeiro !== false ? "text-green-600" : "text-muted-foreground"}`}>
-        {n.gera_financeiro !== false ? "Sim" : "Não"}
-      </span>
-    )},
+    { key: "operacao", label: "Operação", render: (n: NotaFiscal) => {
+      if ((n.tipo_operacao || "normal") === "devolucao") return <span className="text-xs text-warning font-medium">Devolução</span>;
+      return <span className="text-xs text-muted-foreground">Normal</span>;
+    }},
     { key: "status", label: "Status", render: (n: NotaFiscal) => <StatusBadge status={n.status} /> },
   ];
 
@@ -476,6 +563,15 @@ const Fiscal = () => {
           </>
         }
       >
+        {/* Modelo filter tabs */}
+        <div className="flex gap-1 mb-4 flex-wrap">
+          {[{ v: "todos", l: "Todos" }, { v: "55", l: "NF-e" }, { v: "65", l: "NFC-e" }, { v: "57", l: "CT-e" }, { v: "nfse", l: "NFS-e" }].map(t => (
+            <Button key={t.v} size="sm" variant={filterModelo === t.v ? "default" : "outline"} onClick={() => setFilterModelo(t.v)}>
+              {t.l}
+            </Button>
+          ))}
+        </div>
+
         {/* KPI Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <SummaryCard title="Total de NFs" value={String(kpis.total)} icon={FileText} variationType="neutral" variation="registros" />
@@ -490,11 +586,24 @@ const Fiscal = () => {
 
       <FormModal open={modalOpen} onClose={() => setModalOpen(false)} title={mode === "create" ? "Nova Nota Fiscal" : "Editar Nota Fiscal"} size="xl">
         <form onSubmit={handleSubmit} className="space-y-5">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             <div className="space-y-2"><Label>Tipo</Label>
               <Select value={form.tipo} onValueChange={(v) => setForm({ ...form, tipo: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent><SelectItem value="entrada">Entrada</SelectItem><SelectItem value="saida">Saída</SelectItem></SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2"><Label>Modelo</Label>
+              <Select value={form.modelo_documento || "55"} onValueChange={(v) => setForm({ ...form, modelo_documento: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="55">NF-e (Modelo 55)</SelectItem>
+                  <SelectItem value="65">NFC-e (Modelo 65)</SelectItem>
+                  <SelectItem value="57">CT-e (Modelo 57)</SelectItem>
+                  <SelectItem value="67">CT-e OS (Modelo 67)</SelectItem>
+                  <SelectItem value="nfse">NFS-e (Serviço)</SelectItem>
+                  <SelectItem value="outro">Outro</SelectItem>
+                </SelectContent>
               </Select>
             </div>
             <div className="space-y-2"><Label>Número *</Label><Input value={form.numero} onChange={(e) => setForm({ ...form, numero: e.target.value })} required className="font-mono" /></div>
@@ -717,9 +826,13 @@ const Fiscal = () => {
               <ViewSection title="Informações Gerais">
                 <div className="grid grid-cols-2 gap-4">
                   <ViewField label="Tipo"><span className="capitalize font-medium">{selected.tipo === 'entrada' ? 'Entrada' : 'Saída'}</span></ViewField>
+                  <ViewField label="Modelo"><span className="font-mono font-medium">{modeloLabels[selected.modelo_documento || '55'] || selected.modelo_documento}</span></ViewField>
                   <ViewField label="Número / Série"><span className="font-mono font-medium">{selected.numero} / {selected.serie || '1'}</span></ViewField>
                   <ViewField label="Data Emissão">{formatDate(selected.data_emissao)}</ViewField>
                   <ViewField label="Status"><StatusBadge status={selected.status} /></ViewField>
+                  {(selected.tipo_operacao || 'normal') !== 'normal' && (
+                    <ViewField label="Operação"><span className="font-medium capitalize text-warning">{selected.tipo_operacao}</span></ViewField>
+                  )}
                 </div>
                 {selected.chave_acesso && (
                   <div className="mt-3">
@@ -848,6 +961,11 @@ const Fiscal = () => {
                   <CheckCircle className="w-4 h-4 mr-2" /> Confirmar Nota Fiscal
                 </Button>
               )}
+              {selected.status === "confirmada" && selected.tipo === "saida" && (selected.tipo_operacao || "normal") === "normal" && (
+                <Button variant="outline" className="w-full gap-2" onClick={() => { setDrawerOpen(false); openDevolucao(selected); }}>
+                  <ArrowLeftRight className="w-4 h-4" /> Gerar Nota de Devolução
+                </Button>
+              )}
               {selected.status === "confirmada" && (
                 <Button variant="destructive" className="w-full" onClick={() => { handleEstornar(selected); setDrawerOpen(false); }}>
                   <XCircle className="w-4 h-4 mr-2" /> Estornar Nota Fiscal
@@ -866,6 +984,9 @@ const Fiscal = () => {
               title={`NF ${selected.numero}`}
               badge={<StatusBadge status={selected.status} />}
               actions={<>
+                {selected.status === "confirmada" && selected.tipo === "saida" && (selected.tipo_operacao || "normal") === "normal" && (
+                  <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-warning hover:text-warning" onClick={() => { setDrawerOpen(false); openDevolucao(selected); }}><ArrowLeftRight className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Gerar Devolução</TooltipContent></Tooltip>
+                )}
                 <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setDrawerOpen(false); openEdit(selected); }}><Edit className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Editar</TooltipContent></Tooltip>
                 <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => { setDrawerOpen(false); remove(selected.id); }}><Trash2 className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Excluir</TooltipContent></Tooltip>
               </>}
@@ -895,6 +1016,99 @@ const Fiscal = () => {
             />
           );
       })()}
+
+      {/* B.2 — Modal de Devolução */}
+      <Dialog open={devolucaoModalOpen} onOpenChange={setDevolucaoModalOpen}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Gerar Nota de Devolução</DialogTitle>
+          </DialogHeader>
+          {devolucaoNF && (
+            <div className="space-y-5">
+              {/* NF Original info */}
+              <div className="grid grid-cols-4 gap-3 rounded-lg border bg-muted/30 p-4">
+                <div>
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">NF Original</span>
+                  <p className="mt-0.5 text-sm font-mono font-semibold">{devolucaoNF.numero}</p>
+                </div>
+                <div>
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Cliente</span>
+                  <p className="mt-0.5 text-sm font-medium">{devolucaoNF.clientes?.nome_razao_social || "—"}</p>
+                </div>
+                <div>
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Data</span>
+                  <p className="mt-0.5 text-sm">{formatDate(devolucaoNF.data_emissao)}</p>
+                </div>
+                <div>
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Valor Total</span>
+                  <p className="mt-0.5 text-sm font-mono font-semibold">{formatCurrency(Number(devolucaoNF.valor_total))}</p>
+                </div>
+              </div>
+
+              {/* Items table */}
+              <div className="rounded-lg border overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-muted/50">
+                      <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground">Produto</th>
+                      <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground">Qtd Original</th>
+                      <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground">Qtd Devolver</th>
+                      <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground">Vlr Unit.</th>
+                      <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground">Subtotal</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {devolucaoItens.map((item: any, idx: number) => (
+                      <tr key={idx} className={idx % 2 === 0 ? "bg-muted/20" : ""}>
+                        <td className="px-3 py-2 text-xs">{item.nome}</td>
+                        <td className="px-3 py-2 text-xs text-right font-mono">{item.quantidade}</td>
+                        <td className="px-3 py-2 text-right">
+                          <Input type="number" min={0} max={item.quantidade} step={1}
+                            className="h-7 w-20 text-xs text-right ml-auto"
+                            value={item.qtd_devolver}
+                            onChange={(e) => {
+                              const val = Math.min(Number(e.target.value), item.quantidade);
+                              setDevolucaoItens(prev => prev.map((it: any, i: number) => i === idx ? { ...it, qtd_devolver: Math.max(0, val) } : it));
+                            }}
+                          />
+                        </td>
+                        <td className="px-3 py-2 text-xs text-right font-mono">{formatCurrency(Number(item.valor_unitario))}</td>
+                        <td className="px-3 py-2 text-xs text-right font-mono font-semibold">
+                          {formatCurrency((item.qtd_devolver || 0) * Number(item.valor_unitario))}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="border-t bg-muted/30">
+                      <td colSpan={4} className="px-3 py-2 text-xs font-semibold">Total da Devolução</td>
+                      <td className="px-3 py-2 text-xs font-mono text-right font-bold text-primary">{formatCurrency(valorTotalDevolucao)}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Data da Devolução *</Label>
+                  <Input type="date" value={dataDevolucao} onChange={(e) => setDataDevolucao(e.target.value)} />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Motivo da Devolução *</Label>
+                <Textarea value={motivoDevolucao} onChange={(e) => setMotivoDevolucao(e.target.value)} rows={2} placeholder="Descreva o motivo da devolução..." />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDevolucaoModalOpen(false)} disabled={devolucaoProcessing}>Cancelar</Button>
+            <Button onClick={handleDevolucao} disabled={devolucaoProcessing || valorTotalDevolucao <= 0}>
+              {devolucaoProcessing ? "Processando..." : "Confirmar Devolução"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <DanfeViewer open={danfeOpen} onClose={() => setDanfeOpen(false)} data={danfeData} />
     </AppLayout>
   );
