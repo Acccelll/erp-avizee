@@ -586,11 +586,24 @@ const Fiscal = () => {
 
       <FormModal open={modalOpen} onClose={() => setModalOpen(false)} title={mode === "create" ? "Nova Nota Fiscal" : "Editar Nota Fiscal"} size="xl">
         <form onSubmit={handleSubmit} className="space-y-5">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             <div className="space-y-2"><Label>Tipo</Label>
               <Select value={form.tipo} onValueChange={(v) => setForm({ ...form, tipo: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent><SelectItem value="entrada">Entrada</SelectItem><SelectItem value="saida">Saída</SelectItem></SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2"><Label>Modelo</Label>
+              <Select value={form.modelo_documento || "55"} onValueChange={(v) => setForm({ ...form, modelo_documento: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="55">NF-e (Modelo 55)</SelectItem>
+                  <SelectItem value="65">NFC-e (Modelo 65)</SelectItem>
+                  <SelectItem value="57">CT-e (Modelo 57)</SelectItem>
+                  <SelectItem value="67">CT-e OS (Modelo 67)</SelectItem>
+                  <SelectItem value="nfse">NFS-e (Serviço)</SelectItem>
+                  <SelectItem value="outro">Outro</SelectItem>
+                </SelectContent>
               </Select>
             </div>
             <div className="space-y-2"><Label>Número *</Label><Input value={form.numero} onChange={(e) => setForm({ ...form, numero: e.target.value })} required className="font-mono" /></div>
