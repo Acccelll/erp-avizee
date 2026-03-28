@@ -448,12 +448,13 @@ const Fiscal = () => {
     const query = consultaSearch.trim().toLowerCase();
     return data.filter((n) => {
       if (tipoParam && n.tipo !== tipoParam) return false;
+      if (filterModelo !== "todos" && (n.modelo_documento || "55") !== filterModelo) return false;
       if (viewParam !== "consulta" || !query) return true;
       const parceiro = n.tipo === "entrada" ? n.fornecedores?.nome_razao_social : n.clientes?.nome_razao_social;
       const haystack = [n.numero, n.serie, n.chave_acesso, parceiro, n.ordens_venda?.numero].filter(Boolean).join(" ").toLowerCase();
       return haystack.includes(query);
     });
-  }, [consultaSearch, data, tipoParam, viewParam]);
+  }, [consultaSearch, data, tipoParam, viewParam, filterModelo]);
 
   const fiscalSubtitle = viewParam === "consulta"
     ? "Consulta rápida de documentos fiscais e chaves de acesso"
@@ -461,18 +462,89 @@ const Fiscal = () => {
     : tipoParam === "saida" ? "Notas fiscais de saída e faturamento"
     : "Notas fiscais, faturas e documentos";
 
+  // B.2 — Devolução helpers
+  const calcularCfopDevolucao = (cfopOriginal: string | null) => {
+    if (!cfopOriginal) return "5201";
+    return cfopOriginal.startsWith("6") ? "6201" : "5201";
+  };
+
+  const openDevolucao = async (nf: NotaFiscal) => {
+    const { data: itens } = await supabase.from("notas_fiscais_itens")
+      .select("*, produtos(nome, sku)").eq("nota_fiscal_id", nf.id);
+    setDevolucaoNF(nf);
+    setDevolucaoItens((itens || []).map((i: any) => ({
+      ...i, qtd_devolver: 0, nome: i.produtos?.nome || "—",
+    })));
+    setDataDevolucao(new Date().toISOString().split("T")[0]);
+    setMotivoDevolucao("");
+    setDevolucaoModalOpen(true);
+  };
+
+  const handleDevolucao = async () => {
+    if (!devolucaoNF) return;
+    const itensDevolver = devolucaoItens.filter((i: any) => i.qtd_devolver > 0);
+    if (itensDevolver.length === 0) { toast.error("Selecione ao menos um item para devolver"); return; }
+    if (!motivoDevolucao.trim()) { toast.error("Informe o motivo da devolução"); return; }
+    setDevolucaoProcessing(true);
+    try {
+      const valorDevolucao = itensDevolver.reduce((s: number, i: any) => s + i.qtd_devolver * Number(i.valor_unitario), 0);
+      const { data: nfDev, error } = await supabase.from("notas_fiscais").insert({
+        tipo: "entrada", tipo_operacao: "devolucao", nf_referenciada_id: devolucaoNF.id,
+        modelo_documento: devolucaoNF.modelo_documento || "55",
+        numero: `DEV-${devolucaoNF.numero}`, serie: devolucaoNF.serie,
+        data_emissao: dataDevolucao, cliente_id: devolucaoNF.cliente_id,
+        valor_total: valorDevolucao, status: "confirmada",
+        movimenta_estoque: true, gera_financeiro: false,
+        observacoes: `Devolução da NF ${devolucaoNF.numero}. Motivo: ${motivoDevolucao}`,
+        ativo: true,
+      } as any).select().single();
+      if (error) throw error;
+
+      for (const item of itensDevolver) {
+        await supabase.from("notas_fiscais_itens").insert({
+          nota_fiscal_id: nfDev.id, produto_id: item.produto_id,
+          quantidade: item.qtd_devolver, valor_unitario: item.valor_unitario,
+          cfop: calcularCfopDevolucao(item.cfop),
+        });
+        // Reverse stock
+        const { data: prod } = await supabase.from("produtos").select("estoque_atual").eq("id", item.produto_id).single();
+        const saldoAnterior = Number(prod?.estoque_atual || 0);
+        const novoEstoque = saldoAnterior + item.qtd_devolver;
+        await supabase.from("estoque_movimentos").insert({
+          produto_id: item.produto_id, tipo: "entrada",
+          quantidade: item.qtd_devolver, saldo_anterior: saldoAnterior, saldo_atual: novoEstoque,
+          documento_tipo: "devolucao", documento_id: nfDev.id,
+          motivo: `Devolução da NF ${devolucaoNF.numero}`,
+        });
+        await supabase.from("produtos").update({ estoque_atual: novoEstoque }).eq("id", item.produto_id);
+      }
+
+      toast.success("Nota de devolução criada e estoque revertido!");
+      setDevolucaoModalOpen(false);
+      fetchData();
+    } catch (err: any) {
+      console.error("[fiscal] devolução:", err);
+      toast.error("Erro ao gerar devolução");
+    }
+    setDevolucaoProcessing(false);
+  };
+
+  const valorTotalDevolucao = devolucaoItens.reduce((s: number, i: any) => s + (i.qtd_devolver || 0) * Number(i.valor_unitario), 0);
+
   const columns = [
     { key: "tipo", label: "Tipo", render: (n: NotaFiscal) => n.tipo === "entrada" ? "Entrada" : "Saída" },
+    { key: "modelo", label: "Modelo", render: (n: NotaFiscal) => (
+      <span className="text-xs font-mono font-medium">{modeloLabels[n.modelo_documento || '55'] || n.modelo_documento}</span>
+    )},
     { key: "numero", label: "Número", render: (n: NotaFiscal) => <span className="font-mono text-xs font-medium text-primary">{n.numero}</span> },
     { key: "parceiro", label: "Parceiro", render: (n: NotaFiscal) => n.tipo === "entrada" ? n.fornecedores?.nome_razao_social || "—" : n.clientes?.nome_razao_social || "—" },
     { key: "ov", label: "OV", render: (n: NotaFiscal) => n.ordens_venda?.numero ? <span className="font-mono text-xs">{n.ordens_venda.numero}</span> : "—" },
     { key: "data_emissao", label: "Emissão", render: (n: NotaFiscal) => formatDate(n.data_emissao) },
     { key: "valor_total", label: "Total", render: (n: NotaFiscal) => <span className="font-semibold font-mono">{formatCurrency(Number(n.valor_total))}</span> },
-    { key: "gera_fin", label: "Gera Fin.", render: (n: NotaFiscal) => (
-      <span className={`text-xs font-medium ${n.gera_financeiro !== false ? "text-green-600" : "text-muted-foreground"}`}>
-        {n.gera_financeiro !== false ? "Sim" : "Não"}
-      </span>
-    )},
+    { key: "operacao", label: "Operação", render: (n: NotaFiscal) => {
+      if ((n.tipo_operacao || "normal") === "devolucao") return <span className="text-xs text-warning font-medium">Devolução</span>;
+      return <span className="text-xs text-muted-foreground">Normal</span>;
+    }},
     { key: "status", label: "Status", render: (n: NotaFiscal) => <StatusBadge status={n.status} /> },
   ];
 
@@ -491,6 +563,15 @@ const Fiscal = () => {
           </>
         }
       >
+        {/* Modelo filter tabs */}
+        <div className="flex gap-1 mb-4 flex-wrap">
+          {[{ v: "todos", l: "Todos" }, { v: "55", l: "NF-e" }, { v: "65", l: "NFC-e" }, { v: "57", l: "CT-e" }, { v: "nfse", l: "NFS-e" }].map(t => (
+            <Button key={t.v} size="sm" variant={filterModelo === t.v ? "default" : "outline"} onClick={() => setFilterModelo(t.v)}>
+              {t.l}
+            </Button>
+          ))}
+        </div>
+
         {/* KPI Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <SummaryCard title="Total de NFs" value={String(kpis.total)} icon={FileText} variationType="neutral" variation="registros" />
