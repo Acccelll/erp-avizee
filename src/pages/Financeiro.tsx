@@ -266,6 +266,10 @@ const Financeiro = () => {
   const openBaixaModal = () => {
     if (selectedIds.length === 0) { toast.error("Selecione os lançamentos para dar baixa"); return; }
     setBaixaDate(new Date().toISOString().split("T")[0]);
+    setBaixaFormaPagamento("");
+    setBaixaContaBancaria("");
+    setTipoBaixa("total");
+    setValorPagoBaixa(0);
     setBaixaModalOpen(true);
   };
 
@@ -274,19 +278,68 @@ const Financeiro = () => {
   }, [data, selectedIds]);
 
   const totalBaixa = useMemo(() => {
-    return selectedForBaixa.reduce((s, l) => s + Number(l.valor || 0), 0);
+    return selectedForBaixa.reduce((s, l) => s + Number(l.saldo_restante != null ? l.saldo_restante : l.valor || 0), 0);
   }, [selectedForBaixa]);
+
+  // Reset valorPagoBaixa when totalBaixa or tipoBaixa changes
+  useEffect(() => {
+    if (baixaModalOpen) setValorPagoBaixa(totalBaixa);
+  }, [totalBaixa, baixaModalOpen]);
 
   const handleConfirmBaixa = async () => {
     if (!baixaDate) { toast.error("Data de baixa é obrigatória"); return; }
+    if (!baixaFormaPagamento) { toast.error("Forma de pagamento é obrigatória"); return; }
+    if (!baixaContaBancaria) { toast.error("Conta bancária é obrigatória"); return; }
+    if (tipoBaixa === "parcial" && (valorPagoBaixa <= 0 || valorPagoBaixa >= totalBaixa)) {
+      toast.error("Para baixa parcial, informe um valor menor que o total");
+      return;
+    }
     setBaixaProcessing(true);
     try {
-      for (const id of selectedIds) {
-        await supabase.from("financeiro_lancamentos").update({
-          status: "pago", data_pagamento: baixaDate,
-        }).eq("id", id);
+      if (tipoBaixa === "total") {
+        for (const id of selectedIds) {
+          const l = selectedForBaixa.find(x => x.id === id);
+          const valor = l ? Number(l.saldo_restante != null ? l.saldo_restante : l.valor) : 0;
+          await supabase.from("financeiro_lancamentos").update({
+            status: "pago", data_pagamento: baixaDate,
+            valor_pago: valor, tipo_baixa: "total",
+            forma_pagamento: baixaFormaPagamento,
+            conta_bancaria_id: baixaContaBancaria,
+            saldo_restante: 0,
+          } as any).eq("id", id);
+          // Insert baixa record
+          await supabase.from("financeiro_baixas" as any).insert({
+            lancamento_id: id, valor_pago: valor,
+            data_baixa: baixaDate, forma_pagamento: baixaFormaPagamento,
+            conta_bancaria_id: baixaContaBancaria,
+          });
+        }
+        toast.success(`${selectedIds.length} lançamento(s) baixado(s) integralmente!`);
+      } else {
+        // Parcial — distribute valorPagoBaixa proportionally across selected
+        const ratio = valorPagoBaixa / totalBaixa;
+        for (const id of selectedIds) {
+          const l = selectedForBaixa.find(x => x.id === id);
+          const saldo = l ? Number(l.saldo_restante != null ? l.saldo_restante : l.valor) : 0;
+          const pagoParcial = Math.round(saldo * ratio * 100) / 100;
+          const novoSaldo = Math.max(0, saldo - pagoParcial);
+          const novoStatus = novoSaldo <= 0.01 ? "pago" : "parcial";
+          await supabase.from("financeiro_lancamentos").update({
+            status: novoStatus,
+            data_pagamento: novoStatus === "pago" ? baixaDate : null,
+            valor_pago: pagoParcial, tipo_baixa: "parcial",
+            forma_pagamento: baixaFormaPagamento,
+            conta_bancaria_id: baixaContaBancaria,
+            saldo_restante: novoSaldo,
+          } as any).eq("id", id);
+          await supabase.from("financeiro_baixas" as any).insert({
+            lancamento_id: id, valor_pago: pagoParcial,
+            data_baixa: baixaDate, forma_pagamento: baixaFormaPagamento,
+            conta_bancaria_id: baixaContaBancaria,
+          });
+        }
+        toast.success(`Baixa parcial registrada para ${selectedIds.length} lançamento(s)!`);
       }
-      toast.success(`${selectedIds.length} lançamento(s) baixado(s) com sucesso!`);
       setSelectedIds([]);
       setBaixaModalOpen(false);
       window.location.reload();
@@ -294,6 +347,29 @@ const Financeiro = () => {
       toast.error("Erro ao processar baixa em lote");
     }
     setBaixaProcessing(false);
+  };
+
+  const handleEstorno = async () => {
+    if (!estornoTarget) return;
+    setEstornoProcessing(true);
+    try {
+      // Reset the lancamento
+      await supabase.from("financeiro_lancamentos").update({
+        status: "aberto", data_pagamento: null,
+        valor_pago: null, tipo_baixa: null,
+        saldo_restante: null,
+      } as any).eq("id", estornoTarget.id);
+      // Delete related baixas
+      await supabase.from("financeiro_baixas").delete().eq("lancamento_id", estornoTarget.id);
+      // Deactivate child lancamentos (parcelas filhas criadas por baixa parcial)
+      await supabase.from("financeiro_lancamentos").update({ ativo: false } as any).eq("documento_pai_id", estornoTarget.id);
+      toast.success("Estorno realizado com sucesso!");
+      setEstornoTarget(null);
+      window.location.reload();
+    } catch {
+      toast.error("Erro ao estornar");
+    }
+    setEstornoProcessing(false);
   };
 
   const columns = [
