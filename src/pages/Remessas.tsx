@@ -155,15 +155,14 @@ export default function Remessas() {
     if (!remessa.codigo_rastreio) { toast.error("Sem código de rastreio"); return; }
     try {
       toast.info("Consultando rastreio...");
-      const { data: result, error } = await supabase.functions.invoke("correios-api", {
-        body: null,
-        headers: { "Content-Type": "application/json" },
-      });
-      // Use query params approach
       const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
-      const url = `https://${projectId}.supabase.co/functions/v1/correios-api?action=rastrear&codigo=${remessa.codigo_rastreio}`;
+      const url = `https://${projectId}.supabase.co/functions/v1/correios-api?action=rastrear&codigo=${encodeURIComponent(remessa.codigo_rastreio)}`;
       const res = await fetch(url, {
-        headers: { "Content-Type": "application/json", apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || "" },
+        headers: {
+          "Content-Type": "application/json",
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || "",
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || ""}`,
+        },
       });
       const tracking = await res.json();
       if (tracking.error) { toast.error(tracking.error); return; }
