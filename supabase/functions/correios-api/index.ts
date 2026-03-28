@@ -66,12 +66,14 @@ async function getToken(): Promise<string> {
 async function rastrear(codigoObjeto: string): Promise<any> {
   const token = await getToken();
 
-  // Try multiple known endpoint paths
+  // Try multiple known endpoint paths (CWS is the current production URL per Correios docs)
   const endpoints = [
-    `${CORREIOS_API}/rastro/v1/objetos/${codigoObjeto}`,
+    `${CORREIOS_CWS}/rastro/v1/objetos/${codigoObjeto}`,
     `${CORREIOS_API}/srorastro/v1/objetos/${codigoObjeto}?resultado=T`,
+    `https://proxyapp.correios.com.br/v1/sro-rastro/${codigoObjeto}`,
   ];
 
+  let lastError = "";
   for (const url of endpoints) {
     console.log(`[correios] Rastreando: ${url}`);
     const res = await fetch(url, {
@@ -84,19 +86,14 @@ async function rastrear(codigoObjeto: string): Promise<any> {
 
     const errBody = await res.text();
     console.log(`[correios] Rastreio falhou ${res.status}: ${errBody}`);
+    lastError = `${res.status}: ${errBody}`;
 
-    // If 401, token may have expired
     if (res.status === 401) {
       cachedToken = null;
-      continue;
-    }
-    // If not a 404/400 path issue, don't try next
-    if (res.status !== 400 && res.status !== 404) {
-      throw new Error(`Erro rastreio: ${res.status} - ${errBody}`);
     }
   }
 
-  throw new Error(`Nenhum endpoint de rastreio respondeu para ${codigoObjeto}`);
+  throw new Error(`Nenhum endpoint de rastreio respondeu para ${codigoObjeto}. Último erro: ${lastError}`);
 }
 
 async function calcularPreco(params: {
