@@ -76,6 +76,14 @@ const Fiscal = () => {
   const xmlInputRef = useRef<HTMLInputElement>(null);
   const [danfeOpen, setDanfeOpen] = useState(false);
   const [danfeData, setDanfeData] = useState<any>(null);
+  const [filterModelo, setFilterModelo] = useState("todos");
+  // B.2 — Devolução
+  const [devolucaoModalOpen, setDevolucaoModalOpen] = useState(false);
+  const [devolucaoNF, setDevolucaoNF] = useState<NotaFiscal | null>(null);
+  const [devolucaoItens, setDevolucaoItens] = useState<any[]>([]);
+  const [dataDevolucao, setDataDevolucao] = useState(new Date().toISOString().split("T")[0]);
+  const [motivoDevolucao, setMotivoDevolucao] = useState("");
+  const [devolucaoProcessing, setDevolucaoProcessing] = useState(false);
 
   const valorProdutos = items.reduce((s, i) => s + (i.valor_total || 0), 0);
   const totalImpostos = Number(form.icms_valor || 0) + Number(form.ipi_valor || 0) + Number(form.pis_valor || 0) + Number(form.cofins_valor || 0) + Number(form.icms_st_valor || 0);
