@@ -66,30 +66,35 @@ async function getToken(): Promise<string> {
 async function rastrear(codigoObjeto: string): Promise<any> {
   const token = await getToken();
 
-  // Try multiple known endpoint paths (CWS is the current production URL per Correios docs)
+  // CWS is the current production URL per Correios docs v2.4
   const endpoints = [
     `${CORREIOS_CWS}/rastro/v1/objetos/${codigoObjeto}`,
     `${CORREIOS_API}/srorastro/v1/objetos/${codigoObjeto}?resultado=T`,
-    `https://proxyapp.correios.com.br/v1/sro-rastro/${codigoObjeto}`,
   ];
 
   let lastError = "";
   for (const url of endpoints) {
     console.log(`[correios] Rastreando: ${url}`);
-    const res = await fetch(url, {
-      headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
-    });
+    try {
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+      });
 
-    if (res.ok) {
-      return res.json();
-    }
+      const contentType = res.headers.get("content-type") || "";
+      const body = await res.text();
+      console.log(`[correios] Rastreio status=${res.status}, content-type=${contentType}, body=${body.substring(0, 300)}`);
 
-    const errBody = await res.text();
-    console.log(`[correios] Rastreio falhou ${res.status}: ${errBody}`);
-    lastError = `${res.status}: ${errBody}`;
+      if (res.ok && contentType.includes("application/json")) {
+        return JSON.parse(body);
+      }
 
-    if (res.status === 401) {
-      cachedToken = null;
+      lastError = `${res.status}: ${body.substring(0, 200)}`;
+      if (res.status === 401) {
+        cachedToken = null;
+      }
+    } catch (e: any) {
+      console.log(`[correios] Rastreio erro fetch: ${e.message}`);
+      lastError = e.message;
     }
   }
 
