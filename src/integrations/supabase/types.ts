@@ -1267,7 +1267,9 @@ export type Database = {
           icms_valor: number | null
           id: string
           ipi_valor: number | null
+          modelo_documento: string
           movimenta_estoque: boolean | null
+          nf_referenciada_id: string | null
           numero: string
           observacoes: string | null
           ordem_venda_id: string | null
@@ -1276,6 +1278,7 @@ export type Database = {
           serie: string | null
           status: Database["public"]["Enums"]["status_nota_fiscal"]
           tipo: Database["public"]["Enums"]["tipo_nota_fiscal"]
+          tipo_operacao: string | null
           updated_at: string
           usuario_id: string | null
           valor_total: number
@@ -1299,7 +1302,9 @@ export type Database = {
           icms_valor?: number | null
           id?: string
           ipi_valor?: number | null
+          modelo_documento?: string
           movimenta_estoque?: boolean | null
+          nf_referenciada_id?: string | null
           numero: string
           observacoes?: string | null
           ordem_venda_id?: string | null
@@ -1308,6 +1313,7 @@ export type Database = {
           serie?: string | null
           status?: Database["public"]["Enums"]["status_nota_fiscal"]
           tipo: Database["public"]["Enums"]["tipo_nota_fiscal"]
+          tipo_operacao?: string | null
           updated_at?: string
           usuario_id?: string | null
           valor_total?: number
@@ -1331,7 +1337,9 @@ export type Database = {
           icms_valor?: number | null
           id?: string
           ipi_valor?: number | null
+          modelo_documento?: string
           movimenta_estoque?: boolean | null
+          nf_referenciada_id?: string | null
           numero?: string
           observacoes?: string | null
           ordem_venda_id?: string | null
@@ -1340,6 +1348,7 @@ export type Database = {
           serie?: string | null
           status?: Database["public"]["Enums"]["status_nota_fiscal"]
           tipo?: Database["public"]["Enums"]["tipo_nota_fiscal"]
+          tipo_operacao?: string | null
           updated_at?: string
           usuario_id?: string | null
           valor_total?: number
@@ -1364,6 +1373,13 @@ export type Database = {
             columns: ["fornecedor_id"]
             isOneToOne: false
             referencedRelation: "fornecedores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notas_fiscais_nf_referenciada_id_fkey"
+            columns: ["nf_referenciada_id"]
+            isOneToOne: false
+            referencedRelation: "notas_fiscais"
             referencedColumns: ["id"]
           },
           {
