@@ -749,10 +749,57 @@ const Financeiro = () => {
                 </tfoot>
               </table>
             </div>
-            <div className="space-y-2">
-              <Label>Data de Baixa *</Label>
-              <Input type="date" value={baixaDate} onChange={(e) => setBaixaDate(e.target.value)} required />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Data de Baixa *</Label>
+                <Input type="date" value={baixaDate} onChange={(e) => setBaixaDate(e.target.value)} required />
+              </div>
+              <div className="space-y-2">
+                <Label>Tipo de Baixa</Label>
+                <Select value={tipoBaixa} onValueChange={(v) => setTipoBaixa(v as "total" | "parcial")}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="total">Total</SelectItem>
+                    <SelectItem value="parcial">Parcial</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Forma de Pagamento *</Label>
+                <Select value={baixaFormaPagamento || "none"} onValueChange={(v) => setBaixaFormaPagamento(v === "none" ? "" : v)}>
+                  <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Selecione...</SelectItem>
+                    <SelectItem value="dinheiro">Dinheiro</SelectItem>
+                    <SelectItem value="pix">PIX</SelectItem>
+                    <SelectItem value="boleto">Boleto</SelectItem>
+                    <SelectItem value="cartao">Cartão</SelectItem>
+                    <SelectItem value="transferencia">Transferência</SelectItem>
+                    <SelectItem value="cheque">Cheque</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Conta Bancária *</Label>
+                <Select value={baixaContaBancaria || "none"} onValueChange={(v) => setBaixaContaBancaria(v === "none" ? "" : v)}>
+                  <SelectTrigger><SelectValue placeholder="Selecione conta..." /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Selecione...</SelectItem>
+                    {contasBancarias.map(c => (
+                      <SelectItem key={c.id} value={c.id}>{c.bancos?.nome} - {c.descricao}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
+            {tipoBaixa === "parcial" && (
+              <div className="space-y-2">
+                <Label>Valor a Pagar *</Label>
+                <Input type="number" step="0.01" min={0.01} max={totalBaixa - 0.01}
+                  value={valorPagoBaixa} onChange={(e) => setValorPagoBaixa(Number(e.target.value))} />
+                <p className="text-xs text-muted-foreground">Total selecionado: {formatCurrency(totalBaixa)} — Restante após baixa: {formatCurrency(Math.max(0, totalBaixa - valorPagoBaixa))}</p>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setBaixaModalOpen(false)} disabled={baixaProcessing}>Cancelar</Button>
@@ -762,6 +809,17 @@ const Financeiro = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Estorno Confirm Dialog */}
+      <ConfirmDialog
+        open={!!estornoTarget}
+        onClose={() => setEstornoTarget(null)}
+        onConfirm={handleEstorno}
+        title="Confirmar Estorno"
+        description={`Deseja estornar a baixa do lançamento "${estornoTarget?.descricao}"? O status voltará para Aberto e as baixas registradas serão removidas.`}
+        confirmLabel="Estornar"
+        loading={estornoProcessing}
+      />
 
       <BaixaParcialDialog
         open={baixaParcialOpen}
