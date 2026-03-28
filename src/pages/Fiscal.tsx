@@ -826,9 +826,13 @@ const Fiscal = () => {
               <ViewSection title="Informações Gerais">
                 <div className="grid grid-cols-2 gap-4">
                   <ViewField label="Tipo"><span className="capitalize font-medium">{selected.tipo === 'entrada' ? 'Entrada' : 'Saída'}</span></ViewField>
+                  <ViewField label="Modelo"><span className="font-mono font-medium">{modeloLabels[selected.modelo_documento || '55'] || selected.modelo_documento}</span></ViewField>
                   <ViewField label="Número / Série"><span className="font-mono font-medium">{selected.numero} / {selected.serie || '1'}</span></ViewField>
                   <ViewField label="Data Emissão">{formatDate(selected.data_emissao)}</ViewField>
                   <ViewField label="Status"><StatusBadge status={selected.status} /></ViewField>
+                  {(selected.tipo_operacao || 'normal') !== 'normal' && (
+                    <ViewField label="Operação"><span className="font-medium capitalize text-warning">{selected.tipo_operacao}</span></ViewField>
+                  )}
                 </div>
                 {selected.chave_acesso && (
                   <div className="mt-3">
