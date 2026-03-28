@@ -1,105 +1,50 @@
 
 
-# Plano de Execucao — 15 Prompts
+## Cotação de Frete dos Correios no Orçamento
 
-Apos analise detalhada do codigo atual, identifiquei o que ja foi implementado e o que falta para cada prompt. Divido a execucao em 4 blocos por volume de edicoes.
+### Contexto
+O formulário de orçamento já tem campos de peso total, CEP do cliente e campo de frete. A Edge Function `correios-api` já suporta as actions `cotacao` e `prazo`. Falta conectar tudo para que o usuário possa consultar opções de frete diretamente na tela.
 
----
+### Pré-requisito: CEP de origem
+Não existe configuração de CEP da empresa no sistema. Precisamos armazená-lo na tabela `app_configuracoes` (chave `cep_empresa`). Será necessário adicionar um campo na tela de Configurações para o usuário definir o CEP de origem.
 
-## Estado Atual vs Prompts
+### Plano de implementação
 
-| # | Prompt | Status | Acao |
-|---|--------|--------|------|
-| 1 | Busca inteligente itens | Parcial | AutocompleteSearch existe; falta enriquecer resultados com unidade+fornecedor e usar em ItemsGrid |
-| 2 | Filtros avancados | Parcial | AdvancedFilterBar existe mas nenhuma pagina o usa de fato (todas usam Selects ad-hoc) |
-| 3 | Dashboard cleanup | **Feito** | "vencidos" removido do PeriodFilter, badges nos cards |
-| 4 | Navegacao relacional | Parcial | RelationalLink existe, usado em Compras/PedidosCompra; falta em Clientes, Fornecedores, Financeiro, Produtos |
-| 5 | Pedido Compra fluxo completo | Parcial | "Dar Entrada" existe; falta gerar financeiro e estoque automaticamente |
-| 6 | Estoque separado | **Feito** | Tabs Posicao/Movimentacao implementadas |
-| 7 | Drawers padronizados | Quase | Transportadoras ainda usa ViewDrawer antigo |
-| 8 | Produto x Fornecedor UI | Parcial | Tab "Cod. Forn." existe mas e read-only; falta CRUD inline |
-| 9 | Cliente forma/prazo | **Feito** | Auto-sugestao no OrcamentoForm funciona |
-| 10 | Cliente x Transportadora | Parcial | Dados carregados em Clientes mas sem aba dedicada no drawer |
-| 11 | Drawer fiscal | **Feito** | Tabs no Fiscal.tsx |
-| 12 | Relatorios relevantes | Parcial | Falta relatorio de divergencias (pedidos sem NF, NF sem financeiro) |
-| 13 | Correios base | **Feito** | Tabelas remessas + remessa_eventos criadas |
-| 14 | Correios integracao | Nao feito | Edge Function para API Correios |
-| 15 | Revisao transversal | Nao feito | Cleanup final |
+**1. Adicionar campo "CEP da Empresa" nas Configurações**
+- Na página `Configuracoes.tsx`, adicionar uma seção "Empresa" com campo de CEP
+- Usar `useAppConfig("cep_empresa")` para ler/salvar
 
----
+**2. Atualizar a Edge Function para suportar cotação multi-serviço**
+- Adicionar action `cotacao_multi` em `correios-api/index.ts` que consulta preço + prazo para múltiplos serviços (SEDEX `04014`, PAC `04510`, SEDEX 10 `40215`, etc.) em paralelo e retorna array consolidado
+- Aceitar parâmetros: `cepOrigem`, `cepDestino`, `peso`, `comprimento`, `altura`, `largura`
+- Dimensões terão valores padrão caso não informadas (30x15x10cm)
 
-## Bloco A — Filtros + Drawers + Links (Prompts 2, 4, 7, 10)
+**3. Criar componente `FreteCorreiosCard`**
+- Novo componente em `src/components/Orcamento/FreteCorreiosCard.tsx`
+- Botão "Consultar Frete Correios" que aparece quando há cliente com CEP e peso > 0
+- Chama a Edge Function com os dados do orçamento
+- Exibe lista de opções: nome do serviço, valor, prazo estimado
+- Cada opção tem botão "Selecionar" que preenche automaticamente:
+  - `frete_valor` com o preço retornado
+  - `frete_tipo` com o nome do serviço (ex: "CORREIOS (SEDEX)")
+  - `prazo_entrega` com o prazo retornado (ex: "5 dias úteis")
+- Loading state e tratamento de erros
 
-### Transportadoras.tsx
-- Migrar de `ViewDrawer` para `ViewDrawerV2` com tabs (Dados, Clientes Vinculados)
-- Carregar `cliente_transportadoras` ao abrir drawer para exibir clientes vinculados
+**4. Integrar no OrcamentoForm**
+- Inserir `FreteCorreiosCard` entre `OrcamentoTotaisCard` e `OrcamentoCondicoesCard`
+- Passar props: `cepDestino` (do cliente), `pesoTotal`, callbacks para `setFreteValor`, `setFreteTipo`, `setPrazoEntrega`
+- Usar `useAppConfig("cep_empresa")` para obter CEP de origem
 
-### Clientes.tsx
-- Adicionar aba "Transportadoras" no drawer (ja carrega `transportadorasCliente`)
-- Adicionar `RelationalLink` nos titulos financeiros (link para `/financeiro`)
+### Fluxo do usuário
+1. Seleciona cliente (que tem CEP cadastrado)
+2. Adiciona itens (peso é calculado)
+3. Clica em "Consultar Frete"
+4. Vê cards com SEDEX, PAC, etc. com preço e prazo
+5. Clica "Selecionar" em uma opção → campos preenchidos automaticamente
 
-### Fornecedores.tsx
-- Adicionar `RelationalLink` nas compras (link para `/compras`) e produtos (link para `/produtos`)
-
-### Financeiro.tsx
-- Adicionar `RelationalLink` para cliente/fornecedor e nota fiscal no drawer
-
-### Produtos.tsx — Tab "Cod. Forn." (Prompt 8)
-- Transformar tab read-only em CRUD inline com botao "Adicionar Fornecedor"
-- Form inline: fornecedor (autocomplete), ref_fornecedor, preco_compra, lead_time, un_fornecedor, eh_principal
-- Persistir via `produtos_fornecedores`
-
----
-
-## Bloco B — Busca Inteligente + ItemsGrid (Prompt 1)
-
-### AutocompleteSearch
-- Enriquecer renderizacao dos resultados: exibir `[SKU] Nome — UN — Fornecedor Principal`
-
-### ItemsGrid
-- Substituir Select de produto por AutocompleteSearch
-- Passar `searchTerms` com SKU, codigo_interno, referencia_fornecedor
-
----
-
-## Bloco C — Fluxo Pedido Compra Completo (Prompt 5)
-
-### PedidosCompra.tsx
-- Ao "Dar Entrada", alem de abrir tela fiscal pre-preenchida:
-  - Gerar lancamentos financeiros automaticamente (baseado nos valores/condicoes)
-  - Gerar movimentacao de estoque (entrada por item)
-  - Atualizar status do pedido para "concluido" ou "parcial"
-- Exibir no drawer: nota gerada, financeiro gerado, status estoque
-
----
-
-## Bloco D — Relatorios + Revisao (Prompts 12, 14, 15)
-
-### relatorios.service.ts
-- Adicionar relatorio "Divergencias":
-  - Pedidos de compra sem nota fiscal vinculada
-  - Notas fiscais sem lancamento financeiro
-  - Pedidos com status ativo mas sem movimentacao de estoque
-
-### Relatorios.tsx
-- Adicionar card "Divergencias" na lista de relatorios
-
-### Revisao transversal (Prompt 15)
-- Remover imports nao usados
-- Verificar consistencia de nomenclaturas (status, labels)
-- Verificar breadcrumbs e titulos
-
-### Correios Edge Function (Prompt 14) — Requer credenciais
-- Criar edge function `correios-api` com endpoints: token, cotacao, prazo, rastreio
-- Usar secrets para credenciais (usuario, senha, codigo_administrativo, cartao_postagem)
-- Integrar em Remessas.tsx com botoes de acao
-
----
-
-## Detalhes Tecnicos
-
-- **Migrations**: Nenhuma necessaria — tabelas `produtos_fornecedores`, `cliente_transportadoras`, `remessas`, `remessa_eventos` ja existem
-- **Arquivos editados**: ~12 paginas + 2 componentes + 1 service + 1 edge function
-- **Componentes reutilizados**: `AdvancedFilterBar`, `ViewDrawerV2`, `RelationalLink`, `AutocompleteSearch`, `BaixaParcialDialog`
-- Prompt 14 (Correios) requer que o usuario forneca credenciais AWS Correios para funcionar
+### Arquivos modificados
+- `supabase/functions/correios-api/index.ts` — nova action `cotacao_multi`
+- `src/components/Orcamento/FreteCorreiosCard.tsx` — novo componente
+- `src/pages/OrcamentoForm.tsx` — integração do componente
+- `src/pages/Configuracoes.tsx` — campo CEP empresa
 
