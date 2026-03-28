@@ -165,29 +165,60 @@ export default function Remessas() {
         },
       });
       const tracking = await res.json();
-      if (tracking.error) { toast.error(tracking.error); return; }
-
-      // Save events from tracking response
-      const eventos = tracking.objetos?.[0]?.eventos || [];
-      for (const ev of eventos) {
-        const descricao = ev.descricao || ev.tipo || "Evento";
-        const local = ev.unidade?.endereco?.cidade || ev.unidade?.nome || "";
-        const dataHora = ev.dtHrCriado || new Date().toISOString();
-        await supabase.from("remessa_eventos" as any).upsert({
-          remessa_id: remessa.id,
-          descricao,
-          local: local || null,
-          data_hora: dataHora,
-        } as any, { onConflict: "remessa_id,data_hora,descricao" }).select();
+      if (!res.ok || tracking.error) {
+        throw new Error(tracking.error || "Erro ao consultar rastreio");
       }
 
-      toast.success(`${eventos.length} evento(s) atualizado(s)`);
-      // Refresh events
-      const { data: updatedEvents } = await supabase.from("remessa_eventos" as any).select("*").eq("remessa_id", remessa.id).order("data_hora", { ascending: false });
+      const eventosRastreamento = tracking.objetos?.[0]?.eventos || [];
+      const eventosNormalizados = eventosRastreamento.map((ev: any) => ({
+        remessa_id: remessa.id,
+        descricao: ev.descricao || ev.tipo || "Evento",
+        local: ev.unidade?.endereco?.cidade || ev.unidade?.nome || null,
+        data_hora: ev.dtHrCriado || new Date().toISOString(),
+      }));
+
+      const { data: eventosExistentes, error: eventosExistentesError } = await supabase
+        .from("remessa_eventos" as any)
+        .select("descricao, local, data_hora")
+        .eq("remessa_id", remessa.id);
+
+      if (eventosExistentesError) {
+        throw eventosExistentesError;
+      }
+
+      const eventKey = (evento: { descricao: string; local: string | null; data_hora: string }) =>
+        `${evento.data_hora}::${evento.descricao}::${evento.local || ""}`;
+
+      const eventosExistentesSet = new Set(
+        ((eventosExistentes as any[]) || []).map((evento) => eventKey(evento))
+      );
+
+      const novosEventos = eventosNormalizados.filter(
+        (evento: { descricao: string; local: string | null; data_hora: string }) => !eventosExistentesSet.has(eventKey(evento))
+      );
+
+      if (novosEventos.length > 0) {
+        const { error: insertError } = await supabase.from("remessa_eventos" as any).insert(novosEventos as any);
+        if (insertError) {
+          throw insertError;
+        }
+      }
+
+      toast.success(`${novosEventos.length} novo(s) evento(s) incluído(s)`);
+      const { data: updatedEvents, error: updatedEventsError } = await supabase
+        .from("remessa_eventos" as any)
+        .select("*")
+        .eq("remessa_id", remessa.id)
+        .order("data_hora", { ascending: false });
+
+      if (updatedEventsError) {
+        throw updatedEventsError;
+      }
+
       setEventos((updatedEvents as any) || []);
     } catch (err: any) {
       console.error("[rastrear]", err);
-      toast.error("Erro ao consultar rastreio. Verifique as credenciais dos Correios.");
+      toast.error(err.message || "Erro ao consultar rastreio");
     }
   };
 
