@@ -52,20 +52,6 @@ export function FreteCorreiosCard({ cepDestino, pesoTotal, onSelect }: FreteCorr
     setSelected(null);
 
     try {
-      const { data, error } = await supabase.functions.invoke('correios-api', {
-        body: {
-          cepOrigem: cepOrigemClean,
-          cepDestino: cepDestinoClean,
-          peso: pesoTotal,
-          comprimento: 30,
-          altura: 15,
-          largura: 10,
-        },
-        headers: { 'Content-Type': 'application/json' },
-        method: 'POST',
-      });
-
-      // The edge function uses query params, so let's use the proper URL approach
       const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
       const url = `https://${projectId}.supabase.co/functions/v1/correios-api?action=cotacao_multi`;
       const session = await supabase.auth.getSession();
