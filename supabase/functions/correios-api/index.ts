@@ -22,29 +22,44 @@ async function getToken(): Promise<string> {
     throw new Error("Credenciais dos Correios não configuradas");
   }
 
-  const body: Record<string, string> = { numero: cartaoPostagem || "" };
+  const basicAuth = btoa(`${usuario}:${senha}`);
+  console.log(`[correios] Autenticando com usuario=${usuario}, cartao=${cartaoPostagem?.substring(0,4)}...`);
 
-  const res = await fetch(`${CORREIOS_API}/token/v1/autentica/cartaopostagem`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Basic ${btoa(`${usuario}:${senha}`)}`,
-    },
-    body: JSON.stringify(body),
-  });
+  // Try cartaopostagem endpoint first, fallback to simple auth
+  const endpoints = cartaoPostagem
+    ? [
+        { url: `${CORREIOS_API}/token/v1/autentica/cartaopostagem`, body: JSON.stringify({ numero: cartaoPostagem }) },
+        { url: `${CORREIOS_API}/token/v1/autentica`, body: JSON.stringify({}) },
+      ]
+    : [{ url: `${CORREIOS_API}/token/v1/autentica`, body: JSON.stringify({}) }];
 
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Erro ao autenticar nos Correios: ${res.status} ${text}`);
+  let lastError = "";
+  for (const ep of endpoints) {
+    console.log(`[correios] Tentando: ${ep.url}`);
+    const res = await fetch(ep.url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Basic ${basicAuth}`,
+      },
+      body: ep.body,
+    });
+
+    if (res.ok) {
+      const data: TokenResponse = await res.json();
+      cachedToken = {
+        token: data.token,
+        expiresAt: Date.now() + 50 * 60 * 1000,
+      };
+      console.log("[correios] Autenticado com sucesso");
+      return data.token;
+    }
+
+    lastError = await res.text();
+    console.log(`[correios] Falha ${res.status}: ${lastError}`);
   }
 
-  const data: TokenResponse = await res.json();
-  cachedToken = {
-    token: data.token,
-    expiresAt: Date.now() + 50 * 60 * 1000, // 50min
-  };
-
-  return data.token;
+  throw new Error(`Erro ao autenticar nos Correios: ${lastError}`);
 }
 
 async function rastrear(codigoObjeto: string): Promise<any> {
