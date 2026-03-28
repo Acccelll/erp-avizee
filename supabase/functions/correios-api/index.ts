@@ -65,40 +65,26 @@ async function getToken(): Promise<string> {
 
 async function rastrear(codigoObjeto: string): Promise<any> {
   const token = await getToken();
+  const url = `${CORREIOS_API}/srorastro/v1/objetos/${codigoObjeto}?resultado=T`;
+  console.log(`[correios] Rastreando: ${url}`);
 
-  // CWS is the current production URL per Correios docs v2.4
-  const endpoints = [
-    `${CORREIOS_CWS}/rastro/v1/objetos/${codigoObjeto}`,
-    `${CORREIOS_API}/srorastro/v1/objetos/${codigoObjeto}?resultado=T`,
-  ];
+  const res = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json",
+      "Accept-Language": "pt-BR",
+    },
+  });
 
-  let lastError = "";
-  for (const url of endpoints) {
-    console.log(`[correios] Rastreando: ${url}`);
-    try {
-      const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
-      });
+  const body = await res.text();
+  console.log(`[correios] Rastreio status=${res.status}, body=${body.substring(0, 300)}`);
 
-      const contentType = res.headers.get("content-type") || "";
-      const body = await res.text();
-      console.log(`[correios] Rastreio status=${res.status}, content-type=${contentType}, body=${body.substring(0, 300)}`);
-
-      if (res.ok && contentType.includes("application/json")) {
-        return JSON.parse(body);
-      }
-
-      lastError = `${res.status}: ${body.substring(0, 200)}`;
-      if (res.status === 401) {
-        cachedToken = null;
-      }
-    } catch (e: any) {
-      console.log(`[correios] Rastreio erro fetch: ${e.message}`);
-      lastError = e.message;
-    }
+  if (!res.ok) {
+    if (res.status === 401) cachedToken = null;
+    throw new Error(`Erro rastreio: ${res.status} - ${body.substring(0, 200)}`);
   }
 
-  throw new Error(`Nenhum endpoint de rastreio respondeu para ${codigoObjeto}. Último erro: ${lastError}`);
+  return JSON.parse(body);
 }
 
 async function calcularPreco(params: {
