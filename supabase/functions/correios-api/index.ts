@@ -1,6 +1,7 @@
 import { corsHeaders } from "../_shared/cors.ts";
 
 const CORREIOS_API = "https://api.correios.com.br";
+const CORREIOS_CWS = "https://cws.correios.com.br";
 
 interface TokenResponse {
   token: string;
