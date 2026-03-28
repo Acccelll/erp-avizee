@@ -85,6 +85,12 @@ const Financeiro = () => {
   const [viewMode, setViewMode] = useState<"lista" | "calendario">("lista");
   const [baixaParcialOpen, setBaixaParcialOpen] = useState(false);
   const [baixaParcialTarget, setBaixaParcialTarget] = useState<Lancamento | null>(null);
+  const [estornoTarget, setEstornoTarget] = useState<Lancamento | null>(null);
+  const [estornoProcessing, setEstornoProcessing] = useState(false);
+  const [baixaFormaPagamento, setBaixaFormaPagamento] = useState("");
+  const [baixaContaBancaria, setBaixaContaBancaria] = useState("");
+  const [tipoBaixa, setTipoBaixa] = useState<"total" | "parcial">("total");
+  const [valorPagoBaixa, setValorPagoBaixa] = useState(0);
 
   useEffect(() => { if (tipoParam) setFilterTipo(tipoParam); }, [tipoParam]);
 
