@@ -1,50 +1,69 @@
 
 
-## Cotação de Frete dos Correios no Orçamento
+## Plano: Bloco A — Financeiro (A.1 + A.2)
 
-### Contexto
-O formulário de orçamento já tem campos de peso total, CEP do cliente e campo de frete. A Edge Function `correios-api` já suporta as actions `cotacao` e `prazo`. Falta conectar tudo para que o usuário possa consultar opções de frete diretamente na tela.
+### A.1 — Baixa Parcial com Estorno
 
-### Pré-requisito: CEP de origem
-Não existe configuração de CEP da empresa no sistema. Precisamos armazená-lo na tabela `app_configuracoes` (chave `cep_empresa`). Será necessário adicionar um campo na tela de Configurações para o usuário definir o CEP de origem.
+**Contexto**: O sistema já possui `BaixaParcialDialog` e `financeiro_baixas`. O prompt pede uma abordagem diferente usando `valor_pago` e `saldo_restante` como coluna computed na própria tabela `financeiro_lancamentos`, além de estorno.
 
-### Plano de implementação
+#### Migration
+- Adicionar colunas em `financeiro_lancamentos`:
+  - `valor_pago NUMERIC(10,2)` 
+  - `tipo_baixa TEXT CHECK (tipo_baixa IN ('total','parcial'))` 
+  - Nota: `documento_pai_id`, `conta_bancaria_id`, `forma_pagamento` ja existem
+  - `saldo_restante` ja existe mas nao e computed — vamos manter como esta (nao-computed) pois ja e usado pelo `BaixaParcialDialog`
 
-**1. Adicionar campo "CEP da Empresa" nas Configurações**
-- Na página `Configuracoes.tsx`, adicionar uma seção "Empresa" com campo de CEP
-- Usar `useAppConfig("cep_empresa")` para ler/salvar
+#### Modal de Baixa em Lote (baixaModalOpen) — Financeiro.tsx
+Adicionar ao modal existente (linhas 628-675):
+1. Select **Forma de Pagamento** (Dinheiro, PIX, Boleto, Cartao, Transferencia, Cheque)
+2. Select **Conta Bancaria** (do estado `contasBancarias`)
+3. Select **Tipo de Baixa** (Total / Parcial)
+4. Input **Valor Pago** (visivel so quando parcial, default = totalBaixa)
+5. Estados: `baixaFormaPagamento`, `baixaContaBancaria`, `tipoBaixa`, `valorPago`
 
-**2. Atualizar a Edge Function para suportar cotação multi-serviço**
-- Adicionar action `cotacao_multi` em `correios-api/index.ts` que consulta preço + prazo para múltiplos serviços (SEDEX `04014`, PAC `04510`, SEDEX 10 `40215`, etc.) em paralelo e retorna array consolidado
-- Aceitar parâmetros: `cepOrigem`, `cepDestino`, `peso`, `comprimento`, `altura`, `largura`
-- Dimensões terão valores padrão caso não informadas (30x15x10cm)
+#### handleConfirmBaixa — logica nova
+- Validar forma_pagamento e conta_bancaria obrigatorios
+- **Total**: update status='pago', data_pagamento, valor_pago=valor, tipo_baixa='total', forma_pagamento, conta_bancaria_id
+- **Parcial**: update status='pago', valor_pago=valorPago, tipo_baixa='parcial' + criar lancamento filho com saldo restante (documento_pai_id = id original)
 
-**3. Criar componente `FreteCorreiosCard`**
-- Novo componente em `src/components/Orcamento/FreteCorreiosCard.tsx`
-- Botão "Consultar Frete Correios" que aparece quando há cliente com CEP e peso > 0
-- Chama a Edge Function com os dados do orçamento
-- Exibe lista de opções: nome do serviço, valor, prazo estimado
-- Cada opção tem botão "Selecionar" que preenche automaticamente:
-  - `frete_valor` com o preço retornado
-  - `frete_tipo` com o nome do serviço (ex: "CORREIOS (SEDEX)")
-  - `prazo_entrega` com o prazo retornado (ex: "5 dias úteis")
-- Loading state e tratamento de erros
+#### Botao de Estorno
+- Na DataTable, para lancamentos com status === 'pago', adicionar botao com icone `RotateCcw` e tooltip "Estornar baixa"
+- ConfirmDialog perguntando confirmacao
+- `handleEstorno`: update status='aberto', limpar valor_pago/tipo_baixa/forma_pagamento/conta_bancaria_id, desativar lancamentos filhos
 
-**4. Integrar no OrcamentoForm**
-- Inserir `FreteCorreiosCard` entre `OrcamentoTotaisCard` e `OrcamentoCondicoesCard`
-- Passar props: `cepDestino` (do cliente), `pesoTotal`, callbacks para `setFreteValor`, `setFreteTipo`, `setPrazoEntrega`
-- Usar `useAppConfig("cep_empresa")` para obter CEP de origem
+---
 
-### Fluxo do usuário
-1. Seleciona cliente (que tem CEP cadastrado)
-2. Adiciona itens (peso é calculado)
-3. Clica em "Consultar Frete"
-4. Vê cards com SEDEX, PAC, etc. com preço e prazo
-5. Clica "Selecionar" em uma opção → campos preenchidos automaticamente
+### A.2 — Caixa por Banco (multi-conta)
+
+#### Migration
+- Adicionar em `caixa_movimentos`:
+  - `conta_bancaria_id UUID REFERENCES contas_bancarias(id)`
+  - `forma_pagamento TEXT`
+  - Index `idx_caixa_conta_bancaria`
+
+#### Caixa.tsx — Reescrever
+1. **Seletor de conta** no topo como pills: "Geral (todas)" + uma pill por conta bancaria ativa
+2. **Filtro**: quando conta especifica selecionada, filtrar movimentos por `conta_bancaria_id`
+3. **Saldo nos KPIs**:
+   - Geral: soma de `contas_bancarias.saldo_atual`
+   - Conta especifica: `saldo_atual` da conta
+4. **Mini painel "Saldos por conta"** quando visualizacao Geral — grid de cards por conta
+5. **Formulario**: campo obrigatorio "Conta/Caixa" (select de contas bancarias)
+6. **handleSubmit**: salvar `conta_bancaria_id`, calcular saldo anterior/atual relativo a conta
+7. **DataTable**: nova coluna "Banco/Conta"
+
+---
 
 ### Arquivos modificados
-- `supabase/functions/correios-api/index.ts` — nova action `cotacao_multi`
-- `src/components/Orcamento/FreteCorreiosCard.tsx` — novo componente
-- `src/pages/OrcamentoForm.tsx` — integração do componente
-- `src/pages/Configuracoes.tsx` — campo CEP empresa
+| Arquivo | Alteracao |
+|---|---|
+| Migration SQL | A.1: valor_pago, tipo_baixa em financeiro_lancamentos |
+| Migration SQL | A.2: conta_bancaria_id, forma_pagamento, index em caixa_movimentos |
+| `src/pages/Financeiro.tsx` | Modal de baixa aprimorado, handleConfirmBaixa, botao estorno |
+| `src/pages/Caixa.tsx` | Reescrita completa com multi-conta |
+
+### Ordem de execucao
+1. Migrations (A.1 + A.2)
+2. Financeiro.tsx (baixa parcial + estorno)
+3. Caixa.tsx (multi-conta)
 
