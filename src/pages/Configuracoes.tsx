@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTheme } from 'next-themes';
-import { Loader2, Lock, Moon, Palette, Save, Settings, Sun, User } from 'lucide-react';
+import { Building2, Loader2, Lock, Moon, Palette, Save, Settings, Sun, User } from 'lucide-react';
+import { useAppConfig } from '@/hooks/useAppConfig';
 import { AppLayout } from '@/components/AppLayout';
 import { ModulePage } from '@/components/ModulePage';
 import { Button } from '@/components/ui/button';
