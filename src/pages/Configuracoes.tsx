@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTheme } from 'next-themes';
-import { Loader2, Lock, Moon, Palette, Save, Settings, Sun, User } from 'lucide-react';
+import { Building2, Loader2, Lock, Moon, Palette, Save, Settings, Sun, User } from 'lucide-react';
+import { useAppConfig } from '@/hooks/useAppConfig';
 import { AppLayout } from '@/components/AppLayout';
 import { ModulePage } from '@/components/ModulePage';
 import { Button } from '@/components/ui/button';
@@ -25,6 +26,7 @@ interface SideNavItem {
 
 const sideNavItems: SideNavItem[] = [
   { key: 'perfil', label: 'Meu Perfil', icon: User },
+  { key: 'empresa', label: 'Empresa', icon: Building2 },
   { key: 'aparencia', label: 'Aparência', icon: Palette },
   { key: 'seguranca', label: 'Segurança', icon: Lock },
 ];
@@ -43,6 +45,15 @@ export default function Configuracoes() {
 
   const [menuCompacto, setMenuCompacto] = useState(false);
   const [densidade, setDensidade] = useState('confortavel');
+
+  const { value: cepEmpresa, loading: loadingCep, save: saveCepEmpresa } = useAppConfig<string>('cep_empresa', '');
+  const [cepEmpresaLocal, setCepEmpresaLocal] = useState('');
+  const [savingCep, setSavingCep] = useState(false);
+
+  // Sync local cep state when loaded
+  useState(() => {
+    if (cepEmpresa) setCepEmpresaLocal(cepEmpresa);
+  });
 
   const initials = (nome || user?.email || 'U').substring(0, 2).toUpperCase();
 
@@ -130,6 +141,44 @@ export default function Configuracoes() {
               </CardContent>
             </Card>
           </div>
+        );
+
+      case 'empresa':
+        return (
+          <Card>
+            <CardHeader>
+              <CardTitle>Dados da Empresa</CardTitle>
+              <CardDescription>Configurações gerais usadas em cotações e integrações.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2 max-w-sm">
+                <Label>CEP de Origem (para cotação de frete)</Label>
+                <Input
+                  value={cepEmpresaLocal || cepEmpresa || ''}
+                  onChange={(e) => setCepEmpresaLocal(e.target.value.replace(/\D/g, '').slice(0, 8))}
+                  placeholder="Ex: 01001000"
+                  maxLength={8}
+                />
+                <p className="text-xs text-muted-foreground">Usado como CEP de origem na cotação de frete dos Correios.</p>
+              </div>
+              <div className="flex justify-end">
+                <Button
+                  onClick={async () => {
+                    setSavingCep(true);
+                    const ok = await saveCepEmpresa(cepEmpresaLocal || cepEmpresa || '');
+                    if (ok) toast.success('CEP salvo com sucesso!');
+                    else toast.error('Erro ao salvar CEP.');
+                    setSavingCep(false);
+                  }}
+                  disabled={savingCep || loadingCep}
+                  className="gap-2"
+                >
+                  {savingCep ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                  Salvar
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         );
 
       case 'aparencia':
