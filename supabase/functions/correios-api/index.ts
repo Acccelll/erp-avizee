@@ -2,6 +2,7 @@ import { corsHeaders } from "../_shared/cors.ts";
 
 const CORREIOS_API = "https://api.correios.com.br";
 
+
 interface TokenResponse {
   token: string;
   expiraEm: string;
@@ -64,14 +65,26 @@ async function getToken(): Promise<string> {
 
 async function rastrear(codigoObjeto: string): Promise<any> {
   const token = await getToken();
-  const res = await fetch(
-    `${CORREIOS_API}/srorastro/v1/objetos/${codigoObjeto}?resultado=T`,
-    {
-      headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
-    }
-  );
-  if (!res.ok) throw new Error(`Erro rastreio: ${res.status}`);
-  return res.json();
+  const url = `${CORREIOS_API}/srorastro/v1/objetos/${codigoObjeto}?resultado=T`;
+  console.log(`[correios] Rastreando: ${url}`);
+
+  const res = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json",
+      "Accept-Language": "pt-BR",
+    },
+  });
+
+  const body = await res.text();
+  console.log(`[correios] Rastreio status=${res.status}, body=${body.substring(0, 300)}`);
+
+  if (!res.ok) {
+    if (res.status === 401) cachedToken = null;
+    throw new Error(`Erro rastreio: ${res.status} - ${body.substring(0, 200)}`);
+  }
+
+  return JSON.parse(body);
 }
 
 async function calcularPreco(params: {
