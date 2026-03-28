@@ -138,6 +138,56 @@ async function calcularPrazo(params: {
   return res.json();
 }
 
+const SERVICOS = [
+  { codigo: "04014", nome: "SEDEX" },
+  { codigo: "04510", nome: "PAC" },
+  { codigo: "40215", nome: "SEDEX 10" },
+  { codigo: "04782", nome: "SEDEX 12" },
+];
+
+async function cotacaoMulti(params: {
+  cepOrigem: string;
+  cepDestino: string;
+  peso: number;
+  comprimento?: number;
+  altura?: number;
+  largura?: number;
+}): Promise<any[]> {
+  const { cepOrigem, cepDestino, peso, comprimento = 30, altura = 15, largura = 10 } = params;
+
+  const results = await Promise.allSettled(
+    SERVICOS.map(async (servico) => {
+      try {
+        const [preco, prazo] = await Promise.all([
+          calcularPreco({ cepOrigem, cepDestino, peso, comprimento, altura, largura, codigoServico: servico.codigo }),
+          calcularPrazo({ cepOrigem, cepDestino, codigoServico: servico.codigo }),
+        ]);
+
+        const valor = preco?.pcFinal ? parseFloat(String(preco.pcFinal).replace(",", ".")) : 0;
+        const dias = prazo?.prazoEntrega ?? 0;
+
+        return {
+          servico: servico.nome,
+          codigo: servico.codigo,
+          valor,
+          prazo: dias,
+        };
+      } catch (err: any) {
+        console.log(`[correios] cotacao ${servico.nome} erro:`, err.message);
+        return {
+          servico: servico.nome,
+          codigo: servico.codigo,
+          valor: 0,
+          prazo: 0,
+          erro: err.message,
+        };
+      }
+    })
+  );
+
+  return results.map((r) => (r.status === "fulfilled" ? r.value : { servico: "?", codigo: "?", valor: 0, prazo: 0, erro: "Falha" }));
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -149,7 +199,7 @@ Deno.serve(async (req) => {
 
     if (!action) {
       return new Response(
-        JSON.stringify({ error: "Parâmetro 'action' obrigatório (rastrear, cotacao, prazo)" }),
+        JSON.stringify({ error: "Parâmetro 'action' obrigatório (rastrear, cotacao, prazo, cotacao_multi)" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -171,6 +221,11 @@ Deno.serve(async (req) => {
       case "prazo": {
         const body = await req.json();
         result = await calcularPrazo(body);
+        break;
+      }
+      case "cotacao_multi": {
+        const body = await req.json();
+        result = await cotacaoMulti(body);
         break;
       }
       case "token": {

@@ -10,6 +10,7 @@ import { AutocompleteSearch } from "@/components/ui/AutocompleteSearch";
 import { OrcamentoItemsGrid, type OrcamentoItem } from "@/components/Orcamento/OrcamentoItemsGrid";
 import { OrcamentoTotaisCard } from "@/components/Orcamento/OrcamentoTotaisCard";
 import { OrcamentoCondicoesCard } from "@/components/Orcamento/OrcamentoCondicoesCard";
+import { FreteCorreiosCard } from "@/components/Orcamento/FreteCorreiosCard";
 import { OrcamentoSidebarSummary } from "@/components/Orcamento/OrcamentoSidebarSummary";
 import { OrcamentoPdfTemplate } from "@/components/Orcamento/OrcamentoPdfTemplate";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -348,6 +349,16 @@ export default function OrcamentoForm() {
             totalProdutos={totalProdutos}
             form={{ valor_total: valorTotal, desconto, imposto_st: impostoSt, imposto_ipi: impostoIpi, frete_valor: freteValor, outras_despesas: outrasDespesas }}
             onChange={handleTotalChange}
+          />
+
+          <FreteCorreiosCard
+            cepDestino={clienteSnapshot.cep}
+            pesoTotal={pesoTotal}
+            onSelect={(valor, tipo, prazo) => {
+              setFreteValor(valor);
+              setFreteTipo(tipo);
+              setPrazoEntrega(prazo);
+            }}
           />
 
           <OrcamentoCondicoesCard
