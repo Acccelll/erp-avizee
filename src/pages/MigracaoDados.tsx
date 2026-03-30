@@ -18,6 +18,21 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Search, Filter, RefreshCw, Database, ArrowRight, ArrowLeft, CheckCircle2, ChevronRight, FileUp } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle
+} from "@/components/ui/alert";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useImportacaoCadastros } from "@/hooks/importacao/useImportacaoCadastros";
 import { useImportacaoEstoque } from "@/hooks/importacao/useImportacaoEstoque";
 import { useImportacaoXml } from "@/hooks/importacao/useImportacaoXml";
@@ -29,6 +44,7 @@ import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
 import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
 import { ImportSource, ImportType } from "@/hooks/importacao/types";
+import { AlertTriangle, Info } from "lucide-react";
 
 export default function MigracaoDados() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -36,6 +52,7 @@ export default function MigracaoDados() {
   const [statusFilter, setStatusFilter] = useState("todos");
   const [activeTab, setActiveTab] = useState("overview");
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [step, setStep] = useState(1);
   const [currentLoteId, setCurrentLoteId] = useState<string | null>(null);
   const [selectedLote, setSelectedLote] = useState<ImportacaoLote | null>(null);
@@ -147,6 +164,11 @@ export default function MigracaoDados() {
   };
 
   const handleFinalize = async () => {
+    setIsConfirmOpen(true);
+  };
+
+  const onConfirmCarga = async () => {
+    setIsConfirmOpen(false);
     const success = await finalizeImport(currentLoteId || undefined);
     if (success) {
       setIsImportModalOpen(false);
@@ -192,6 +214,17 @@ export default function MigracaoDados() {
             </Button>
           </div>
         </div>
+
+        {/* Aviso de Segurança */}
+        <Alert className="bg-amber-50 border-amber-200">
+          <AlertTriangle className="h-4 w-4 text-amber-600" />
+          <AlertTitle className="text-amber-800 font-bold">Atenção - Módulo de Carga Inicial</AlertTitle>
+          <AlertDescription className="text-amber-700 text-xs">
+            Esta área é destinada exclusivamente para a migração de dados de sistemas legados.
+            A importação de dados pode causar duplicidade se os SKUs ou CPFs/CNPJs não forem conferidos previamente.
+            <strong> Valide os dados no ambiente de staging antes de confirmar a carga definitiva.</strong>
+          </AlertDescription>
+        </Alert>
 
         {/* Resumo */}
         <ImportacaoResumoCards
@@ -491,6 +524,25 @@ export default function MigracaoDados() {
             setSelectedLote(null);
           }}
         />
+
+        {/* Confirmação de Carga */}
+        <AlertDialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Confirmar Carga de Dados?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Esta ação irá inserir os registros validados definitivamente nas tabelas operacionais do sistema.
+                Certifique-se de que revisou as inconsistências no passo anterior.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Revisar mais uma vez</AlertDialogCancel>
+              <AlertDialogAction onClick={onConfirmCarga} className="bg-emerald-600 hover:bg-emerald-700">
+                Confirmar Carga
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </AppLayout>
   );
