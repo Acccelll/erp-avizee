@@ -175,12 +175,12 @@ const Clientes = () => {
   }, [data, grupoFilter, searchTerm, tipoFilter]);
 
   const columns = [
-  { key: "nome_razao_social", label: "Nome / Razão Social" },
+  { key: "nome_razao_social", label: "Nome / Razão Social", sortable: true },
   { key: "tipo_pessoa", label: "Tipo", render: (c: Cliente) => c.tipo_pessoa === "F" ? "PF" : "PJ" },
   { key: "cpf_cnpj", label: "CPF/CNPJ", render: (c: Cliente) => <span className="font-mono text-xs">{c.cpf_cnpj || "—"}</span> },
-  { key: "email", label: "E-mail" },
+  { key: "email", label: "E-mail", sortable: true },
   { key: "telefone", label: "Telefone" },
-  { key: "cidade", label: "Cidade", render: (c: Cliente) => c.cidade ? `${c.cidade}/${c.uf}` : "—" },
+  { key: "cidade", label: "Cidade", sortable: true, render: (c: Cliente) => c.cidade ? `${c.cidade}/${c.uf}` : "—" },
   { key: "grupo", label: "Grupo Econômico", render: (c: Cliente) => grupoNome(c.grupo_economico_id) },
   { key: "ativo", label: "Status", render: (c: Cliente) => <StatusBadge status={c.ativo ? "Ativo" : "Inativo"} /> }];
 

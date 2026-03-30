@@ -378,10 +378,10 @@ const Financeiro = () => {
         {l.tipo === "receber" ? "Receber" : "Pagar"}
       </Badge>
     )},
-    { key: "descricao", label: "Descrição" },
+    { key: "descricao", label: "Descrição", sortable: true },
     { key: "parceiro", label: "Parceiro", render: (l: Lancamento) => l.tipo === "receber" ? l.clientes?.nome_razao_social || "—" : l.fornecedores?.nome_razao_social || "—" },
-    { key: "valor", label: "Valor", render: (l: Lancamento) => <span className="font-semibold mono">{formatCurrency(Number(l.valor))}</span> },
-    { key: "data_vencimento", label: "Vencimento", render: (l: Lancamento) => {
+    { key: "valor", label: "Valor", sortable: true, render: (l: Lancamento) => <span className="font-semibold mono">{formatCurrency(Number(l.valor))}</span> },
+    { key: "data_vencimento", label: "Vencimento", sortable: true, render: (l: Lancamento) => {
       const d = new Date(l.data_vencimento);
       const isOverdue = getEffectiveStatus(l) === "vencido";
       const isToday = l.data_vencimento === hoje.toISOString().split("T")[0];
@@ -392,7 +392,7 @@ const Financeiro = () => {
       return <span className="text-xs">{l.contas_bancarias.bancos?.nome} - {l.contas_bancarias.descricao}</span>;
     }},
     { key: "forma_pagamento", label: "Forma", render: (l: Lancamento) => l.forma_pagamento || "—" },
-    { key: "status", label: "Status", render: (l: Lancamento) => <StatusBadge status={getEffectiveStatus(l)} /> },
+    { key: "status", label: "Status", sortable: true, render: (l: Lancamento) => <StatusBadge status={getEffectiveStatus(l)} /> },
   ];
 
   const finActiveFilters = useMemo(() => {

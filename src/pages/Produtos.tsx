@@ -200,14 +200,14 @@ const Produtos = () => {
   }, [data, estoqueFilter, searchTerm, tipoFilter, grupoFilter]);
 
   const columns = [
-  { key: "sku", label: "SKU", render: (p: Produto) => <span className="font-mono text-xs font-medium text-primary">{p.sku || "—"}</span> },
-  { key: "nome", label: "Nome" },
+  { key: "sku", label: "SKU", sortable: true, render: (p: Produto) => <span className="font-mono text-xs font-medium text-primary">{p.sku || "—"}</span> },
+  { key: "nome", label: "Nome", sortable: true },
   { key: "unidade_medida", label: "UN" },
-  { key: "estoque_atual", label: "Estoque", render: (p: Produto) =>
+  { key: "estoque_atual", label: "Estoque", sortable: true, render: (p: Produto) =>
     <span className={Number(p.estoque_atual) <= Number(p.estoque_minimo) && Number(p.estoque_minimo) > 0 ? "text-destructive font-semibold" : ""}>{p.estoque_atual}</span>
   },
-  { key: "preco_custo", label: "Custo", render: (p: Produto) => <span className="font-mono">{formatCurrency(p.preco_custo || 0)}</span> },
-  { key: "preco_venda", label: "Preço Venda", render: (p: Produto) => <span className="font-semibold font-mono">{formatCurrency(p.preco_venda)}</span> },
+  { key: "preco_custo", label: "Custo", sortable: true, render: (p: Produto) => <span className="font-mono">{formatCurrency(p.preco_custo || 0)}</span> },
+  { key: "preco_venda", label: "Preço Venda", sortable: true, render: (p: Produto) => <span className="font-semibold font-mono">{formatCurrency(p.preco_venda)}</span> },
   { key: "margem", label: "Margem", render: (p: Produto) => {
       const custo = Number(p.preco_custo || 0);
       const venda = Number(p.preco_venda);
