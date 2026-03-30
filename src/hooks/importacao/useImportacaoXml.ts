@@ -127,12 +127,12 @@ export function useImportacaoXml() {
         .eq("id", currentLoteId);
 
       toast.success(`${validos} XMLs validados e prontos para carga.`);
+      setIsProcessing(false);
       return currentLoteId;
 
     } catch (error: any) {
       console.error("Erro na importação XML:", error);
       toast.error(`Falha no staging XML: ${error.message}`);
-    } finally {
       setIsProcessing(false);
     }
   };
@@ -216,10 +216,12 @@ export function useImportacaoXml() {
         .eq("id", idLote);
 
       toast.success(`Carga finalizada para ${importedCount} notas fiscais.`);
+      setIsProcessing(false);
       return true;
 
     } catch (err: any) {
       toast.error(`Erro na finalização: ${err.message}`);
+      setIsProcessing(false);
     } finally {
       setIsProcessing(false);
     }
