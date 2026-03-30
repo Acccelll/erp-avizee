@@ -528,7 +528,7 @@ const Produtos = () => {
                     <h4 className="font-semibold text-sm">Códigos de Fornecedores (De/Para)</h4>
                     <p className="text-xs text-muted-foreground">Referências usadas na importação de XML para vínculo automático de produtos.</p>
                   </div>
-                  <Button size="sm" variant="outline" className="gap-1" onClick={() => { setAddFornOpen(true); setFornForm({ fornecedor_id: "", referencia_fornecedor: "", preco_compra: 0, lead_time_dias: 0, unidade_fornecedor: "UN", eh_principal: false }); }}>
+                  <Button size="sm" variant="outline" className="gap-1" onClick={() => { setAddFornOpen(true); setFornForm({ fornecedor_id: "", referencia_fornecedor: "", preco_compra: 0, lead_time_dias: 0, unidade_fornecedor: "UN", eh_principal: false, descricao_fornecedor: "" }); }}>
                     <Plus className="w-3 h-3" /> Adicionar
                   </Button>
                 </div>
@@ -565,6 +565,7 @@ const Produtos = () => {
                           lead_time_dias: fornForm.lead_time_dias || null,
                           unidade_fornecedor: fornForm.unidade_fornecedor || "UN",
                           eh_principal: fornForm.eh_principal,
+                          descricao_fornecedor: fornForm.descricao_fornecedor || null,
                         } as any);
                         if (error) { toast.error("Erro ao salvar: " + error.message); return; }
                         toast.success("Fornecedor vinculado!");
