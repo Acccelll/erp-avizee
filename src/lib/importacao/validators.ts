@@ -69,13 +69,7 @@ export function validateClienteImport(data: any): ImportValidationResult {
 export function validateFornecedorImport(data: any): ImportValidationResult {
   // Mesma lógica básica do cliente para propósitos de staging
   const result = validateClienteImport(data);
-  return {
-    ...result,
-    normalizedData: {
-      ...result.normalizedData,
-      tipo: 'fornecedor',
-    }
-  };
+  return result;
 }
 
 /**

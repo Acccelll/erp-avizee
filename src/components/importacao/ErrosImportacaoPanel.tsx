@@ -1,13 +1,12 @@
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle, AlertTriangle, CheckCircle2, FileText, ListChecks } from "lucide-react";
-import { ImportType } from "@/hooks/importacao/useImportacaoCadastros";
 
 interface ErrosImportacaoPanelProps {
   data: any[];
-  importType: ImportType;
+  importType?: string;
 }
 
-export function ErrosImportacaoPanel({ data, importType }: ErrosImportacaoPanelProps) {
+export function ErrosImportacaoPanel({ data }: ErrosImportacaoPanelProps) {
   const total = data.length;
   const validos = data.filter(r => r._valid).length;
   const erros = total - validos;

@@ -1,11 +1,10 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CheckCircle2, XCircle, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { ImportType } from "@/hooks/importacao/useImportacaoCadastros";
 
 interface PreviewImportacaoTableProps {
   data: any[];
-  importType: ImportType;
+  importType: string;
 }
 
 export function PreviewImportacaoTable({ data, importType }: PreviewImportacaoTableProps) {

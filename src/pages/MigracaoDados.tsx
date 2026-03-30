@@ -14,6 +14,7 @@ import { Search, Filter, RefreshCw, Database, ArrowRight, ArrowLeft, CheckCircle
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { useImportacaoCadastros, ImportType } from "@/hooks/importacao/useImportacaoCadastros";
+import { useImportacaoEstoque } from "@/hooks/importacao/useImportacaoEstoque";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
@@ -35,6 +36,13 @@ export default function MigracaoDados() {
     orderBy: "criado_em"
   });
 
+  const [activeImportSource, setActiveImportSource] = useState<"cadastros" | "estoque">("cadastros");
+
+  const hookCadastros = useImportacaoCadastros();
+  const hookEstoque = useImportacaoEstoque();
+
+  const activeHook = activeImportSource === "cadastros" ? hookCadastros : hookEstoque;
+
   const {
     file,
     sheets,
@@ -51,7 +59,7 @@ export default function MigracaoDados() {
     generatePreview,
     processImport,
     finalizeImport
-  } = useImportacaoCadastros();
+  } = activeHook;
 
   const filteredLotes = lotes.filter(lote => {
     const matchesSearch = lote.arquivo_nome?.toLowerCase().includes(searchTerm.toLowerCase());
@@ -66,7 +74,12 @@ export default function MigracaoDados() {
   };
 
   const handleOpenImport = (type: string) => {
-    setImportType(type as ImportType);
+    if (type === "estoque_inicial") {
+      setActiveImportSource("estoque");
+    } else {
+      setActiveImportSource("cadastros");
+      setImportType(type as ImportType);
+    }
     setStep(1);
     setIsImportModalOpen(true);
   };
@@ -171,7 +184,7 @@ export default function MigracaoDados() {
                 type="estoque_inicial"
                 title="Estoque Inicial"
                 description="Carga de saldos iniciais de inventário por depósito."
-                onImport={() => toast.info("Em breve...")}
+                onImport={() => handleOpenImport("estoque_inicial")}
                 onViewBatches={() => { setTypeFilter("estoque_inicial"); setActiveTab("lotes"); }}
               />
               <ImportacaoTipoCard

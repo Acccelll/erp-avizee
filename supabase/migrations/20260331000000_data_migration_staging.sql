@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS public.importacao_lotes (
     total_validos INTEGER DEFAULT 0,
     total_erros INTEGER DEFAULT 0,
     total_importados INTEGER DEFAULT 0,
+    mapeamento JSONB, -- mapeamento de colunas utilizado
     observacoes TEXT,
     criado_em TIMESTAMPTZ DEFAULT now(),
     criado_por UUID REFERENCES auth.users(id)

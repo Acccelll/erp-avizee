@@ -2,20 +2,14 @@ import { useState, useCallback } from "react";
 import * as XLSX from "xlsx";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import {
-  validateProdutoImport,
-  validateClienteImport,
-  validateFornecedorImport
-} from "@/lib/importacao/validators";
+import { validateEstoqueInicialImport } from "@/lib/importacao/validators";
 import { FIELD_ALIASES } from "@/lib/importacao/aliases";
-
-export type ImportType = "produtos" | "clientes" | "fornecedores";
 
 interface Mapping {
   [key: string]: string;
 }
 
-export function useImportacaoCadastros() {
+export function useImportacaoEstoque() {
   const [file, setFile] = useState<File | null>(null);
   const [workbook, setWorkbook] = useState<XLSX.WorkBook | null>(null);
   const [sheets, setSheets] = useState<string[]>([]);
@@ -23,7 +17,6 @@ export function useImportacaoCadastros() {
   const [rawRows, setRawRows] = useState<any[]>([]);
   const [headers, setHeaders] = useState<string[]>([]);
   const [mapping, setMapping] = useState<Mapping>({});
-  const [importType, setImportType] = useState<ImportType>("produtos");
   const [previewData, setPreviewData] = useState<any[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [loteId, setLoteId] = useState<string | null>(null);
@@ -44,7 +37,7 @@ export function useImportacaoCadastros() {
       }
     };
     reader.readAsBinaryString(selectedFile);
-  }, [onSheetChange]);
+  }, []);
 
   const onSheetChange = useCallback((sheetName: string, wb = workbook) => {
     if (!wb) return;
@@ -56,7 +49,6 @@ export function useImportacaoCadastros() {
       setHeaders(headerRow);
       setRawRows(XLSX.utils.sheet_to_json(ws));
 
-      // Auto-mapping based on aliases
       const initialMapping: Mapping = {};
       headerRow.forEach(h => {
         const cleanH = String(h).trim().toUpperCase();
@@ -68,48 +60,66 @@ export function useImportacaoCadastros() {
     }
   }, [workbook]);
 
-  const generatePreview = useCallback(() => {
+  const generatePreview = useCallback(async () => {
     if (rawRows.length === 0) return;
+    setIsProcessing(true);
 
-    const preview = rawRows.map((row, index) => {
-      const mappedRow: any = {};
-      Object.entries(mapping).forEach(([field, colName]) => {
-        mappedRow[field] = row[colName];
+    try {
+      // Carregar produtos do banco para validar existência
+      const { data: produtosBanco } = await supabase
+        .from("produtos")
+        .select("id, codigo_interno, nome, preco_custo, preco_venda");
+
+      const prodMap = new Map(produtosBanco?.map(p => [p.codigo_interno, p]));
+
+      const preview = rawRows.map((row, index) => {
+        const mappedRow: any = {};
+        Object.entries(mapping).forEach(([field, colName]) => {
+          mappedRow[field] = row[colName];
+        });
+
+        const validation = validateEstoqueInicialImport(mappedRow);
+        const produtoInfo = prodMap.get(validation.normalizedData.codigo_produto);
+
+        if (!produtoInfo) {
+          validation.valid = false;
+          validation.errors.push(`Produto não encontrado: ${validation.normalizedData.codigo_produto}`);
+        } else {
+          validation.normalizedData.produto_id = produtoInfo.id;
+          validation.normalizedData.nome_produto = produtoInfo.nome;
+          validation.normalizedData.custo_unitario = mappedRow.custo_unitario || produtoInfo.preco_custo || 0;
+        }
+
+        return {
+          ...validation.normalizedData,
+          _valid: validation.valid,
+          _errors: validation.errors,
+          _originalLine: index + 2,
+          _originalRow: row
+        };
       });
 
-      let validation;
-      if (importType === "produtos") validation = validateProdutoImport(mappedRow);
-      else if (importType === "clientes") validation = validateClienteImport(mappedRow);
-      else validation = validateFornecedorImport(mappedRow);
-
-      return {
-        ...validation.normalizedData,
-        _valid: validation.valid,
-        _errors: validation.errors,
-        _originalLine: index + 2,
-        _originalRow: row
-      };
-    });
-
-    setPreviewData(preview);
-    return preview;
-  }, [rawRows, mapping, importType]);
+      setPreviewData(preview);
+    } catch (err: any) {
+      toast.error(`Erro ao validar dados: ${err.message}`);
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [rawRows, mapping]);
 
   const processImport = async () => {
     if (previewData.length === 0) return;
     setIsProcessing(true);
 
     try {
-      // 1. Criar Lote
       const { data: user } = await supabase.auth.getUser();
       const { data: lote, error: loteError } = await supabase
         .from("importacao_lotes")
         .insert({
-          tipo_importacao: importType,
+          tipo_importacao: "estoque_inicial",
           arquivo_nome: file?.name,
           status: "processando",
           total_lidos: previewData.length,
-          mapeamento: mapping,
           criado_por: user?.user?.id
         })
         .select()
@@ -119,8 +129,6 @@ export function useImportacaoCadastros() {
       const currentLoteId = lote.id;
       setLoteId(currentLoteId);
 
-      // 2. Salvar em Staging
-      const stagingTable = `stg_${importType === "produtos" ? "produtos" : importType === "clientes" ? "clientes" : "fornecedores"}`;
       const stagingData = previewData.map(item => ({
         lote_importacao_id: currentLoteId,
         arquivo_origem: file?.name,
@@ -132,10 +140,9 @@ export function useImportacaoCadastros() {
         criado_por: user?.user?.id
       }));
 
-      const { error: stagingError } = await supabase.from(stagingTable as any).insert(stagingData);
+      const { error: stagingError } = await supabase.from("stg_estoque_inicial").insert(stagingData);
       if (stagingError) throw stagingError;
 
-      // 3. Atualizar Lote com contagens
       const validos = previewData.filter(i => i._valid).length;
       const erros = previewData.length - validos;
 
@@ -148,13 +155,13 @@ export function useImportacaoCadastros() {
         })
         .eq("id", currentLoteId);
 
-      toast.success(`${validos} registros validados e prontos para carga.`);
-      setIsProcessing(false);
+      toast.success(`${validos} registros prontos para abertura de saldo.`);
       return currentLoteId;
 
     } catch (error: any) {
       console.error("Erro na importação:", error);
-      toast.error(`Falha no processamento: ${error.message}`);
+      toast.error(`Falha no staging: ${error.message}`);
+    } finally {
       setIsProcessing(false);
     }
   };
@@ -164,21 +171,17 @@ export function useImportacaoCadastros() {
     setIsProcessing(true);
 
     try {
-      // 1. Recuperar mapeamento do lote
+      // 1. Recuperar mapeamento e dados de staging
       const { data: loteData } = await supabase
         .from("importacao_lotes")
-        .select("mapeamento, tipo_importacao")
+        .select("mapeamento")
         .eq("id", idLote)
         .single();
 
       const batchMapping = loteData?.mapeamento as Mapping;
-      const batchType = loteData?.tipo_importacao as ImportType;
-
-      // 2. Carregar registros válidos de staging
-      const stagingTable = `stg_${batchType === "produtos" ? "produtos" : batchType === "clientes" ? "clientes" : "fornecedores"}`;
 
       const { data: validItems, error: fetchError } = await supabase
-        .from(stagingTable as any)
+        .from("stg_estoque_inicial")
         .select("payload, linha_origem")
         .eq("lote_importacao_id", idLote)
         .eq("status_validacao", "valido");
@@ -190,8 +193,14 @@ export function useImportacaoCadastros() {
         return;
       }
 
-      // 3. Processar em lotes para melhor performance e respeitar o mapeamento
-      const dataToInsert: any[] = [];
+      // 2. Carregar produtos para calcular saldos e obter IDs
+      const { data: allProds } = await supabase.from("produtos").select("id, codigo_interno, estoque_atual");
+      const prodMap = new Map(allProds?.map(p => [p.codigo_interno, p]));
+
+      // 3. Preparar dados para inserção em bloco
+      const movements: any[] = [];
+      const productUpdates: { id: string, estoque_atual: number }[] = [];
+
       validItems.forEach(item => {
         const raw = item.payload;
         const mappedRow: any = {};
@@ -199,47 +208,61 @@ export function useImportacaoCadastros() {
           mappedRow[field] = raw[colName];
         });
 
-        let validated;
-        if (batchType === "produtos") validated = validateProdutoImport(mappedRow);
-        else if (batchType === "clientes") validated = validateClienteImport(mappedRow);
-        else validated = validateFornecedorImport(mappedRow);
+        const validation = validateEstoqueInicialImport(mappedRow);
+        const prod = prodMap.get(validation.normalizedData.codigo_produto);
 
-        dataToInsert.push(validated.normalizedData);
+        if (prod) {
+          const saldo_anterior = Number(prod.estoque_atual || 0);
+          const saldo_atual = validation.normalizedData.quantidade;
+          const diff = saldo_atual - saldo_anterior;
+
+          movements.push({
+            produto_id: prod.id,
+            tipo: diff >= 0 ? "entrada" : "saida",
+            quantidade: Math.abs(diff),
+            saldo_anterior,
+            saldo_atual,
+            motivo: `Abertura de estoque inicial via migração (Lote: ${idLote})`,
+            documento_tipo: "abertura",
+            documento_id: idLote
+          });
+
+          productUpdates.push({ id: prod.id, estoque_atual: saldo_atual });
+        }
       });
 
-      // 4. Upsert em bloco
-      let query;
-      if (batchType === "produtos") {
-        query = supabase.from("produtos").upsert(dataToInsert, { onConflict: "codigo_interno" });
-      } else {
-        query = supabase.from(batchType as any).upsert(dataToInsert, { onConflict: "cpf_cnpj" });
+      // 4. Executar operações em bloco
+      if (movements.length > 0) {
+        const { error: movError } = await supabase.from("estoque_movimentos").insert(movements);
+        if (movError) throw movError;
+
+        // Atualização de produtos (Supabase/PostgREST não suporta bulk update com IDs diferentes de forma nativa facilmente via insert/upsert)
+        // Usaremos uma estratégia de upsert para as colunas específicas
+        const { error: updError } = await supabase
+          .from("produtos")
+          .upsert(productUpdates, { onConflict: "id" });
+
+        if (updError) throw updError;
       }
 
-      const { error: insertError } = await query;
+      const importedCount = movements.length;
 
-      if (insertError) {
-        throw insertError;
-      }
-
-      const importedCount = dataToInsert.length;
-
-      // Atualizar Lote Final
       await supabase
         .from("importacao_lotes")
         .update({
           status: "concluido",
           total_importados: importedCount,
-          observacoes: `Carga finalizada com ${importedCount} registros inseridos/atualizados.`
+          observacoes: `Abertura de saldo concluída para ${importedCount} produtos.`
         })
         .eq("id", idLote);
 
-      toast.success(`Importação finalizada! ${importedCount} registros carregados.`);
-      setIsProcessing(false);
+      toast.success(`Importação finalizada! ${importedCount} saldos atualizados.`);
       return true;
 
     } catch (error: any) {
       console.error("Erro na finalização:", error);
       toast.error(`Falha na carga final: ${error.message}`);
+    } finally {
       setIsProcessing(false);
     }
   };
@@ -250,13 +273,11 @@ export function useImportacaoCadastros() {
     currentSheet,
     headers,
     mapping,
-    importType,
     previewData,
     isProcessing,
     onFileChange,
     onSheetChange,
     setMapping,
-    setImportType,
     generatePreview,
     processImport,
     finalizeImport,
