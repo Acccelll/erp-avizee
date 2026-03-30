@@ -2,13 +2,21 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
+interface CrudFilter {
+  column: string;
+  value: string | number | boolean;
+  operator?: "eq" | "neq" | "gt" | "gte" | "lt" | "lte" | "like" | "ilike" | "in";
+}
+
 interface UseCrudOptions {
   table: string;
   select?: string;
   orderBy?: string;
   ascending?: boolean;
-  filter?: { column: string; value: any }[];
+  filter?: CrudFilter[];
   hasAtivo?: boolean;
+  pageSize?: number;
+  showToasts?: boolean;
 }
 
 export function useSupabaseCrud<T extends Record<string, any>>({
@@ -18,11 +26,33 @@ export function useSupabaseCrud<T extends Record<string, any>>({
   ascending = false,
   filter = [],
   hasAtivo = true,
+  pageSize,
+  showToasts = true,
 }: UseCrudOptions) {
   const [data, setData] = useState<T[]>([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
   const filterRef = useRef(filter);
   filterRef.current = filter;
+
+  const applyFilters = useCallback((query: any) => {
+    for (const f of filterRef.current) {
+      const op = f.operator || "eq";
+      switch (op) {
+        case "neq": query = query.neq(f.column, f.value); break;
+        case "gt": query = query.gt(f.column, f.value); break;
+        case "gte": query = query.gte(f.column, f.value); break;
+        case "lt": query = query.lt(f.column, f.value); break;
+        case "lte": query = query.lte(f.column, f.value); break;
+        case "like": query = query.like(f.column, f.value); break;
+        case "ilike": query = query.ilike(f.column, f.value); break;
+        case "in": query = query.in(f.column, Array.isArray(f.value) ? f.value : [f.value]); break;
+        default: query = query.eq(f.column, f.value);
+      }
+    }
+    return query;
+  }, []);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -32,19 +62,24 @@ export function useSupabaseCrud<T extends Record<string, any>>({
       query = query.eq("ativo", true);
     }
 
-    for (const f of filterRef.current) {
-      query = query.eq(f.column, f.value);
+    query = applyFilters(query);
+
+    if (pageSize) {
+      const from = page * pageSize;
+      query = query.range(from, from + pageSize - 1);
     }
 
     const { data: result, error } = await query;
     if (error) {
       console.error(`[crud] Erro ao carregar ${table}:`, error);
-      toast.error("Erro ao carregar dados. Tente novamente.");
+      if (showToasts) toast.error("Erro ao carregar dados. Tente novamente.");
     } else {
-      setData((result as unknown as T[]) || []);
+      const rows = (result as unknown as T[]) || [];
+      setData(rows);
+      if (pageSize) setHasMore(rows.length === pageSize);
     }
     setLoading(false);
-  }, [table, select, orderBy, ascending, hasAtivo]);
+  }, [table, select, orderBy, ascending, hasAtivo, applyFilters, pageSize, page, showToasts]);
 
   useEffect(() => {
     fetchData();
@@ -54,10 +89,10 @@ export function useSupabaseCrud<T extends Record<string, any>>({
     const { data: result, error } = await supabase.from(table as any).insert(record as any).select().single();
     if (error) {
       console.error(`[crud] Erro ao criar em ${table}:`, error);
-      toast.error("Erro ao criar registro. Tente novamente.");
+      if (showToasts) toast.error("Erro ao criar registro. Tente novamente.");
       throw error;
     }
-    toast.success("Registro criado com sucesso!");
+    if (showToasts) toast.success("Registro criado com sucesso!");
     fetchData();
     return result;
   };
@@ -66,10 +101,10 @@ export function useSupabaseCrud<T extends Record<string, any>>({
     const { data: result, error } = await supabase.from(table as any).update(record as any).eq("id", id).select().single();
     if (error) {
       console.error(`[crud] Erro ao atualizar em ${table}:`, error);
-      toast.error("Erro ao atualizar registro. Tente novamente.");
+      if (showToasts) toast.error("Erro ao atualizar registro. Tente novamente.");
       throw error;
     }
-    toast.success("Registro atualizado com sucesso!");
+    if (showToasts) toast.success("Registro atualizado com sucesso!");
     fetchData();
     return result;
   };
@@ -77,12 +112,12 @@ export function useSupabaseCrud<T extends Record<string, any>>({
   const remove = async (id: string, soft = true) => {
     if (soft && hasAtivo) {
       const { error } = await supabase.from(table as any).update({ ativo: false } as any).eq("id", id);
-      if (error) { console.error(`[crud] Erro ao remover de ${table}:`, error); toast.error("Erro ao remover registro. Tente novamente."); throw error; }
+      if (error) { console.error(`[crud] Erro ao remover de ${table}:`, error); if (showToasts) toast.error("Erro ao remover registro. Tente novamente."); throw error; }
     } else {
       const { error } = await supabase.from(table as any).delete().eq("id", id);
-      if (error) { console.error(`[crud] Erro ao remover de ${table}:`, error); toast.error("Erro ao remover registro. Tente novamente."); throw error; }
+      if (error) { console.error(`[crud] Erro ao remover de ${table}:`, error); if (showToasts) toast.error("Erro ao remover registro. Tente novamente."); throw error; }
     }
-    toast.success("Registro removido com sucesso!");
+    if (showToasts) toast.success("Registro removido com sucesso!");
     fetchData();
   };
 
@@ -100,5 +135,5 @@ export function useSupabaseCrud<T extends Record<string, any>>({
     return create(copy);
   };
 
-  return { data, loading, fetchData, create, update, remove, duplicate };
+  return { data, loading, fetchData, create, update, remove, duplicate, page, setPage, hasMore };
 }

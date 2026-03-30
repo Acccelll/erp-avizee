@@ -1,46 +1,55 @@
+import { lazy, Suspense } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
+import { BrowserRouter, Route, Routes, Navigate, useParams } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AdminRoute } from "@/components/AdminRoute";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import Index from "./pages/Index";
-import Produtos from "./pages/Produtos";
-import Clientes from "./pages/Clientes";
-import GruposEconomicos from "./pages/GruposEconomicos";
-import Fornecedores from "./pages/Fornecedores";
-import Compras from "./pages/Compras";
-import Orcamentos from "./pages/Orcamentos";
-import OrcamentoForm from "./pages/OrcamentoForm";
-import OrdensVenda from "./pages/OrdensVenda";
-import Estoque from "./pages/Estoque";
-import Fiscal from "./pages/Fiscal";
-import Financeiro from "./pages/Financeiro";
-import Caixa from "./pages/Caixa";
-import ContasBancarias from "./pages/ContasBancarias";
-import FluxoCaixa from "./pages/FluxoCaixa";
-import ContasContabeis from "./pages/ContasContabeis";
-import Login from "./pages/Login";
-import Pedidos from "./pages/Pedidos";
-import Relatorios from "./pages/Relatorios";
-import Configuracoes from "./pages/Configuracoes";
-import Administracao from "./pages/Administracao";
-import Auditoria from "./pages/Auditoria";
-import Perfil from "./pages/Perfil";
-import Signup from "./pages/Signup";
-import ForgotPassword from "./pages/ForgotPassword";
-import ResetPassword from "./pages/ResetPassword";
-import NotFound from "./pages/NotFound";
-import Transportadoras from "./pages/Transportadoras";
-import FormasPagamento from "./pages/FormasPagamento";
-import CotacoesCompra from "./pages/CotacoesCompra";
-import PedidosCompra from "./pages/PedidosCompra";
-import Remessas from "./pages/Remessas";
-import Funcionarios from "./pages/Funcionarios";
-import OrcamentoPublico from "./pages/OrcamentoPublico";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
+
+// Lazy-loaded pages
+const Index = lazy(() => import("./pages/Index"));
+const Produtos = lazy(() => import("./pages/Produtos"));
+const Clientes = lazy(() => import("./pages/Clientes"));
+const GruposEconomicos = lazy(() => import("./pages/GruposEconomicos"));
+const Fornecedores = lazy(() => import("./pages/Fornecedores"));
+const Compras = lazy(() => import("./pages/Compras"));
+const Orcamentos = lazy(() => import("./pages/Orcamentos"));
+const OrcamentoForm = lazy(() => import("./pages/OrcamentoForm"));
+const OrdensVenda = lazy(() => import("./pages/OrdensVenda"));
+const Estoque = lazy(() => import("./pages/Estoque"));
+const Fiscal = lazy(() => import("./pages/Fiscal"));
+const Financeiro = lazy(() => import("./pages/Financeiro"));
+const Caixa = lazy(() => import("./pages/Caixa"));
+const ContasBancarias = lazy(() => import("./pages/ContasBancarias"));
+const FluxoCaixa = lazy(() => import("./pages/FluxoCaixa"));
+const ContasContabeis = lazy(() => import("./pages/ContasContabeis"));
+const Login = lazy(() => import("./pages/Login"));
+const Pedidos = lazy(() => import("./pages/Pedidos"));
+const Relatorios = lazy(() => import("./pages/Relatorios"));
+const Configuracoes = lazy(() => import("./pages/Configuracoes"));
+const Administracao = lazy(() => import("./pages/Administracao"));
+const Auditoria = lazy(() => import("./pages/Auditoria"));
+const Perfil = lazy(() => import("./pages/Perfil"));
+const Signup = lazy(() => import("./pages/Signup"));
+const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const Transportadoras = lazy(() => import("./pages/Transportadoras"));
+const FormasPagamento = lazy(() => import("./pages/FormasPagamento"));
+const CotacoesCompra = lazy(() => import("./pages/CotacoesCompra"));
+const PedidosCompra = lazy(() => import("./pages/PedidosCompra"));
+const Remessas = lazy(() => import("./pages/Remessas"));
+const Funcionarios = lazy(() => import("./pages/Funcionarios"));
+const OrcamentoPublico = lazy(() => import("./pages/OrcamentoPublico"));
+
+// Redirect component that properly maps :id param
+function CotacaoIdRedirect() {
+  const { id } = useParams();
+  return <Navigate to={`/orcamentos/${id}`} replace />;
+}
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -53,6 +62,12 @@ const queryClient = new QueryClient({
   },
 });
 
+const PageLoader = () => (
+  <div className="flex items-center justify-center min-h-screen">
+    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+  </div>
+);
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider>
@@ -61,6 +76,7 @@ const App = () => (
         <BrowserRouter>
           <AuthProvider>
           <ErrorBoundary>
+          <Suspense fallback={<PageLoader />}>
           <Routes>
             <Route path="/orcamento-publico" element={<OrcamentoPublico />} />
             <Route path="/login" element={<Login />} />
@@ -81,7 +97,7 @@ const App = () => (
             <Route path="/remessas" element={<ProtectedRoute><Remessas /></ProtectedRoute>} />
             <Route path="/cotacoes" element={<Navigate to="/orcamentos" replace />} />
             <Route path="/cotacoes/novo" element={<Navigate to="/orcamentos/novo" replace />} />
-            <Route path="/cotacoes/:id" element={<Navigate to="/orcamentos/:id" replace />} />
+            <Route path="/cotacoes/:id" element={<CotacaoIdRedirect />} />
             <Route path="/orcamentos" element={<ProtectedRoute><Orcamentos /></ProtectedRoute>} />
             <Route path="/orcamentos/novo" element={<ProtectedRoute><OrcamentoForm /></ProtectedRoute>} />
             <Route path="/orcamentos/:id" element={<ProtectedRoute><OrcamentoForm /></ProtectedRoute>} />
@@ -101,6 +117,7 @@ const App = () => (
             <Route path="/contas-contabeis-plano" element={<ProtectedRoute><ContasContabeis /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
+          </Suspense>
           </ErrorBoundary>
           </AuthProvider>
         </BrowserRouter>
