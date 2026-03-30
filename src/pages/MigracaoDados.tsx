@@ -3,107 +3,106 @@ import { AppLayout } from "@/components/AppLayout";
 import { ImportacaoResumoCards } from "@/components/importacao/ImportacaoResumoCards";
 import { ImportacaoTipoCard } from "@/components/importacao/ImportacaoTipoCard";
 import { ImportacaoLotesTable, ImportacaoLote } from "@/components/importacao/ImportacaoLotesTable";
+import { UploadPlanilhaCard } from "@/components/importacao/UploadPlanilhaCard";
+import { MapeamentoColunasForm } from "@/components/importacao/MapeamentoColunasForm";
+import { PreviewImportacaoTable } from "@/components/importacao/PreviewImportacaoTable";
+import { ErrosImportacaoPanel } from "@/components/importacao/ErrosImportacaoPanel";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Filter, RefreshCw, Database } from "lucide-react";
+import { Search, Filter, RefreshCw, Database, ArrowRight, ArrowLeft, CheckCircle2, ChevronRight } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-
-// Mock data for initial structure
-const MOCK_LOTES: ImportacaoLote[] = [
-  {
-    id: "1",
-    tipo_importacao: "produtos",
-    status: "concluido",
-    arquivo_nome: "lista_produtos_2024.xlsx",
-    total_lidos: 150,
-    total_validos: 148,
-    total_erros: 2,
-    total_importados: 148,
-    criado_em: new Date(Date.now() - 86400000).toISOString(),
-  },
-  {
-    id: "2",
-    tipo_importacao: "estoque_inicial",
-    status: "validado",
-    arquivo_nome: "inventario_geral.csv",
-    total_lidos: 850,
-    total_validos: 850,
-    total_erros: 0,
-    total_importados: 0,
-    criado_em: new Date(Date.now() - 3600000).toISOString(),
-  },
-  {
-    id: "3",
-    tipo_importacao: "clientes",
-    status: "processando",
-    arquivo_nome: "base_clientes_v3.xlsx",
-    total_lidos: 2500,
-    total_validos: 1200,
-    total_erros: 5,
-    total_importados: 0,
-    criado_em: new Date().toISOString(),
-  }
-];
-
-const IMPORT_TYPES = [
-  {
-    id: "cadastros",
-    title: "Cadastros",
-    description: "Importação de Produtos, Clientes e Fornecedores via Excel/CSV.",
-    summary: { lastDate: "20/03/2024", lastStatus: "Concluído", totalBatches: 12 }
-  },
-  {
-    id: "estoque_inicial",
-    title: "Estoque Inicial",
-    description: "Carga de saldos iniciais de inventário por depósito.",
-    summary: { lastDate: "21/03/2024", lastStatus: "Validado", totalBatches: 3 }
-  },
-  {
-    id: "compras_xml",
-    title: "Compras por XML",
-    description: "Processamento em lote de arquivos XML de notas de compra.",
-    summary: { lastDate: "15/03/2024", lastStatus: "Concluído", totalBatches: 45 }
-  },
-  {
-    id: "faturamento",
-    title: "Faturamento Histórico",
-    description: "Importação de histórico de vendas de sistemas legados.",
-    summary: { lastDate: "05/01/2024", lastStatus: "Concluído", totalBatches: 1 }
-  },
-  {
-    id: "financeiro",
-    title: "Financeiro em Aberto",
-    description: "Carga de contas a pagar e receber pendentes.",
-    summary: { lastDate: "N/A", lastStatus: "Sem dados", totalBatches: 0 }
-  }
-];
+import { useImportacaoCadastros, ImportType } from "@/hooks/importacao/useImportacaoCadastros";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Progress } from "@/components/ui/progress";
+import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
+import { cn } from "@/lib/utils";
+import { Label } from "@/components/ui/label";
 
 export default function MigracaoDados() {
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState("todos");
   const [statusFilter, setStatusFilter] = useState("todos");
   const [activeTab, setActiveTab] = useState("overview");
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [step, setStep] = useState(1);
+  const [currentLoteId, setCurrentLoteId] = useState<string | null>(null);
 
-  const filteredLotes = MOCK_LOTES.filter(lote => {
-    const matchesSearch = lote.arquivo_nome.toLowerCase().includes(searchTerm.toLowerCase());
+  const { data: lotes, loading: loadingLotes, fetchData: refreshLotes } = useSupabaseCrud<ImportacaoLote>({
+    table: "importacao_lotes",
+    hasAtivo: false,
+    orderBy: "criado_em"
+  });
+
+  const {
+    file,
+    sheets,
+    currentSheet,
+    headers,
+    mapping,
+    importType,
+    previewData,
+    isProcessing,
+    onFileChange,
+    onSheetChange,
+    setMapping,
+    setImportType,
+    generatePreview,
+    processImport,
+    finalizeImport
+  } = useImportacaoCadastros();
+
+  const filteredLotes = lotes.filter(lote => {
+    const matchesSearch = lote.arquivo_nome?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesType = typeFilter === "todos" || lote.tipo_importacao === typeFilter;
     const matchesStatus = statusFilter === "todos" || lote.status === statusFilter;
     return matchesSearch && matchesType && matchesStatus;
   });
 
   const handleRefresh = () => {
-    toast.info("Atualizando dados...");
+    refreshLotes();
+    toast.info("Dados atualizados.");
   };
 
-  const handleImport = (type: string) => {
-    toast.success(`Iniciando importação de ${type}...`);
+  const handleOpenImport = (type: string) => {
+    setImportType(type as ImportType);
+    setStep(1);
+    setIsImportModalOpen(true);
   };
 
-  const handleViewBatches = (type: string) => {
-    setTypeFilter(type);
-    setActiveTab("lotes");
+  const handleNextStep = async () => {
+    if (step === 1 && !file) {
+      toast.error("Selecione um arquivo primeiro.");
+      return;
+    }
+
+    if (step === 2) {
+      generatePreview();
+    }
+
+    if (step === 3) {
+      const loteId = await processImport();
+      if (!loteId) return;
+      setCurrentLoteId(loteId);
+    }
+
+    setStep(s => s + 1);
+  };
+
+  const handleFinalize = async () => {
+    const success = await finalizeImport(currentLoteId || undefined);
+    if (success) {
+      setIsImportModalOpen(false);
+      refreshLotes();
+      setActiveTab("lotes");
+    }
+  };
+
+  const resetModal = () => {
+    setIsImportModalOpen(false);
+    setStep(1);
+    setCurrentLoteId(null);
   };
 
   return (
@@ -124,7 +123,7 @@ export default function MigracaoDados() {
           </div>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={handleRefresh} className="gap-2">
-              <RefreshCw className="h-4 w-4" />
+              <RefreshCw className={`h-4 w-4 ${loadingLotes ? 'animate-spin' : ''}`} />
               Atualizar
             </Button>
           </div>
@@ -132,10 +131,10 @@ export default function MigracaoDados() {
 
         {/* Resumo */}
         <ImportacaoResumoCards
-          totalBatches={MOCK_LOTES.length}
-          totalProcessed={1}
-          totalErrors={1}
-          totalPending={1}
+          totalBatches={lotes.length}
+          totalProcessed={lotes.filter(l => l.status === 'concluido').length}
+          totalErrors={lotes.reduce((acc, curr) => acc + (curr.total_erros || 0), 0)}
+          totalPending={lotes.filter(l => ['validado', 'parcial', 'processando'].includes(l.status)).length}
         />
 
         {/* Tabs */}
@@ -147,17 +146,41 @@ export default function MigracaoDados() {
 
           <TabsContent value="overview" className="mt-0">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-              {IMPORT_TYPES.map((type) => (
-                <ImportacaoTipoCard
-                  key={type.id}
-                  type={type.id}
-                  title={type.title}
-                  description={type.description}
-                  summary={type.summary}
-                  onImport={handleImport}
-                  onViewBatches={handleViewBatches}
-                />
-              ))}
+              <ImportacaoTipoCard
+                type="produtos"
+                title="Produtos"
+                description="Importação de SKUs, descrições, preços e NCM via Excel."
+                onImport={() => handleOpenImport("produtos")}
+                onViewBatches={() => { setTypeFilter("produtos"); setActiveTab("lotes"); }}
+              />
+              <ImportacaoTipoCard
+                type="clientes"
+                title="Clientes"
+                description="Carga de base de clientes com CPF/CNPJ e contatos."
+                onImport={() => handleOpenImport("clientes")}
+                onViewBatches={() => { setTypeFilter("clientes"); setActiveTab("lotes"); }}
+              />
+              <ImportacaoTipoCard
+                type="fornecedores"
+                title="Fornecedores"
+                description="Cadastro de fornecedores legados para compras e fiscal."
+                onImport={() => handleOpenImport("fornecedores")}
+                onViewBatches={() => { setTypeFilter("fornecedores"); setActiveTab("lotes"); }}
+              />
+              <ImportacaoTipoCard
+                type="estoque_inicial"
+                title="Estoque Inicial"
+                description="Carga de saldos iniciais de inventário por depósito."
+                onImport={() => toast.info("Em breve...")}
+                onViewBatches={() => { setTypeFilter("estoque_inicial"); setActiveTab("lotes"); }}
+              />
+              <ImportacaoTipoCard
+                type="compras_xml"
+                title="Compras por XML"
+                description="Processamento em lote de arquivos XML de notas de compra."
+                onImport={() => toast.info("Em breve...")}
+                onViewBatches={() => { setTypeFilter("compras_xml"); setActiveTab("lotes"); }}
+              />
             </div>
           </TabsContent>
 
@@ -181,11 +204,11 @@ export default function MigracaoDados() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="todos">Todos os tipos</SelectItem>
-                    <SelectItem value="produtos">Cadastros</SelectItem>
+                    <SelectItem value="produtos">Produtos</SelectItem>
+                    <SelectItem value="clientes">Clientes</SelectItem>
+                    <SelectItem value="fornecedores">Fornecedores</SelectItem>
                     <SelectItem value="estoque_inicial">Estoque Inicial</SelectItem>
                     <SelectItem value="compras_xml">Compras por XML</SelectItem>
-                    <SelectItem value="faturamento">Faturamento</SelectItem>
-                    <SelectItem value="financeiro">Financeiro</SelectItem>
                   </SelectContent>
                 </Select>
 
@@ -197,6 +220,7 @@ export default function MigracaoDados() {
                     <SelectItem value="todos">Todos status</SelectItem>
                     <SelectItem value="concluido">Concluído</SelectItem>
                     <SelectItem value="validado">Validado</SelectItem>
+                    <SelectItem value="parcial">Parcial</SelectItem>
                     <SelectItem value="processando">Processando</SelectItem>
                     <SelectItem value="cancelado">Cancelado</SelectItem>
                   </SelectContent>
@@ -210,11 +234,134 @@ export default function MigracaoDados() {
 
             <ImportacaoLotesTable
               lotes={filteredLotes}
-              onView={(id) => toast.info(`Abrindo lote ${id}...`)}
-              onDelete={(id) => toast.error(`Lote ${id} excluído (mock)`)}
+              isLoading={loadingLotes}
+              onView={(id) => toast.info(`Visualizar lote ${id}`)}
+              onImport={(id) => {
+                 setCurrentLoteId(id);
+                 setStep(4);
+                 setIsImportModalOpen(true);
+              }}
+              onDelete={(id) => toast.error("Exclusão não implementada")}
             />
           </TabsContent>
         </Tabs>
+
+        {/* Modal de Importação */}
+        <Dialog open={isImportModalOpen} onOpenChange={setIsImportModalOpen}>
+          <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <FileUp className="h-5 w-5" />
+                Importar {importType.charAt(0).toUpperCase() + importType.slice(1)}
+              </DialogTitle>
+              <DialogDescription>
+                Siga os passos abaixo para realizar a carga de dados.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="flex items-center justify-between px-8 py-4 bg-muted/30 rounded-lg">
+              {[1, 2, 3, 4].map(s => (
+                <div key={s} className="flex items-center">
+                  <div className={cn(
+                    "flex items-center justify-center h-8 w-8 rounded-full border-2 font-bold text-sm transition-colors",
+                    step === s ? "bg-primary text-primary-foreground border-primary" :
+                    step > s ? "bg-emerald-500 text-white border-emerald-500" : "border-muted-foreground/30 text-muted-foreground"
+                  )}>
+                    {step > s ? <CheckCircle2 className="h-5 w-5" /> : s}
+                  </div>
+                  {s < 4 && <ChevronRight className="mx-2 h-4 w-4 text-muted-foreground/30" />}
+                </div>
+              ))}
+            </div>
+
+            <div className="flex-grow overflow-auto py-4">
+              {step === 1 && (
+                <div className="space-y-4">
+                  <UploadPlanilhaCard
+                    onFileChange={onFileChange}
+                    fileName={file?.name}
+                    isProcessing={isProcessing}
+                  />
+                  {sheets.length > 0 && (
+                    <div className="space-y-2">
+                      <Label>Selecione a aba da planilha:</Label>
+                      <Select value={currentSheet} onValueChange={(val) => onSheetChange(val)}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione a aba" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {sheets.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {step === 2 && (
+                <div className="space-y-4">
+                  <div className="bg-amber-50 border border-amber-200 p-3 rounded-md text-sm text-amber-800">
+                    Mapeie as colunas da sua planilha para os campos correspondentes no sistema.
+                  </div>
+                  <MapeamentoColunasForm
+                    headers={headers}
+                    importType={importType}
+                    mapping={mapping}
+                    onMappingChange={(f, c) => setMapping(prev => ({ ...prev, [f]: c }))}
+                  />
+                </div>
+              )}
+
+              {step === 3 && (
+                <div className="space-y-6">
+                  <ErrosImportacaoPanel data={previewData} importType={importType} />
+                  <PreviewImportacaoTable data={previewData} importType={importType} />
+                </div>
+              )}
+
+              {step === 4 && (
+                <div className="flex flex-col items-center justify-center py-12 text-center space-y-4">
+                  <div className="p-4 bg-emerald-100 rounded-full">
+                    <CheckCircle2 className="h-12 w-12 text-emerald-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold">Tudo pronto!</h3>
+                    <p className="text-muted-foreground max-w-md">
+                      Os dados foram validados e estão no ambiente de staging.
+                      Clique em <strong>Confirmar Carga</strong> para inserir definitivamente no sistema.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {isProcessing && (
+              <div className="space-y-2 mb-4">
+                <Progress value={undefined} className="h-2" />
+                <p className="text-[10px] text-center text-muted-foreground animate-pulse">Processando dados, por favor aguarde...</p>
+              </div>
+            )}
+
+            <DialogFooter className="border-t pt-4">
+              <Button variant="ghost" onClick={resetModal} disabled={isProcessing}>Cancelar</Button>
+              <div className="flex-grow" />
+              {step > 1 && step < 4 && (
+                <Button variant="outline" onClick={() => setStep(s => s - 1)} disabled={isProcessing}>
+                  <ArrowLeft className="mr-2 h-4 w-4" /> Voltar
+                </Button>
+              )}
+              {step < 4 ? (
+                <Button onClick={handleNextStep} disabled={isProcessing || (step === 1 && !file)}>
+                  Próximo <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              ) : (
+                <Button onClick={handleFinalize} disabled={isProcessing} className="bg-emerald-600 hover:bg-emerald-700">
+                  Confirmar Carga Final
+                </Button>
+              )}
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </AppLayout>
   );

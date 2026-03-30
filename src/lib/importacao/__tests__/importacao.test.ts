@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import * as normalizers from '../normalizers';
 import * as parsers from '../parsers';
 import * as validators from '../validators';
+import { FIELD_ALIASES } from '../aliases';
 
 describe('Import Normalizers', () => {
   it('should normalize text correctly', () => {
@@ -80,7 +81,7 @@ describe('Import Validators', () => {
     };
     const result = validators.validateProdutoImport(validProduct);
     expect(result.valid).toBe(true);
-    expect(result.normalizedData.codigo).toBe('P001');
+    expect(result.normalizedData.codigo_interno).toBe('P001');
     expect(result.normalizedData.preco_venda).toBe(150);
 
     const invalidProduct = {
@@ -117,5 +118,22 @@ describe('Import Validators', () => {
     const result = validators.validateEstoqueInicialImport(validStock);
     expect(result.valid).toBe(true);
     expect(result.normalizedData.quantidade).toBe(120);
+  });
+
+  it('should auto-map headers based on aliases', () => {
+    const headers = ['SKU', 'PREÇO', 'NOME FANTASIA', 'DESCONHECIDO'];
+    const mapping: Record<string, string> = {};
+
+    headers.forEach(h => {
+      const cleanH = String(h).trim().toUpperCase();
+      if (FIELD_ALIASES[cleanH]) {
+        mapping[FIELD_ALIASES[cleanH]] = h;
+      }
+    });
+
+    expect(mapping['codigo_interno']).toBe('SKU');
+    expect(mapping['preco_venda']).toBe('PREÇO');
+    expect(mapping['nome_fantasia']).toBe('NOME FANTASIA');
+    expect(mapping['desconhecido']).toBeUndefined();
   });
 });

@@ -17,7 +17,7 @@ export interface ImportValidationResult<T = any> {
 export function validateProdutoImport(data: any): ImportValidationResult {
   const errors: string[] = [];
   const normalizedData: any = {
-    codigo: normalizeCodigoProduto(data.codigo || data.SKU || data.CÓDIGO),
+    codigo_interno: normalizeCodigoProduto(data.codigo_interno || data.SKU || data.CÓDIGO || data.codigo),
     nome: normalizeText(data.nome || data.DESCRIÇÃO || data.DESCRICAO),
     preco_venda: parseDecimalFlexible(data.preco_venda || data.PREÇO || data.VALOR).value || 0,
     preco_custo: parseDecimalFlexible(data.preco_custo || data.CUSTO).value || 0,
@@ -26,7 +26,7 @@ export function validateProdutoImport(data: any): ImportValidationResult {
     gtin: normalizeText(data.gtin || data.GTIN || data.EAN),
   };
 
-  if (!normalizedData.codigo) errors.push('Código do produto é obrigatório.');
+  if (!normalizedData.codigo_interno) errors.push('Código do produto é obrigatório.');
   if (!normalizedData.nome) errors.push('Nome/Descrição do produto é obrigatório.');
   if (normalizedData.preco_venda <= 0) errors.push('Preço de venda deve ser maior que zero.');
 
