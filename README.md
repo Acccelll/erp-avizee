@@ -29,7 +29,9 @@ ERP web da AviZee construído com React, Vite, TypeScript, shadcn/ui e Supabase.
 - Contas bancárias
 - Plano de contas
 - Relatórios
+- Remessas e rastreamento logístico
 - Configurações
+- Administração
 
 ## Como rodar localmente
 
@@ -48,6 +50,9 @@ Crie um `.env` com as chaves do projeto Supabase.
 VITE_SUPABASE_URL=...
 VITE_SUPABASE_PUBLISHABLE_KEY=...
 ```
+
+> **Nota:** `VITE_SUPABASE_PROJECT_ID` **não é mais necessário**. A URL das Edge
+> Functions é derivada automaticamente de `VITE_SUPABASE_URL`.
 
 ## Scripts úteis
 
@@ -84,6 +89,7 @@ A navegação foi reorganizada para reduzir poluição visual e manter contexto:
 - `/pedidos`
 - `/relatorios`
 - `/configuracoes`
+- `/remessas`
 
 Além disso, a navegação usa query strings para contextualizar submódulos:
 
@@ -137,16 +143,17 @@ supabase db reset
 
 ## Configurações
 
-A página `/configuracoes` está organizada por abas:
+A página `/configuracoes` está organizada por seções:
 
-- Geral
-- Usuários
-- E-mail
-- Fiscal
-- Financeiro
+- Meu Perfil
+- Empresa
 - Aparência
+- Segurança
 
-Nesta fase, os parâmetros continuam com persistência local no navegador. A tabela `app_configuracoes` permanece preparada para persistência futura no Supabase.
+As preferências de usuário (nome, cargo, senha, tema) são persistidas diretamente
+no Supabase via tabela `profiles`. Configurações funcionais do sistema como
+CEP da empresa são armazenadas na tabela `app_configuracoes`, com localStorage
+usado apenas como cache de leitura rápida entre recarregamentos.
 
 ## Relatórios
 
@@ -157,7 +164,7 @@ O módulo de relatórios entrega uma primeira versão com:
 - fluxo de caixa
 - vendas por período
 - compras por fornecedor
-- exportação CSV
+- exportação CSV / XLSX
 - impressão / PDF via navegador
 
 ## Estrutura sugerida
@@ -187,11 +194,43 @@ supabase gen types typescript --local > src/integrations/supabase/types.ts
 
 ## Edge Functions
 
-Atualmente existe a função:
+O projeto possui duas Edge Functions em `supabase/functions/`:
 
-- `supabase/functions/process-email-queue`
+### `correios-api`
 
-Próximo passo recomendado: criar a Edge Function de geração server-side do PDF de orçamento.
+Integração com a API REST dos Correios para:
+
+- **Rastreamento de objetos** (`?action=rastrear&codigo=<CÓDIGO>`)
+- **Cotação de frete** para múltiplos serviços (`?action=cotacao_multi`)
+- **Cálculo de prazo** (`?action=prazo`)
+
+Requer os secrets no Supabase:
+
+| Secret                      | Descrição                          |
+|-----------------------------|------------------------------------|
+| `CORREIOS_USUARIO`          | Usuário/CNPJ do contrato Correios  |
+| `CORREIOS_SENHA`            | Senha do contrato                  |
+| `CORREIOS_CARTAO_POSTAGEM`  | Número do cartão de postagem (opt) |
+
+> Sem os secrets, a edge function retorna HTTP 503 com mensagem clara. O
+> frontend exibe a mensagem de erro sem quebrar a tela.
+
+### `process-email-queue`
+
+Processamento assíncrono da fila de e-mails do sistema.
+
+## O que já funciona sem configuração externa
+
+- Toda a UI e navegação
+- Autenticação via Supabase Auth
+- CRUD de todos os módulos
+- Relatórios e exportações
+- Cotação de frete (requer configurar CEP da empresa em Configurações → Empresa)
+
+## O que depende de configuração externa
+
+- **Rastreamento Correios**: requer secrets `CORREIOS_USUARIO` e `CORREIOS_SENHA` no Supabase
+- **E-mail**: requer configuração de SMTP/provider no Supabase ou serviço externo
 
 ## CI
 

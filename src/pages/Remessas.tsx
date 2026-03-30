@@ -46,6 +46,20 @@ interface RemessaEvento {
   created_at: string;
 }
 
+/** Shape of a single event object returned by the Correios tracking API. */
+interface CorreiosEvento {
+  descricao?: string;
+  tipo?: string;
+  unidade?: { nome?: string; endereco?: { cidade?: string } };
+  dtHrCriado?: string;
+}
+
+/** Top-level response shape from the Correios tracking endpoint. */
+interface CorreiosTrackingResponse {
+  error?: string;
+  objetos?: Array<{ eventos?: CorreiosEvento[] }>;
+}
+
 const statusMap: Record<string, { label: string; color: string }> = {
   pendente: { label: "Pendente", color: "Pendente" },
   postado: { label: "Postado", color: "Enviado" },
@@ -165,22 +179,25 @@ export default function Remessas() {
     if (!codigoSanitizado) { toast.error("Código de rastreio inválido"); return; }
     try {
       toast.info("Consultando rastreio...");
-      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
-      const url = `https://${projectId}.supabase.co/functions/v1/correios-api?action=rastrear&codigo=${encodeURIComponent(codigoSanitizado)}`;
+      // Derive the Edge Function URL from VITE_SUPABASE_URL (always configured),
+      // avoiding the need for VITE_SUPABASE_PROJECT_ID.
+      const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL as string || "").replace(/\/$/, "");
+      const url = `${supabaseUrl}/functions/v1/correios-api?action=rastrear&codigo=${encodeURIComponent(codigoSanitizado)}`;
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || "";
       const res = await fetch(url, {
         headers: {
-          "Content-Type": "application/json",
           apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || "",
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || ""}`,
+          Authorization: `Bearer ${token}`,
         },
       });
-      const tracking = await res.json();
+      const tracking = await res.json() as CorreiosTrackingResponse;
       if (!res.ok || tracking.error) {
-        throw new Error(tracking.error || "Erro ao consultar rastreio");
+        throw new Error(tracking.error || `Erro ao consultar rastreio (${res.status})`);
       }
 
       const eventosRastreamento = tracking.objetos?.[0]?.eventos || [];
-      const eventosNormalizados = eventosRastreamento.map((ev: any) => ({
+      const eventosNormalizados = eventosRastreamento.map((ev) => ({
         remessa_id: remessa.id,
         descricao: ev.descricao || ev.tipo || "Evento",
         local: ev.unidade?.endereco?.cidade || ev.unidade?.nome || null,

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTheme } from 'next-themes';
 import { Building2, Loader2, Lock, Moon, Palette, Save, Settings, Sun, User } from 'lucide-react';
 import { useAppConfig } from '@/hooks/useAppConfig';
@@ -50,10 +50,10 @@ export default function Configuracoes() {
   const [cepEmpresaLocal, setCepEmpresaLocal] = useState('');
   const [savingCep, setSavingCep] = useState(false);
 
-  // Sync local cep state when loaded
-  useState(() => {
+  // Sync local CEP state when the Supabase value loads.
+  useEffect(() => {
     if (cepEmpresa) setCepEmpresaLocal(cepEmpresa);
-  });
+  }, [cepEmpresa]);
 
   const initials = (nome || user?.email || 'U').substring(0, 2).toUpperCase();
 
@@ -64,7 +64,7 @@ export default function Configuracoes() {
       const { error } = await supabase.from('profiles').update({ nome, cargo }).eq('id', user.id);
       if (error) throw error;
       toast.success('Perfil atualizado com sucesso!');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('[perfil] save:', err);
       toast.error('Erro ao salvar perfil.');
     }
@@ -82,7 +82,7 @@ export default function Configuracoes() {
       if (error) throw error;
       toast.success('Senha alterada com sucesso!');
       setNewPassword('');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('[perfil] password:', err);
       toast.error('Erro ao alterar senha.');
     }

@@ -5,10 +5,26 @@ const CORREIOS_API = "https://api.correios.com.br";
 
 interface TokenResponse {
   token: string;
-  expiraEm: string;
+  expiraEm: string; // ISO 8601 date-time returned by the Correios API
 }
 
 let cachedToken: { token: string; expiresAt: number } | null = null;
+
+/** Parses the Correios expiry string into a Unix timestamp (ms).
+ *  Falls back to 45 minutes from now if the value is missing or unparseable. */
+function parseExpiry(expiraEm?: string): number {
+  if (expiraEm) {
+    const ts = Date.parse(expiraEm);
+    // Add a 60-second tolerance window to handle minor clock skew between
+    // this server and the Correios auth server.
+    if (!isNaN(ts) && ts > Date.now() - 60_000) {
+      // Apply a 5-minute safety margin to avoid using an almost-expired token
+      return ts - 5 * 60 * 1000;
+    }
+  }
+  // Default: 45 minutes from now (tokens are usually valid for 50 min)
+  return Date.now() + 45 * 60 * 1000;
+}
 
 async function getToken(): Promise<string> {
   if (cachedToken && Date.now() < cachedToken.expiresAt) {
@@ -50,9 +66,9 @@ async function getToken(): Promise<string> {
       const data: TokenResponse = await res.json();
       cachedToken = {
         token: data.token,
-        expiresAt: Date.now() + 45 * 60 * 1000, // 45 min (5 min safety margin)
+        expiresAt: parseExpiry(data.expiraEm),
       };
-      console.log("[correios] Autenticado com sucesso");
+      console.log(`[correios] Autenticado com sucesso, token válido até ${new Date(cachedToken.expiresAt).toISOString()}`);
       return data.token;
     }
 
@@ -245,11 +261,20 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : "Erro interno";
     console.error("[correios-api]", error);
+
+    // Return 503 when the error is a missing/invalid credential so the
+    // caller can distinguish a configuration issue from a runtime error.
+    const isCredentialError =
+      msg.includes("Credenciais dos Correios não configuradas") ||
+      msg.includes("Erro ao autenticar");
+    const status = isCredentialError ? 503 : 500;
+
     return new Response(
-      JSON.stringify({ error: error.message || "Erro interno" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      JSON.stringify({ error: msg }),
+      { status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });
