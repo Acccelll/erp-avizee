@@ -1093,6 +1093,59 @@ export type Database = {
           },
         ]
       }
+      folha_pagamento: {
+        Row: {
+          competencia: string
+          created_at: string
+          descontos: number
+          financeiro_gerado: boolean
+          funcionario_id: string
+          id: string
+          observacoes: string | null
+          proventos: number
+          salario_base: number
+          status: string
+          updated_at: string
+          valor_liquido: number
+        }
+        Insert: {
+          competencia: string
+          created_at?: string
+          descontos?: number
+          financeiro_gerado?: boolean
+          funcionario_id: string
+          id?: string
+          observacoes?: string | null
+          proventos?: number
+          salario_base?: number
+          status?: string
+          updated_at?: string
+          valor_liquido?: number
+        }
+        Update: {
+          competencia?: string
+          created_at?: string
+          descontos?: number
+          financeiro_gerado?: boolean
+          funcionario_id?: string
+          id?: string
+          observacoes?: string | null
+          proventos?: number
+          salario_base?: number
+          status?: string
+          updated_at?: string
+          valor_liquido?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "folha_pagamento_funcionario_id_fkey"
+            columns: ["funcionario_id"]
+            isOneToOne: false
+            referencedRelation: "funcionarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       formas_pagamento: {
         Row: {
           ativo: boolean
@@ -1209,6 +1262,54 @@ export type Database = {
           telefone?: string | null
           tipo_pessoa?: Database["public"]["Enums"]["tipo_pessoa"]
           uf?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      funcionarios: {
+        Row: {
+          ativo: boolean
+          cargo: string | null
+          cpf: string | null
+          created_at: string
+          data_admissao: string
+          data_demissao: string | null
+          departamento: string | null
+          id: string
+          nome: string
+          observacoes: string | null
+          salario_base: number
+          tipo_contrato: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          cargo?: string | null
+          cpf?: string | null
+          created_at?: string
+          data_admissao?: string
+          data_demissao?: string | null
+          departamento?: string | null
+          id?: string
+          nome: string
+          observacoes?: string | null
+          salario_base?: number
+          tipo_contrato?: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          cargo?: string | null
+          cpf?: string | null
+          created_at?: string
+          data_admissao?: string
+          data_demissao?: string | null
+          departamento?: string | null
+          id?: string
+          nome?: string
+          observacoes?: string | null
+          salario_base?: number
+          tipo_contrato?: string
           updated_at?: string
         }
         Relationships: []
