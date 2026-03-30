@@ -571,7 +571,7 @@ const Produtos = () => {
                         toast.success("Fornecedor vinculado!");
                         setAddFornOpen(false);
                         const { data: updated } = await supabase.from("produtos_fornecedores")
-                          .select("preco_compra, lead_time_dias, referencia_fornecedor, eh_principal, unidade_fornecedor, fornecedores:fornecedor_id(nome_razao_social)")
+                          .select("preco_compra, lead_time_dias, referencia_fornecedor, eh_principal, unidade_fornecedor, descricao_fornecedor, fornecedores:fornecedor_id(nome_razao_social)")
                           .eq("produto_id", selected.id);
                         setFornecedoresProd(updated || []);
                       }}>Salvar</Button>
@@ -586,13 +586,14 @@ const Produtos = () => {
                   <div className="rounded-lg border overflow-hidden">
                     <table className="w-full text-sm">
                       <thead>
-                        <tr className="bg-muted/50">
-                          <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground">Fornecedor</th>
-                          <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground">Ref. Fornecedor</th>
-                          <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground">Preço Compra</th>
-                          <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground">Lead Time</th>
-                          <th className="text-center px-3 py-2 text-xs font-semibold text-muted-foreground">Princ.</th>
-                        </tr>
+                         <tr className="bg-muted/50">
+                           <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground">Fornecedor</th>
+                           <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground">Ref. Fornecedor</th>
+                           <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground">Desc. Forn.</th>
+                           <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground">Preço Compra</th>
+                           <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground">Lead Time</th>
+                           <th className="text-center px-3 py-2 text-xs font-semibold text-muted-foreground">Princ.</th>
+                         </tr>
                       </thead>
                       <tbody>
                         {fornecedoresProd.map((f: any, idx: number) => (
@@ -600,9 +601,10 @@ const Produtos = () => {
                             <td className="px-3 py-2 text-xs">
                               <RelationalLink to="/fornecedores">{f.fornecedores?.nome_razao_social || "—"}</RelationalLink>
                             </td>
-                            <td className="px-3 py-2 text-xs font-mono font-medium text-primary">{f.referencia_fornecedor || "—"}</td>
-                            <td className="px-3 py-2 text-xs font-mono text-right">{f.preco_compra ? formatCurrency(f.preco_compra) : "—"}</td>
-                            <td className="px-3 py-2 text-xs text-right">{f.lead_time_dias ? `${f.lead_time_dias} dias` : "—"}</td>
+                             <td className="px-3 py-2 text-xs font-mono font-medium text-primary">{f.referencia_fornecedor || "—"}</td>
+                             <td className="px-3 py-2 text-xs">{f.descricao_fornecedor || "—"}</td>
+                             <td className="px-3 py-2 text-xs font-mono text-right">{f.preco_compra ? formatCurrency(f.preco_compra) : "—"}</td>
+                             <td className="px-3 py-2 text-xs text-right">{f.lead_time_dias ? `${f.lead_time_dias} dias` : "—"}</td>
                             <td className="px-3 py-2 text-xs text-center">{f.eh_principal ? "★" : ""}</td>
                           </tr>
                         ))}
