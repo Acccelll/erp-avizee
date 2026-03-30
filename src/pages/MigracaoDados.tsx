@@ -8,6 +8,7 @@ import { MapeamentoColunasForm } from "@/components/importacao/MapeamentoColunas
 import { PreviewImportacaoTable } from "@/components/importacao/PreviewImportacaoTable";
 import { ErrosImportacaoPanel } from "@/components/importacao/ErrosImportacaoPanel";
 import { PreviewXmlTable } from "@/components/importacao/PreviewXmlTable";
+import { PreviewFaturamentoTable } from "@/components/importacao/PreviewFaturamentoTable";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -17,6 +18,7 @@ import { toast } from "sonner";
 import { useImportacaoCadastros } from "@/hooks/importacao/useImportacaoCadastros";
 import { useImportacaoEstoque } from "@/hooks/importacao/useImportacaoEstoque";
 import { useImportacaoXml } from "@/hooks/importacao/useImportacaoXml";
+import { useImportacaoFaturamento } from "@/hooks/importacao/useImportacaoFaturamento";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
@@ -44,8 +46,11 @@ export default function MigracaoDados() {
   const hookCadastros = useImportacaoCadastros();
   const hookEstoque = useImportacaoEstoque();
   const hookXml = useImportacaoXml();
+  const hookFaturamento = useImportacaoFaturamento();
 
-  const activeHook = activeImportSource === "cadastros" ? hookCadastros : activeImportSource === "estoque" ? hookEstoque : hookXml;
+  const activeHook = activeImportSource === "cadastros" ? hookCadastros :
+                    activeImportSource === "estoque" ? hookEstoque :
+                    activeImportSource === "xml" ? hookXml : hookFaturamento;
 
   const {
     file,
@@ -82,6 +87,9 @@ export default function MigracaoDados() {
       setActiveImportSource("estoque");
     } else if (type === "compras_xml") {
       setActiveImportSource("xml");
+    } else if (type === "faturamento") {
+      setActiveImportSource("faturamento");
+      setImportType("produtos" as any); // fallback dummy
     } else {
       setActiveImportSource("cadastros");
       setImportType(type as ImportType);
@@ -102,7 +110,6 @@ export default function MigracaoDados() {
     }
 
     if (step === 1 && activeImportSource === 'xml') {
-      // Pula mapeamento para XML
       setStep(3);
       return;
     }
@@ -110,6 +117,8 @@ export default function MigracaoDados() {
     if (step === 2) {
       if (activeImportSource === 'estoque') {
         await hookEstoque.generatePreview();
+      } else if (activeImportSource === 'faturamento') {
+        await hookFaturamento.generatePreview();
       } else {
         hookCadastros.generatePreview();
       }
@@ -209,6 +218,13 @@ export default function MigracaoDados() {
                 onViewBatches={() => { setTypeFilter("estoque_inicial"); setActiveTab("lotes"); }}
               />
               <ImportacaoTipoCard
+                type="faturamento"
+                title="Faturamento Histórico"
+                description="Importação de histórico de vendas de sistemas legados."
+                onImport={() => handleOpenImport("faturamento")}
+                onViewBatches={() => { setTypeFilter("faturamento"); setActiveTab("lotes"); }}
+              />
+              <ImportacaoTipoCard
                 type="compras_xml"
                 title="Compras por XML"
                 description="Processamento em lote de arquivos XML de notas de compra."
@@ -242,6 +258,7 @@ export default function MigracaoDados() {
                     <SelectItem value="clientes">Clientes</SelectItem>
                     <SelectItem value="fornecedores">Fornecedores</SelectItem>
                     <SelectItem value="estoque_inicial">Estoque Inicial</SelectItem>
+                    <SelectItem value="faturamento">Faturamento</SelectItem>
                     <SelectItem value="compras_xml">Compras por XML</SelectItem>
                   </SelectContent>
                 </Select>
@@ -286,7 +303,9 @@ export default function MigracaoDados() {
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <FileUp className="h-5 w-5" />
-                Importar {activeImportSource === 'xml' ? 'Compras por XML' : importType?.charAt(0).toUpperCase() + importType?.slice(1)}
+                Importar {activeImportSource === 'xml' ? 'Compras por XML' :
+                          activeImportSource === 'faturamento' ? 'Faturamento Histórico' :
+                          importType?.charAt(0).toUpperCase() + importType?.slice(1)}
               </DialogTitle>
               <DialogDescription>
                 Siga os passos abaixo para realizar a carga de dados.
@@ -339,7 +358,7 @@ export default function MigracaoDados() {
                   </div>
                   <MapeamentoColunasForm
                     headers={headers}
-                    importType={importType}
+                    importType={activeImportSource === 'faturamento' ? 'produtos' : importType}
                     mapping={mapping}
                     onMappingChange={(f, c) => setMapping(prev => ({ ...prev, [f]: c }))}
                   />
@@ -350,9 +369,11 @@ export default function MigracaoDados() {
                 <div className="space-y-6">
                   {activeImportSource === 'xml' ? (
                     <PreviewXmlTable data={hookXml.xmlData} />
+                  ) : activeImportSource === 'faturamento' ? (
+                    <PreviewFaturamentoTable data={hookFaturamento.previewData} />
                   ) : (
                     <>
-                      <ErrosImportacaoPanel data={previewData} importType={importType} />
+                      <ErrosImportacaoPanel data={previewData} />
                       <PreviewImportacaoTable data={previewData} importType={importType} />
                     </>
                   )}
