@@ -129,7 +129,7 @@ export default function Relatorios() {
     try {
       const report = await carregarRelatorio(tipo, { dataInicio, dataFim });
       setResultado(report);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('[relatorios]', error);
       toast.error("Não foi possível carregar o relatório.");
     } finally {
@@ -140,17 +140,17 @@ export default function Relatorios() {
   useEffect(() => { loadData(); }, [tipo]);
 
   const isQtyReport = resultado._isQuantityReport === true;
-  const isDreReport = (resultado as any)._isDreReport === true;
+  const isDreReport = resultado._isDreReport === true;
 
   const kpis = useMemo(() => {
-    const rows = resultado.rows as any[];
+    const rows = resultado.rows as Record<string, unknown>[];
     const total = rows.length;
     const chartData = resultado.chartData || [];
     const totalValue = chartData.reduce((s, c) => s + (c.value || 0), 0);
     const alertCount = tipo === 'estoque'
-      ? rows.filter((r: any) => r.situacao !== "OK").length
+      ? rows.filter((r) => r.situacao !== "OK").length
       : tipo === 'financeiro'
-      ? rows.filter((r: any) => r.status === "vencido").length
+      ? rows.filter((r) => r.status === "vencido").length
       : 0;
     return { total, totalValue, alertCount };
   }, [resultado, tipo]);
@@ -263,19 +263,24 @@ export default function Relatorios() {
                   <div className="p-4">
                     <table className="w-full text-sm">
                       <tbody>
-                        {(resultado.rows as any[]).map((row, i) => (
+                         {(resultado.rows as Array<Record<string, unknown>>).map((row, i) => {
+                          const tipo = row.tipo as string | undefined;
+                          const valor = row.valor as number | undefined;
+                          const linha = row.linha as string | undefined;
+                          return (
                           <tr key={i} className={
-                            row.tipo === "header" ? "bg-primary/5 font-bold" :
-                            row.tipo === "subtotal" ? "bg-muted/50 font-semibold border-t" :
-                            row.tipo === "resultado" ? "bg-primary/10 font-bold text-lg border-t-2 border-primary/30" :
+                            tipo === "header" ? "bg-primary/5 font-bold" :
+                            tipo === "subtotal" ? "bg-muted/50 font-semibold border-t" :
+                            tipo === "resultado" ? "bg-primary/10 font-bold text-lg border-t-2 border-primary/30" :
                             "text-muted-foreground"
                           }>
-                            <td className={`px-4 py-3 ${row.tipo === "deducao" ? "pl-8" : ""}`}>{row.linha}</td>
-                            <td className={`px-4 py-3 text-right font-mono ${row.valor < 0 ? "text-destructive" : ""}`}>
-                              {formatCurrency(row.valor)}
+                            <td className={`px-4 py-3 ${tipo === "deducao" ? "pl-8" : ""}`}>{linha}</td>
+                            <td className={`px-4 py-3 text-right font-mono ${(valor ?? 0) < 0 ? "text-destructive" : ""}`}>
+                              {formatCurrency(valor ?? 0)}
                             </td>
                           </tr>
-                        ))}
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>

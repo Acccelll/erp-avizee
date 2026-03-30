@@ -36,7 +36,7 @@ interface Transportadora {
   created_at: string;
 }
 
-const emptyForm: Record<string, any> = {
+const emptyForm: Record<string, string> = {
   nome_razao_social: "", nome_fantasia: "", cpf_cnpj: "", contato: "",
   telefone: "", email: "", cidade: "", uf: "", modalidade: "rodoviario",
   prazo_medio: "", observacoes: "",
@@ -52,7 +52,12 @@ export default function Transportadoras() {
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [clientesVinculados, setClientesVinculados] = useState<any[]>([]);
+  interface ClienteVinculado {
+    modalidade?: string;
+    prazo_medio?: string;
+    clientes?: { nome_razao_social: string; cpf_cnpj: string; cidade: string; uf: string };
+  }
+  const [clientesVinculados, setClientesVinculados] = useState<ClienteVinculado[]>([]);
 
   const openCreate = () => { setMode("create"); setForm({...emptyForm}); setSelected(null); setModalOpen(true); };
   const openEdit = (t: Transportadora) => {
@@ -72,7 +77,7 @@ export default function Transportadoras() {
     const { data: ct } = await supabase.from("cliente_transportadoras" as any)
       .select("*, clientes:cliente_id(nome_razao_social, cpf_cnpj, cidade, uf)")
       .eq("transportadora_id", t.id).eq("ativo", true);
-    setClientesVinculados(ct || []);
+    setClientesVinculados((ct as unknown as ClienteVinculado[]) || []);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -83,7 +88,9 @@ export default function Transportadoras() {
       if (mode === "create") await create(form);
       else if (selected) await update(selected.id, form);
       setModalOpen(false);
-    } catch {}
+    } catch (err: unknown) {
+      console.error("[transportadoras] handleSubmit:", err);
+    }
     setSaving(false);
   };
 
@@ -205,7 +212,7 @@ export default function Transportadoras() {
                 <p className="text-sm text-muted-foreground text-center py-6">Nenhum cliente vinculado</p>
               ) : (
                 <div className="space-y-1 max-h-[350px] overflow-y-auto">
-                  {clientesVinculados.map((ct: any, idx: number) => (
+                  {clientesVinculados.map((ct, idx) => (
                     <div key={idx} className="flex items-center justify-between py-2 px-2 rounded-md hover:bg-muted/30 border-b last:border-b-0">
                       <div className="min-w-0 flex-1">
                         <RelationalLink to="/clientes">
