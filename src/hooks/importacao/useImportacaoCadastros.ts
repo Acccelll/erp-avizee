@@ -8,12 +8,7 @@ import {
   validateFornecedorImport
 } from "@/lib/importacao/validators";
 import { FIELD_ALIASES } from "@/lib/importacao/aliases";
-
-export type ImportType = "produtos" | "clientes" | "fornecedores";
-
-interface Mapping {
-  [key: string]: string;
-}
+import { ImportType, Mapping } from "./types";
 
 export function useImportacaoCadastros() {
   const [file, setFile] = useState<File | null>(null);
@@ -27,6 +22,30 @@ export function useImportacaoCadastros() {
   const [previewData, setPreviewData] = useState<any[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [loteId, setLoteId] = useState<string | null>(null);
+
+  const onSheetChange = useCallback((sheetName: string, wb: XLSX.WorkBook | null = null) => {
+    const activeWb = wb || workbook;
+    if (!activeWb) return;
+
+    setCurrentSheet(sheetName);
+    const ws = activeWb.Sheets[sheetName];
+    const data = XLSX.utils.sheet_to_json(ws, { header: 1 });
+    if (data.length > 0) {
+      const headerRow = data[0] as string[];
+      setHeaders(headerRow);
+      setRawRows(XLSX.utils.sheet_to_json(ws));
+
+      // Auto-mapping based on aliases
+      const initialMapping: Mapping = {};
+      headerRow.forEach(h => {
+        const cleanH = String(h).trim().toUpperCase();
+        if (FIELD_ALIASES[cleanH]) {
+          initialMapping[FIELD_ALIASES[cleanH]] = h;
+        }
+      });
+      setMapping(initialMapping);
+    }
+  }, [workbook]);
 
   const onFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -45,28 +64,6 @@ export function useImportacaoCadastros() {
     };
     reader.readAsBinaryString(selectedFile);
   }, [onSheetChange]);
-
-  const onSheetChange = useCallback((sheetName: string, wb = workbook) => {
-    if (!wb) return;
-    setCurrentSheet(sheetName);
-    const ws = wb.Sheets[sheetName];
-    const data = XLSX.utils.sheet_to_json(ws, { header: 1 });
-    if (data.length > 0) {
-      const headerRow = data[0] as string[];
-      setHeaders(headerRow);
-      setRawRows(XLSX.utils.sheet_to_json(ws));
-
-      // Auto-mapping based on aliases
-      const initialMapping: Mapping = {};
-      headerRow.forEach(h => {
-        const cleanH = String(h).trim().toUpperCase();
-        if (FIELD_ALIASES[cleanH]) {
-          initialMapping[FIELD_ALIASES[cleanH]] = h;
-        }
-      });
-      setMapping(initialMapping);
-    }
-  }, [workbook]);
 
   const generatePreview = useCallback(() => {
     if (rawRows.length === 0) return;

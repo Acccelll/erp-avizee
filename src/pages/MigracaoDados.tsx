@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Search, Filter, RefreshCw, Database, ArrowRight, ArrowLeft, CheckCircle2, ChevronRight, FileUp } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { useImportacaoCadastros, ImportType } from "@/hooks/importacao/useImportacaoCadastros";
+import { useImportacaoCadastros } from "@/hooks/importacao/useImportacaoCadastros";
 import { useImportacaoEstoque } from "@/hooks/importacao/useImportacaoEstoque";
 import { useImportacaoXml } from "@/hooks/importacao/useImportacaoXml";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -22,6 +22,7 @@ import { Progress } from "@/components/ui/progress";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
 import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
+import { ImportSource, ImportType } from "@/hooks/importacao/types";
 
 export default function MigracaoDados() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -38,7 +39,7 @@ export default function MigracaoDados() {
     orderBy: "criado_em"
   });
 
-  const [activeImportSource, setActiveImportSource] = useState<"cadastros" | "estoque" | "xml">("cadastros");
+  const [activeImportSource, setActiveImportSource] = useState<ImportSource>("cadastros");
 
   const hookCadastros = useImportacaoCadastros();
   const hookEstoque = useImportacaoEstoque();

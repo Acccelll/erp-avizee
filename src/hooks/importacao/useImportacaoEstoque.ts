@@ -4,10 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { validateEstoqueInicialImport } from "@/lib/importacao/validators";
 import { FIELD_ALIASES } from "@/lib/importacao/aliases";
-
-interface Mapping {
-  [key: string]: string;
-}
+import { Mapping } from "./types";
 
 export function useImportacaoEstoque() {
   const [file, setFile] = useState<File | null>(null);
@@ -20,6 +17,29 @@ export function useImportacaoEstoque() {
   const [previewData, setPreviewData] = useState<any[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [loteId, setLoteId] = useState<string | null>(null);
+
+  const onSheetChange = useCallback((sheetName: string, wb: XLSX.WorkBook | null = null) => {
+    const activeWb = wb || workbook;
+    if (!activeWb) return;
+
+    setCurrentSheet(sheetName);
+    const ws = activeWb.Sheets[sheetName];
+    const data = XLSX.utils.sheet_to_json(ws, { header: 1 });
+    if (data.length > 0) {
+      const headerRow = data[0] as string[];
+      setHeaders(headerRow);
+      setRawRows(XLSX.utils.sheet_to_json(ws));
+
+      const initialMapping: Mapping = {};
+      headerRow.forEach(h => {
+        const cleanH = String(h).trim().toUpperCase();
+        if (FIELD_ALIASES[cleanH]) {
+          initialMapping[FIELD_ALIASES[cleanH]] = h;
+        }
+      });
+      setMapping(initialMapping);
+    }
+  }, [workbook]);
 
   const onFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -37,28 +57,7 @@ export function useImportacaoEstoque() {
       }
     };
     reader.readAsBinaryString(selectedFile);
-  }, []);
-
-  const onSheetChange = useCallback((sheetName: string, wb = workbook) => {
-    if (!wb) return;
-    setCurrentSheet(sheetName);
-    const ws = wb.Sheets[sheetName];
-    const data = XLSX.utils.sheet_to_json(ws, { header: 1 });
-    if (data.length > 0) {
-      const headerRow = data[0] as string[];
-      setHeaders(headerRow);
-      setRawRows(XLSX.utils.sheet_to_json(ws));
-
-      const initialMapping: Mapping = {};
-      headerRow.forEach(h => {
-        const cleanH = String(h).trim().toUpperCase();
-        if (FIELD_ALIASES[cleanH]) {
-          initialMapping[FIELD_ALIASES[cleanH]] = h;
-        }
-      });
-      setMapping(initialMapping);
-    }
-  }, [workbook]);
+  }, [onSheetChange]);
 
   const generatePreview = useCallback(async () => {
     if (rawRows.length === 0) return;
@@ -120,6 +119,7 @@ export function useImportacaoEstoque() {
           arquivo_nome: file?.name,
           status: "processando",
           total_lidos: previewData.length,
+          mapeamento: mapping,
           criado_por: user?.user?.id
         })
         .select()

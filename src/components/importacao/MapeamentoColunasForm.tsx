@@ -1,12 +1,12 @@
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ImportType } from "@/hooks/importacao/useImportacaoCadastros";
+import { ImportType, Mapping } from "@/hooks/importacao/types";
 
 interface MapeamentoColunasFormProps {
   headers: string[];
   importType: ImportType;
-  mapping: Record<string, string>;
+  mapping: Mapping;
   onMappingChange: (field: string, col: string) => void;
 }
 
