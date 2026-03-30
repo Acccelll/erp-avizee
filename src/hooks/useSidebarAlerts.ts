@@ -13,7 +13,7 @@ export function useSidebarAlerts() {
     const load = async () => {
       const today = new Date().toISOString().slice(0, 10);
 
-      const [{ count: vencidos }, { data: estMin }] = await Promise.all([
+      const [{ count: vencidos }, { count: baixo }] = await Promise.all([
         supabase
           .from('financeiro_lancamentos')
           .select('*', { count: 'exact', head: true })
@@ -22,22 +22,37 @@ export function useSidebarAlerts() {
           .lt('data_vencimento', today),
         supabase
           .from('produtos')
-          .select('estoque_atual, estoque_minimo')
+          .select('*', { count: 'exact', head: true })
           .eq('ativo', true)
-          .not('estoque_minimo', 'is', null)
-          .limit(500),
+          .gt('estoque_minimo', 0)
+          .filter('estoque_atual', 'lte', 'estoque_minimo'),
       ]);
 
-      const baixo = (estMin || []).filter(
-        (p: any) => p.estoque_minimo > 0 && (p.estoque_atual ?? 0) <= p.estoque_minimo,
-      ).length;
-
-      setAlerts({ financeiroVencidos: vencidos || 0, estoqueBaixo: baixo });
+      setAlerts({
+        financeiroVencidos: vencidos || 0,
+        estoqueBaixo: baixo || 0,
+      });
     };
 
     load();
-    const interval = setInterval(load, 5 * 60 * 1000); // refresh every 5 min
-    return () => clearInterval(interval);
+
+    // Realtime listener para financeiro_lancamentos
+    const channel = supabase
+      .channel('sidebar-alerts-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'financeiro_lancamentos' },
+        () => { load(); }
+      )
+      .subscribe();
+
+    // Polling de fallback a cada 5 min
+    const interval = setInterval(load, 5 * 60 * 1000);
+
+    return () => {
+      clearInterval(interval);
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   return alerts;

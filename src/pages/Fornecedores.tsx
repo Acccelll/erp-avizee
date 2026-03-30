@@ -126,11 +126,11 @@ const Fornecedores = () => {
   }, [data, searchTerm, tipoFilter]);
 
   const columns = [
-  { key: "nome_razao_social", label: "Razão Social" },
+  { key: "nome_razao_social", label: "Razão Social", sortable: true },
   { key: "cpf_cnpj", label: "CNPJ", render: (f: Fornecedor) => <span className="font-mono text-xs">{f.cpf_cnpj || "—"}</span> },
-  { key: "email", label: "E-mail" },
+  { key: "email", label: "E-mail", sortable: true },
   { key: "telefone", label: "Telefone" },
-  { key: "cidade", label: "Cidade", render: (f: Fornecedor) => f.cidade ? `${f.cidade}/${f.uf}` : "—" },
+  { key: "cidade", label: "Cidade", sortable: true, render: (f: Fornecedor) => f.cidade ? `${f.cidade}/${f.uf}` : "—" },
   { key: "ativo", label: "Status", render: (f: Fornecedor) => <StatusBadge status={f.ativo ? "Ativo" : "Inativo"} /> }];
 
 

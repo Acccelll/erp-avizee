@@ -2,11 +2,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { downloadTextFile } from "@/lib/utils";
 import { formatCurrency, formatDate, formatNumber } from "@/lib/format";
 
-export type TipoRelatorio = "estoque" | "movimentos_estoque" | "financeiro" | "fluxo_caixa" | "vendas" | "compras" | "aging" | "dre" | "curva_abc" | "margem_produtos" | "estoque_minimo" | "vendas_cliente" | "compras_fornecedor" | "divergencias";
+export type TipoRelatorio = "estoque" | "movimentos_estoque" | "financeiro" | "fluxo_caixa" | "vendas" | "compras" | "aging" | "dre" | "curva_abc" | "margem_produtos" | "estoque_minimo" | "vendas_cliente" | "compras_fornecedor" | "divergencias" | "faturamento";
 
 export interface FiltroRelatorio {
   dataInicio?: string;
   dataFim?: string;
+  clienteId?: string;
+  fornecedorId?: string;
+  grupoProdutoId?: string;
+  tipoFinanceiro?: string;
 }
 
 export interface RelatorioResultado<T = Record<string, unknown>> {
@@ -36,11 +40,13 @@ function withDateRange(query: any, column: string, filtros: FiltroRelatorio) {
 export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRelatorio = {}): Promise<RelatorioResultado> {
   switch (tipo) {
     case "estoque": {
-      const { data, error } = await supabase
+      let query = supabase
         .from("produtos")
         .select("codigo_interno, nome, unidade_medida, estoque_atual, estoque_minimo, preco_custo, preco_venda")
         .eq("ativo", true)
         .order("nome");
+      if (filtros.grupoProdutoId) query = query.eq('grupo_id', filtros.grupoProdutoId);
+      const { data, error } = await query;
 
       if (error) throw error;
 
@@ -89,6 +95,7 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
         .order("created_at", { ascending: false });
 
       query = withDateRange(query, "created_at", filtros);
+      if (filtros.grupoProdutoId) query = query.eq('grupo_id', filtros.grupoProdutoId);
       const { data, error } = await query;
       if (error) throw error;
 
@@ -136,6 +143,7 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
         .order("data_vencimento", { ascending: true });
 
       query = withDateRange(query, "data_vencimento", filtros);
+      if (filtros.tipoFinanceiro) query = query.eq('tipo', filtros.tipoFinanceiro);
       const { data, error } = await query;
       if (error) throw error;
 
@@ -216,6 +224,7 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
         .order("data_emissao", { ascending: false });
 
       query = withDateRange(query, "data_emissao", filtros);
+      if (filtros.clienteId) query = query.eq('cliente_id', filtros.clienteId);
       const { data, error } = await query;
       if (error) throw error;
 
@@ -240,6 +249,71 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
       };
     }
 
+    case "faturamento": {
+      let query = supabase
+        .from("notas_fiscais")
+        .select(`
+          numero, serie, data_emissao, valor_total, modelo_documento,
+          frete_valor, icms_valor, ipi_valor, pis_valor, cofins_valor,
+          icms_st_valor, desconto_valor, outras_despesas,
+          forma_pagamento, status,
+          clientes(nome_razao_social),
+          ordens_venda(numero)
+        `)
+        .eq("ativo", true)
+        .eq("tipo", "saida")
+        .eq("status", "confirmada")
+        .order("data_emissao", { ascending: false });
+
+      query = withDateRange(query, "data_emissao", filtros);
+      if (filtros.clienteId) query = query.eq('cliente_id', filtros.clienteId);
+      const { data, error } = await query;
+      if (error) throw error;
+
+      const modeloLabels: Record<string, string> = { '55': 'NF-e', '65': 'NFC-e', '57': 'CT-e', 'nfse': 'NFS-e' };
+
+      const rows = (data || []).map((nf: any) => {
+        const totalImpostos = Number(nf.icms_valor || 0) + Number(nf.ipi_valor || 0) +
+          Number(nf.pis_valor || 0) + Number(nf.cofins_valor || 0) + Number(nf.icms_st_valor || 0);
+        const valorTotal = Number(nf.valor_total || 0);
+        return {
+          data: nf.data_emissao,
+          nf: `${nf.numero}/${nf.serie || '1'}`,
+          modelo: modeloLabels[nf.modelo_documento || '55'] || nf.modelo_documento || 'NF-e',
+          cliente: (nf.clientes as any)?.nome_razao_social || '—',
+          ov: (nf.ordens_venda as any)?.numero || '—',
+          frete: Number(nf.frete_valor || 0),
+          desconto: Number(nf.desconto_valor || 0),
+          impostos: totalImpostos,
+          valorTotal,
+          receitaLiquida: valorTotal - totalImpostos,
+        };
+      });
+
+      const totalBruto = rows.reduce((s, r) => s + r.valorTotal, 0);
+      const totalImpostos = rows.reduce((s, r) => s + r.impostos, 0);
+      const totalLiquido = rows.reduce((s, r) => s + r.receitaLiquida, 0);
+
+      const byMonth = new Map<string, number>();
+      rows.forEach(r => {
+        const m = r.data.slice(0, 7);
+        byMonth.set(m, (byMonth.get(m) || 0) + r.valorTotal);
+      });
+
+      return {
+        title: "Faturamento",
+        subtitle: "Notas fiscais de saída confirmadas — valor bruto, impostos e receita líquida.",
+        rows,
+        chartData: Array.from(byMonth.entries())
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([month, value]) => ({
+            name: new Date(month + '-01T12:00:00').toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }),
+            value,
+          })),
+        totals: { totalBruto, totalImpostos, totalLiquido },
+      };
+    }
+
     case "compras": {
       let query = supabase
         .from("compras")
@@ -248,6 +322,7 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
         .order("data_compra", { ascending: false });
 
       query = withDateRange(query, "data_compra", filtros);
+      if (filtros.fornecedorId) query = query.eq('fornecedor_id', filtros.fornecedorId);
       const { data, error } = await query;
       if (error) throw error;
 
@@ -352,12 +427,16 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
 
     case "aging":
     default: {
-      const { data, error } = await supabase
+      let query = supabase
         .from("financeiro_lancamentos")
         .select("tipo, descricao, valor, status, data_vencimento, data_pagamento, clientes(nome_razao_social), fornecedores(nome_razao_social)")
         .eq("ativo", true)
         .in("status", ["aberto", "vencido"])
         .order("data_vencimento", { ascending: true });
+      query = withDateRange(query, "data_vencimento", filtros);
+      if (filtros.clienteId) query = query.eq('cliente_id', filtros.clienteId);
+      if (filtros.tipoFinanceiro) query = query.eq('tipo', filtros.tipoFinanceiro);
+      const { data, error } = await query;
 
       if (error) throw error;
 
@@ -405,22 +484,33 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
     }
 
     case "curva_abc": {
-      let query = supabase
-        .from("orcamentos_itens")
-        .select("produto_id, valor_total, descricao_snapshot, codigo_snapshot, orcamentos!inner(ativo, status)")
-        .order("valor_total", { ascending: false });
+      let nfQuery = supabase
+        .from("notas_fiscais_itens")
+        .select(`
+          produto_id,
+          quantidade,
+          valor_unitario,
+          produtos(nome, codigo_interno),
+          notas_fiscais!inner(ativo, tipo, status, data_emissao)
+        `)
+        .eq("notas_fiscais.ativo", true)
+        .eq("notas_fiscais.tipo", "saida")
+        .eq("notas_fiscais.status", "confirmada");
 
-      const { data, error } = await query;
+      nfQuery = withDateRange(nfQuery, "notas_fiscais.data_emissao", filtros);
+      if (filtros.clienteId) nfQuery = nfQuery.eq('notas_fiscais.cliente_id', filtros.clienteId);
+
+      const { data, error } = await nfQuery;
       if (error) throw error;
 
-      // Aggregate by product
       const prodMap = new Map<string, { produto: string; codigo: string; total: number }>();
       for (const item of data || []) {
-        const orc = item.orcamentos as any;
-        if (!orc?.ativo) continue;
-        const key = item.produto_id;
-        const existing = prodMap.get(key) || { produto: item.descricao_snapshot || '-', codigo: item.codigo_snapshot || '-', total: 0 };
-        existing.total += Number(item.valor_total || 0);
+        const key = item.produto_id || "sem-produto";
+        const nome = (item.produtos as any)?.nome || "Produto removido";
+        const codigo = (item.produtos as any)?.codigo_interno || "-";
+        const existing = prodMap.get(key) || { produto: nome, codigo, total: 0 };
+        const itemTotal = Number(item.quantidade || 0) * Number(item.valor_unitario || 0);
+        existing.total += itemTotal;
         prodMap.set(key, existing);
       }
 
@@ -449,7 +539,7 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
 
       return {
         title: "Curva ABC de Produtos",
-        subtitle: "Classificação de produtos por participação no faturamento.",
+        subtitle: "Classificação por faturamento real — notas fiscais de saída confirmadas.",
         rows,
         chartData: [
           { name: `A (${classA.length} itens)`, value: classA.reduce((s, r) => s + r.faturamento, 0) },
@@ -461,11 +551,13 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
     }
 
     case "margem_produtos": {
-      const { data, error } = await supabase
+      let query = supabase
         .from("produtos")
         .select("codigo_interno, nome, preco_custo, preco_venda, estoque_atual, unidade_medida")
         .eq("ativo", true)
         .order("nome");
+      if (filtros.grupoProdutoId) query = query.eq('grupo_id', filtros.grupoProdutoId);
+      const { data, error } = await query;
 
       if (error) throw error;
 
@@ -539,6 +631,7 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
         .select("valor_total, clientes(nome_razao_social, cpf_cnpj)")
         .eq("ativo", true);
       query = withDateRange(query, "data_emissao", filtros);
+      if (filtros.clienteId) query = query.eq('cliente_id', filtros.clienteId);
       const { data, error } = await query;
       if (error) throw error;
 
@@ -572,6 +665,7 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
         .select("valor_total, fornecedores(nome_razao_social, cpf_cnpj)")
         .eq("ativo", true);
       query = withDateRange(query, "data_compra", filtros);
+      if (filtros.fornecedorId) query = query.eq('fornecedor_id', filtros.fornecedorId);
       const { data, error } = await query;
       if (error) throw error;
 

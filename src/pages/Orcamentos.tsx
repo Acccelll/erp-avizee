@@ -156,12 +156,12 @@ const Orcamentos = () => {
   }, [data, searchTerm, statusFilter]);
 
   const columns = [
-    { key: "numero", label: "Nº", render: (o: Orcamento) => <span className="font-mono text-xs font-medium text-primary">{o.numero}</span> },
+    { key: "numero", label: "Nº", sortable: true, render: (o: Orcamento) => <span className="font-mono text-xs font-medium text-primary">{o.numero}</span> },
     { key: "cliente", label: "Cliente", render: (o: Orcamento) => o.clientes?.nome_razao_social || "—" },
-    { key: "data_orcamento", label: "Data", render: (o: Orcamento) => formatDate(o.data_orcamento) },
+    { key: "data_orcamento", label: "Data", sortable: true, render: (o: Orcamento) => formatDate(o.data_orcamento) },
     { key: "validade", label: "Validade", render: (o: Orcamento) => o.validade ? formatDate(o.validade) : "—" },
-    { key: "valor_total", label: "Total", render: (o: Orcamento) => <span className="font-semibold font-mono">{formatCurrency(Number(o.valor_total || 0))}</span> },
-    { key: "status", label: "Status", render: (o: Orcamento) => <StatusBadge status={o.status} label={statusLabels[o.status]} /> },
+    { key: "valor_total", label: "Total", sortable: true, render: (o: Orcamento) => <span className="font-semibold font-mono">{formatCurrency(Number(o.valor_total || 0))}</span> },
+    { key: "status", label: "Status", sortable: true, render: (o: Orcamento) => <StatusBadge status={o.status} label={statusLabels[o.status]} /> },
     {
       key: "acoes_comercial", label: "Ações", sortable: false, render: (o: Orcamento) => (
         <div className="flex gap-1">

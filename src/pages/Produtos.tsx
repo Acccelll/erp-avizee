@@ -21,6 +21,7 @@ import { Plus, Trash2, RefreshCw, Package, TrendingUp, AlertTriangle, Archive, F
 import { formatCurrency, formatDate } from "@/lib/format";
 import { FiscalAutocomplete } from "@/components/ui/FiscalAutocomplete";
 import { cfopCodes, cstIcmsCodes } from "@/lib/fiscalData";
+import { useNcmLookup } from '@/hooks/useNcmLookup';
 
 interface Produto {
   id: string;sku: string;codigo_interno: string;nome: string;descricao: string;
@@ -66,6 +67,7 @@ const Produtos = () => {
   const [fornecedoresList, setFornecedoresList] = useState<any[]>([]);
   const [addFornOpen, setAddFornOpen] = useState(false);
   const [fornForm, setFornForm] = useState({ fornecedor_id: "", referencia_fornecedor: "", preco_compra: 0, lead_time_dias: 0, unidade_fornecedor: "UN", eh_principal: false, descricao_fornecedor: "" });
+  const { buscarNcm, loading: ncmLoading } = useNcmLookup();
 
   useEffect(() => {
     Promise.all([
@@ -200,14 +202,14 @@ const Produtos = () => {
   }, [data, estoqueFilter, searchTerm, tipoFilter, grupoFilter]);
 
   const columns = [
-  { key: "sku", label: "SKU", render: (p: Produto) => <span className="font-mono text-xs font-medium text-primary">{p.sku || "—"}</span> },
-  { key: "nome", label: "Nome" },
+  { key: "sku", label: "SKU", sortable: true, render: (p: Produto) => <span className="font-mono text-xs font-medium text-primary">{p.sku || "—"}</span> },
+  { key: "nome", label: "Nome", sortable: true },
   { key: "unidade_medida", label: "UN" },
-  { key: "estoque_atual", label: "Estoque", render: (p: Produto) =>
+  { key: "estoque_atual", label: "Estoque", sortable: true, render: (p: Produto) =>
     <span className={Number(p.estoque_atual) <= Number(p.estoque_minimo) && Number(p.estoque_minimo) > 0 ? "text-destructive font-semibold" : ""}>{p.estoque_atual}</span>
   },
-  { key: "preco_custo", label: "Custo", render: (p: Produto) => <span className="font-mono">{formatCurrency(p.preco_custo || 0)}</span> },
-  { key: "preco_venda", label: "Preço Venda", render: (p: Produto) => <span className="font-semibold font-mono">{formatCurrency(p.preco_venda)}</span> },
+  { key: "preco_custo", label: "Custo", sortable: true, render: (p: Produto) => <span className="font-mono">{formatCurrency(p.preco_custo || 0)}</span> },
+  { key: "preco_venda", label: "Preço Venda", sortable: true, render: (p: Produto) => <span className="font-semibold font-mono">{formatCurrency(p.preco_venda)}</span> },
   { key: "margem", label: "Margem", render: (p: Produto) => {
       const custo = Number(p.preco_custo || 0);
       const venda = Number(p.preco_venda);
@@ -295,7 +297,34 @@ const Produtos = () => {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2"><Label>NCM</Label><Input value={form.ncm} onChange={(e) => setForm({ ...form, ncm: e.target.value })} /></div>
+            <div className="space-y-2">
+              <Label>NCM</Label>
+              <div className="flex gap-2">
+                <Input
+                  value={form.ncm || ''}
+                  onChange={(e) => setForm({ ...form, ncm: e.target.value })}
+                  placeholder="Ex: 84713012"
+                  className="flex-1 font-mono"
+                  maxLength={8}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0 text-xs"
+                  disabled={ncmLoading || (form.ncm || '').replace(/\D/g, '').length < 4}
+                  onClick={async () => {
+                    const result = await buscarNcm(form.ncm || '');
+                    if (result) setForm({ ...form, ncm: result.codigo });
+                  }}
+                >
+                  {ncmLoading ? '...' : 'Verificar'}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                4–8 dígitos. Clique em Verificar para confirmar na tabela TIPI da Receita Federal.
+              </p>
+            </div>
             {!form.eh_composto &&
             <div className="space-y-2"><Label>Preço Custo</Label><Input type="number" step="0.01" value={form.preco_custo} onChange={(e) => setForm({ ...form, preco_custo: Number(e.target.value) })} /></div>
             }
@@ -315,7 +344,34 @@ const Produtos = () => {
           <div className="grid grid-cols-3 gap-4">
             <div className="space-y-2"><Label>CST</Label><FiscalAutocomplete data={cstIcmsCodes} value={form.cst} onChange={(v) => setForm({ ...form, cst: v })} placeholder="Ex: 000" /></div>
             <div className="space-y-2"><Label>CFOP Padrão</Label><FiscalAutocomplete data={cfopCodes} value={form.cfop_padrao} onChange={(v) => setForm({ ...form, cfop_padrao: v })} placeholder="Ex: 5102" /></div>
-            <div className="space-y-2"><Label>NCM</Label><Input value={form.ncm} onChange={(e) => setForm({ ...form, ncm: e.target.value })} /></div>
+            <div className="space-y-2">
+              <Label>NCM</Label>
+              <div className="flex gap-2">
+                <Input
+                  value={form.ncm || ''}
+                  onChange={(e) => setForm({ ...form, ncm: e.target.value })}
+                  placeholder="Ex: 84713012"
+                  className="flex-1 font-mono"
+                  maxLength={8}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0 text-xs"
+                  disabled={ncmLoading || (form.ncm || '').replace(/\D/g, '').length < 4}
+                  onClick={async () => {
+                    const result = await buscarNcm(form.ncm || '');
+                    if (result) setForm({ ...form, ncm: result.codigo });
+                  }}
+                >
+                  {ncmLoading ? '...' : 'Verificar'}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                4–8 dígitos. Clique em Verificar para confirmar na tabela TIPI da Receita Federal.
+              </p>
+            </div>
           </div>
 
           <div className="space-y-2"><Label>Descrição</Label><Textarea value={form.descricao} onChange={(e) => setForm({ ...form, descricao: e.target.value })} /></div>

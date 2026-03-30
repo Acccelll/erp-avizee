@@ -7,13 +7,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DataTable } from '@/components/DataTable';
 import { PreviewModal } from '@/components/ui/PreviewModal';
-import { BarChart3, Package, Wallet, ShoppingCart, TrendingUp, Truck, Download, RefreshCcw, Hash, AlertTriangle, DollarSign, FileText, Eye, ArrowLeftRight, FileSpreadsheet, CalendarClock } from 'lucide-react';
+import { BarChart3, Package, Wallet, ShoppingCart, TrendingUp, Truck, Download, RefreshCcw, Hash, AlertTriangle, DollarSign, FileText, Eye, ArrowLeftRight, FileSpreadsheet, CalendarClock, Receipt } from 'lucide-react';
 import { ResponsiveContainer, BarChart, XAxis, YAxis, Tooltip, Bar, PieChart, Pie, Cell, Legend } from 'recharts';
 import { carregarRelatorio, exportarCsv, exportarXlsx, formatCellValue, type RelatorioResultado, type TipoRelatorio } from '@/services/relatorios.service';
 import { formatCurrency, formatNumber, formatDate } from '@/lib/format';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 const reportCards: Array<{ type: TipoRelatorio; title: string; description: string; icon: typeof Package }> = [
   { type: 'estoque', title: 'Estoque', description: 'Posição atual, custo e alertas', icon: Package },
@@ -22,6 +24,7 @@ const reportCards: Array<{ type: TipoRelatorio; title: string; description: stri
   { type: 'financeiro', title: 'Financeiro', description: 'Contas a pagar e receber', icon: Wallet },
   { type: 'fluxo_caixa', title: 'Fluxo de Caixa', description: 'Entradas, saídas e saldo', icon: TrendingUp },
   { type: 'vendas', title: 'Vendas', description: 'Ordens por período e faturamento', icon: ShoppingCart },
+  { type: 'faturamento', title: 'Faturamento', description: 'NFs de saída confirmadas com impostos e receita líquida', icon: Receipt },
   { type: 'vendas_cliente', title: 'Vendas/Cliente', description: 'Ranking de clientes por volume', icon: ShoppingCart },
   { type: 'compras', title: 'Compras', description: 'Consolidado por fornecedor', icon: Truck },
   { type: 'compras_fornecedor', title: 'Compras/Fornecedor', description: 'Ranking de fornecedores por volume', icon: Truck },
@@ -83,6 +86,18 @@ function buildPdf(resultado: RelatorioResultado, dataInicio: string, dataFim: st
       doc.setFontSize(7);
 
       const maxRows = Math.min(rows.length, 200);
+      if (rows.length > 200) {
+        // Add warning at bottom of last page
+        y += 10;
+        if (y > doc.internal.pageSize.getHeight() - 20) { doc.addPage(); y = 20; }
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'bolditalic');
+        doc.setTextColor(180, 0, 0);
+        doc.text(
+          `⚠ PDF limitado a 200 de ${rows.length} registros. Use "Exportar Excel" para o relatório completo.`,
+          margin, y
+        );
+      }
       for (let r = 0; r < maxRows; r++) {
         if (y > doc.internal.pageSize.getHeight() - 20) {
           doc.addPage();
@@ -115,9 +130,31 @@ export default function Relatorios() {
   const [tipo, setTipo] = useState<TipoRelatorio>(tipoInicial);
   const [dataInicio, setDataInicio] = useState('');
   const [dataFim, setDataFim] = useState('');
+  const [filtroClienteId, setFiltroClienteId] = useState('');
+  const [filtroFornecedorId, setFiltroFornecedorId] = useState('');
+  const [filtroGrupoId, setFiltroGrupoId] = useState('');
+  const [filtroStatus, setFiltroStatus] = useState('');
+  const [dreCompetencia, setDreCompetencia] = useState<'mes' | 'trimestre' | 'ano' | 'personalizado'>('mes');
+  const [dreMes, setDreMes] = useState(() => new Date().toISOString().slice(0, 7));
+  const [clientes, setClientes] = useState<{ id: string; nome_razao_social: string }[]>([]);
+  const [fornecedores, setFornecedores] = useState<{ id: string; nome_razao_social: string }[]>([]);
+  const [grupos, setGrupos] = useState<{ id: string; nome: string }[]>([]);
   const [loading, setLoading] = useState(false);
   const [resultado, setResultado] = useState<RelatorioResultado>({ title: '', subtitle: '', rows: [] });
   const [previewOpen, setPreviewOpen] = useState(false);
+  const selectedReport = tipo;
+
+  useEffect(() => {
+    Promise.all([
+      supabase.from('clientes').select('id, nome_razao_social').eq('ativo', true).order('nome_razao_social').limit(300),
+      supabase.from('fornecedores').select('id, nome_razao_social').eq('ativo', true).order('nome_razao_social').limit(300),
+      supabase.from('grupos_produto').select('id, nome').eq('ativo', true).order('nome'),
+    ]).then(([{ data: c }, { data: f }, { data: g }]) => {
+      setClientes(c || []);
+      setFornecedores(f || []);
+      setGrupos(g || []);
+    });
+  }, []);
 
   useEffect(() => {
     const tipoQuery = searchParams.get('tipo') as TipoRelatorio | null;
@@ -127,7 +164,10 @@ export default function Relatorios() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const report = await carregarRelatorio(tipo, { dataInicio, dataFim });
+      const filtros = selectedReport === 'dre'
+        ? { ...getDreDateRange(), clienteId: undefined, fornecedorId: undefined, grupoProdutoId: undefined }
+        : { dataInicio, dataFim, clienteId: filtroClienteId || undefined, fornecedorId: filtroFornecedorId || undefined, grupoProdutoId: filtroGrupoId || undefined, tipoFinanceiro: filtroStatus || undefined };
+      const report = await carregarRelatorio(tipo, filtros);
       setResultado(report);
     } catch (error: unknown) {
       console.error('[relatorios]', error);
@@ -165,6 +205,10 @@ export default function Relatorios() {
   }, [resultado.rows, isQtyReport]);
 
   const handleSelectTipo = (nextTipo: TipoRelatorio) => {
+    setFiltroClienteId('');
+    setFiltroFornecedorId('');
+    setFiltroGrupoId('');
+    setFiltroStatus('');
     setTipo(nextTipo);
     setSearchParams((current) => {
       const next = new URLSearchParams(current);
@@ -179,6 +223,12 @@ export default function Relatorios() {
   };
 
   const handleExportPdf = async () => {
+    if (resultado && resultado.rows.length > 200) {
+      toast.warning(
+        `Este relatório tem ${resultado.rows.length} registros. O PDF mostrará apenas os primeiros 200. Use "Exportar Excel" para exportar tudo.`,
+        { duration: 8000 }
+      );
+    }
     const doc = await buildPdf(resultado, dataInicio, dataFim);
     doc.save(`${resultado.title || 'relatorio'}.pdf`);
     toast.success('PDF gerado com sucesso!');
@@ -192,6 +242,27 @@ export default function Relatorios() {
   const periodoLabel = dataInicio || dataFim
     ? `${dataInicio ? formatDate(dataInicio) : '—'} a ${dataFim ? formatDate(dataFim) : '—'}`
     : new Date().toLocaleDateString('pt-BR');
+
+  const getDreDateRange = () => {
+    if (dreCompetencia === 'personalizado') return { dataInicio, dataFim };
+    const now = new Date();
+    if (dreCompetencia === 'mes') {
+      const [y, m] = dreMes.split('-').map(Number);
+      const start = `${y}-${String(m).padStart(2,'0')}-01`;
+      const end = new Date(y, m, 0).toISOString().slice(0, 10);
+      return { dataInicio: start, dataFim: end };
+    }
+    if (dreCompetencia === 'trimestre') {
+      const q = Math.floor(now.getMonth() / 3);
+      const start = new Date(now.getFullYear(), q * 3, 1).toISOString().slice(0, 10);
+      const end = new Date(now.getFullYear(), q * 3 + 3, 0).toISOString().slice(0, 10);
+      return { dataInicio: start, dataFim: end };
+    }
+    return {
+      dataInicio: `${now.getFullYear()}-01-01`,
+      dataFim: `${now.getFullYear()}-12-31`,
+    };
+  };
 
   return (
     <AppLayout>
@@ -248,6 +319,100 @@ export default function Relatorios() {
                   <Button size="sm" onClick={handleExportCsv} className="gap-1.5"><Download className="h-3.5 w-3.5" />CSV</Button>
                 </div>
               </div>
+
+              {/* Filtros contextuais */}
+              <div className="flex flex-wrap gap-3 items-end mt-3">
+                {['vendas', 'faturamento', 'aging', 'curva_abc', 'vendas_cliente'].includes(selectedReport || '') && (
+                  <div className="space-y-1">
+                    <Label className="text-xs">Cliente</Label>
+                    <Select value={filtroClienteId || 'todos'} onValueChange={v => setFiltroClienteId(v === 'todos' ? '' : v)}>
+                      <SelectTrigger className="h-9 w-[220px]"><SelectValue placeholder="Todos os clientes" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todos">Todos os clientes</SelectItem>
+                        {clientes.map(c => <SelectItem key={c.id} value={c.id}>{c.nome_razao_social}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {['compras', 'compras_fornecedor'].includes(selectedReport || '') && (
+                  <div className="space-y-1">
+                    <Label className="text-xs">Fornecedor</Label>
+                    <Select value={filtroFornecedorId || 'todos'} onValueChange={v => setFiltroFornecedorId(v === 'todos' ? '' : v)}>
+                      <SelectTrigger className="h-9 w-[220px]"><SelectValue placeholder="Todos os fornecedores" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todos">Todos os fornecedores</SelectItem>
+                        {fornecedores.map(f => <SelectItem key={f.id} value={f.id}>{f.nome_razao_social}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {['estoque', 'estoque_minimo', 'movimentos_estoque', 'margem_produtos', 'curva_abc'].includes(selectedReport || '') && (
+                  <div className="space-y-1">
+                    <Label className="text-xs">Grupo de Produto</Label>
+                    <Select value={filtroGrupoId || 'todos'} onValueChange={v => setFiltroGrupoId(v === 'todos' ? '' : v)}>
+                      <SelectTrigger className="h-9 w-[200px]"><SelectValue placeholder="Todos os grupos" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todos">Todos os grupos</SelectItem>
+                        {grupos.map(g => <SelectItem key={g.id} value={g.id}>{g.nome}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {['financeiro', 'aging'].includes(selectedReport || '') && (
+                  <div className="space-y-1">
+                    <Label className="text-xs">Tipo</Label>
+                    <Select value={filtroStatus || 'todos'} onValueChange={v => setFiltroStatus(v === 'todos' ? '' : v)}>
+                      <SelectTrigger className="h-9 w-[160px]"><SelectValue placeholder="Todos" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todos">Todos</SelectItem>
+                        <SelectItem value="receber">A Receber</SelectItem>
+                        <SelectItem value="pagar">A Pagar</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+
+              {selectedReport === 'dre' && (
+                <div className="flex flex-wrap gap-3 items-end mt-3 pt-3 border-t">
+                  <div className="space-y-1">
+                    <Label className="text-xs font-medium">Competência</Label>
+                    <Select value={dreCompetencia} onValueChange={(v: any) => setDreCompetencia(v)}>
+                      <SelectTrigger className="h-9 w-[190px]"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="mes">Mês específico</SelectItem>
+                        <SelectItem value="trimestre">Trimestre atual</SelectItem>
+                        <SelectItem value="ano">Ano atual</SelectItem>
+                        <SelectItem value="personalizado">Personalizado</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {dreCompetencia === 'mes' && (
+                    <div className="space-y-1">
+                      <Label className="text-xs font-medium">Mês/Ano</Label>
+                      <Input
+                        type="month"
+                        value={dreMes}
+                        onChange={(e) => setDreMes(e.target.value)}
+                        className="h-9 w-[160px]"
+                      />
+                    </div>
+                  )}
+                  {dreCompetencia === 'trimestre' && (
+                    <p className="text-xs text-muted-foreground self-end pb-2">
+                      {(() => { const q = Math.floor(new Date().getMonth()/3)+1; return `${q}º trimestre de ${new Date().getFullYear()}`; })()}
+                    </p>
+                  )}
+                  {dreCompetencia === 'ano' && (
+                    <p className="text-xs text-muted-foreground self-end pb-2">
+                      Exercício {new Date().getFullYear()}
+                    </p>
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
 

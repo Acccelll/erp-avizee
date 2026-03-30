@@ -6,9 +6,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 interface ChartPoint {
   mes: string;
-  entradas: number;
-  saidas: number;
-  saldo: number;
+  entradas_real: number;
+  saidas_real: number;
+  entradas_prev: number;
+  saidas_prev: number;
 }
 
 export function FluxoCaixaChart() {
@@ -23,33 +24,59 @@ export function FluxoCaixaChart() {
       sixMonthsAgo.setDate(1);
       const dateFrom = sixMonthsAgo.toISOString().slice(0, 10);
 
-      const { data: lancamentos } = await supabase
-        .from('financeiro_lancamentos')
-        .select('tipo, valor, data_vencimento')
-        .eq('ativo', true)
-        .in('status', ['pago', 'aberto', 'vencido'])
-        .gte('data_vencimento', dateFrom)
-        .order('data_vencimento', { ascending: true });
+      const [{ data: realizados }, { data: previstos }] = await Promise.all([
+        supabase
+          .from('financeiro_lancamentos')
+          .select('tipo, valor, data_pagamento')
+          .eq('ativo', true)
+          .eq('status', 'pago')
+          .not('data_pagamento', 'is', null)
+          .gte('data_pagamento', dateFrom),
+        supabase
+          .from('financeiro_lancamentos')
+          .select('tipo, valor, data_vencimento')
+          .eq('ativo', true)
+          .in('status', ['aberto', 'vencido'])
+          .gte('data_vencimento', dateFrom),
+      ]);
 
-      const monthMap = new Map<string, { entradas: number; saidas: number }>();
+      const realMap = new Map<string, { entradas_real: number; saidas_real: number }>();
+      const prevMap = new Map<string, { entradas_prev: number; saidas_prev: number }>();
 
-      for (const l of lancamentos || []) {
-        const month = (l.data_vencimento as string).slice(0, 7);
-        const current = monthMap.get(month) || { entradas: 0, saidas: 0 };
+      for (const l of realizados || []) {
+        const month = (l.data_pagamento as string).slice(0, 7);
+        const current = realMap.get(month) || { entradas_real: 0, saidas_real: 0 };
         const valor = Number(l.valor || 0);
-        if (l.tipo === 'receber') current.entradas += valor;
-        else current.saidas += valor;
-        monthMap.set(month, current);
+        if (l.tipo === 'receber') current.entradas_real += valor;
+        else current.saidas_real += valor;
+        realMap.set(month, current);
       }
 
-      const months = Array.from(monthMap.keys()).sort();
-      let saldo = 0;
+      for (const l of previstos || []) {
+        const month = (l.data_vencimento as string).slice(0, 7);
+        const current = prevMap.get(month) || { entradas_prev: 0, saidas_prev: 0 };
+        const valor = Number(l.valor || 0);
+        if (l.tipo === 'receber') current.entradas_prev += valor;
+        else current.saidas_prev += valor;
+        prevMap.set(month, current);
+      }
+
+      const months = Array.from(new Set([...realMap.keys(), ...prevMap.keys()])).sort();
       const points: ChartPoint[] = months.map((m) => {
-        const { entradas, saidas } = monthMap.get(m)!;
-        saldo += entradas - saidas;
+        const real = realMap.get(m) || { entradas_real: 0, saidas_real: 0 };
+        const prev = prevMap.get(m) || { entradas_prev: 0, saidas_prev: 0 };
         const [year, mon] = m.split('-');
-        const mesLabel = new Date(Number(year), Number(mon) - 1).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
-        return { mes: mesLabel, entradas, saidas, saldo };
+        const mesLabel = new Date(Number(year), Number(mon) - 1).toLocaleDateString('pt-BR', {
+          month: 'short',
+          year: '2-digit',
+        });
+        return {
+          mes: mesLabel,
+          entradas_real: real.entradas_real,
+          saidas_real: real.saidas_real,
+          entradas_prev: prev.entradas_prev,
+          saidas_prev: prev.saidas_prev,
+        };
       });
 
       setData(points);
@@ -78,7 +105,7 @@ export function FluxoCaixaChart() {
 
   return (
     <div className="bg-card rounded-xl border p-5">
-      <h3 className="font-semibold text-foreground mb-4">Fluxo de Caixa (6 meses)</h3>
+      <h3 className="font-semibold text-foreground mb-4">Fluxo de Caixa — Realizado vs Previsto (6 meses)</h3>
       <ResponsiveContainer width="100%" height={220}>
         <AreaChart data={data}>
           <defs>
@@ -97,17 +124,35 @@ export function FluxoCaixaChart() {
           <Tooltip
             formatter={(value: number, name: string) => [
               formatCurrency(value),
-              name === 'entradas' ? 'Entradas' : name === 'saidas' ? 'Saídas' : 'Saldo',
+              name === 'entradas_real'
+                ? 'Recebimentos realizados'
+                : name === 'saidas_real'
+                  ? 'Pagamentos realizados'
+                  : name === 'entradas_prev'
+                    ? 'A receber (previsto)'
+                    : 'A pagar (previsto)',
             ]}
             contentStyle={{ fontSize: 12, borderRadius: 8 }}
           />
-          <Area type="monotone" dataKey="entradas" stroke="hsl(142 76% 36%)" fill="url(#colorEntradas)" strokeWidth={2} />
-          <Area type="monotone" dataKey="saidas" stroke="hsl(0 84% 60%)" fill="url(#colorSaidas)" strokeWidth={2} />
+          <Area type="monotone" dataKey="entradas_real" stroke="hsl(142 76% 36%)" fill="url(#colorEntradas)" strokeWidth={2} />
+          <Area type="monotone" dataKey="saidas_real" stroke="hsl(0 84% 60%)" fill="url(#colorSaidas)" strokeWidth={2} />
+          <Area type="monotone" dataKey="entradas_prev" stroke="hsl(142 76% 36%)" fill="none" strokeDasharray="5 3" strokeWidth={1.5} opacity={0.6} />
+          <Area type="monotone" dataKey="saidas_prev" stroke="hsl(0 84% 60%)" fill="none" strokeDasharray="5 3" strokeWidth={1.5} opacity={0.6} />
         </AreaChart>
       </ResponsiveContainer>
-      <div className="flex gap-4 mt-3 text-xs text-muted-foreground justify-center">
-        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: 'hsl(142 76% 36%)' }} />Entradas</span>
-        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: 'hsl(0 84% 60%)' }} />Saídas</span>
+      <div className="flex gap-6 mt-3 text-xs text-muted-foreground justify-center flex-wrap">
+        <span className="flex items-center gap-1.5">
+          <span className="w-3 h-0.5 bg-[hsl(142_76%_36%)]" />Recebimentos realizados
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="w-3 h-0.5 bg-[hsl(0_84%_60%)]" />Pagamentos realizados
+        </span>
+        <span className="flex items-center gap-1.5 opacity-60">
+          <span className="w-3 border-t border-dashed border-[hsl(142_76%_36%)]" />A receber (previsto)
+        </span>
+        <span className="flex items-center gap-1.5 opacity-60">
+          <span className="w-3 border-t border-dashed border-[hsl(0_84%_60%)]" />A pagar (previsto)
+        </span>
       </div>
     </div>
   );

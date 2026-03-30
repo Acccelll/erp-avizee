@@ -33,8 +33,6 @@ const ROLE_COLORS: Record<AppRole, string> = {
   estoquista: 'bg-emerald-100 text-emerald-700 border-emerald-300 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-700',
 };
 
-const STORAGE_KEY = 'erp-avizee-admin-config';
-
 const defaultConfig = {
   geral: {
     empresa: 'AviZee Equipamentos LTDA',
@@ -122,8 +120,6 @@ export default function Administracao() {
     const loadConfig = async () => {
       setLoading(true);
       try {
-        const localBackup = localStorage.getItem(STORAGE_KEY);
-        const parsedBackup = localBackup ? JSON.parse(localBackup) : defaultConfig;
         const [{ data: empresaRows }, { data: appRows }] = await Promise.all([
           supabase.from('empresa_config').select('*').limit(1),
           supabase.from('app_configuracoes').select('chave, valor'),
@@ -132,10 +128,8 @@ export default function Administracao() {
         const appConfig = Object.fromEntries((appRows || []).map((row: { chave: string; valor: unknown }) => [row.chave, row.valor || {}]));
         const merged = {
           ...defaultConfig,
-          ...parsedBackup,
           geral: {
             ...defaultConfig.geral,
-            ...(parsedBackup.geral || {}),
             empresa: empresa?.razao_social || defaultConfig.geral.empresa,
             nomeFantasia: empresa?.nome_fantasia || defaultConfig.geral.nomeFantasia,
             email: empresa?.email || defaultConfig.geral.email,
@@ -144,18 +138,18 @@ export default function Administracao() {
             corPrimaria: (appConfig.geral as any)?.corPrimaria || defaultConfig.geral.corPrimaria,
             corSecundaria: (appConfig.geral as any)?.corSecundaria || defaultConfig.geral.corSecundaria,
           },
-          usuarios: { ...defaultConfig.usuarios, ...(parsedBackup.usuarios || {}), ...(appConfig.usuarios || {}) },
-          email: { ...defaultConfig.email, ...(parsedBackup.email || {}), ...(appConfig.email || {}) },
-          fiscal: { ...defaultConfig.fiscal, ...(parsedBackup.fiscal || {}), ...(appConfig.fiscal || {}) },
-          financeiro: { ...defaultConfig.financeiro, ...(parsedBackup.financeiro || {}), ...(appConfig.financeiro || {}) },
+          usuarios: { ...defaultConfig.usuarios, ...(appConfig.usuarios || {}) },
+          email: { ...defaultConfig.email, ...(appConfig.email || {}) },
+          fiscal: { ...defaultConfig.fiscal, ...(appConfig.fiscal || {}) },
+          financeiro: { ...defaultConfig.financeiro, ...(appConfig.financeiro || {}) },
         };
         if (mounted) {
           setEmpresaConfigId(empresa?.id || null);
           setConfig(merged);
         }
       } catch {
-        const saved = localStorage.getItem(STORAGE_KEY);
-        if (saved && mounted) setConfig({ ...defaultConfig, ...JSON.parse(saved) });
+        console.error('[admin] Erro ao carregar configurações do Supabase');
+        if (mounted) setConfig(defaultConfig);
       } finally {
         if (mounted) setLoading(false);
       }
@@ -260,13 +254,10 @@ export default function Administracao() {
         { chave: 'financeiro', valor: config.financeiro as any, descricao: 'Parâmetros financeiros' },
       ];
       await supabase.from('app_configuracoes').upsert(appRows, { onConflict: 'chave' });
-      // localStorage acts only as a cache for the last successfully persisted config.
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
       toast.success('Configurações salvas com sucesso.');
     } catch (error: unknown) {
-      // Do NOT update localStorage on failure to avoid diverging from the server state.
       console.error('[admin] Erro ao salvar:', error);
-      toast.error('Não foi possível salvar.');
+      toast.error('Erro ao salvar configurações. Verifique sua conexão e tente novamente.');
     } finally {
       setSaving(false);
     }
