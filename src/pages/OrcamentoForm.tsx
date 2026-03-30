@@ -19,8 +19,6 @@ import { toast } from "sonner";
 import { ArrowLeft, Save, Eye, FileText, Copy, Plus } from "lucide-react";
 import { QuickAddClientModal } from "@/components/QuickAddClientModal";
 import { useIsMobile } from "@/hooks/use-mobile";
-import html2canvas from "html2canvas";
-import jsPDF from "jspdf";
 
 interface ClienteSnapshot {
   nome_razao_social: string; nome_fantasia: string; cpf_cnpj: string;
@@ -206,6 +204,11 @@ export default function OrcamentoForm() {
     setTimeout(async () => {
       if (!pdfRef.current) return;
       try {
+        // Dynamically import heavy PDF libraries to keep the initial bundle lean.
+        const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
+          import("html2canvas"),
+          import("jspdf"),
+        ]);
         const canvas = await html2canvas(pdfRef.current, { scale: 2, useCORS: true, backgroundColor: "#fff" });
         const imgData = canvas.toDataURL("image/png");
         const pdf = new jsPDF("p", "mm", "a4");

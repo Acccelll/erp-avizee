@@ -129,7 +129,7 @@ export default function Administracao() {
           supabase.from('app_configuracoes').select('chave, valor'),
         ]);
         const empresa = empresaRows?.[0];
-        const appConfig = Object.fromEntries((appRows || []).map((row: any) => [row.chave, row.valor || {}]));
+        const appConfig = Object.fromEntries((appRows || []).map((row: { chave: string; valor: unknown }) => [row.chave, row.valor || {}]));
         const merged = {
           ...defaultConfig,
           ...parsedBackup,
@@ -173,12 +173,12 @@ export default function Administracao() {
         supabase.from('user_roles').select('user_id, role'),
       ]);
       const roleMap = new Map<string, AppRole[]>();
-      (roles || []).forEach((r: any) => {
+      (roles || []).forEach((r: { user_id: string; role: string }) => {
         const existing = roleMap.get(r.user_id) || [];
         existing.push(r.role as AppRole);
         roleMap.set(r.user_id, existing);
       });
-      const merged: UserWithRoles[] = (profiles || []).map((p: any) => ({
+      const merged: UserWithRoles[] = (profiles || []).map((p: { id: string; nome: string; email: string | null; cargo: string | null; ativo: boolean; created_at: string }) => ({
         ...p,
         roles: roleMap.get(p.id) || [],
       }));
@@ -260,10 +260,11 @@ export default function Administracao() {
         { chave: 'financeiro', valor: config.financeiro as any, descricao: 'Parâmetros financeiros' },
       ];
       await supabase.from('app_configuracoes').upsert(appRows, { onConflict: 'chave' });
+      // localStorage acts only as a cache for the last successfully persisted config.
       localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
       toast.success('Configurações salvas com sucesso.');
-    } catch (error: any) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+    } catch (error: unknown) {
+      // Do NOT update localStorage on failure to avoid diverging from the server state.
       console.error('[admin] Erro ao salvar:', error);
       toast.error('Não foi possível salvar.');
     } finally {

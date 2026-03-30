@@ -52,16 +52,17 @@ export function FreteCorreiosCard({ cepDestino, pesoTotal, onSelect }: FreteCorr
     setSelected(null);
 
     try {
-      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
-      const url = `https://${projectId}.supabase.co/functions/v1/correios-api?action=cotacao_multi`;
+      // Derive Edge Function URL from VITE_SUPABASE_URL, avoiding dependency on VITE_SUPABASE_PROJECT_ID.
+      const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL as string || '').replace(/\/$/, '');
+      const url = `${supabaseUrl}/functions/v1/correios-api?action=cotacao_multi`;
       const session = await supabase.auth.getSession();
-      const token = session.data.session?.access_token;
+      const token = session.data.session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '';
 
       const res = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '',
           'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
@@ -87,9 +88,9 @@ export function FreteCorreiosCard({ cepDestino, pesoTotal, onSelect }: FreteCorr
       }
 
       setOpcoes(validas);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('[frete-correios]', err);
-      toast.error('Erro ao consultar frete: ' + (err.message || 'Tente novamente'));
+      toast.error('Erro ao consultar frete: ' + (err instanceof Error ? err.message : 'Tente novamente'));
     }
     setLoading(false);
   };
