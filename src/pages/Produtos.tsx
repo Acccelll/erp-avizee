@@ -65,7 +65,7 @@ const Produtos = () => {
   const [fornecedoresProd, setFornecedoresProd] = useState<any[]>([]);
   const [fornecedoresList, setFornecedoresList] = useState<any[]>([]);
   const [addFornOpen, setAddFornOpen] = useState(false);
-  const [fornForm, setFornForm] = useState({ fornecedor_id: "", referencia_fornecedor: "", preco_compra: 0, lead_time_dias: 0, unidade_fornecedor: "UN", eh_principal: false });
+  const [fornForm, setFornForm] = useState({ fornecedor_id: "", referencia_fornecedor: "", preco_compra: 0, lead_time_dias: 0, unidade_fornecedor: "UN", eh_principal: false, descricao_fornecedor: "" });
 
   useEffect(() => {
     Promise.all([
@@ -543,10 +543,11 @@ const Produtos = () => {
                           <SelectContent>{fornecedoresList.map((f: any) => <SelectItem key={f.id} value={f.id}>{f.nome_razao_social}</SelectItem>)}</SelectContent>
                         </Select>
                       </div>
-                      <div className="space-y-1"><Label className="text-xs">Ref. Fornecedor</Label><Input className="h-8 text-xs font-mono" value={fornForm.referencia_fornecedor} onChange={(e) => setFornForm({ ...fornForm, referencia_fornecedor: e.target.value })} placeholder="Código do forn." /></div>
-                      <div className="space-y-1"><Label className="text-xs">Preço Compra</Label><Input className="h-8 text-xs" type="number" step="0.01" value={fornForm.preco_compra || ""} onChange={(e) => setFornForm({ ...fornForm, preco_compra: Number(e.target.value) })} /></div>
-                      <div className="space-y-1"><Label className="text-xs">Lead Time (dias)</Label><Input className="h-8 text-xs" type="number" value={fornForm.lead_time_dias || ""} onChange={(e) => setFornForm({ ...fornForm, lead_time_dias: Number(e.target.value) })} /></div>
-                      <div className="space-y-1"><Label className="text-xs">UN Fornecedor</Label><Input className="h-8 text-xs" value={fornForm.unidade_fornecedor} onChange={(e) => setFornForm({ ...fornForm, unidade_fornecedor: e.target.value })} /></div>
+                       <div className="space-y-1"><Label className="text-xs">Ref. Fornecedor</Label><Input className="h-8 text-xs font-mono" value={fornForm.referencia_fornecedor} onChange={(e) => setFornForm({ ...fornForm, referencia_fornecedor: e.target.value })} placeholder="Código do forn." /></div>
+                       <div className="space-y-1"><Label className="text-xs">Preço Compra</Label><Input className="h-8 text-xs" type="number" step="0.01" value={fornForm.preco_compra || ""} onChange={(e) => setFornForm({ ...fornForm, preco_compra: Number(e.target.value) })} /></div>
+                       <div className="space-y-1"><Label className="text-xs">Lead Time (dias)</Label><Input className="h-8 text-xs" type="number" value={fornForm.lead_time_dias || ""} onChange={(e) => setFornForm({ ...fornForm, lead_time_dias: Number(e.target.value) })} /></div>
+                       <div className="space-y-1"><Label className="text-xs">UN Fornecedor</Label><Input className="h-8 text-xs" value={fornForm.unidade_fornecedor} onChange={(e) => setFornForm({ ...fornForm, unidade_fornecedor: e.target.value })} /></div>
+                       <div className="col-span-2 space-y-1"><Label className="text-xs">Descrição do Fornecedor</Label><Input className="h-8 text-xs" value={fornForm.descricao_fornecedor || ""} onChange={(e) => setFornForm({ ...fornForm, descricao_fornecedor: e.target.value })} placeholder="Nome/descrição usada pelo fornecedor" /></div>
                       <div className="flex items-end">
                         <label className="flex items-center gap-2 text-xs cursor-pointer h-8">
                           <input type="checkbox" checked={fornForm.eh_principal} onChange={(e) => setFornForm({ ...fornForm, eh_principal: e.target.checked })} className="rounded" />
