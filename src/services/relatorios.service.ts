@@ -680,11 +680,32 @@ export function exportarCsv(title: string, rows: Record<string, unknown>[]) {
 
 export async function exportarXlsx(title: string, rows: Record<string, unknown>[]) {
   if (!rows.length) return;
-  const XLSX = await import("xlsx");
-  const ws = XLSX.utils.json_to_sheet(rows);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Relatório");
-  XLSX.writeFile(wb, `${title}.xlsx`);
+
+  // write-excel-file replaces the vulnerable xlsx package.
+  // It has no known CVEs and produces valid .xlsx files via the browser API.
+  const { default: writeXlsxFile } = await import("write-excel-file/browser");
+
+  const keys = Object.keys(rows[0]);
+
+  // Build a 2-D cell array: header row followed by data rows.
+  // Cell values are kept in their native JS types so that the library can
+  // render numbers as numbers and booleans as booleans in Excel.
+  type CellValue = string | number | boolean | null;
+  type WriteCell = { value: CellValue; fontWeight?: "bold" };
+
+  const headerRow: WriteCell[] = keys.map((key) => ({ value: key, fontWeight: "bold" }));
+
+  const dataRows: WriteCell[][] = rows.map((row) =>
+    keys.map((key) => {
+      const v = row[key];
+      if (v == null) return { value: null };
+      if (typeof v === "number" || typeof v === "boolean") return { value: v };
+      return { value: String(v) };
+    })
+  );
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await writeXlsxFile([headerRow, ...dataRows] as any, { fileName: `${title}.xlsx` });
 }
 
 function formatCsvValue(value: unknown) {
