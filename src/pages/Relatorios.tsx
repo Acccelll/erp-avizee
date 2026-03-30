@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DataTable } from '@/components/DataTable';
 import { PreviewModal } from '@/components/ui/PreviewModal';
 import { BarChart3, Package, Wallet, ShoppingCart, TrendingUp, Truck, Download, RefreshCcw, Hash, AlertTriangle, DollarSign, FileText, Eye, ArrowLeftRight, FileSpreadsheet, CalendarClock, Receipt } from 'lucide-react';
@@ -14,6 +15,7 @@ import { ResponsiveContainer, BarChart, XAxis, YAxis, Tooltip, Bar, PieChart, Pi
 import { carregarRelatorio, exportarCsv, exportarXlsx, formatCellValue, type RelatorioResultado, type TipoRelatorio } from '@/services/relatorios.service';
 import { formatCurrency, formatNumber, formatDate } from '@/lib/format';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 const reportCards: Array<{ type: TipoRelatorio; title: string; description: string; icon: typeof Package }> = [
   { type: 'estoque', title: 'Estoque', description: 'Posição atual, custo e alertas', icon: Package },
@@ -128,9 +130,29 @@ export default function Relatorios() {
   const [tipo, setTipo] = useState<TipoRelatorio>(tipoInicial);
   const [dataInicio, setDataInicio] = useState('');
   const [dataFim, setDataFim] = useState('');
+  const [filtroClienteId, setFiltroClienteId] = useState('');
+  const [filtroFornecedorId, setFiltroFornecedorId] = useState('');
+  const [filtroGrupoId, setFiltroGrupoId] = useState('');
+  const [filtroStatus, setFiltroStatus] = useState('');
+  const [clientes, setClientes] = useState<{ id: string; nome_razao_social: string }[]>([]);
+  const [fornecedores, setFornecedores] = useState<{ id: string; nome_razao_social: string }[]>([]);
+  const [grupos, setGrupos] = useState<{ id: string; nome: string }[]>([]);
   const [loading, setLoading] = useState(false);
   const [resultado, setResultado] = useState<RelatorioResultado>({ title: '', subtitle: '', rows: [] });
   const [previewOpen, setPreviewOpen] = useState(false);
+  const selectedReport = tipo;
+
+  useEffect(() => {
+    Promise.all([
+      supabase.from('clientes').select('id, nome_razao_social').eq('ativo', true).order('nome_razao_social').limit(300),
+      supabase.from('fornecedores').select('id, nome_razao_social').eq('ativo', true).order('nome_razao_social').limit(300),
+      supabase.from('grupos_produto').select('id, nome').eq('ativo', true).order('nome'),
+    ]).then(([{ data: c }, { data: f }, { data: g }]) => {
+      setClientes(c || []);
+      setFornecedores(f || []);
+      setGrupos(g || []);
+    });
+  }, []);
 
   useEffect(() => {
     const tipoQuery = searchParams.get('tipo') as TipoRelatorio | null;
@@ -140,7 +162,14 @@ export default function Relatorios() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const report = await carregarRelatorio(tipo, { dataInicio, dataFim });
+      const report = await carregarRelatorio(tipo, {
+        dataInicio,
+        dataFim,
+        clienteId: filtroClienteId || undefined,
+        fornecedorId: filtroFornecedorId || undefined,
+        grupoProdutoId: filtroGrupoId || undefined,
+        tipoFinanceiro: filtroStatus || undefined,
+      });
       setResultado(report);
     } catch (error: unknown) {
       console.error('[relatorios]', error);
@@ -178,6 +207,10 @@ export default function Relatorios() {
   }, [resultado.rows, isQtyReport]);
 
   const handleSelectTipo = (nextTipo: TipoRelatorio) => {
+    setFiltroClienteId('');
+    setFiltroFornecedorId('');
+    setFiltroGrupoId('');
+    setFiltroStatus('');
     setTipo(nextTipo);
     setSearchParams((current) => {
       const next = new URLSearchParams(current);
@@ -266,6 +299,62 @@ export default function Relatorios() {
                   <Button variant="outline" size="sm" onClick={handleExportXlsx} disabled={!resultado.rows.length} className="gap-1.5"><FileSpreadsheet className="h-3.5 w-3.5" />Excel</Button>
                   <Button size="sm" onClick={handleExportCsv} className="gap-1.5"><Download className="h-3.5 w-3.5" />CSV</Button>
                 </div>
+              </div>
+
+              {/* Filtros contextuais */}
+              <div className="flex flex-wrap gap-3 items-end mt-3">
+                {['vendas', 'faturamento', 'aging', 'curva_abc', 'vendas_cliente'].includes(selectedReport || '') && (
+                  <div className="space-y-1">
+                    <Label className="text-xs">Cliente</Label>
+                    <Select value={filtroClienteId || 'todos'} onValueChange={v => setFiltroClienteId(v === 'todos' ? '' : v)}>
+                      <SelectTrigger className="h-9 w-[220px]"><SelectValue placeholder="Todos os clientes" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todos">Todos os clientes</SelectItem>
+                        {clientes.map(c => <SelectItem key={c.id} value={c.id}>{c.nome_razao_social}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {['compras', 'compras_fornecedor'].includes(selectedReport || '') && (
+                  <div className="space-y-1">
+                    <Label className="text-xs">Fornecedor</Label>
+                    <Select value={filtroFornecedorId || 'todos'} onValueChange={v => setFiltroFornecedorId(v === 'todos' ? '' : v)}>
+                      <SelectTrigger className="h-9 w-[220px]"><SelectValue placeholder="Todos os fornecedores" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todos">Todos os fornecedores</SelectItem>
+                        {fornecedores.map(f => <SelectItem key={f.id} value={f.id}>{f.nome_razao_social}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {['estoque', 'estoque_minimo', 'movimentos_estoque', 'margem_produtos', 'curva_abc'].includes(selectedReport || '') && (
+                  <div className="space-y-1">
+                    <Label className="text-xs">Grupo de Produto</Label>
+                    <Select value={filtroGrupoId || 'todos'} onValueChange={v => setFiltroGrupoId(v === 'todos' ? '' : v)}>
+                      <SelectTrigger className="h-9 w-[200px]"><SelectValue placeholder="Todos os grupos" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todos">Todos os grupos</SelectItem>
+                        {grupos.map(g => <SelectItem key={g.id} value={g.id}>{g.nome}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {['financeiro', 'aging'].includes(selectedReport || '') && (
+                  <div className="space-y-1">
+                    <Label className="text-xs">Tipo</Label>
+                    <Select value={filtroStatus || 'todos'} onValueChange={v => setFiltroStatus(v === 'todos' ? '' : v)}>
+                      <SelectTrigger className="h-9 w-[160px]"><SelectValue placeholder="Todos" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todos">Todos</SelectItem>
+                        <SelectItem value="receber">A Receber</SelectItem>
+                        <SelectItem value="pagar">A Pagar</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>

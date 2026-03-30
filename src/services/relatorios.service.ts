@@ -7,6 +7,10 @@ export type TipoRelatorio = "estoque" | "movimentos_estoque" | "financeiro" | "f
 export interface FiltroRelatorio {
   dataInicio?: string;
   dataFim?: string;
+  clienteId?: string;
+  fornecedorId?: string;
+  grupoProdutoId?: string;
+  tipoFinanceiro?: string;
 }
 
 export interface RelatorioResultado<T = Record<string, unknown>> {
@@ -36,11 +40,13 @@ function withDateRange(query: any, column: string, filtros: FiltroRelatorio) {
 export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRelatorio = {}): Promise<RelatorioResultado> {
   switch (tipo) {
     case "estoque": {
-      const { data, error } = await supabase
+      let query = supabase
         .from("produtos")
         .select("codigo_interno, nome, unidade_medida, estoque_atual, estoque_minimo, preco_custo, preco_venda")
         .eq("ativo", true)
         .order("nome");
+      if (filtros.grupoProdutoId) query = query.eq('grupo_id', filtros.grupoProdutoId);
+      const { data, error } = await query;
 
       if (error) throw error;
 
@@ -89,6 +95,7 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
         .order("created_at", { ascending: false });
 
       query = withDateRange(query, "created_at", filtros);
+      if (filtros.grupoProdutoId) query = query.eq('grupo_id', filtros.grupoProdutoId);
       const { data, error } = await query;
       if (error) throw error;
 
@@ -136,6 +143,7 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
         .order("data_vencimento", { ascending: true });
 
       query = withDateRange(query, "data_vencimento", filtros);
+      if (filtros.tipoFinanceiro) query = query.eq('tipo', filtros.tipoFinanceiro);
       const { data, error } = await query;
       if (error) throw error;
 
@@ -216,6 +224,7 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
         .order("data_emissao", { ascending: false });
 
       query = withDateRange(query, "data_emissao", filtros);
+      if (filtros.clienteId) query = query.eq('cliente_id', filtros.clienteId);
       const { data, error } = await query;
       if (error) throw error;
 
@@ -257,6 +266,7 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
         .order("data_emissao", { ascending: false });
 
       query = withDateRange(query, "data_emissao", filtros);
+      if (filtros.clienteId) query = query.eq('cliente_id', filtros.clienteId);
       const { data, error } = await query;
       if (error) throw error;
 
@@ -312,6 +322,7 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
         .order("data_compra", { ascending: false });
 
       query = withDateRange(query, "data_compra", filtros);
+      if (filtros.fornecedorId) query = query.eq('fornecedor_id', filtros.fornecedorId);
       const { data, error } = await query;
       if (error) throw error;
 
@@ -416,12 +427,16 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
 
     case "aging":
     default: {
-      const { data, error } = await supabase
+      let query = supabase
         .from("financeiro_lancamentos")
         .select("tipo, descricao, valor, status, data_vencimento, data_pagamento, clientes(nome_razao_social), fornecedores(nome_razao_social)")
         .eq("ativo", true)
         .in("status", ["aberto", "vencido"])
         .order("data_vencimento", { ascending: true });
+      query = withDateRange(query, "data_vencimento", filtros);
+      if (filtros.clienteId) query = query.eq('cliente_id', filtros.clienteId);
+      if (filtros.tipoFinanceiro) query = query.eq('tipo', filtros.tipoFinanceiro);
+      const { data, error } = await query;
 
       if (error) throw error;
 
@@ -483,6 +498,7 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
         .eq("notas_fiscais.status", "confirmada");
 
       nfQuery = withDateRange(nfQuery, "notas_fiscais.data_emissao", filtros);
+      if (filtros.clienteId) nfQuery = nfQuery.eq('notas_fiscais.cliente_id', filtros.clienteId);
 
       const { data, error } = await nfQuery;
       if (error) throw error;
@@ -535,11 +551,13 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
     }
 
     case "margem_produtos": {
-      const { data, error } = await supabase
+      let query = supabase
         .from("produtos")
         .select("codigo_interno, nome, preco_custo, preco_venda, estoque_atual, unidade_medida")
         .eq("ativo", true)
         .order("nome");
+      if (filtros.grupoProdutoId) query = query.eq('grupo_id', filtros.grupoProdutoId);
+      const { data, error } = await query;
 
       if (error) throw error;
 
@@ -613,6 +631,7 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
         .select("valor_total, clientes(nome_razao_social, cpf_cnpj)")
         .eq("ativo", true);
       query = withDateRange(query, "data_emissao", filtros);
+      if (filtros.clienteId) query = query.eq('cliente_id', filtros.clienteId);
       const { data, error } = await query;
       if (error) throw error;
 
@@ -646,6 +665,7 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
         .select("valor_total, fornecedores(nome_razao_social, cpf_cnpj)")
         .eq("ativo", true);
       query = withDateRange(query, "data_compra", filtros);
+      if (filtros.fornecedorId) query = query.eq('fornecedor_id', filtros.fornecedorId);
       const { data, error } = await query;
       if (error) throw error;
 
