@@ -50,7 +50,7 @@ async function getToken(): Promise<string> {
       const data: TokenResponse = await res.json();
       cachedToken = {
         token: data.token,
-        expiresAt: Date.now() + 50 * 60 * 1000,
+        expiresAt: Date.now() + 45 * 60 * 1000, // 45 min (5 min safety margin)
       };
       console.log("[correios] Autenticado com sucesso");
       return data.token;
@@ -64,8 +64,10 @@ async function getToken(): Promise<string> {
 }
 
 async function rastrear(codigoObjeto: string): Promise<any> {
+  const codigo = codigoObjeto.trim().toUpperCase().replace(/\s+/g, "");
+  if (!codigo) throw new Error("Código de rastreio vazio");
   const token = await getToken();
-  const url = `${CORREIOS_API}/srorastro/v1/objetos/${codigoObjeto}?resultado=T`;
+  const url = `${CORREIOS_API}/srorastro/v1/objetos/${codigo}?resultado=T`;
   console.log(`[correios] Rastreando: ${url}`);
 
   const res = await fetch(url, {
