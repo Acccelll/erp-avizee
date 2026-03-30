@@ -405,21 +405,31 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
     }
 
     case "curva_abc": {
-      let query = supabase
-        .from("orcamentos_itens")
-        .select("produto_id, valor_total, descricao_snapshot, codigo_snapshot, orcamentos!inner(ativo, status)")
-        .order("valor_total", { ascending: false });
+      let nfQuery = supabase
+        .from("notas_fiscais_itens")
+        .select(`
+          produto_id,
+          quantidade,
+          valor_unitario,
+          valor_total,
+          produtos(nome, codigo_interno),
+          notas_fiscais!inner(ativo, tipo, status, data_emissao)
+        `)
+        .eq("notas_fiscais.ativo", true)
+        .eq("notas_fiscais.tipo", "saida")
+        .eq("notas_fiscais.status", "confirmada");
 
-      const { data, error } = await query;
+      nfQuery = withDateRange(nfQuery, "notas_fiscais.data_emissao", filtros);
+
+      const { data, error } = await nfQuery;
       if (error) throw error;
 
-      // Aggregate by product
       const prodMap = new Map<string, { produto: string; codigo: string; total: number }>();
       for (const item of data || []) {
-        const orc = item.orcamentos as any;
-        if (!orc?.ativo) continue;
-        const key = item.produto_id;
-        const existing = prodMap.get(key) || { produto: item.descricao_snapshot || '-', codigo: item.codigo_snapshot || '-', total: 0 };
+        const key = item.produto_id || "sem-produto";
+        const nome = (item.produtos as any)?.nome || "Produto removido";
+        const codigo = (item.produtos as any)?.codigo_interno || "-";
+        const existing = prodMap.get(key) || { produto: nome, codigo, total: 0 };
         existing.total += Number(item.valor_total || 0);
         prodMap.set(key, existing);
       }
@@ -449,7 +459,7 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
 
       return {
         title: "Curva ABC de Produtos",
-        subtitle: "Classificação de produtos por participação no faturamento.",
+        subtitle: "Classificação por faturamento real — notas fiscais de saída confirmadas.",
         rows,
         chartData: [
           { name: `A (${classA.length} itens)`, value: classA.reduce((s, r) => s + r.faturamento, 0) },
