@@ -10,6 +10,8 @@ import { ErrosImportacaoPanel } from "@/components/importacao/ErrosImportacaoPan
 import { PreviewXmlTable } from "@/components/importacao/PreviewXmlTable";
 import { PreviewFaturamentoTable } from "@/components/importacao/PreviewFaturamentoTable";
 import { PreviewFinanceiroTable } from "@/components/importacao/PreviewFinanceiroTable";
+import { ReconciliacaoIndicadores } from "@/components/importacao/ReconciliacaoIndicadores";
+import { ReconciliacaoDetalhe } from "@/components/importacao/ReconciliacaoDetalhe";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -36,6 +38,8 @@ export default function MigracaoDados() {
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [step, setStep] = useState(1);
   const [currentLoteId, setCurrentLoteId] = useState<string | null>(null);
+  const [selectedLote, setSelectedLote] = useState<ImportacaoLote | null>(null);
+  const [isReconciliacaoOpen, setIsReconciliacaoOpen] = useState(false);
 
   const { data: lotes, loading: loadingLotes, fetchData: refreshLotes } = useSupabaseCrud<ImportacaoLote>({
     table: "importacao_lotes",
@@ -157,6 +161,14 @@ export default function MigracaoDados() {
     setCurrentLoteId(null);
   };
 
+  const handleViewLote = (id: string) => {
+    const lote = lotes.find(l => l.id === id);
+    if (lote) {
+      setSelectedLote(lote);
+      setIsReconciliacaoOpen(true);
+    }
+  };
+
   return (
     <AppLayout>
       <div className="flex flex-col gap-6 p-6 max-w-[1600px] mx-auto">
@@ -191,9 +203,10 @@ export default function MigracaoDados() {
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full max-w-md grid-cols-2 mb-6">
+          <TabsList className="grid w-full max-w-lg grid-cols-3 mb-6">
             <TabsTrigger value="overview">Tipos de Importação</TabsTrigger>
             <TabsTrigger value="lotes">Lotes de Importação</TabsTrigger>
+            <TabsTrigger value="reconciliacao">Conferência & Reconciliação</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="mt-0">
@@ -303,7 +316,7 @@ export default function MigracaoDados() {
             <ImportacaoLotesTable
               lotes={filteredLotes}
               isLoading={loadingLotes}
-              onView={(id) => toast.info(`Visualizar lote ${id}`)}
+              onView={handleViewLote}
               onImport={(id) => {
                  setCurrentLoteId(id);
                  setStep(4);
@@ -311,6 +324,28 @@ export default function MigracaoDados() {
               }}
               onDelete={(id) => toast.error("Exclusão não implementada")}
             />
+          </TabsContent>
+
+          <TabsContent value="reconciliacao" className="mt-0 space-y-6">
+            <div className="bg-muted/30 p-4 rounded-lg border border-dashed text-center mb-6">
+              <h3 className="text-sm font-semibold text-muted-foreground mb-1 italic">
+                Painel de Reconciliação de Carga
+              </h3>
+              <p className="text-[11px] text-muted-foreground max-w-lg mx-auto">
+                Utilize este painel para conferir os totais migrados por categoria e identificar inconsistências em massa.
+              </p>
+            </div>
+
+            <ReconciliacaoIndicadores lotes={lotes} />
+
+            <div className="space-y-4 pt-4">
+              <h4 className="text-sm font-bold tracking-tight">Últimos Lotes para Conferência</h4>
+              <ImportacaoLotesTable
+                lotes={lotes.slice(0, 10)}
+                isLoading={loadingLotes}
+                onView={handleViewLote}
+              />
+            </div>
           </TabsContent>
         </Tabs>
 
@@ -447,6 +482,15 @@ export default function MigracaoDados() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        <ReconciliacaoDetalhe
+          lote={selectedLote}
+          isOpen={isReconciliacaoOpen}
+          onClose={() => {
+            setIsReconciliacaoOpen(false);
+            setSelectedLote(null);
+          }}
+        />
       </div>
     </AppLayout>
   );
