@@ -411,7 +411,6 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
           produto_id,
           quantidade,
           valor_unitario,
-          valor_total,
           produtos(nome, codigo_interno),
           notas_fiscais!inner(ativo, tipo, status, data_emissao)
         `)
@@ -430,7 +429,8 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
         const nome = (item.produtos as any)?.nome || "Produto removido";
         const codigo = (item.produtos as any)?.codigo_interno || "-";
         const existing = prodMap.get(key) || { produto: nome, codigo, total: 0 };
-        existing.total += Number(item.valor_total || 0);
+        const itemTotal = Number(item.quantidade || 0) * Number(item.valor_unitario || 0);
+        existing.total += itemTotal;
         prodMap.set(key, existing);
       }
 
