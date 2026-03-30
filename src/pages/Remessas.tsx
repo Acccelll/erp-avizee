@@ -153,10 +153,12 @@ export default function Remessas() {
 
   const handleRastrear = async (remessa: Remessa) => {
     if (!remessa.codigo_rastreio) { toast.error("Sem código de rastreio"); return; }
+    const codigoSanitizado = remessa.codigo_rastreio.trim().toUpperCase().replace(/\s+/g, "");
+    if (!codigoSanitizado) { toast.error("Código de rastreio inválido"); return; }
     try {
       toast.info("Consultando rastreio...");
       const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
-      const url = `https://${projectId}.supabase.co/functions/v1/correios-api?action=rastrear&codigo=${encodeURIComponent(remessa.codigo_rastreio)}`;
+      const url = `https://${projectId}.supabase.co/functions/v1/correios-api?action=rastrear&codigo=${encodeURIComponent(codigoSanitizado)}`;
       const res = await fetch(url, {
         headers: {
           "Content-Type": "application/json",
