@@ -31,6 +31,7 @@ const Pedidos = lazy(() => import("./pages/Pedidos"));
 const Relatorios = lazy(() => import("./pages/Relatorios"));
 const Configuracoes = lazy(() => import("./pages/Configuracoes"));
 const Administracao = lazy(() => import("./pages/Administracao"));
+const MigracaoDados = lazy(() => import("./pages/MigracaoDados"));
 const Auditoria = lazy(() => import("./pages/Auditoria"));
 const Perfil = lazy(() => import("./pages/Perfil"));
 const Signup = lazy(() => import("./pages/Signup"));
@@ -112,6 +113,7 @@ const App = () => (
             <Route path="/relatorios" element={<ProtectedRoute><Relatorios /></ProtectedRoute>} />
             <Route path="/configuracoes" element={<ProtectedRoute><Configuracoes /></ProtectedRoute>} />
             <Route path="/administracao" element={<AdminRoute><Administracao /></AdminRoute>} />
+            <Route path="/migracao-dados" element={<AdminRoute><MigracaoDados /></AdminRoute>} />
             <Route path="/auditoria" element={<AdminRoute><Auditoria /></AdminRoute>} />
             <Route path="/perfil" element={<ProtectedRoute><Perfil /></ProtectedRoute>} />
             <Route path="/contas-contabeis-plano" element={<ProtectedRoute><ContasContabeis /></ProtectedRoute>} />

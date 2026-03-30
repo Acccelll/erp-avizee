@@ -11,6 +11,7 @@ import {
   Receipt,
   Settings,
   Shield,
+  Database,
   ShoppingCart,
   Truck,
   User,
@@ -189,6 +190,7 @@ export const navSections: NavSection[] = [
           { title: 'E-mails', path: '/administracao?tab=email' },
           { title: 'Parâmetros Fiscais', path: '/administracao?tab=fiscal' },
           { title: 'Parâmetros Financeiros', path: '/administracao?tab=financeiro' },
+          { title: 'Migração de Dados', path: '/migracao-dados', keywords: ['importacao', 'excel', 'csv', 'carga'] },
           { title: 'Auditoria', path: '/auditoria', keywords: ['logs', 'historico', 'rastreabilidade'] },
         ],
       },
@@ -234,6 +236,7 @@ export const headerIcons: Record<string, LucideIcon> = {
   '/relatorios': BarChart3,
   '/configuracoes': Settings,
   '/administracao': Shield,
+  '/migracao-dados': Database,
   '/auditoria': Shield,
   '/perfil': User,
 };
@@ -265,6 +268,7 @@ const baseRouteLabels: Record<string, string> = {
   '/relatorios': 'Relatórios',
   '/configuracoes': 'Configurações',
   '/administracao': 'Administração',
+  '/migracao-dados': 'Migração de Dados',
   '/auditoria': 'Auditoria',
   '/perfil': 'Meu Perfil',
 };
