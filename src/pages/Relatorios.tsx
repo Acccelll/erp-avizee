@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { DataTable } from '@/components/DataTable';
 import { PreviewModal } from '@/components/ui/PreviewModal';
-import { BarChart3, Package, Wallet, ShoppingCart, TrendingUp, Truck, Download, RefreshCcw, Hash, AlertTriangle, DollarSign, FileText, Eye, ArrowLeftRight, FileSpreadsheet, CalendarClock } from 'lucide-react';
+import { BarChart3, Package, Wallet, ShoppingCart, TrendingUp, Truck, Download, RefreshCcw, Hash, AlertTriangle, DollarSign, FileText, Eye, ArrowLeftRight, FileSpreadsheet, CalendarClock, Receipt } from 'lucide-react';
 import { ResponsiveContainer, BarChart, XAxis, YAxis, Tooltip, Bar, PieChart, Pie, Cell, Legend } from 'recharts';
 import { carregarRelatorio, exportarCsv, exportarXlsx, formatCellValue, type RelatorioResultado, type TipoRelatorio } from '@/services/relatorios.service';
 import { formatCurrency, formatNumber, formatDate } from '@/lib/format';
@@ -22,6 +22,7 @@ const reportCards: Array<{ type: TipoRelatorio; title: string; description: stri
   { type: 'financeiro', title: 'Financeiro', description: 'Contas a pagar e receber', icon: Wallet },
   { type: 'fluxo_caixa', title: 'Fluxo de Caixa', description: 'Entradas, saídas e saldo', icon: TrendingUp },
   { type: 'vendas', title: 'Vendas', description: 'Ordens por período e faturamento', icon: ShoppingCart },
+  { type: 'faturamento', title: 'Faturamento', description: 'NFs de saída confirmadas com impostos e receita líquida', icon: Receipt },
   { type: 'vendas_cliente', title: 'Vendas/Cliente', description: 'Ranking de clientes por volume', icon: ShoppingCart },
   { type: 'compras', title: 'Compras', description: 'Consolidado por fornecedor', icon: Truck },
   { type: 'compras_fornecedor', title: 'Compras/Fornecedor', description: 'Ranking de fornecedores por volume', icon: Truck },
