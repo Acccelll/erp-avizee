@@ -1093,6 +1093,48 @@ export type Database = {
           },
         ]
       }
+      formas_pagamento: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          descricao: string
+          gera_financeiro: boolean
+          id: string
+          intervalos_dias: Json | null
+          observacoes: string | null
+          parcelas: number
+          prazo_dias: number
+          tipo: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          descricao: string
+          gera_financeiro?: boolean
+          id?: string
+          intervalos_dias?: Json | null
+          observacoes?: string | null
+          parcelas?: number
+          prazo_dias?: number
+          tipo?: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          descricao?: string
+          gera_financeiro?: boolean
+          id?: string
+          intervalos_dias?: Json | null
+          observacoes?: string | null
+          parcelas?: number
+          prazo_dias?: number
+          tipo?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       fornecedores: {
         Row: {
           ativo: boolean
@@ -1634,6 +1676,7 @@ export type Database = {
           id: string
           numero: string
           observacoes: string | null
+          po_number: string | null
           prazo_despacho_dias: number | null
           status: Database["public"]["Enums"]["status_ordem_venda"]
           status_faturamento: Database["public"]["Enums"]["status_faturamento"]
@@ -1653,6 +1696,7 @@ export type Database = {
           id?: string
           numero: string
           observacoes?: string | null
+          po_number?: string | null
           prazo_despacho_dias?: number | null
           status?: Database["public"]["Enums"]["status_ordem_venda"]
           status_faturamento?: Database["public"]["Enums"]["status_faturamento"]
@@ -1672,6 +1716,7 @@ export type Database = {
           id?: string
           numero?: string
           observacoes?: string | null
+          po_number?: string | null
           prazo_despacho_dias?: number | null
           status?: Database["public"]["Enums"]["status_ordem_venda"]
           status_faturamento?: Database["public"]["Enums"]["status_faturamento"]

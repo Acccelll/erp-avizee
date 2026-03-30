@@ -65,7 +65,7 @@ const Produtos = () => {
   const [fornecedoresProd, setFornecedoresProd] = useState<any[]>([]);
   const [fornecedoresList, setFornecedoresList] = useState<any[]>([]);
   const [addFornOpen, setAddFornOpen] = useState(false);
-  const [fornForm, setFornForm] = useState({ fornecedor_id: "", referencia_fornecedor: "", preco_compra: 0, lead_time_dias: 0, unidade_fornecedor: "UN", eh_principal: false });
+  const [fornForm, setFornForm] = useState({ fornecedor_id: "", referencia_fornecedor: "", preco_compra: 0, lead_time_dias: 0, unidade_fornecedor: "UN", eh_principal: false, descricao_fornecedor: "" });
 
   useEffect(() => {
     Promise.all([
@@ -528,7 +528,7 @@ const Produtos = () => {
                     <h4 className="font-semibold text-sm">Códigos de Fornecedores (De/Para)</h4>
                     <p className="text-xs text-muted-foreground">Referências usadas na importação de XML para vínculo automático de produtos.</p>
                   </div>
-                  <Button size="sm" variant="outline" className="gap-1" onClick={() => { setAddFornOpen(true); setFornForm({ fornecedor_id: "", referencia_fornecedor: "", preco_compra: 0, lead_time_dias: 0, unidade_fornecedor: "UN", eh_principal: false }); }}>
+                  <Button size="sm" variant="outline" className="gap-1" onClick={() => { setAddFornOpen(true); setFornForm({ fornecedor_id: "", referencia_fornecedor: "", preco_compra: 0, lead_time_dias: 0, unidade_fornecedor: "UN", eh_principal: false, descricao_fornecedor: "" }); }}>
                     <Plus className="w-3 h-3" /> Adicionar
                   </Button>
                 </div>
@@ -543,10 +543,11 @@ const Produtos = () => {
                           <SelectContent>{fornecedoresList.map((f: any) => <SelectItem key={f.id} value={f.id}>{f.nome_razao_social}</SelectItem>)}</SelectContent>
                         </Select>
                       </div>
-                      <div className="space-y-1"><Label className="text-xs">Ref. Fornecedor</Label><Input className="h-8 text-xs font-mono" value={fornForm.referencia_fornecedor} onChange={(e) => setFornForm({ ...fornForm, referencia_fornecedor: e.target.value })} placeholder="Código do forn." /></div>
-                      <div className="space-y-1"><Label className="text-xs">Preço Compra</Label><Input className="h-8 text-xs" type="number" step="0.01" value={fornForm.preco_compra || ""} onChange={(e) => setFornForm({ ...fornForm, preco_compra: Number(e.target.value) })} /></div>
-                      <div className="space-y-1"><Label className="text-xs">Lead Time (dias)</Label><Input className="h-8 text-xs" type="number" value={fornForm.lead_time_dias || ""} onChange={(e) => setFornForm({ ...fornForm, lead_time_dias: Number(e.target.value) })} /></div>
-                      <div className="space-y-1"><Label className="text-xs">UN Fornecedor</Label><Input className="h-8 text-xs" value={fornForm.unidade_fornecedor} onChange={(e) => setFornForm({ ...fornForm, unidade_fornecedor: e.target.value })} /></div>
+                       <div className="space-y-1"><Label className="text-xs">Ref. Fornecedor</Label><Input className="h-8 text-xs font-mono" value={fornForm.referencia_fornecedor} onChange={(e) => setFornForm({ ...fornForm, referencia_fornecedor: e.target.value })} placeholder="Código do forn." /></div>
+                       <div className="space-y-1"><Label className="text-xs">Preço Compra</Label><Input className="h-8 text-xs" type="number" step="0.01" value={fornForm.preco_compra || ""} onChange={(e) => setFornForm({ ...fornForm, preco_compra: Number(e.target.value) })} /></div>
+                       <div className="space-y-1"><Label className="text-xs">Lead Time (dias)</Label><Input className="h-8 text-xs" type="number" value={fornForm.lead_time_dias || ""} onChange={(e) => setFornForm({ ...fornForm, lead_time_dias: Number(e.target.value) })} /></div>
+                       <div className="space-y-1"><Label className="text-xs">UN Fornecedor</Label><Input className="h-8 text-xs" value={fornForm.unidade_fornecedor} onChange={(e) => setFornForm({ ...fornForm, unidade_fornecedor: e.target.value })} /></div>
+                       <div className="col-span-2 space-y-1"><Label className="text-xs">Descrição do Fornecedor</Label><Input className="h-8 text-xs" value={fornForm.descricao_fornecedor || ""} onChange={(e) => setFornForm({ ...fornForm, descricao_fornecedor: e.target.value })} placeholder="Nome/descrição usada pelo fornecedor" /></div>
                       <div className="flex items-end">
                         <label className="flex items-center gap-2 text-xs cursor-pointer h-8">
                           <input type="checkbox" checked={fornForm.eh_principal} onChange={(e) => setFornForm({ ...fornForm, eh_principal: e.target.checked })} className="rounded" />
@@ -564,12 +565,13 @@ const Produtos = () => {
                           lead_time_dias: fornForm.lead_time_dias || null,
                           unidade_fornecedor: fornForm.unidade_fornecedor || "UN",
                           eh_principal: fornForm.eh_principal,
+                          descricao_fornecedor: fornForm.descricao_fornecedor || null,
                         } as any);
                         if (error) { toast.error("Erro ao salvar: " + error.message); return; }
                         toast.success("Fornecedor vinculado!");
                         setAddFornOpen(false);
                         const { data: updated } = await supabase.from("produtos_fornecedores")
-                          .select("preco_compra, lead_time_dias, referencia_fornecedor, eh_principal, unidade_fornecedor, fornecedores:fornecedor_id(nome_razao_social)")
+                          .select("preco_compra, lead_time_dias, referencia_fornecedor, eh_principal, unidade_fornecedor, descricao_fornecedor, fornecedores:fornecedor_id(nome_razao_social)")
                           .eq("produto_id", selected.id);
                         setFornecedoresProd(updated || []);
                       }}>Salvar</Button>
@@ -584,13 +586,14 @@ const Produtos = () => {
                   <div className="rounded-lg border overflow-hidden">
                     <table className="w-full text-sm">
                       <thead>
-                        <tr className="bg-muted/50">
-                          <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground">Fornecedor</th>
-                          <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground">Ref. Fornecedor</th>
-                          <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground">Preço Compra</th>
-                          <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground">Lead Time</th>
-                          <th className="text-center px-3 py-2 text-xs font-semibold text-muted-foreground">Princ.</th>
-                        </tr>
+                         <tr className="bg-muted/50">
+                           <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground">Fornecedor</th>
+                           <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground">Ref. Fornecedor</th>
+                           <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground">Desc. Forn.</th>
+                           <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground">Preço Compra</th>
+                           <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground">Lead Time</th>
+                           <th className="text-center px-3 py-2 text-xs font-semibold text-muted-foreground">Princ.</th>
+                         </tr>
                       </thead>
                       <tbody>
                         {fornecedoresProd.map((f: any, idx: number) => (
@@ -598,9 +601,10 @@ const Produtos = () => {
                             <td className="px-3 py-2 text-xs">
                               <RelationalLink to="/fornecedores">{f.fornecedores?.nome_razao_social || "—"}</RelationalLink>
                             </td>
-                            <td className="px-3 py-2 text-xs font-mono font-medium text-primary">{f.referencia_fornecedor || "—"}</td>
-                            <td className="px-3 py-2 text-xs font-mono text-right">{f.preco_compra ? formatCurrency(f.preco_compra) : "—"}</td>
-                            <td className="px-3 py-2 text-xs text-right">{f.lead_time_dias ? `${f.lead_time_dias} dias` : "—"}</td>
+                             <td className="px-3 py-2 text-xs font-mono font-medium text-primary">{f.referencia_fornecedor || "—"}</td>
+                             <td className="px-3 py-2 text-xs">{f.descricao_fornecedor || "—"}</td>
+                             <td className="px-3 py-2 text-xs font-mono text-right">{f.preco_compra ? formatCurrency(f.preco_compra) : "—"}</td>
+                             <td className="px-3 py-2 text-xs text-right">{f.lead_time_dias ? `${f.lead_time_dias} dias` : "—"}</td>
                             <td className="px-3 py-2 text-xs text-center">{f.eh_principal ? "★" : ""}</td>
                           </tr>
                         ))}

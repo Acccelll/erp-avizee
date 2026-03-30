@@ -23,6 +23,7 @@ interface OrdemVenda {
   cotacao_id: string; status: string; status_faturamento: string;
   data_aprovacao: string; data_prometida_despacho: string;
   prazo_despacho_dias: number; valor_total: number; observacoes: string;
+  po_number: string;
   ativo: boolean;
   clientes?: { nome_razao_social: string };
   orcamentos?: { numero: string };
@@ -153,6 +154,7 @@ const OrdensVenda = () => {
 
   const columns = [
     { key: "numero", label: "Nº OV", render: (o: OrdemVenda) => <span className="mono text-xs font-medium text-primary">{o.numero}</span> },
+    { key: "po_number", label: "PO Cliente", render: (o: OrdemVenda) => o.po_number ? <span className="mono text-xs">{o.po_number}</span> : "—" },
     { key: "cotacao", label: "Cotação", render: (o: OrdemVenda) => o.orcamentos?.numero ? <span className="mono text-xs">{o.orcamentos.numero}</span> : "—" },
     { key: "cliente", label: "Cliente", render: (o: OrdemVenda) => o.clientes?.nome_razao_social || "—" },
     { key: "data_emissao", label: "Emissão", render: (o: OrdemVenda) => formatDate(o.data_emissao) },
@@ -221,12 +223,13 @@ const OrdensVenda = () => {
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <ViewField label="Nº OV"><span className="font-mono">{selected.numero}</span></ViewField>
-                <ViewField label="Cotação Origem">
-                  {selected.orcamentos?.numero ? (
-                    <RelationalLink to="/orcamentos" mono>{selected.orcamentos.numero}</RelationalLink>
-                  ) : "—"}
-                </ViewField>
+                <ViewField label="PO Cliente"><span className="font-mono">{selected.po_number || "—"}</span></ViewField>
               </div>
+              <ViewField label="Cotação Origem">
+                {selected.orcamentos?.numero ? (
+                  <RelationalLink to="/orcamentos" mono>{selected.orcamentos.numero}</RelationalLink>
+                ) : "—"}
+              </ViewField>
               <ViewField label="Cliente">
                 {selected.clientes?.nome_razao_social ? (
                   <RelationalLink to="/clientes">{selected.clientes.nome_razao_social}</RelationalLink>
