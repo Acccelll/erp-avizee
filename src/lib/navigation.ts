@@ -18,6 +18,7 @@ import {
   Wallet,
   Warehouse,
   FileSearch,
+  UserCog,
 } from 'lucide-react';
 
 export interface NavLeafItem {
@@ -81,6 +82,7 @@ export const navSections: NavSection[] = [
           { title: 'Transportadoras', path: '/transportadoras', keywords: ['frete', 'logistica'] },
           { title: 'Formas de Pagamento', path: '/formas-pagamento', keywords: ['prazo', 'parcelamento'] },
           { title: 'Grupos Econômicos', path: '/grupos-economicos', keywords: ['matriz', 'filiais'] },
+          { title: 'Funcionários', path: '/funcionarios', keywords: ['fopag', 'folha', 'salario', 'rh'] },
         ],
       },
     ],
@@ -222,6 +224,7 @@ export const headerIcons: Record<string, LucideIcon> = {
   '/transportadoras': Truck,
   '/formas-pagamento': CreditCard,
   '/grupos-economicos': Building2,
+  '/funcionarios': UserCog,
   '/financeiro': Wallet,
   '/contas-bancarias': DollarSign,
   '/fluxo-caixa': DollarSign,
@@ -252,6 +255,7 @@ const baseRouteLabels: Record<string, string> = {
   '/transportadoras': 'Transportadoras',
   '/formas-pagamento': 'Formas de Pagamento',
   '/grupos-economicos': 'Grupos Econômicos',
+  '/funcionarios': 'Funcionários',
   '/financeiro': 'Financeiro',
   '/contas-bancarias': 'Contas Bancárias',
   '/fluxo-caixa': 'Fluxo de Caixa',
