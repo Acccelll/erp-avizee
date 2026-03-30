@@ -8,21 +8,43 @@ import { MapeamentoColunasForm } from "@/components/importacao/MapeamentoColunas
 import { PreviewImportacaoTable } from "@/components/importacao/PreviewImportacaoTable";
 import { ErrosImportacaoPanel } from "@/components/importacao/ErrosImportacaoPanel";
 import { PreviewXmlTable } from "@/components/importacao/PreviewXmlTable";
+import { PreviewFaturamentoTable } from "@/components/importacao/PreviewFaturamentoTable";
+import { PreviewFinanceiroTable } from "@/components/importacao/PreviewFinanceiroTable";
+import { ReconciliacaoIndicadores } from "@/components/importacao/ReconciliacaoIndicadores";
+import { ReconciliacaoDetalhe } from "@/components/importacao/ReconciliacaoDetalhe";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, Filter, RefreshCw, Database, ArrowRight, ArrowLeft, CheckCircle2, ChevronRight, FileUp } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle
+} from "@/components/ui/alert";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useImportacaoCadastros } from "@/hooks/importacao/useImportacaoCadastros";
 import { useImportacaoEstoque } from "@/hooks/importacao/useImportacaoEstoque";
 import { useImportacaoXml } from "@/hooks/importacao/useImportacaoXml";
+import { useImportacaoFaturamento } from "@/hooks/importacao/useImportacaoFaturamento";
+import { useImportacaoFinanceiro } from "@/hooks/importacao/useImportacaoFinanceiro";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
 import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
 import { ImportSource, ImportType } from "@/hooks/importacao/types";
+import { AlertTriangle, Info } from "lucide-react";
 
 export default function MigracaoDados() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -30,8 +52,11 @@ export default function MigracaoDados() {
   const [statusFilter, setStatusFilter] = useState("todos");
   const [activeTab, setActiveTab] = useState("overview");
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [step, setStep] = useState(1);
   const [currentLoteId, setCurrentLoteId] = useState<string | null>(null);
+  const [selectedLote, setSelectedLote] = useState<ImportacaoLote | null>(null);
+  const [isReconciliacaoOpen, setIsReconciliacaoOpen] = useState(false);
 
   const { data: lotes, loading: loadingLotes, fetchData: refreshLotes } = useSupabaseCrud<ImportacaoLote>({
     table: "importacao_lotes",
@@ -44,8 +69,13 @@ export default function MigracaoDados() {
   const hookCadastros = useImportacaoCadastros();
   const hookEstoque = useImportacaoEstoque();
   const hookXml = useImportacaoXml();
+  const hookFaturamento = useImportacaoFaturamento();
+  const hookFinanceiro = useImportacaoFinanceiro();
 
-  const activeHook = activeImportSource === "cadastros" ? hookCadastros : activeImportSource === "estoque" ? hookEstoque : hookXml;
+  const activeHook = activeImportSource === "cadastros" ? hookCadastros :
+                    activeImportSource === "estoque" ? hookEstoque :
+                    activeImportSource === "xml" ? hookXml :
+                    activeImportSource === "faturamento" ? hookFaturamento : hookFinanceiro;
 
   const {
     file,
@@ -82,6 +112,12 @@ export default function MigracaoDados() {
       setActiveImportSource("estoque");
     } else if (type === "compras_xml") {
       setActiveImportSource("xml");
+    } else if (type === "faturamento") {
+      setActiveImportSource("faturamento");
+      setImportType("produtos" as any); // fallback dummy
+    } else if (type === "financeiro") {
+      setActiveImportSource("financeiro");
+      setImportType("produtos" as any); // fallback dummy
     } else {
       setActiveImportSource("cadastros");
       setImportType(type as ImportType);
@@ -102,7 +138,6 @@ export default function MigracaoDados() {
     }
 
     if (step === 1 && activeImportSource === 'xml') {
-      // Pula mapeamento para XML
       setStep(3);
       return;
     }
@@ -110,6 +145,10 @@ export default function MigracaoDados() {
     if (step === 2) {
       if (activeImportSource === 'estoque') {
         await hookEstoque.generatePreview();
+      } else if (activeImportSource === 'faturamento') {
+        await hookFaturamento.generatePreview();
+      } else if (activeImportSource === 'financeiro') {
+        await hookFinanceiro.generatePreview();
       } else {
         hookCadastros.generatePreview();
       }
@@ -125,6 +164,11 @@ export default function MigracaoDados() {
   };
 
   const handleFinalize = async () => {
+    setIsConfirmOpen(true);
+  };
+
+  const onConfirmCarga = async () => {
+    setIsConfirmOpen(false);
     const success = await finalizeImport(currentLoteId || undefined);
     if (success) {
       setIsImportModalOpen(false);
@@ -137,6 +181,14 @@ export default function MigracaoDados() {
     setIsImportModalOpen(false);
     setStep(1);
     setCurrentLoteId(null);
+  };
+
+  const handleViewLote = (id: string) => {
+    const lote = lotes.find(l => l.id === id);
+    if (lote) {
+      setSelectedLote(lote);
+      setIsReconciliacaoOpen(true);
+    }
   };
 
   return (
@@ -163,6 +215,17 @@ export default function MigracaoDados() {
           </div>
         </div>
 
+        {/* Aviso de Segurança */}
+        <Alert className="bg-amber-50 border-amber-200">
+          <AlertTriangle className="h-4 w-4 text-amber-600" />
+          <AlertTitle className="text-amber-800 font-bold">Atenção - Módulo de Carga Inicial</AlertTitle>
+          <AlertDescription className="text-amber-700 text-xs">
+            Esta área é destinada exclusivamente para a migração de dados de sistemas legados.
+            A importação de dados pode causar duplicidade se os SKUs ou CPFs/CNPJs não forem conferidos previamente.
+            <strong> Valide os dados no ambiente de staging antes de confirmar a carga definitiva.</strong>
+          </AlertDescription>
+        </Alert>
+
         {/* Resumo */}
         <ImportacaoResumoCards
           totalBatches={lotes.length}
@@ -173,13 +236,14 @@ export default function MigracaoDados() {
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full max-w-md grid-cols-2 mb-6">
+          <TabsList className="grid w-full max-w-lg grid-cols-3 mb-6">
             <TabsTrigger value="overview">Tipos de Importação</TabsTrigger>
             <TabsTrigger value="lotes">Lotes de Importação</TabsTrigger>
+            <TabsTrigger value="reconciliacao">Conferência & Reconciliação</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="mt-0">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
               <ImportacaoTipoCard
                 type="produtos"
                 title="Produtos"
@@ -207,6 +271,20 @@ export default function MigracaoDados() {
                 description="Carga de saldos iniciais de inventário por depósito."
                 onImport={() => handleOpenImport("estoque_inicial")}
                 onViewBatches={() => { setTypeFilter("estoque_inicial"); setActiveTab("lotes"); }}
+              />
+              <ImportacaoTipoCard
+                type="faturamento"
+                title="Faturamento Histórico"
+                description="Importação de histórico de vendas de sistemas legados."
+                onImport={() => handleOpenImport("faturamento")}
+                onViewBatches={() => { setTypeFilter("faturamento"); setActiveTab("lotes"); }}
+              />
+              <ImportacaoTipoCard
+                type="financeiro"
+                title="Financeiro em Aberto"
+                description="Carga de contas a pagar e receber pendentes."
+                onImport={() => handleOpenImport("financeiro")}
+                onViewBatches={() => { setTypeFilter("financeiro"); setActiveTab("lotes"); }}
               />
               <ImportacaoTipoCard
                 type="compras_xml"
@@ -242,6 +320,8 @@ export default function MigracaoDados() {
                     <SelectItem value="clientes">Clientes</SelectItem>
                     <SelectItem value="fornecedores">Fornecedores</SelectItem>
                     <SelectItem value="estoque_inicial">Estoque Inicial</SelectItem>
+                    <SelectItem value="faturamento">Faturamento</SelectItem>
+                    <SelectItem value="financeiro_aberto">Financeiro</SelectItem>
                     <SelectItem value="compras_xml">Compras por XML</SelectItem>
                   </SelectContent>
                 </Select>
@@ -269,7 +349,7 @@ export default function MigracaoDados() {
             <ImportacaoLotesTable
               lotes={filteredLotes}
               isLoading={loadingLotes}
-              onView={(id) => toast.info(`Visualizar lote ${id}`)}
+              onView={handleViewLote}
               onImport={(id) => {
                  setCurrentLoteId(id);
                  setStep(4);
@@ -277,6 +357,28 @@ export default function MigracaoDados() {
               }}
               onDelete={(id) => toast.error("Exclusão não implementada")}
             />
+          </TabsContent>
+
+          <TabsContent value="reconciliacao" className="mt-0 space-y-6">
+            <div className="bg-muted/30 p-4 rounded-lg border border-dashed text-center mb-6">
+              <h3 className="text-sm font-semibold text-muted-foreground mb-1 italic">
+                Painel de Reconciliação de Carga
+              </h3>
+              <p className="text-[11px] text-muted-foreground max-w-lg mx-auto">
+                Utilize este painel para conferir os totais migrados por categoria e identificar inconsistências em massa.
+              </p>
+            </div>
+
+            <ReconciliacaoIndicadores lotes={lotes} />
+
+            <div className="space-y-4 pt-4">
+              <h4 className="text-sm font-bold tracking-tight">Últimos Lotes para Conferência</h4>
+              <ImportacaoLotesTable
+                lotes={lotes.slice(0, 10)}
+                isLoading={loadingLotes}
+                onView={handleViewLote}
+              />
+            </div>
           </TabsContent>
         </Tabs>
 
@@ -286,7 +388,10 @@ export default function MigracaoDados() {
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <FileUp className="h-5 w-5" />
-                Importar {activeImportSource === 'xml' ? 'Compras por XML' : importType?.charAt(0).toUpperCase() + importType?.slice(1)}
+                Importar {activeImportSource === 'xml' ? 'Compras por XML' :
+                          activeImportSource === 'faturamento' ? 'Faturamento Histórico' :
+                          activeImportSource === 'financeiro' ? 'Financeiro em Aberto' :
+                          importType?.charAt(0).toUpperCase() + importType?.slice(1)}
               </DialogTitle>
               <DialogDescription>
                 Siga os passos abaixo para realizar a carga de dados.
@@ -339,7 +444,8 @@ export default function MigracaoDados() {
                   </div>
                   <MapeamentoColunasForm
                     headers={headers}
-                    importType={importType}
+                    importType={activeImportSource === 'faturamento' ? 'produtos' :
+                                activeImportSource === 'financeiro' ? 'clientes' : importType}
                     mapping={mapping}
                     onMappingChange={(f, c) => setMapping(prev => ({ ...prev, [f]: c }))}
                   />
@@ -350,9 +456,13 @@ export default function MigracaoDados() {
                 <div className="space-y-6">
                   {activeImportSource === 'xml' ? (
                     <PreviewXmlTable data={hookXml.xmlData} />
+                  ) : activeImportSource === 'faturamento' ? (
+                    <PreviewFaturamentoTable data={hookFaturamento.previewData} />
+                  ) : activeImportSource === 'financeiro' ? (
+                    <PreviewFinanceiroTable data={hookFinanceiro.previewData} />
                   ) : (
                     <>
-                      <ErrosImportacaoPanel data={previewData} importType={importType} />
+                      <ErrosImportacaoPanel data={previewData} />
                       <PreviewImportacaoTable data={previewData} importType={importType} />
                     </>
                   )}
@@ -405,6 +515,34 @@ export default function MigracaoDados() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        <ReconciliacaoDetalhe
+          lote={selectedLote}
+          isOpen={isReconciliacaoOpen}
+          onClose={() => {
+            setIsReconciliacaoOpen(false);
+            setSelectedLote(null);
+          }}
+        />
+
+        {/* Confirmação de Carga */}
+        <AlertDialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Confirmar Carga de Dados?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Esta ação irá inserir os registros validados definitivamente nas tabelas operacionais do sistema.
+                Certifique-se de que revisou as inconsistências no passo anterior.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Revisar mais uma vez</AlertDialogCancel>
+              <AlertDialogAction onClick={onConfirmCarga} className="bg-emerald-600 hover:bg-emerald-700">
+                Confirmar Carga
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </AppLayout>
   );

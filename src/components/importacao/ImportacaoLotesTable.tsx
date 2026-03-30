@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 
 export interface ImportacaoLote {
   id: string;
@@ -86,7 +87,7 @@ export function ImportacaoLotesTable({ lotes, isLoading, onView, onImport, onDel
               <TableCell className="max-w-[200px] truncate" title={lote.arquivo_nome}>
                 {lote.arquivo_nome}
               </TableCell>
-              <TableCell>
+              <TableCell className={cn((lote.status === 'concluido' || lote.status === 'cancelado') && "opacity-50")}>
                 <ImportacaoStatusBadge status={lote.status} />
               </TableCell>
               <TableCell className="text-center font-semibold">{lote.total_lidos}</TableCell>
@@ -106,7 +107,7 @@ export function ImportacaoLotesTable({ lotes, isLoading, onView, onImport, onDel
                       <Eye className="mr-2 h-4 w-4" />
                       Visualizar
                     </DropdownMenuItem>
-                    {lote.status === 'validado' && (
+                    {(lote.status === 'validado' || lote.status === 'parcial') && (
                       <DropdownMenuItem onClick={() => onImport?.(lote.id)}>
                         <CheckCircle2 className="mr-2 h-4 w-4" />
                         Finalizar Importação
