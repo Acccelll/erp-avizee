@@ -223,12 +223,13 @@ const OrdensVenda = () => {
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <ViewField label="Nº OV"><span className="font-mono">{selected.numero}</span></ViewField>
-                <ViewField label="Cotação Origem">
-                  {selected.orcamentos?.numero ? (
-                    <RelationalLink to="/orcamentos" mono>{selected.orcamentos.numero}</RelationalLink>
-                  ) : "—"}
-                </ViewField>
+                <ViewField label="PO Cliente"><span className="font-mono">{selected.po_number || "—"}</span></ViewField>
               </div>
+              <ViewField label="Cotação Origem">
+                {selected.orcamentos?.numero ? (
+                  <RelationalLink to="/orcamentos" mono>{selected.orcamentos.numero}</RelationalLink>
+                ) : "—"}
+              </ViewField>
               <ViewField label="Cliente">
                 {selected.clientes?.nome_razao_social ? (
                   <RelationalLink to="/clientes">{selected.clientes.nome_razao_social}</RelationalLink>
