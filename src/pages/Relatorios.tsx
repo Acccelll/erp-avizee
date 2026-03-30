@@ -83,6 +83,18 @@ function buildPdf(resultado: RelatorioResultado, dataInicio: string, dataFim: st
       doc.setFontSize(7);
 
       const maxRows = Math.min(rows.length, 200);
+      if (rows.length > 200) {
+        // Add warning at bottom of last page
+        y += 10;
+        if (y > doc.internal.pageSize.getHeight() - 20) { doc.addPage(); y = 20; }
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'bolditalic');
+        doc.setTextColor(180, 0, 0);
+        doc.text(
+          `⚠ PDF limitado a 200 de ${rows.length} registros. Use "Exportar Excel" para o relatório completo.`,
+          margin, y
+        );
+      }
       for (let r = 0; r < maxRows; r++) {
         if (y > doc.internal.pageSize.getHeight() - 20) {
           doc.addPage();
@@ -179,6 +191,12 @@ export default function Relatorios() {
   };
 
   const handleExportPdf = async () => {
+    if (resultado && resultado.rows.length > 200) {
+      toast.warning(
+        `Este relatório tem ${resultado.rows.length} registros. O PDF mostrará apenas os primeiros 200. Use "Exportar Excel" para exportar tudo.`,
+        { duration: 8000 }
+      );
+    }
     const doc = await buildPdf(resultado, dataInicio, dataFim);
     doc.save(`${resultado.title || 'relatorio'}.pdf`);
     toast.success('PDF gerado com sucesso!');
