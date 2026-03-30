@@ -77,7 +77,7 @@ export default function Transportadoras() {
     const { data: ct } = await supabase.from("cliente_transportadoras" as any)
       .select("*, clientes:cliente_id(nome_razao_social, cpf_cnpj, cidade, uf)")
       .eq("transportadora_id", t.id).eq("ativo", true);
-    setClientesVinculados(ct || []);
+    setClientesVinculados((ct as unknown as ClienteVinculado[]) || []);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
