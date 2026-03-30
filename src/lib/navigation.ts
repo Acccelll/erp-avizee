@@ -18,6 +18,7 @@ import {
   Wallet,
   Warehouse,
   FileSearch,
+  UserCog,
 } from 'lucide-react';
 
 export interface NavLeafItem {
