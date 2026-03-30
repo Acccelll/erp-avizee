@@ -134,6 +134,8 @@ export default function Relatorios() {
   const [filtroFornecedorId, setFiltroFornecedorId] = useState('');
   const [filtroGrupoId, setFiltroGrupoId] = useState('');
   const [filtroStatus, setFiltroStatus] = useState('');
+  const [dreCompetencia, setDreCompetencia] = useState<'mes' | 'trimestre' | 'ano' | 'personalizado'>('mes');
+  const [dreMes, setDreMes] = useState(() => new Date().toISOString().slice(0, 7));
   const [clientes, setClientes] = useState<{ id: string; nome_razao_social: string }[]>([]);
   const [fornecedores, setFornecedores] = useState<{ id: string; nome_razao_social: string }[]>([]);
   const [grupos, setGrupos] = useState<{ id: string; nome: string }[]>([]);
@@ -162,14 +164,10 @@ export default function Relatorios() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const report = await carregarRelatorio(tipo, {
-        dataInicio,
-        dataFim,
-        clienteId: filtroClienteId || undefined,
-        fornecedorId: filtroFornecedorId || undefined,
-        grupoProdutoId: filtroGrupoId || undefined,
-        tipoFinanceiro: filtroStatus || undefined,
-      });
+      const filtros = selectedReport === 'dre'
+        ? { ...getDreDateRange(), clienteId: undefined, fornecedorId: undefined, grupoProdutoId: undefined }
+        : { dataInicio, dataFim, clienteId: filtroClienteId || undefined, fornecedorId: filtroFornecedorId || undefined, grupoProdutoId: filtroGrupoId || undefined, tipoFinanceiro: filtroStatus || undefined };
+      const report = await carregarRelatorio(tipo, filtros);
       setResultado(report);
     } catch (error: unknown) {
       console.error('[relatorios]', error);
@@ -244,6 +242,27 @@ export default function Relatorios() {
   const periodoLabel = dataInicio || dataFim
     ? `${dataInicio ? formatDate(dataInicio) : '—'} a ${dataFim ? formatDate(dataFim) : '—'}`
     : new Date().toLocaleDateString('pt-BR');
+
+  const getDreDateRange = () => {
+    if (dreCompetencia === 'personalizado') return { dataInicio, dataFim };
+    const now = new Date();
+    if (dreCompetencia === 'mes') {
+      const [y, m] = dreMes.split('-').map(Number);
+      const start = `${y}-${String(m).padStart(2,'0')}-01`;
+      const end = new Date(y, m, 0).toISOString().slice(0, 10);
+      return { dataInicio: start, dataFim: end };
+    }
+    if (dreCompetencia === 'trimestre') {
+      const q = Math.floor(now.getMonth() / 3);
+      const start = new Date(now.getFullYear(), q * 3, 1).toISOString().slice(0, 10);
+      const end = new Date(now.getFullYear(), q * 3 + 3, 0).toISOString().slice(0, 10);
+      return { dataInicio: start, dataFim: end };
+    }
+    return {
+      dataInicio: `${now.getFullYear()}-01-01`,
+      dataFim: `${now.getFullYear()}-12-31`,
+    };
+  };
 
   return (
     <AppLayout>
@@ -356,6 +375,44 @@ export default function Relatorios() {
                   </div>
                 )}
               </div>
+
+              {selectedReport === 'dre' && (
+                <div className="flex flex-wrap gap-3 items-end mt-3 pt-3 border-t">
+                  <div className="space-y-1">
+                    <Label className="text-xs font-medium">Competência</Label>
+                    <Select value={dreCompetencia} onValueChange={(v: any) => setDreCompetencia(v)}>
+                      <SelectTrigger className="h-9 w-[190px]"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="mes">Mês específico</SelectItem>
+                        <SelectItem value="trimestre">Trimestre atual</SelectItem>
+                        <SelectItem value="ano">Ano atual</SelectItem>
+                        <SelectItem value="personalizado">Personalizado</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {dreCompetencia === 'mes' && (
+                    <div className="space-y-1">
+                      <Label className="text-xs font-medium">Mês/Ano</Label>
+                      <Input
+                        type="month"
+                        value={dreMes}
+                        onChange={(e) => setDreMes(e.target.value)}
+                        className="h-9 w-[160px]"
+                      />
+                    </div>
+                  )}
+                  {dreCompetencia === 'trimestre' && (
+                    <p className="text-xs text-muted-foreground self-end pb-2">
+                      {(() => { const q = Math.floor(new Date().getMonth()/3)+1; return `${q}º trimestre de ${new Date().getFullYear()}`; })()}
+                    </p>
+                  )}
+                  {dreCompetencia === 'ano' && (
+                    <p className="text-xs text-muted-foreground self-end pb-2">
+                      Exercício {new Date().getFullYear()}
+                    </p>
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
 
