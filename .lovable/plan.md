@@ -1,101 +1,102 @@
 
 
-# Plano de Execucao — Prompt 4 (11 Correcoes)
+# Plano: Revisao e Correcao Geral do Frontend
 
-## Resumo dos 11 Prompts
+## Objetivo
+Deixar o projeto em estado limpo: build, lint sem erros criticos, testes uteis, lockfile sincronizado.
 
-| # | Tema | Complexidade | Status Atual |
-|---|------|-------------|--------------|
-| 1 | Correios rastreio | Media | Edge function OK, falta sanitizacao no frontend e mensagens claras |
-| 2 | Rota dinamica `/cotacoes/:id` | Baixa | Bug literal na linha 84 do App.tsx |
-| 3 | FormasPagamento mock | Ja feito | useSupabaseCrud ja integrado |
-| 4 | Persistencia configs | Baixa | localStorage usado apenas em UI state (sidebar, dismissed) — ja coerente |
-| 5 | Package-lock | Media | Regenerar lockfile |
-| 6 | Bundle reduction | Media | Lazy load paginas + dynamic import xlsx/jspdf |
-| 7 | Tipagem any | Media | ~15 arquivos com any excessivo |
-| 8 | useSupabaseCrud melhoria | Media | Adicionar paginacao, filtros, invalidacao seletiva |
-| 9 | Filtros padronizados | Media | AdvancedFilterBar existe, falta aplicar em modulos |
-| 10 | Documentacao | Baixa | Atualizar README |
-| 11 | Revisao final | Baixa | Cross-cutting |
+## A. Dependencias e Setup
 
-## Prompts ja resolvidos (nenhuma acao necessaria)
+1. **tailwind.config.ts** — substituir `require("tailwindcss-animate")` por `import` ESM
+2. **package-lock.json** — nao pode ser regenerado diretamente pelo Lovable (sem terminal npm ci), mas garantir que `package.json` esta coerente
 
-- **Prompt 3**: FormasPagamento ja usa `useSupabaseCrud` com tabela real no banco
-- **Prompt 4**: localStorage e usado apenas para UI state legitimo (sidebar collapsed, notificacoes dismissed). Configuracoes funcionais ja usam `useAppConfig` com Supabase. Administracao usa Supabase com localStorage como fallback — padrao aceitavel
+## B. Lint e Qualidade — Arquivos Prioritarios
 
-## Bloco 1 — Correcoes Criticas (Prompts 1, 2)
+### B.1 `src/services/relatorios.service.ts` (~30 `any`)
+- Criar interfaces tipadas para cada tipo de row (EstoqueRow, FinanceiroRow, VendasRow, etc.)
+- Substituir `(item: any)` por tipos concretos nos `.map()`
+- Tipar `withDateRange` com tipo generico em vez de `any`
 
-### Prompt 1: Correios rastreio
-- Sanitizar codigo no frontend (`handleRastrear` em Remessas.tsx): trim, uppercase, encodeURIComponent
-- Sanitizar codigo na edge function (strip spaces, uppercase)
-- Melhorar mensagens de erro: diferenciar credencial invalida, cartao invalido, parametro ausente
-- Adicionar logs mais claros na edge function
-- Revisar cache de token (adicionar margin de seguranca de 5min)
+### B.2 `src/pages/Relatorios.tsx` (~5 `any`)
+- Remover `as any` do `isDreReport` — usar optional chaining no tipo `RelatorioResultado`
+- Tipar `rows as any[]` nos KPIs usando interface union ou Record tipado
+- Tipar DRE rows com interface `DreRow`
 
-### Prompt 2: Rota dinamica
-- Corrigir `App.tsx` linha 84: substituir `<Navigate to="/orcamentos/:id">` por componente que usa `useParams()` para injetar o id real
-- Criar componente `CotacaoRedirect` inline
+### B.3 `src/pages/Remessas.tsx` (~15 `as any`)
+- `table: "remessas" as any` — tabela pode nao estar no types.ts gerado; manter cast mas documentar
+- `emptyForm: Record<string, any>` — criar tipo `RemessaForm` com campos concretos
+- Catch vazio `} catch {}` — adicionar log minimo
+- Substituir `err: any` por `err: unknown` com narrowing
 
-## Bloco 2 — Performance (Prompts 5, 6)
+### B.4 `src/pages/Transportadoras.tsx` (~3 `as any`)
+- `cliente_transportadoras as any` — manter cast (tabela ausente nos types)
+- `clientesVinculados: any[]` — tipar com interface `ClienteVinculado`
+- Catch vazio — adicionar log
 
-### Prompt 5: Package-lock
-- Regenerar `package-lock.json` com `npm install`
-- Verificar build funciona
+### B.5 `src/hooks/useSupabaseCrud.ts`
+- `query: any` no `applyFilters` — manter (tipo Supabase query builder nao e exportado)
+- Catch vazios ja tratados
 
-### Prompt 6: Bundle
-- Lazy load todas as paginas em `App.tsx` com `React.lazy` + `Suspense`
-- Dynamic import de `xlsx` e `jspdf` nos pontos de uso (Relatorios, OrcamentoPdfTemplate)
+### B.6 `src/contexts/AuthContext.tsx`
+- `user_roles as any` — manter (tabela pode nao estar nos types gerados)
+- `(data as any[])` no fetchRoles — tipar com `{ role: string }[]`
 
-## Bloco 3 — Qualidade de Codigo (Prompts 7, 8)
+### B.7 Outros arquivos com `any`
+- Varrer `src/pages/Compras.tsx`, `Fiscal.tsx`, `Produtos.tsx`, `Administracao.tsx` para catch vazios e `any` evitaveis
 
-### Prompt 7: Tipagem
-- Substituir `any` em: AuthContext, useSupabaseCrud, Compras, Fiscal, Produtos, Remessas, Administracao, Relatorios
-- Alinhar com tipos do `types.ts` gerado
+## C. Edge Functions
 
-### Prompt 8: useSupabaseCrud
-- Adicionar suporte a filtros opcionais no hook
-- Adicionar paginacao opcional
-- Separar feedback (toast) da logica de dados
-- Manter API retrocompativel
+### C.1 `supabase/functions/correios-api/index.ts`
+- Tipar `TokenResponse` e responses intermediarias
+- `cachedToken` ja tem tipo — OK
+- Tipar params das funcoes `calcularPreco`, `calcularPrazo` — ja tipados
+- Adicionar tipagem no retorno de `cotacaoMulti` items
 
-## Bloco 4 — UX e Documentacao (Prompts 9, 10, 11)
+### C.2 `supabase/functions/process-email-queue/index.ts`
+- Arquivo esta bem estruturado, com boa tipagem e tratamento de erro
+- Unico ponto: `(msg: any)` e `(id: any)` nos maps — tipar com interfaces `QueueMessage`
 
-### Prompt 9: Filtros padronizados
-- Aplicar `AdvancedFilterBar` em: Produtos, Compras, Fiscal, Financeiro, Clientes, Fornecedores, Remessas, Relatorios
-- Configurar filtros relevantes por modulo (status, datas, tipo)
+## D. Testes
 
-### Prompt 10: Documentacao
-- Reescrever README com modulos atuais, rotas, integracao Correios, stack
-- Remover SPRINT_1_PROGRESS.md, PROGRESS_REVIEW.md, REVERT_COMMIT.md (defasados)
+### D.1 Remover `src/test/example.test.ts` (teste ficticio)
+### D.2 Manter testes existentes uteis:
+- `useSupabaseCrud.test.tsx` — ja cobre CRUD basico
+- `OrcamentoForm.test.tsx` — ja cobre renderizacao
+- `DataTable.test.tsx`, `MaskedInput.test.tsx` — ja existem
+- `format.test.ts`, `utils.test.ts` — ja existem
 
-### Prompt 11: Revisao final
-- Revisar breadcrumbs e titulos
-- Verificar estados de loading e feedback
-- Remover mocks residuais e codigo legado
+### D.3 Criar testes novos minimos:
+- `src/lib/__tests__/validators.test.ts` — testar validateCPF, validateCNPJ (funcoes puras criticas)
+- `src/services/__tests__/relatorios.service.test.ts` — testar `formatCellValue`, `exportarCsv` (funcoes puras)
+
+## E. Limpeza
+
+- Remover imports nao utilizados encontrados durante revisao
+- Substituir `let` por `const` onde aplicavel
+- Garantir que blocos `catch {}` vazios tenham ao menos `console.error` ou comentario explicito
 
 ## Arquivos Modificados
 
-| Arquivo | Prompts |
-|---------|---------|
-| `supabase/functions/correios-api/index.ts` | 1 |
-| `src/pages/Remessas.tsx` | 1 |
-| `src/App.tsx` | 2, 6 |
-| `src/pages/Relatorios.tsx` | 6, 7 |
-| `src/hooks/useSupabaseCrud.ts` | 7, 8 |
-| `src/contexts/AuthContext.tsx` | 7 |
-| `src/pages/Produtos.tsx` | 9 |
-| `src/pages/Compras.tsx` | 7, 9 |
-| `src/pages/Fiscal.tsx` | 7, 9 |
-| `src/pages/Financeiro.tsx` | 9 |
-| `src/pages/Clientes.tsx` | 9 |
-| `src/pages/Fornecedores.tsx` | 9 |
-| `src/pages/Remessas.tsx` | 9 |
-| `README.md` | 10 |
-| ~15 paginas | 6 (lazy load) |
+| Arquivo | Mudanca |
+|---|---|
+| `tailwind.config.ts` | ESM import |
+| `src/services/relatorios.service.ts` | Tipagem rows, withDateRange |
+| `src/pages/Relatorios.tsx` | Remover any, tipar DRE |
+| `src/pages/Remessas.tsx` | Tipar form, catch, err |
+| `src/pages/Transportadoras.tsx` | Tipar vinculados |
+| `src/contexts/AuthContext.tsx` | Tipar fetchRoles |
+| `src/hooks/useSupabaseCrud.ts` | Ajustes menores |
+| `supabase/functions/correios-api/index.ts` | Tipagem retornos |
+| `supabase/functions/process-email-queue/index.ts` | Tipar messages |
+| `src/test/example.test.ts` | Remover |
+| `src/lib/__tests__/validators.test.ts` | Novo |
+| `src/services/__tests__/relatorios.service.test.ts` | Novo |
 
-## Ordem de execucao
-1. Bloco 1 (Prompts 1, 2) — correcoes de bugs
-2. Bloco 2 (Prompts 5, 6) — performance
-3. Bloco 3 (Prompts 7, 8) — qualidade
-4. Bloco 4 (Prompts 9, 10, 11) — UX e docs
+## Ordem de Execucao
+1. tailwind.config.ts (rapido, desbloqueia lint)
+2. Tipagem em servicos e hooks (relatorios.service, useSupabaseCrud, AuthContext)
+3. Tipagem em paginas (Relatorios, Remessas, Transportadoras)
+4. Edge functions (correios-api, process-email-queue)
+5. Testes (remover ficticio, criar validators + relatorios)
+6. Limpeza final (catch, let→const, imports)
 
