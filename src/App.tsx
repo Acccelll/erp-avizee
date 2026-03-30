@@ -38,6 +38,7 @@ import FormasPagamento from "./pages/FormasPagamento";
 import CotacoesCompra from "./pages/CotacoesCompra";
 import PedidosCompra from "./pages/PedidosCompra";
 import Remessas from "./pages/Remessas";
+import Funcionarios from "./pages/Funcionarios";
 import OrcamentoPublico from "./pages/OrcamentoPublico";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 
@@ -73,6 +74,7 @@ const App = () => (
             <Route path="/transportadoras" element={<ProtectedRoute><Transportadoras /></ProtectedRoute>} />
             <Route path="/formas-pagamento" element={<ProtectedRoute><FormasPagamento /></ProtectedRoute>} />
             <Route path="/grupos-economicos" element={<ProtectedRoute><GruposEconomicos /></ProtectedRoute>} />
+            <Route path="/funcionarios" element={<ProtectedRoute><Funcionarios /></ProtectedRoute>} />
             <Route path="/compras" element={<ProtectedRoute><Compras /></ProtectedRoute>} />
             <Route path="/cotacoes-compra" element={<ProtectedRoute><CotacoesCompra /></ProtectedRoute>} />
             <Route path="/pedidos-compra" element={<ProtectedRoute><PedidosCompra /></ProtectedRoute>} />
