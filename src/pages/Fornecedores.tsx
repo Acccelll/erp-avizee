@@ -20,7 +20,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MaskedInput } from "@/components/ui/MaskedInput";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Truck, Clock, AlertTriangle, ShoppingCart, DollarSign } from "lucide-react";
+import { Truck, Clock, AlertTriangle, ShoppingCart, DollarSign, Search } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/format";
 
 interface Fornecedor {
@@ -171,7 +171,7 @@ const Fornecedores = () => {
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             <div className="col-span-2 space-y-2"><Label>Razão Social *</Label><Input value={form.nome_razao_social} onChange={(e) => setForm({ ...form, nome_razao_social: e.target.value })} required /></div>
             <div className="space-y-2"><Label>Nome Fantasia</Label><Input value={form.nome_fantasia} onChange={(e) => setForm({ ...form, nome_fantasia: e.target.value })} /></div>
-            <div className="space-y-2"><Label>CNPJ</Label><MaskedInput mask="cnpj" value={form.cpf_cnpj} onChange={(v) => setForm({ ...form, cpf_cnpj: v })} onBlur={async () => {
+            <div className="space-y-2"><Label>CNPJ</Label><div className="flex gap-1"><MaskedInput mask="cnpj" value={form.cpf_cnpj} onChange={(v) => setForm({ ...form, cpf_cnpj: v })} /><Button type="button" variant="outline" size="icon" className="shrink-0" disabled={cnpjLoading} onClick={async () => {
               const result = await buscarCnpj(form.cpf_cnpj);
               if (result) setForm(prev => ({
                 ...prev,
@@ -187,7 +187,7 @@ const Fornecedores = () => {
                 uf: result.uf || prev.uf,
                 cep: result.cep || prev.cep,
               }));
-            }} /></div>
+            }}><Search className="h-4 w-4" /></Button></div></div>
             <div className="space-y-2"><Label>I.E.</Label><Input value={form.inscricao_estadual} onChange={(e) => setForm({ ...form, inscricao_estadual: e.target.value })} /></div>
             <div className="space-y-2"><Label>E-mail</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
             <div className="space-y-2"><Label>Telefone</Label><MaskedInput mask="telefone" value={form.telefone} onChange={(v) => setForm({ ...form, telefone: v })} /></div>

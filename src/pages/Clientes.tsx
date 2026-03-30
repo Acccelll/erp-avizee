@@ -21,7 +21,7 @@ import { MaskedInput } from "@/components/ui/MaskedInput";
 import { TimelineList } from "@/components/ui/TimelineList";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { MessageSquare, Plus, Building2, Clock, DollarSign, CreditCard, AlertTriangle } from "lucide-react";
+import { MessageSquare, Plus, Building2, Clock, DollarSign, CreditCard, AlertTriangle, Search } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/format";
 
 interface Cliente {
@@ -242,25 +242,23 @@ const Clientes = () => {
                 <SelectContent><SelectItem value="F">Pessoa Física</SelectItem><SelectItem value="J">Pessoa Jurídica</SelectItem></SelectContent>
               </Select>
             </div>
-            <div className="space-y-2"><Label>CPF/CNPJ</Label><MaskedInput mask="cpf_cnpj" value={form.cpf_cnpj} onChange={(v) => setForm({ ...form, cpf_cnpj: v })} onBlur={async () => {
-              if (form.tipo_pessoa === "J") {
-                const result = await buscarCnpj(form.cpf_cnpj);
-                if (result) setForm(prev => ({
-                  ...prev,
-                  nome_razao_social: result.razao_social || prev.nome_razao_social,
-                  nome_fantasia: result.nome_fantasia || prev.nome_fantasia,
-                  email: result.email || prev.email,
-                  telefone: result.telefone || prev.telefone,
-                  logradouro: result.logradouro || prev.logradouro,
-                  numero: result.numero || prev.numero,
-                  complemento: result.complemento || prev.complemento,
-                  bairro: result.bairro || prev.bairro,
-                  cidade: result.municipio || prev.cidade,
-                  uf: result.uf || prev.uf,
-                  cep: result.cep || prev.cep,
-                }));
-              }
-            }} /></div>
+            <div className="space-y-2"><Label>CPF/CNPJ</Label><div className="flex gap-1"><MaskedInput mask="cpf_cnpj" value={form.cpf_cnpj} onChange={(v) => setForm({ ...form, cpf_cnpj: v })} /><Button type="button" variant="outline" size="icon" className="shrink-0" disabled={cnpjLoading || form.tipo_pessoa !== "J"} onClick={async () => {
+              const result = await buscarCnpj(form.cpf_cnpj);
+              if (result) setForm(prev => ({
+                ...prev,
+                nome_razao_social: result.razao_social || prev.nome_razao_social,
+                nome_fantasia: result.nome_fantasia || prev.nome_fantasia,
+                email: result.email || prev.email,
+                telefone: result.telefone || prev.telefone,
+                logradouro: result.logradouro || prev.logradouro,
+                numero: result.numero || prev.numero,
+                complemento: result.complemento || prev.complemento,
+                bairro: result.bairro || prev.bairro,
+                cidade: result.municipio || prev.cidade,
+                uf: result.uf || prev.uf,
+                cep: result.cep || prev.cep,
+              }));
+            }}><Search className="h-4 w-4" /></Button></div></div>
             <div className="space-y-2"><Label>I.E.</Label><Input value={form.inscricao_estadual} onChange={(e) => setForm({ ...form, inscricao_estadual: e.target.value })} /></div>
             <div className="col-span-2 md:col-span-3 space-y-2"><Label>Nome / Razão Social *</Label><Input value={form.nome_razao_social} onChange={(e) => setForm({ ...form, nome_razao_social: e.target.value })} required /></div>
             <div className="col-span-2 md:col-span-3 space-y-2"><Label>Nome Fantasia</Label><Input value={form.nome_fantasia} onChange={(e) => setForm({ ...form, nome_fantasia: e.target.value })} /></div>

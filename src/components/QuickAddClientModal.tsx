@@ -4,8 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { MaskedInput } from "@/components/ui/MaskedInput";
+import { useCnpjLookup } from "@/hooks/useCnpjLookup";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { Search } from "lucide-react";
 
 interface QuickAddClientModalProps {
   open: boolean;
@@ -15,6 +18,7 @@ interface QuickAddClientModalProps {
 
 export function QuickAddClientModal({ open, onClose, onCreated }: QuickAddClientModalProps) {
   const [saving, setSaving] = useState(false);
+  const { buscarCnpj, loading: cnpjLoading } = useCnpjLookup();
   const [form, setForm] = useState({
     nome_razao_social: "",
     nome_fantasia: "",
@@ -89,7 +93,21 @@ export function QuickAddClientModal({ open, onClose, onCreated }: QuickAddClient
             </div>
             <div className="space-y-2">
               <Label>{form.tipo_pessoa === "J" ? "CNPJ" : "CPF"}</Label>
-              <Input value={form.cpf_cnpj} onChange={(e) => setForm({ ...form, cpf_cnpj: e.target.value })} placeholder={form.tipo_pessoa === "J" ? "00.000.000/0001-00" : "000.000.000-00"} />
+              <div className="flex gap-1">
+                <MaskedInput mask="cpf_cnpj" value={form.cpf_cnpj} onChange={(v) => setForm({ ...form, cpf_cnpj: v })} />
+                {form.tipo_pessoa === "J" && <Button type="button" variant="outline" size="icon" className="shrink-0" disabled={cnpjLoading} onClick={async () => {
+                  const result = await buscarCnpj(form.cpf_cnpj);
+                  if (result) setForm(prev => ({
+                    ...prev,
+                    nome_razao_social: result.razao_social || prev.nome_razao_social,
+                    nome_fantasia: result.nome_fantasia || prev.nome_fantasia,
+                    email: result.email || prev.email,
+                    telefone: result.telefone || prev.telefone,
+                    cidade: result.municipio || prev.cidade,
+                    uf: result.uf || prev.uf,
+                  }));
+                }}><Search className="h-4 w-4" /></Button>}
+              </div>
             </div>
           </div>
           <div className="space-y-2">
