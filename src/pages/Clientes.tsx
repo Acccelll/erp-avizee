@@ -21,7 +21,7 @@ import { MaskedInput } from "@/components/ui/MaskedInput";
 import { TimelineList } from "@/components/ui/TimelineList";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { MessageSquare, Plus, Building2, Clock, DollarSign, CreditCard, AlertTriangle } from "lucide-react";
+import { MessageSquare, Plus, Building2, Clock, DollarSign, CreditCard, AlertTriangle, Search } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/format";
 
 interface Cliente {

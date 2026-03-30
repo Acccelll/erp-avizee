@@ -20,7 +20,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MaskedInput } from "@/components/ui/MaskedInput";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Truck, Clock, AlertTriangle, ShoppingCart, DollarSign } from "lucide-react";
+import { Truck, Clock, AlertTriangle, ShoppingCart, DollarSign, Search } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/format";
 
 interface Fornecedor {
