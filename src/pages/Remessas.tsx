@@ -54,7 +54,13 @@ const statusMap: Record<string, { label: string; color: string }> = {
   devolvido: { label: "Devolvido", color: "Cancelado" },
 };
 
-const emptyForm: Record<string, any> = {
+interface RemessaForm {
+  cliente_id: string; transportadora_id: string; servico: string; codigo_rastreio: string;
+  data_postagem: string; previsao_entrega: string; status_transporte: string;
+  peso: string; volumes: string; valor_frete: string; observacoes: string; ordem_venda_id: string;
+}
+
+const emptyForm: RemessaForm = {
   cliente_id: "", transportadora_id: "", servico: "", codigo_rastreio: "",
   data_postagem: "", previsao_entrega: "", status_transporte: "pendente",
   peso: "", volumes: "1", valor_frete: "", observacoes: "", ordem_venda_id: "",
@@ -70,8 +76,8 @@ export default function Remessas() {
   const [saving, setSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
-  const [clientes, setClientes] = useState<any[]>([]);
-  const [transportadoras, setTransportadoras] = useState<any[]>([]);
+  const [clientes, setClientes] = useState<Array<{ id: string; nome_razao_social: string }>>([]);
+  const [transportadoras, setTransportadoras] = useState<Array<{ id: string; nome_razao_social: string }>>([]);
   const [eventos, setEventos] = useState<RemessaEvento[]>([]);
   const [eventoForm, setEventoForm] = useState({ descricao: "", local: "" });
   const [savingEvento, setSavingEvento] = useState(false);
@@ -110,7 +116,7 @@ export default function Remessas() {
     e.preventDefault();
     if (!form.transportadora_id) { toast.error("Transportadora é obrigatória"); return; }
     setSaving(true);
-    const payload: any = {
+    const payload = {
       ...form,
       peso: form.peso ? Number(form.peso) : null,
       volumes: form.volumes ? Number(form.volumes) : 1,
@@ -125,7 +131,9 @@ export default function Remessas() {
       if (mode === "create") await create(payload);
       else if (selected) await update(selected.id, payload);
       setModalOpen(false);
-    } catch {}
+    } catch (err: unknown) {
+      console.error("[remessas] handleSubmit:", err);
+    }
     setSaving(false);
   };
 
@@ -218,9 +226,9 @@ export default function Remessas() {
       }
 
       setEventos((updatedEvents as any) || []);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("[rastrear]", err);
-      toast.error(err.message || "Erro ao consultar rastreio");
+      toast.error(err instanceof Error ? err.message : "Erro ao consultar rastreio");
     }
   };
 
