@@ -7,14 +7,16 @@ import { UploadPlanilhaCard } from "@/components/importacao/UploadPlanilhaCard";
 import { MapeamentoColunasForm } from "@/components/importacao/MapeamentoColunasForm";
 import { PreviewImportacaoTable } from "@/components/importacao/PreviewImportacaoTable";
 import { ErrosImportacaoPanel } from "@/components/importacao/ErrosImportacaoPanel";
+import { PreviewXmlTable } from "@/components/importacao/PreviewXmlTable";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Filter, RefreshCw, Database, ArrowRight, ArrowLeft, CheckCircle2, ChevronRight } from "lucide-react";
+import { Search, Filter, RefreshCw, Database, ArrowRight, ArrowLeft, CheckCircle2, ChevronRight, FileUp } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { useImportacaoCadastros, ImportType } from "@/hooks/importacao/useImportacaoCadastros";
 import { useImportacaoEstoque } from "@/hooks/importacao/useImportacaoEstoque";
+import { useImportacaoXml } from "@/hooks/importacao/useImportacaoXml";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
@@ -36,12 +38,13 @@ export default function MigracaoDados() {
     orderBy: "criado_em"
   });
 
-  const [activeImportSource, setActiveImportSource] = useState<"cadastros" | "estoque">("cadastros");
+  const [activeImportSource, setActiveImportSource] = useState<"cadastros" | "estoque" | "xml">("cadastros");
 
   const hookCadastros = useImportacaoCadastros();
   const hookEstoque = useImportacaoEstoque();
+  const hookXml = useImportacaoXml();
 
-  const activeHook = activeImportSource === "cadastros" ? hookCadastros : hookEstoque;
+  const activeHook = activeImportSource === "cadastros" ? hookCadastros : activeImportSource === "estoque" ? hookEstoque : hookXml;
 
   const {
     file,
@@ -59,7 +62,7 @@ export default function MigracaoDados() {
     generatePreview,
     processImport,
     finalizeImport
-  } = activeHook;
+  } = activeHook as any;
 
   const filteredLotes = lotes.filter(lote => {
     const matchesSearch = lote.arquivo_nome?.toLowerCase().includes(searchTerm.toLowerCase());
@@ -76,6 +79,8 @@ export default function MigracaoDados() {
   const handleOpenImport = (type: string) => {
     if (type === "estoque_inicial") {
       setActiveImportSource("estoque");
+    } else if (type === "compras_xml") {
+      setActiveImportSource("xml");
     } else {
       setActiveImportSource("cadastros");
       setImportType(type as ImportType);
@@ -85,13 +90,28 @@ export default function MigracaoDados() {
   };
 
   const handleNextStep = async () => {
-    if (step === 1 && !file) {
+    if (activeImportSource !== 'xml' && step === 1 && !file) {
       toast.error("Selecione um arquivo primeiro.");
       return;
     }
 
+    if (activeImportSource === 'xml' && step === 1 && hookXml.files.length === 0) {
+      toast.error("Selecione os arquivos XML primeiro.");
+      return;
+    }
+
+    if (step === 1 && activeImportSource === 'xml') {
+      // Pula mapeamento para XML
+      setStep(3);
+      return;
+    }
+
     if (step === 2) {
-      generatePreview();
+      if (activeImportSource === 'estoque') {
+        await hookEstoque.generatePreview();
+      } else {
+        hookCadastros.generatePreview();
+      }
     }
 
     if (step === 3) {
@@ -191,7 +211,7 @@ export default function MigracaoDados() {
                 type="compras_xml"
                 title="Compras por XML"
                 description="Processamento em lote de arquivos XML de notas de compra."
-                onImport={() => toast.info("Em breve...")}
+                onImport={() => handleOpenImport("compras_xml")}
                 onViewBatches={() => { setTypeFilter("compras_xml"); setActiveTab("lotes"); }}
               />
             </div>
@@ -265,7 +285,7 @@ export default function MigracaoDados() {
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <FileUp className="h-5 w-5" />
-                Importar {importType.charAt(0).toUpperCase() + importType.slice(1)}
+                Importar {activeImportSource === 'xml' ? 'Compras por XML' : importType?.charAt(0).toUpperCase() + importType?.slice(1)}
               </DialogTitle>
               <DialogDescription>
                 Siga os passos abaixo para realizar a carga de dados.
@@ -291,11 +311,11 @@ export default function MigracaoDados() {
               {step === 1 && (
                 <div className="space-y-4">
                   <UploadPlanilhaCard
-                    onFileChange={onFileChange}
-                    fileName={file?.name}
+                    onFileChange={activeImportSource === 'xml' ? hookXml.onFilesChange : onFileChange}
+                    fileName={activeImportSource === 'xml' ? (hookXml.files.length > 0 ? `${hookXml.files.length} arquivo(s) selecionado(s)` : undefined) : file?.name}
                     isProcessing={isProcessing}
                   />
-                  {sheets.length > 0 && (
+                  {activeImportSource !== 'xml' && sheets.length > 0 && (
                     <div className="space-y-2">
                       <Label>Selecione a aba da planilha:</Label>
                       <Select value={currentSheet} onValueChange={(val) => onSheetChange(val)}>
@@ -327,8 +347,14 @@ export default function MigracaoDados() {
 
               {step === 3 && (
                 <div className="space-y-6">
-                  <ErrosImportacaoPanel data={previewData} importType={importType} />
-                  <PreviewImportacaoTable data={previewData} importType={importType} />
+                  {activeImportSource === 'xml' ? (
+                    <PreviewXmlTable data={hookXml.xmlData} />
+                  ) : (
+                    <>
+                      <ErrosImportacaoPanel data={previewData} importType={importType} />
+                      <PreviewImportacaoTable data={previewData} importType={importType} />
+                    </>
+                  )}
                 </div>
               )}
 
@@ -359,12 +385,15 @@ export default function MigracaoDados() {
               <Button variant="ghost" onClick={resetModal} disabled={isProcessing}>Cancelar</Button>
               <div className="flex-grow" />
               {step > 1 && step < 4 && (
-                <Button variant="outline" onClick={() => setStep(s => s - 1)} disabled={isProcessing}>
+                <Button variant="outline" onClick={() => {
+                  if (activeImportSource === 'xml' && step === 3) setStep(1);
+                  else setStep(s => s - 1);
+                }} disabled={isProcessing}>
                   <ArrowLeft className="mr-2 h-4 w-4" /> Voltar
                 </Button>
               )}
               {step < 4 ? (
-                <Button onClick={handleNextStep} disabled={isProcessing || (step === 1 && !file)}>
+                <Button onClick={handleNextStep} disabled={isProcessing || (activeImportSource === 'xml' ? hookXml.files.length === 0 : !file)}>
                   Próximo <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               ) : (
