@@ -21,9 +21,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { FileText, DollarSign, CheckCircle, AlertTriangle, Clock, XCircle } from "lucide-react";
+import { FileText, DollarSign, CheckCircle, AlertTriangle, Clock, XCircle, Truck } from "lucide-react";
 import { parseNFeXml, type NFeData } from "@/lib/nfeXmlParser";
 import { DanfeViewer } from "@/components/DanfeViewer";
+import { LogisticaRastreioSection } from "@/components/logistica/LogisticaRastreioSection";
 
 interface NotaFiscal {
   id: string; tipo: string; numero: string; serie: string; chave_acesso: string;
@@ -1010,6 +1011,14 @@ const Fiscal = () => {
                 { value: "resumo", label: "Resumo", content: tabResumo },
                 { value: "itens", label: `Itens (${viewItems.length})`, content: tabItens },
                 { value: "impostos", label: "Impostos", content: tabImpostos },
+                { value: "logistica", label: "Logística", content: (
+                  <div className="space-y-4">
+                    <h4 className="text-sm font-semibold flex items-center gap-2 px-1">
+                      <Truck className="w-4 h-4" /> Rastreamento Logístico
+                    </h4>
+                    <LogisticaRastreioSection notaFiscalId={selected.id} />
+                  </div>
+                )},
                 { value: "vinculos", label: "Vínculos", content: tabVinculos },
               ]}
               footer={drawerFooter}

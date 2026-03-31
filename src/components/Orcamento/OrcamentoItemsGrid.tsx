@@ -3,6 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Plus, Trash2, Search, Tag } from "lucide-react";
 import { ProductSelector } from "@/components/ui/DataSelector";
 import { Tables } from "@/integrations/supabase/types";
+import { toast } from "sonner";
 
 interface ProductWithForn extends Tables<"produtos"> {
   produtos_fornecedores?: (Tables<"produtos_fornecedores"> & {
@@ -67,7 +68,7 @@ export function OrcamentoItemsGrid({ items, onChange, produtos, precosEspeciais 
         item.peso_unitario = prod.peso || 0;
 
         if (precoEspecial) {
-          import("sonner").then(({ toast }) => toast.info(`Preço especial aplicado para ${prod.nome}`));
+          toast.info(`Preço especial aplicado para ${prod.nome}`);
         }
       }
     }

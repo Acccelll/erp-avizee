@@ -20,8 +20,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatCurrency, formatNumber } from "@/lib/format";
-import { ShoppingCart, Clock, CheckCircle2, FileText } from "lucide-react";
+import { ShoppingCart, Clock, CheckCircle2, FileText, Truck } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { LogisticaRastreioSection } from "@/components/logistica/LogisticaRastreioSection";
 
 interface PedidoCompra {
   id: string; numero: string; fornecedor_id: string; data_pedido: string;
@@ -337,6 +338,14 @@ const PedidosCompra = () => {
             tabs={[
               { value: "dados", label: "Dados", content: tabDados },
               { value: "itens", label: `Itens (${viewItems.length})`, content: tabItens },
+              { value: "logistica", label: "Logística", content: (
+                <div className="space-y-4">
+                  <h4 className="text-sm font-semibold flex items-center gap-2 px-1">
+                    <Truck className="w-4 h-4" /> Rastreamento de Entrega
+                  </h4>
+                  <LogisticaRastreioSection pedidoCompraId={selected.id} />
+                </div>
+              )},
             ]}
             footer={drawerFooter}
           />
