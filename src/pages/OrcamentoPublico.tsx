@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { formatCurrency, formatDate } from '@/lib/format';
 import { FileText, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
 
 interface OrcamentoPublicoData {
   numero: string;
@@ -43,6 +44,8 @@ export default function OrcamentoPublico() {
   const [data, setData] = useState<OrcamentoPublicoData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [actionLoading, setActionLoading] = useState(false);
+  const [actionDone, setActionDone] = useState<'aprovado' | 'rejeitado' | null>(null);
 
   useEffect(() => {
     if (!token) {
@@ -117,6 +120,21 @@ export default function OrcamentoPublico() {
 
   const cliente = data.cliente_snapshot as any;
   const isExpired = data.validade && new Date(data.validade) < new Date();
+  const handleAction = async (acao: 'aprovado' | 'rejeitado') => {
+    if (!data || !token) return;
+    setActionLoading(true);
+    const { error } = await (supabase.from('orcamentos') as any)
+      .update({ status: acao })
+      .eq('public_token', token)
+      .eq('ativo', true);
+    if (error) {
+      toast.error('Erro ao registrar sua resposta. Tente novamente.');
+    } else {
+      setActionDone(acao);
+      setData((prev: any) => prev ? { ...prev, status: acao } : prev);
+    }
+    setActionLoading(false);
+  };
 
   return (
     <div className="min-h-screen bg-muted/30 py-8 px-4">
@@ -225,6 +243,61 @@ export default function OrcamentoPublico() {
             </div>
           )}
         </div>
+
+        {/* Action buttons — only when pending and not expired */}
+        {!actionDone && !isExpired && !['aprovado', 'rejeitado', 'cancelado'].includes(data.status) && (
+          <div className="bg-card rounded-xl border p-6 text-center">
+            <p className="text-sm text-muted-foreground mb-5">
+              Revise os itens acima e confirme sua resposta:
+            </p>
+            <div className="flex gap-3 justify-center flex-wrap">
+              <Button
+                size="lg"
+                className="bg-green-600 hover:bg-green-700 text-white gap-2 min-w-[200px]"
+                disabled={actionLoading}
+                onClick={() => handleAction('aprovado')}
+              >
+                <CheckCircle className="h-5 w-5" />
+                {actionLoading ? 'Aguarde...' : 'Aceitar esta cotação'}
+              </Button>
+              <Button
+                size="lg"
+                variant="outline"
+                className="border-destructive text-destructive hover:bg-destructive/5 gap-2 min-w-[200px]"
+                disabled={actionLoading}
+                onClick={() => handleAction('rejeitado')}
+              >
+                <XCircle className="h-5 w-5" />
+                {actionLoading ? 'Aguarde...' : 'Solicitar revisão'}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Confirmation message after action */}
+        {actionDone && (
+          <div className={`bg-card rounded-xl border-2 p-8 text-center ${
+            actionDone === 'aprovado' ? 'border-green-300' : 'border-orange-300'
+          }`}>
+            {actionDone === 'aprovado' ? (
+              <>
+                <CheckCircle className="h-12 w-12 text-green-600 mx-auto mb-4" />
+                <p className="text-lg font-semibold text-green-700 mb-2">Cotação aceita com sucesso!</p>
+                <p className="text-sm text-muted-foreground">
+                  Nossa equipe entrará em contato em breve para confirmar os próximos passos.
+                </p>
+              </>
+            ) : (
+              <>
+                <XCircle className="h-12 w-12 text-orange-500 mx-auto mb-4" />
+                <p className="text-lg font-semibold text-orange-700 mb-2">Solicitação de revisão registrada.</p>
+                <p className="text-sm text-muted-foreground">
+                  Nossa equipe analisará suas considerações e enviará uma nova versão em breve.
+                </p>
+              </>
+            )}
+          </div>
+        )}
 
         {/* Footer */}
         <div className="text-center text-xs text-muted-foreground py-4">

@@ -10,6 +10,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Edit, Trash2 } from "lucide-react";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -37,6 +39,8 @@ const Orcamentos = () => {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selected, setSelected] = useState<Orcamento | null>(null);
   const [convertingId, setConvertingId] = useState<string | null>(null);
+  const [poNumberCliente, setPoNumberCliente] = useState("");
+  const [dataPoCliente, setDataPoCliente] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("todos");
   const { isAdmin } = useIsAdmin();
@@ -122,6 +126,8 @@ const Orcamentos = () => {
         cliente_id: orc.cliente_id, cotacao_id: orc.id,
         status: "pendente", status_faturamento: "aguardando",
         valor_total: orc.valor_total, observacoes: orc.observacoes,
+        po_number: poNumberCliente || null,
+        data_po_cliente: dataPoCliente || null,
       }).select().single();
       if (error) throw error;
       if (items && items.length > 0 && newOV) {
@@ -137,6 +143,8 @@ const Orcamentos = () => {
       }
       await supabase.from("orcamentos").update({ status: "convertido" }).eq("id", orc.id);
       toast.success(`Ordem de Venda ${ovNumero} criada!`);
+      setPoNumberCliente("");
+      setDataPoCliente("");
       fetchData();
       navigate(`/ordens-venda`);
     } catch (err: any) {
@@ -156,12 +164,12 @@ const Orcamentos = () => {
   }, [data, searchTerm, statusFilter]);
 
   const columns = [
-    { key: "numero", label: "Nº", render: (o: Orcamento) => <span className="font-mono text-xs font-medium text-primary">{o.numero}</span> },
+    { key: "numero", label: "Nº", sortable: true, render: (o: Orcamento) => <span className="font-mono text-xs font-medium text-primary">{o.numero}</span> },
     { key: "cliente", label: "Cliente", render: (o: Orcamento) => o.clientes?.nome_razao_social || "—" },
-    { key: "data_orcamento", label: "Data", render: (o: Orcamento) => formatDate(o.data_orcamento) },
+    { key: "data_orcamento", label: "Data", sortable: true, render: (o: Orcamento) => formatDate(o.data_orcamento) },
     { key: "validade", label: "Validade", render: (o: Orcamento) => o.validade ? formatDate(o.validade) : "—" },
-    { key: "valor_total", label: "Total", render: (o: Orcamento) => <span className="font-semibold font-mono">{formatCurrency(Number(o.valor_total || 0))}</span> },
-    { key: "status", label: "Status", render: (o: Orcamento) => <StatusBadge status={o.status} label={statusLabels[o.status]} /> },
+    { key: "valor_total", label: "Total", sortable: true, render: (o: Orcamento) => <span className="font-semibold font-mono">{formatCurrency(Number(o.valor_total || 0))}</span> },
+    { key: "status", label: "Status", sortable: true, render: (o: Orcamento) => <StatusBadge status={o.status} label={statusLabels[o.status]} /> },
     {
       key: "acoes_comercial", label: "Ações", sortable: false, render: (o: Orcamento) => (
         <div className="flex gap-1">
@@ -304,11 +312,37 @@ const Orcamentos = () => {
 
       <ConfirmDialog
         open={!!convertingId}
-        onClose={() => setConvertingId(null)}
+        onClose={() => {
+          setConvertingId(null);
+          setPoNumberCliente("");
+          setDataPoCliente("");
+        }}
         onConfirm={() => convertingOrc && handleConvertToOV(convertingOrc)}
         title="Converter em Ordem de Venda"
         description={`Deseja converter a cotação ${convertingOrc?.numero} em uma Ordem de Venda?`}
-      />
+      >
+        <div className="grid grid-cols-2 gap-3 mt-3">
+          <div className="space-y-2">
+            <Label className="text-xs">Nº Pedido do Cliente (PO)</Label>
+            <Input
+              value={poNumberCliente}
+              onChange={(e) => setPoNumberCliente(e.target.value)}
+              placeholder="Ex: PO-2026-00123"
+              className="h-9"
+            />
+            <p className="text-xs text-muted-foreground">Número do pedido de compra emitido pelo cliente.</p>
+          </div>
+          <div className="space-y-2">
+            <Label className="text-xs">Data do Pedido do Cliente</Label>
+            <Input
+              type="date"
+              value={dataPoCliente}
+              onChange={(e) => setDataPoCliente(e.target.value)}
+              className="h-9"
+            />
+          </div>
+        </div>
+      </ConfirmDialog>
     </AppLayout>
   );
 };
