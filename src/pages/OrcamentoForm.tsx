@@ -45,6 +45,7 @@ export default function OrcamentoForm() {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [clientes, setClientes] = useState<Tables<"clientes">[]>([]);
   const [produtos, setProdutos] = useState<ProductWithForn[]>([]);
+  const [precosEspeciais, setPrecosEspeciais] = useState<Tables<"precos_especiais">[]>([]);
 
   const [numero, setNumero] = useState("");
   const [dataOrcamento, setDataOrcamento] = useState(new Date().toISOString().split("T")[0]);
@@ -121,6 +122,15 @@ export default function OrcamentoForm() {
       if (c.forma_pagamento_padrao && !pagamento) setPagamento(c.forma_pagamento_padrao);
       if (c.prazo_preferencial && !prazoPagamento) setPrazoPagamento(`${c.prazo_preferencial} dias`);
       if (c.prazo_padrao && !prazoPagamento && !c.prazo_preferencial) setPrazoPagamento(`${c.prazo_padrao} dias`);
+
+      // Load special prices for this client
+      supabase.from("precos_especiais")
+        .select("*")
+        .eq("cliente_id", cId)
+        .eq("ativo", true)
+        .then(({ data }) => setPrecosEspeciais(data || []));
+    } else {
+      setPrecosEspeciais([]);
     }
   }, [clientes, pagamento, prazoPagamento]);
 
@@ -356,7 +366,12 @@ export default function OrcamentoForm() {
             </div>
           </div>
 
-          <OrcamentoItemsGrid items={items} onChange={setItems} produtos={produtos} />
+          <OrcamentoItemsGrid
+            items={items}
+            onChange={setItems}
+            produtos={produtos}
+            precosEspeciais={precosEspeciais}
+          />
 
           <OrcamentoTotaisCard
             totalProdutos={totalProdutos}

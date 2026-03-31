@@ -22,6 +22,7 @@ import { formatCurrency, formatDate } from "@/lib/format";
 import { FiscalAutocomplete } from "@/components/ui/FiscalAutocomplete";
 import { cfopCodes, cstIcmsCodes } from "@/lib/fiscalData";
 import { useNcmLookup } from '@/hooks/useNcmLookup';
+import { PrecosEspeciaisTab } from "@/components/precos/PrecosEspeciaisTab";
 
 interface Produto {
   id: string;sku: string;codigo_interno: string;nome: string;descricao: string;
@@ -473,6 +474,7 @@ const Produtos = () => {
                 <TabsTrigger value="estoque" className="text-xs">Estoque</TabsTrigger>
                 <TabsTrigger value="fiscal" className="text-xs">Fiscal</TabsTrigger>
                 <TabsTrigger value="cod_fornecedor" className="text-xs">Cód. Forn.</TabsTrigger>
+                <TabsTrigger value="precos" className="text-xs">Preços</TabsTrigger>
                 <TabsTrigger value="historico" className="text-xs">Histórico</TabsTrigger>
               </TabsList>
 
@@ -578,6 +580,10 @@ const Produtos = () => {
                   <div><span className="text-xs text-muted-foreground">CFOP Padrão</span><p className="font-mono">{selected.cfop_padrao || "—"}</p></div>
                   <div><span className="text-xs text-muted-foreground">Unidade</span><p>{selected.unidade_medida}</p></div>
                 </div>
+              </TabsContent>
+
+              <TabsContent value="precos" className="space-y-3 mt-3">
+                <PrecosEspeciaisTab produtoId={selected.id} />
               </TabsContent>
 
               <TabsContent value="cod_fornecedor" className="space-y-3 mt-3">

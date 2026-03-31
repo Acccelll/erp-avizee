@@ -19,6 +19,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MaskedInput } from "@/components/ui/MaskedInput";
 import { TimelineList } from "@/components/ui/TimelineList";
+import { PrecosEspeciaisTab } from "@/components/precos/PrecosEspeciaisTab";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { MessageSquare, Plus, Building2, Clock, DollarSign, CreditCard, AlertTriangle, Search } from "lucide-react";
@@ -360,6 +361,7 @@ const Clientes = () => {
                 <TabsTrigger value="financeiro" className="text-xs">Financeiro</TabsTrigger>
                 <TabsTrigger value="transp" className="text-xs">Transp.</TabsTrigger>
                 <TabsTrigger value="endereco" className="text-xs">Endereço</TabsTrigger>
+                <TabsTrigger value="precos" className="text-xs">Preços</TabsTrigger>
                 <TabsTrigger value="grupo" className="text-xs">Grupo</TabsTrigger>
                 <TabsTrigger value="historico" className="text-xs">Histórico</TabsTrigger>
               </TabsList>
@@ -444,6 +446,10 @@ const Clientes = () => {
                     {selected.caixa_postal && <p>Caixa Postal: {selected.caixa_postal}</p>}
                   </div> :
               <p className="text-sm text-muted-foreground">Nenhum endereço cadastrado</p>}
+              </TabsContent>
+
+              <TabsContent value="precos" className="space-y-3 mt-3">
+                <PrecosEspeciaisTab clienteId={selected.id} />
               </TabsContent>
 
               <TabsContent value="grupo" className="space-y-3 mt-3">

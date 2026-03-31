@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Trash2, Search } from "lucide-react";
+import { Plus, Trash2, Search, Tag } from "lucide-react";
 import { ProductSelector } from "@/components/ui/DataSelector";
 import { Tables } from "@/integrations/supabase/types";
 
@@ -28,6 +28,7 @@ interface Props {
   items: OrcamentoItem[];
   onChange: (items: OrcamentoItem[]) => void;
   produtos: ProductWithForn[];
+  precosEspeciais?: Tables<"precos_especiais">[];
 }
 
 const emptyItem = (): OrcamentoItem => ({
@@ -36,7 +37,7 @@ const emptyItem = (): OrcamentoItem => ({
   peso_unitario: 0, peso_total: 0,
 });
 
-export function OrcamentoItemsGrid({ items, onChange, produtos }: Props) {
+export function OrcamentoItemsGrid({ items, onChange, produtos, precosEspeciais }: Props) {
   const addItem = () => onChange([...items, emptyItem()]);
 
   const removeItem = (idx: number) => {
@@ -54,8 +55,20 @@ export function OrcamentoItemsGrid({ items, onChange, produtos }: Props) {
         item.codigo_snapshot = prod.sku || prod.codigo_interno || "";
         item.descricao_snapshot = prod.nome;
         item.unidade = prod.unidade_medida || "UN";
-        item.valor_unitario = prod.preco_venda || 0;
+
+        // Check for special price
+        const precoEspecial = precosEspeciais?.find(p =>
+          p.produto_id === value &&
+          (!p.vigencia_inicio || new Date(p.vigencia_inicio + "T00:00:00") <= new Date()) &&
+          (!p.vigencia_fim || new Date(p.vigencia_fim + "T23:59:59") >= new Date())
+        );
+
+        item.valor_unitario = precoEspecial ? Number(precoEspecial.preco_especial) : (prod.preco_venda || 0);
         item.peso_unitario = prod.peso || 0;
+
+        if (precoEspecial) {
+          import("sonner").then(({ toast }) => toast.info(`Preço especial aplicado para ${prod.nome}`));
+        }
       }
     }
 
@@ -152,13 +165,22 @@ export function OrcamentoItemsGrid({ items, onChange, produtos }: Props) {
                     />
                   </td>
                   <td className="px-3 py-2">
-                    <Input
-                      className="h-8 text-xs text-right font-mono"
-                      type="number"
-                      step="0.01"
-                      value={item.valor_unitario || ""}
-                      onChange={(e) => updateItem(idx, "valor_unitario", Number(e.target.value))}
-                    />
+                    <div className="relative">
+                      <Input
+                        className={`h-8 text-xs text-right font-mono ${
+                          precosEspeciais?.some(p => p.produto_id === item.produto_id) ? "border-primary bg-primary/5" : ""
+                        }`}
+                        type="number"
+                        step="0.01"
+                        value={item.valor_unitario || ""}
+                        onChange={(e) => updateItem(idx, "valor_unitario", Number(e.target.value))}
+                      />
+                      {precosEspeciais?.some(p => p.produto_id === item.produto_id) && (
+                        <div className="absolute -top-2 -right-1">
+                          <Tag className="w-3 h-3 text-primary fill-primary" />
+                        </div>
+                      )}
+                    </div>
                   </td>
                   <td className="px-3 py-2 text-right font-mono text-sm font-semibold">
                     R$ {item.valor_total.toFixed(2)}
