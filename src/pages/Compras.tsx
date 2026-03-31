@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { MultiSelect, type MultiSelectOption } from "@/components/ui/MultiSelect";
 import { Card, CardContent } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -58,6 +59,8 @@ const Compras = () => {
   const [items, setItems] = useState<GridItem[]>([]);
   const [saving, setSaving] = useState(false);
   const [viewItems, setViewItems] = useState<any[]>([]);
+  const [statusFilters, setStatusFilters] = useState<string[]>([]);
+  const [fornecedorFilters, setFornecedorFilters] = useState<string[]>([]);
   const [searchParams] = useSearchParams();
 
   const valorProdutos = items.reduce((s, i) => s + (i.valor_total || 0), 0);
@@ -71,8 +74,16 @@ const Compras = () => {
   const valorTotal = valorProdutos + (form.frete_valor || 0) + (form.impostos_valor || 0);
 
   const filteredData = useMemo(() => {
-    return data.filter((compra) => (isCotacoesView ? compra.status === "rascunho" : compra.status !== "rascunho"));
-  }, [data, isCotacoesView]);
+    return data.filter((compra) => {
+      const baseMatch = isCotacoesView ? compra.status === "rascunho" : compra.status !== "rascunho";
+      if (!baseMatch) return false;
+
+      if (statusFilters.length > 0 && !statusFilters.includes(compra.status)) return false;
+      if (fornecedorFilters.length > 0 && !fornecedorFilters.includes(compra.fornecedor_id || "")) return false;
+
+      return true;
+    });
+  }, [data, isCotacoesView, statusFilters, fornecedorFilters]);
 
   // KPIs
   const kpis = useMemo(() => {
@@ -151,6 +162,31 @@ const Compras = () => {
   const fornecedorOptions = fornecedoresCrud.data.map((f: any) => ({ id: f.id, label: f.nome_razao_social, sublabel: f.cpf_cnpj || "" }));
   const selectedFornecedor = fornecedoresCrud.data.find((f: any) => f.id === form.fornecedor_id);
 
+  const compActiveFilters = useMemo(() => {
+    const chips: FilterChip[] = [];
+    statusFilters.forEach(f => {
+      chips.push({ key: "status", label: "Status", value: [f], displayValue: statusLabels[f] || f });
+    });
+    fornecedorFilters.forEach(f => {
+      const forn = fornecedoresCrud.data.find(x => x.id === f);
+      chips.push({ key: "fornecedor", label: "Fornecedor", value: [f], displayValue: forn?.nome_razao_social || f });
+    });
+    return chips;
+  }, [statusFilters, fornecedorFilters, fornecedoresCrud.data]);
+
+  const handleRemoveCompFilter = (key: string, value?: string) => {
+    if (key === "status") setStatusFilters(prev => prev.filter(v => v !== value));
+    if (key === "fornecedor") setFornecedorFilters(prev => prev.filter(v => v !== value));
+  };
+
+  const statusOptions: MultiSelectOption[] = Object.entries(statusLabels)
+    .filter(([k]) => isCotacoesView ? k === "rascunho" : k !== "rascunho")
+    .map(([k, v]) => ({ label: v, value: k }));
+
+  const fornecedorFilterOptions: MultiSelectOption[] = fornecedoresCrud.data.map(f => ({
+    label: f.nome_razao_social, value: f.id
+  }));
+
   const columns = [
     { key: "numero", label: "Nº", render: (c: Compra) => <span className="font-mono text-xs font-medium text-primary">{c.numero}</span> },
     { key: "fornecedor", label: "Fornecedor", render: (c: Compra) => (c as any).fornecedores?.nome_razao_social || "—" },
@@ -161,7 +197,30 @@ const Compras = () => {
 
   return (
     <AppLayout>
-      <ModulePage title={title} subtitle={subtitle} addLabel={addLabel} onAdd={openCreate} count={filteredData.length}>
+      <ModulePage title={title} subtitle={subtitle} addLabel={addLabel} onAdd={openCreate}>
+        <AdvancedFilterBar
+          activeFilters={compActiveFilters}
+          onRemoveFilter={handleRemoveCompFilter}
+          onClearAll={() => { setStatusFilters([]); setFornecedorFilters([]); }}
+          count={filteredData.length}
+        >
+          {!isCotacoesView && (
+            <MultiSelect
+              options={statusOptions}
+              selected={statusFilters}
+              onChange={setStatusFilters}
+              placeholder="Status"
+              className="w-[200px]"
+            />
+          )}
+          <MultiSelect
+            options={fornecedorFilterOptions}
+            selected={fornecedorFilters}
+            onChange={setFornecedorFilters}
+            placeholder="Fornecedores"
+            className="w-[250px]"
+          />
+        </AdvancedFilterBar>
         {/* KPI Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <SummaryCard title="Total de Compras" value={formatNumber(kpis.total)} icon={ShoppingCart} variationType="neutral" variation="no período" />

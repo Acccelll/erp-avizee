@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { MultiSelect, type MultiSelectOption } from "@/components/ui/MultiSelect";
 import { Textarea } from "@/components/ui/textarea";
 import { MaskedInput } from "@/components/ui/MaskedInput";
 import { supabase } from "@/integrations/supabase/client";
@@ -56,8 +57,8 @@ const Clientes = () => {
   const [saving, setSaving] = useState(false);
   const [grupos, setGrupos] = useState<GrupoEconomico[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [tipoFilter, setTipoFilter] = useState<"todos" | "F" | "J">("todos");
-  const [grupoFilter, setGrupoFilter] = useState<"todos" | "com_grupo" | "sem_grupo">("todos");
+  const [tipoFilters, setTipoFilters] = useState<string[]>([]);
+  const [grupoFilters, setGrupoFilters] = useState<string[]>([]);
 
   useEffect(() => {
     supabase.from("grupos_economicos").select("id, nome").eq("ativo", true).order("nome").then(({ data: g }: any) => setGrupos(g || []));
@@ -107,13 +108,24 @@ const Clientes = () => {
   const filteredData = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
     return data.filter((cliente) => {
-      if (tipoFilter !== "todos" && cliente.tipo_pessoa !== tipoFilter) return false;
-      if (grupoFilter === "com_grupo" && !cliente.grupo_economico_id) return false;
-      if (grupoFilter === "sem_grupo" && cliente.grupo_economico_id) return false;
+      if (tipoFilters.length > 0 && !tipoFilters.includes(cliente.tipo_pessoa)) return false;
+
+      if (grupoFilters.length > 0) {
+        const hasGroup = !!cliente.grupo_economico_id;
+        const groupId = cliente.grupo_economico_id || "sem_grupo";
+
+        // Se o filtro contém ids específicos de grupo OU "sem_grupo"
+        if (!grupoFilters.includes(groupId)) {
+          // Caso especial: se selecionou "com_grupo" (lógica antiga adaptada ou nova?)
+          // Vamos usar IDs específicos + "sem_grupo"
+          return false;
+        }
+      }
+
       if (!query) return true;
       return [cliente.nome_razao_social, cliente.nome_fantasia, cliente.cpf_cnpj, cliente.email, cliente.cidade, cliente.uf, cliente.telefone, cliente.contato].filter(Boolean).join(" ").toLowerCase().includes(query);
     });
-  }, [data, grupoFilter, searchTerm, tipoFilter]);
+  }, [data, grupoFilters, searchTerm, tipoFilters]);
 
   const columns = [
   { key: "nome_razao_social", label: "Nome / Razão Social", sortable: true },
@@ -128,15 +140,43 @@ const Clientes = () => {
 
   const cliActiveFilters = useMemo(() => {
     const chips: FilterChip[] = [];
-    if (tipoFilter !== "todos") chips.push({ key: "tipo", label: "Tipo", value: tipoFilter, displayValue: tipoFilter === "J" ? "Pessoa Jurídica" : "Pessoa Física" });
-    if (grupoFilter !== "todos") chips.push({ key: "grupo", label: "Grupo", value: grupoFilter, displayValue: grupoFilter === "com_grupo" ? "Com grupo" : "Sem grupo" });
-    return chips;
-  }, [tipoFilter, grupoFilter]);
 
-  const handleRemoveCliFilter = (key: string) => {
-    if (key === "tipo") setTipoFilter("todos");
-    if (key === "grupo") setGrupoFilter("todos");
+    tipoFilters.forEach(f => {
+      chips.push({
+        key: "tipo",
+        label: "Tipo",
+        value: [f],
+        displayValue: f === "J" ? "Pessoa Jurídica" : "Pessoa Física"
+      });
+    });
+
+    grupoFilters.forEach(f => {
+      const g = grupos.find(x => x.id === f);
+      chips.push({
+        key: "grupo",
+        label: "Grupo",
+        value: [f],
+        displayValue: g?.nome || "Sem grupo"
+      });
+    });
+
+    return chips;
+  }, [tipoFilters, grupoFilters, grupos]);
+
+  const handleRemoveCliFilter = (key: string, value?: string) => {
+    if (key === "tipo") setTipoFilters(prev => prev.filter(v => v !== value));
+    if (key === "grupo") setGrupoFilters(prev => prev.filter(v => v !== value));
   };
+
+  const tipoOptions: MultiSelectOption[] = [
+    { label: "Pessoa Jurídica", value: "J" },
+    { label: "Pessoa Física", value: "F" },
+  ];
+
+  const grupoOptions: MultiSelectOption[] = [
+    ...grupos.map(g => ({ label: g.nome, value: g.id })),
+    { label: "Sem grupo", value: "sem_grupo" }
+  ];
 
   return (
     <AppLayout>
@@ -148,25 +188,23 @@ const Clientes = () => {
           searchPlaceholder="Buscar por nome, CNPJ, e-mail ou cidade..."
           activeFilters={cliActiveFilters}
           onRemoveFilter={handleRemoveCliFilter}
-          onClearAll={() => { setTipoFilter("todos"); setGrupoFilter("todos"); }}
+          onClearAll={() => { setTipoFilters([]); setGrupoFilters([]); }}
           count={filteredData.length}
         >
-          <Select value={tipoFilter} onValueChange={(v: any) => setTipoFilter(v)}>
-            <SelectTrigger className="h-9 w-[170px]"><SelectValue placeholder="Tipo" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todos os tipos</SelectItem>
-              <SelectItem value="J">Pessoa jurídica</SelectItem>
-              <SelectItem value="F">Pessoa física</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={grupoFilter} onValueChange={(v: any) => setGrupoFilter(v)}>
-            <SelectTrigger className="h-9 w-[190px]"><SelectValue placeholder="Grupo econômico" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todos os grupos</SelectItem>
-              <SelectItem value="com_grupo">Com grupo econômico</SelectItem>
-              <SelectItem value="sem_grupo">Sem grupo econômico</SelectItem>
-            </SelectContent>
-          </Select>
+          <MultiSelect
+            options={tipoOptions}
+            selected={tipoFilters}
+            onChange={setTipoFilters}
+            placeholder="Tipos"
+            className="w-[150px]"
+          />
+          <MultiSelect
+            options={grupoOptions}
+            selected={grupoFilters}
+            onChange={setGrupoFilters}
+            placeholder="Grupos"
+            className="w-[200px]"
+          />
         </AdvancedFilterBar>
 
         <DataTable columns={columns} data={filteredData} loading={loading}

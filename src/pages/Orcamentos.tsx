@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { MultiSelect, type MultiSelectOption } from "@/components/ui/MultiSelect";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Copy, ArrowRightCircle, CheckCircle, FileText, DollarSign, Clock, BarChart3, Link2 } from "lucide-react";
@@ -43,8 +44,14 @@ const Orcamentos = () => {
   const [poNumberCliente, setPoNumberCliente] = useState("");
   const [dataPoCliente, setDataPoCliente] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("todos");
+  const [statusFilters, setStatusFilters] = useState<string[]>([]);
+  const [clienteFilters, setClienteFilters] = useState<string[]>([]);
+  const [clientesList, setClientesList] = useState<any[]>([]);
   const { isAdmin } = useIsAdmin();
+
+  useEffect(() => {
+    supabase.from("clientes").select("id, nome_razao_social").eq("ativo", true).then(({ data }) => setClientesList(data || []));
+  }, []);
 
   const handleSendForApproval = useCallback(async (orc: Orcamento) => {
     if (orc.status !== "rascunho") return;
@@ -158,11 +165,13 @@ const Orcamentos = () => {
   const filteredData = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
     return data.filter((orc) => {
-      if (statusFilter !== "todos" && orc.status !== statusFilter) return false;
+      if (statusFilters.length > 0 && !statusFilters.includes(orc.status)) return false;
+      if (clienteFilters.length > 0 && !clienteFilters.includes(orc.cliente_id || "")) return false;
+
       if (!query) return true;
       return [orc.numero, orc.clientes?.nome_razao_social, orc.observacoes].filter(Boolean).join(" ").toLowerCase().includes(query);
     });
-  }, [data, searchTerm, statusFilter]);
+  }, [data, searchTerm, statusFilters, clienteFilters]);
 
   const columns = [
     { key: "numero", label: "Nº", sortable: true, render: (o: Orcamento) => <span className="font-mono text-xs font-medium text-primary">{o.numero}</span> },
@@ -195,13 +204,31 @@ const Orcamentos = () => {
   ];
 
   const convertingOrc = data.find(o => o.id === convertingId);
-  const statusOptions = ["todos", "rascunho", "confirmado", "aprovado", "convertido", "cancelado", "faturado"];
 
   const orcActiveFilters = useMemo(() => {
     const chips: FilterChip[] = [];
-    if (statusFilter !== "todos") chips.push({ key: "status", label: "Status", value: statusFilter, displayValue: statusLabels[statusFilter] || statusFilter });
+    statusFilters.forEach(f => {
+      chips.push({ key: "status", label: "Status", value: [f], displayValue: statusLabels[f] || f });
+    });
+    clienteFilters.forEach(f => {
+      const cli = clientesList.find(x => x.id === f);
+      chips.push({ key: "cliente", label: "Cliente", value: [f], displayValue: cli?.nome_razao_social || f });
+    });
     return chips;
-  }, [statusFilter]);
+  }, [statusFilters, clienteFilters, clientesList]);
+
+  const handleRemoveOrcFilter = (key: string, value?: string) => {
+    if (key === "status") setStatusFilters(prev => prev.filter(v => v !== value));
+    if (key === "cliente") setClienteFilters(prev => prev.filter(v => v !== value));
+  };
+
+  const statusOptions: MultiSelectOption[] = Object.entries(statusLabels).map(([k, v]) => ({
+    label: v, value: k
+  }));
+
+  const clienteOptions: MultiSelectOption[] = clientesList.map(c => ({
+    label: c.nome_razao_social, value: c.id
+  }));
 
   return (
     <AppLayout>
@@ -223,17 +250,24 @@ const Orcamentos = () => {
           onSearchChange={setSearchTerm}
           searchPlaceholder="Buscar por número da cotação ou cliente..."
           activeFilters={orcActiveFilters}
-          onRemoveFilter={() => setStatusFilter("todos")}
+          onRemoveFilter={handleRemoveOrcFilter}
+          onClearAll={() => { setStatusFilters([]); setClienteFilters([]); }}
           count={filteredData.length}
         >
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="h-9 w-[190px]"><SelectValue placeholder="Status" /></SelectTrigger>
-            <SelectContent>
-              {statusOptions.map((status) => (
-                <SelectItem key={status} value={status}>{status === "todos" ? "Todos os status" : statusLabels[status] || status}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <MultiSelect
+            options={statusOptions}
+            selected={statusFilters}
+            onChange={setStatusFilters}
+            placeholder="Status"
+            className="w-[200px]"
+          />
+          <MultiSelect
+            options={clienteOptions}
+            selected={clienteFilters}
+            onChange={setClienteFilters}
+            placeholder="Clientes"
+            className="w-[250px]"
+          />
         </AdvancedFilterBar>
 
         <DataTable columns={columns} data={filteredData} loading={loading}

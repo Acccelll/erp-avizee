@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { MultiSelect, type MultiSelectOption } from "@/components/ui/MultiSelect";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatCurrency, formatDate } from "@/lib/format";
@@ -78,7 +79,9 @@ const Fiscal = () => {
   const xmlInputRef = useRef<HTMLInputElement>(null);
   const [danfeOpen, setDanfeOpen] = useState(false);
   const [danfeData, setDanfeData] = useState<any>(null);
-  const [filterModelo, setFilterModelo] = useState("todos");
+  const [modeloFilters, setModeloFilters] = useState<string[]>([]);
+  const [statusFilters, setStatusFilters] = useState<string[]>([]);
+  const [tipoFilters, setTipoFilters] = useState<string[]>([]);
   // B.2 — Devolução
   const [devolucaoModalOpen, setDevolucaoModalOpen] = useState(false);
   const [devolucaoNF, setDevolucaoNF] = useState<NotaFiscal | null>(null);
@@ -447,13 +450,42 @@ const Fiscal = () => {
     const query = consultaSearch.trim().toLowerCase();
     return data.filter((n) => {
       if (tipoParam && n.tipo !== tipoParam) return false;
-      if (filterModelo !== "todos" && (n.modelo_documento || "55") !== filterModelo) return false;
+
+      if (tipoFilters.length > 0 && !tipoFilters.includes(n.tipo)) return false;
+      if (modeloFilters.length > 0 && !modeloFilters.includes(n.modelo_documento || "55")) return false;
+      if (statusFilters.length > 0 && !statusFilters.includes(n.status)) return false;
+
       if (viewParam !== "consulta" || !query) return true;
       const parceiro = n.tipo === "entrada" ? n.fornecedores?.nome_razao_social : n.clientes?.nome_razao_social;
       const haystack = [n.numero, n.serie, n.chave_acesso, parceiro, n.ordens_venda?.numero].filter(Boolean).join(" ").toLowerCase();
       return haystack.includes(query);
     });
-  }, [consultaSearch, data, tipoParam, viewParam, filterModelo]);
+  }, [consultaSearch, data, tipoParam, viewParam, modeloFilters, statusFilters, tipoFilters]);
+
+  const fiscalActiveFilters = useMemo(() => {
+    const chips: FilterChip[] = [];
+    tipoFilters.forEach(f => chips.push({ key: "tipo", label: "Tipo", value: [f], displayValue: f === "entrada" ? "Entrada" : "Saída" }));
+    modeloFilters.forEach(f => chips.push({ key: "modelo", label: "Modelo", value: [f], displayValue: modeloLabels[f] || f }));
+    statusFilters.forEach(f => chips.push({ key: "status", label: "Status", value: [f], displayValue: f.charAt(0).toUpperCase() + f.slice(1) }));
+    return chips;
+  }, [tipoFilters, modeloFilters, statusFilters]);
+
+  const handleRemoveFiscalFilter = (key: string, value?: string) => {
+    if (key === "tipo") setTipoFilters(prev => prev.filter(v => v !== value));
+    if (key === "modelo") setModeloFilters(prev => prev.filter(v => v !== value));
+    if (key === "status") setStatusFilters(prev => prev.filter(v => v !== value));
+  };
+
+  const tipoOptions: MultiSelectOption[] = [
+    { label: "Entrada", value: "entrada" },
+    { label: "Saída", value: "saida" },
+  ];
+  const modeloOptions: MultiSelectOption[] = Object.entries(modeloLabels).map(([v, l]) => ({ label: l, value: v }));
+  const statusOptions: MultiSelectOption[] = [
+    { label: "Pendente", value: "pendente" },
+    { label: "Confirmada", value: "confirmada" },
+    { label: "Cancelada", value: "cancelada" },
+  ];
 
   const fiscalSubtitle = viewParam === "consulta"
     ? "Consulta rápida de documentos fiscais e chaves de acesso"
@@ -549,10 +581,7 @@ const Fiscal = () => {
 
   return (
     <AppLayout>
-      <ModulePage title="Fiscal" subtitle={fiscalSubtitle} addLabel="Nova NF" onAdd={openCreate} count={filteredData.length}
-        searchValue={viewParam === "consulta" ? consultaSearch : undefined}
-        onSearchChange={viewParam === "consulta" ? setConsultaSearch : undefined}
-        searchPlaceholder="Buscar por número, chave ou parceiro..."
+      <ModulePage title="Fiscal" subtitle={fiscalSubtitle} addLabel="Nova NF" onAdd={openCreate}
         headerActions={
           <>
             <input ref={xmlInputRef} type="file" accept=".xml" className="hidden" onChange={handleXmlImport} />
@@ -562,14 +591,39 @@ const Fiscal = () => {
           </>
         }
       >
-        {/* Modelo filter tabs */}
-        <div className="flex gap-1 mb-4 flex-wrap">
-          {[{ v: "todos", l: "Todos" }, { v: "55", l: "NF-e" }, { v: "65", l: "NFC-e" }, { v: "57", l: "CT-e" }, { v: "nfse", l: "NFS-e" }].map(t => (
-            <Button key={t.v} size="sm" variant={filterModelo === t.v ? "default" : "outline"} onClick={() => setFilterModelo(t.v)}>
-              {t.l}
-            </Button>
-          ))}
-        </div>
+        <AdvancedFilterBar
+          searchValue={viewParam === "consulta" ? consultaSearch : ""}
+          onSearchChange={viewParam === "consulta" ? setConsultaSearch : undefined}
+          searchPlaceholder="Buscar por número, chave ou parceiro..."
+          activeFilters={fiscalActiveFilters}
+          onRemoveFilter={handleRemoveFiscalFilter}
+          onClearAll={() => { setTipoFilters([]); setModeloFilters([]); setStatusFilters([]); }}
+          count={filteredData.length}
+        >
+          {!tipoParam && (
+            <MultiSelect
+              options={tipoOptions}
+              selected={tipoFilters}
+              onChange={setTipoFilters}
+              placeholder="Tipo"
+              className="w-[150px]"
+            />
+          )}
+          <MultiSelect
+            options={modeloOptions}
+            selected={modeloFilters}
+            onChange={setModeloFilters}
+            placeholder="Modelos"
+            className="w-[180px]"
+          />
+          <MultiSelect
+            options={statusOptions}
+            selected={statusFilters}
+            onChange={setStatusFilters}
+            placeholder="Status"
+            className="w-[180px]"
+          />
+        </AdvancedFilterBar>
 
         {/* KPI Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">

@@ -2,6 +2,7 @@ import { useMemo, useState, useEffect } from "react";
 import { AppLayout } from "@/components/AppLayout";
 import { ModulePage } from "@/components/ModulePage";
 import { DataTable, StatusBadge } from "@/components/DataTable";
+import { AdvancedFilterBar, type FilterChip } from "@/components/AdvancedFilterBar";
 import { FormModal } from "@/components/FormModal";
 import { ViewDrawerV2 } from "@/components/ViewDrawerV2";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -15,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { MultiSelect, type MultiSelectOption } from "@/components/ui/MultiSelect";
 import { toast } from "sonner";
 import { format } from "date-fns";
 
@@ -66,6 +68,8 @@ export default function Remessas() {
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilters, setStatusFilters] = useState<string[]>([]);
+  const [transportadoraFilters, setTransportadoraFilters] = useState<string[]>([]);
 
   const [clientes, setClientes] = useState<Array<{ id: string; nome_razao_social: string }>>([]);
   const [transportadoras, setTransportadoras] = useState<Array<{ id: string; nome_razao_social: string }>>([]);
@@ -263,11 +267,32 @@ export default function Remessas() {
 
   const filteredData = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
-    if (!q) return data;
-    return data.filter(r =>
-      [r.codigo_rastreio, clienteMap[r.cliente_id || ""], transportadoraMap[r.transportadora_id || ""]].filter(Boolean).join(" ").toLowerCase().includes(q)
-    );
-  }, [data, searchTerm, clienteMap, transportadoraMap]);
+    return data.filter(r => {
+      if (statusFilters.length > 0 && !statusFilters.includes(r.status_transporte)) return false;
+      if (transportadoraFilters.length > 0 && !transportadoraFilters.includes(r.transportadora_id || "")) return false;
+
+      if (!q) return true;
+      return [r.codigo_rastreio, clienteMap[r.cliente_id || ""], transportadoraMap[r.transportadora_id || ""]].filter(Boolean).join(" ").toLowerCase().includes(q);
+    });
+  }, [data, searchTerm, clienteMap, transportadoraMap, statusFilters, transportadoraFilters]);
+
+  const remActiveFilters = useMemo(() => {
+    const chips: FilterChip[] = [];
+    statusFilters.forEach(f => chips.push({ key: "status", label: "Status", value: [f], displayValue: statusMap[f]?.label || f }));
+    transportadoraFilters.forEach(f => {
+      const t = transportadoras.find(x => x.id === f);
+      chips.push({ key: "transportadora", label: "Transportadora", value: [f], displayValue: t?.nome_razao_social || f });
+    });
+    return chips;
+  }, [statusFilters, transportadoraFilters, transportadoras]);
+
+  const handleRemoveRemFilter = (key: string, value?: string) => {
+    if (key === "status") setStatusFilters(prev => prev.filter(v => v !== value));
+    if (key === "transportadora") setTransportadoraFilters(prev => prev.filter(v => v !== value));
+  };
+
+  const statusOptions: MultiSelectOption[] = Object.entries(statusMap).map(([k, v]) => ({ label: v.label, value: k }));
+  const transportadoraOptions: MultiSelectOption[] = transportadoras.map(t => ({ label: t.nome_razao_social, value: t.id }));
 
   const columns = [
     { key: "codigo_rastreio", label: "Rastreio", render: (r: Remessa) => <span className="font-mono text-xs">{r.codigo_rastreio || "—"}</span> },
@@ -286,8 +311,31 @@ export default function Remessas() {
 
   return (
     <AppLayout>
-      <ModulePage title="Remessas" subtitle="Gestão de remessas e rastreamento logístico" addLabel="Nova Remessa" onAdd={openCreate} count={filteredData.length}
-        searchValue={searchTerm} onSearchChange={setSearchTerm} searchPlaceholder="Buscar por rastreio, cliente ou transportadora...">
+      <ModulePage title="Remessas" subtitle="Gestão de remessas e rastreamento logístico" addLabel="Nova Remessa" onAdd={openCreate}>
+        <AdvancedFilterBar
+          searchValue={searchTerm}
+          onSearchChange={setSearchTerm}
+          searchPlaceholder="Buscar por rastreio, cliente ou transportadora..."
+          activeFilters={remActiveFilters}
+          onRemoveFilter={handleRemoveRemFilter}
+          onClearAll={() => { setStatusFilters([]); setTransportadoraFilters([]); }}
+          count={filteredData.length}
+        >
+          <MultiSelect
+            options={statusOptions}
+            selected={statusFilters}
+            onChange={setStatusFilters}
+            placeholder="Status"
+            className="w-[180px]"
+          />
+          <MultiSelect
+            options={transportadoraOptions}
+            selected={transportadoraFilters}
+            onChange={setTransportadoraFilters}
+            placeholder="Transportadoras"
+            className="w-[220px]"
+          />
+        </AdvancedFilterBar>
         <DataTable columns={columns} data={filteredData} loading={loading} onView={openView} onEdit={openEdit} />
       </ModulePage>
 

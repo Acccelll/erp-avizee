@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { MultiSelect, type MultiSelectOption } from "@/components/ui/MultiSelect";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -51,9 +52,9 @@ const Produtos = () => {
   const [editComposicao, setEditComposicao] = useState<ComposicaoItem[]>([]);
   const [margemLucro, setMargemLucro] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
-  const [tipoFilter, setTipoFilter] = useState<"todos" | "simples" | "composto">("todos");
-  const [estoqueFilter, setEstoqueFilter] = useState<"todos" | "baixo" | "ok">("todos");
-  const [grupoFilter, setGrupoFilter] = useState<string>("todos");
+  const [tipoFilters, setTipoFilters] = useState<string[]>([]);
+  const [estoqueFilters, setEstoqueFilters] = useState<string[]>([]);
+  const [grupoFilters, setGrupoFilters] = useState<string[]>([]);
   const [grupos, setGrupos] = useState<{id: string; nome: string}[]>([]);
   const { buscarNcm, loading: ncmLoading } = useNcmLookup();
 
@@ -155,15 +156,25 @@ const Produtos = () => {
     return data.filter((p) => {
       const isComposto = Boolean(p.eh_composto);
       const baixoEstoque = Number(p.estoque_minimo || 0) > 0 && Number(p.estoque_atual || 0) <= Number(p.estoque_minimo || 0);
-      if (tipoFilter === "composto" && !isComposto) return false;
-      if (tipoFilter === "simples" && isComposto) return false;
-      if (estoqueFilter === "baixo" && !baixoEstoque) return false;
-      if (estoqueFilter === "ok" && baixoEstoque) return false;
-      if (grupoFilter !== "todos" && p.grupo_id !== grupoFilter) return false;
+
+      if (tipoFilters.length > 0) {
+        const type = isComposto ? "composto" : "simples";
+        if (!tipoFilters.includes(type)) return false;
+      }
+
+      if (estoqueFilters.length > 0) {
+        const stockStatus = baixoEstoque ? "baixo" : "ok";
+        if (!estoqueFilters.includes(stockStatus)) return false;
+      }
+
+      if (grupoFilters.length > 0 && !grupoFilters.includes(p.grupo_id || "sem_grupo")) {
+        return false;
+      }
+
       if (!query) return true;
       return [p.nome, p.sku, p.codigo_interno, p.descricao, p.ncm].filter(Boolean).join(" ").toLowerCase().includes(query);
     });
-  }, [data, estoqueFilter, searchTerm, tipoFilter, grupoFilter]);
+  }, [data, estoqueFilters, searchTerm, tipoFilters, grupoFilters]);
 
   const columns = [
   { key: "sku", label: "SKU", sortable: true, render: (p: Produto) => <span className="font-mono text-xs font-medium text-primary">{p.sku || "—"}</span> },
@@ -185,20 +196,58 @@ const Produtos = () => {
 
   const prodActiveFilters = useMemo(() => {
     const chips: FilterChip[] = [];
-    if (tipoFilter !== "todos") chips.push({ key: "tipo", label: "Tipo", value: tipoFilter, displayValue: tipoFilter === "simples" ? "Simples" : "Composto" });
-    if (estoqueFilter !== "todos") chips.push({ key: "estoque", label: "Estoque", value: estoqueFilter, displayValue: estoqueFilter === "baixo" ? "Abaixo do mínimo" : "Normal" });
-    if (grupoFilter !== "todos") {
-      const g = grupos.find(g => g.id === grupoFilter);
-      chips.push({ key: "grupo", label: "Grupo", value: grupoFilter, displayValue: g?.nome || grupoFilter });
-    }
-    return chips;
-  }, [tipoFilter, estoqueFilter, grupoFilter, grupos]);
 
-  const handleRemoveProdFilter = (key: string) => {
-    if (key === "tipo") setTipoFilter("todos");
-    if (key === "estoque") setEstoqueFilter("todos");
-    if (key === "grupo") setGrupoFilter("todos");
+    tipoFilters.forEach(f => {
+      chips.push({
+        key: "tipo",
+        label: "Tipo",
+        value: [f],
+        displayValue: f === "simples" ? "Simples" : "Composto"
+      });
+    });
+
+    estoqueFilters.forEach(f => {
+      chips.push({
+        key: "estoque",
+        label: "Estoque",
+        value: [f],
+        displayValue: f === "baixo" ? "Abaixo do mínimo" : "Normal"
+      });
+    });
+
+    grupoFilters.forEach(f => {
+      const g = grupos.find(x => x.id === f);
+      chips.push({
+        key: "grupo",
+        label: "Grupo",
+        value: [f],
+        displayValue: g?.nome || "Sem grupo"
+      });
+    });
+
+    return chips;
+  }, [tipoFilters, estoqueFilters, grupoFilters, grupos]);
+
+  const handleRemoveProdFilter = (key: string, value?: string) => {
+    if (key === "tipo") setTipoFilters(prev => prev.filter(v => v !== value));
+    if (key === "estoque") setEstoqueFilters(prev => prev.filter(v => v !== value));
+    if (key === "grupo") setGrupoFilters(prev => prev.filter(v => v !== value));
   };
+
+  const tipoOptions: MultiSelectOption[] = [
+    { label: "Simples", value: "simples" },
+    { label: "Composto", value: "composto" },
+  ];
+
+  const estoqueOptions: MultiSelectOption[] = [
+    { label: "Abaixo do mínimo", value: "baixo" },
+    { label: "Normal", value: "ok" },
+  ];
+
+  const grupoOptions: MultiSelectOption[] = [
+    ...grupos.map(g => ({ label: g.nome, value: g.id })),
+    { label: "Sem grupo", value: "sem_grupo" }
+  ];
 
   return (
     <AppLayout>
@@ -210,32 +259,30 @@ const Produtos = () => {
           searchPlaceholder="Buscar por nome, SKU ou código..."
           activeFilters={prodActiveFilters}
           onRemoveFilter={handleRemoveProdFilter}
-          onClearAll={() => { setTipoFilter("todos"); setEstoqueFilter("todos"); setGrupoFilter("todos"); }}
+          onClearAll={() => { setTipoFilters([]); setEstoqueFilters([]); setGrupoFilters([]); }}
           count={filteredData.length}
         >
-          <Select value={tipoFilter} onValueChange={(v: any) => setTipoFilter(v)}>
-            <SelectTrigger className="h-9 w-[170px]"><SelectValue placeholder="Tipo" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todos os tipos</SelectItem>
-              <SelectItem value="simples">Somente simples</SelectItem>
-              <SelectItem value="composto">Somente compostos</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={estoqueFilter} onValueChange={(v: any) => setEstoqueFilter(v)}>
-            <SelectTrigger className="h-9 w-[190px]"><SelectValue placeholder="Estoque" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todo o estoque</SelectItem>
-              <SelectItem value="baixo">Abaixo do mínimo</SelectItem>
-              <SelectItem value="ok">Estoque normal</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={grupoFilter} onValueChange={setGrupoFilter}>
-            <SelectTrigger className="h-9 w-[180px]"><SelectValue placeholder="Grupo" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todos os grupos</SelectItem>
-              {grupos.map((g) => <SelectItem key={g.id} value={g.id}>{g.nome}</SelectItem>)}
-            </SelectContent>
-          </Select>
+          <MultiSelect
+            options={tipoOptions}
+            selected={tipoFilters}
+            onChange={setTipoFilters}
+            placeholder="Tipos"
+            className="w-[150px]"
+          />
+          <MultiSelect
+            options={estoqueOptions}
+            selected={estoqueFilters}
+            onChange={setEstoqueFilters}
+            placeholder="Estoque"
+            className="w-[180px]"
+          />
+          <MultiSelect
+            options={grupoOptions}
+            selected={grupoFilters}
+            onChange={setGrupoFilters}
+            placeholder="Grupos"
+            className="w-[200px]"
+          />
         </AdvancedFilterBar>
 
         <DataTable columns={columns} data={filteredData} loading={loading}

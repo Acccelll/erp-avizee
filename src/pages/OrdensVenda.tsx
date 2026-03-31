@@ -13,6 +13,7 @@ import { useRelationalNavigation } from "@/contexts/RelationalNavigationContext"
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { MultiSelect, type MultiSelectOption } from "@/components/ui/MultiSelect";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatCurrency, formatDate, daysSince, formatNumber } from "@/lib/format";
@@ -52,9 +53,15 @@ const OrdensVenda = () => {
   const [ovItems, setOvItems] = useState<any[]>([]);
   const [loadingItems, setLoadingItems] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("todos");
-  const [faturamentoFilter, setFaturamentoFilter] = useState<string>("todos");
+  const [statusFilters, setStatusFilters] = useState<string[]>([]);
+  const [faturamentoFilters, setFaturamentoFilters] = useState<string[]>([]);
+  const [clienteFilters, setClienteFilters] = useState<string[]>([]);
+  const [clientesList, setClientesList] = useState<any[]>([]);
   const [generatingNfId, setGeneratingNfId] = useState<string | null>(null);
+
+  useEffect(() => {
+    supabase.from("clientes").select("id, nome_razao_social").eq("ativo", true).then(({ data }) => setClientesList(data || []));
+  }, []);
 
   // KPIs
   const kpis = useMemo(() => {
@@ -144,12 +151,39 @@ const OrdensVenda = () => {
   const filteredData = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
     return data.filter((ov) => {
-      if (statusFilter !== "todos" && ov.status !== statusFilter) return false;
-      if (faturamentoFilter !== "todos" && ov.status_faturamento !== faturamentoFilter) return false;
+      if (statusFilters.length > 0 && !statusFilters.includes(ov.status)) return false;
+      if (faturamentoFilters.length > 0 && !faturamentoFilters.includes(ov.status_faturamento)) return false;
+      if (clienteFilters.length > 0 && !clienteFilters.includes(ov.cliente_id || "")) return false;
+
       if (!query) return true;
       return [ov.numero, ov.clientes?.nome_razao_social, ov.orcamentos?.numero, ov.observacoes].filter(Boolean).join(" ").toLowerCase().includes(query);
     });
-  }, [data, faturamentoFilter, searchTerm, statusFilter]);
+  }, [data, faturamentoFilters, searchTerm, statusFilters, clienteFilters]);
+
+  const ovActiveFilters = useMemo(() => {
+    const chips: FilterChip[] = [];
+    statusFilters.forEach(f => {
+      chips.push({ key: "status", label: "Status", value: [f], displayValue: statusComercialLabels[f] || f });
+    });
+    faturamentoFilters.forEach(f => {
+      chips.push({ key: "faturamento", label: "Faturamento", value: [f], displayValue: statusFaturamentoLabels[f] || f });
+    });
+    clienteFilters.forEach(f => {
+      const cli = clientesList.find(x => x.id === f);
+      chips.push({ key: "cliente", label: "Cliente", value: [f], displayValue: cli?.nome_razao_social || f });
+    });
+    return chips;
+  }, [statusFilters, faturamentoFilters, clienteFilters, clientesList]);
+
+  const handleRemoveOvFilter = (key: string, value?: string) => {
+    if (key === "status") setStatusFilters(prev => prev.filter(v => v !== value));
+    if (key === "faturamento") setFaturamentoFilters(prev => prev.filter(v => v !== value));
+    if (key === "cliente") setClienteFilters(prev => prev.filter(v => v !== value));
+  };
+
+  const statusOptions: MultiSelectOption[] = Object.entries(statusComercialLabels).map(([k, v]) => ({ label: v, value: k }));
+  const faturamentoOptions: MultiSelectOption[] = Object.entries(statusFaturamentoLabels).map(([k, v]) => ({ label: v, value: k }));
+  const clienteOptions: MultiSelectOption[] = clientesList.map(c => ({ label: c.nome_razao_social, value: c.id }));
 
   const columns = [
     { key: "numero", label: "Nº OV", render: (o: OrdemVenda) => <span className="mono text-xs font-medium text-primary">{o.numero}</span> },
@@ -195,12 +229,38 @@ const OrdensVenda = () => {
       <ModulePage
         title="Ordens de Venda"
         subtitle="Gestão de pedidos comerciais e faturamento"
-        count={filteredData.length}
-        searchValue={searchTerm}
-        onSearchChange={setSearchTerm}
-        searchPlaceholder="Buscar por OV, cliente ou cotação..."
-        filters={<><Select value={statusFilter} onValueChange={setStatusFilter}><SelectTrigger className="h-9 w-[180px]"><SelectValue placeholder="Status comercial" /></SelectTrigger><SelectContent><SelectItem value="todos">Todos os status</SelectItem>{Object.entries(statusComercialLabels).map(([value, label]) => (<SelectItem key={value} value={value}>{label}</SelectItem>))}</SelectContent></Select><Select value={faturamentoFilter} onValueChange={setFaturamentoFilter}><SelectTrigger className="h-9 w-[190px]"><SelectValue placeholder="Faturamento" /></SelectTrigger><SelectContent><SelectItem value="todos">Todo faturamento</SelectItem>{Object.entries(statusFaturamentoLabels).map(([value, label]) => (<SelectItem key={value} value={value}>{label}</SelectItem>))}</SelectContent></Select></>}
       >
+        <AdvancedFilterBar
+          searchValue={searchTerm}
+          onSearchChange={setSearchTerm}
+          searchPlaceholder="Buscar por OV, cliente ou cotação..."
+          activeFilters={ovActiveFilters}
+          onRemoveFilter={handleRemoveOvFilter}
+          onClearAll={() => { setStatusFilters([]); setFaturamentoFilters([]); setClienteFilters([]); }}
+          count={filteredData.length}
+        >
+          <MultiSelect
+            options={statusOptions}
+            selected={statusFilters}
+            onChange={setStatusFilters}
+            placeholder="Status"
+            className="w-[180px]"
+          />
+          <MultiSelect
+            options={faturamentoOptions}
+            selected={faturamentoFilters}
+            onChange={setFaturamentoFilters}
+            placeholder="Faturamento"
+            className="w-[180px]"
+          />
+          <MultiSelect
+            options={clienteOptions}
+            selected={clienteFilters}
+            onChange={setClienteFilters}
+            placeholder="Clientes"
+            className="w-[200px]"
+          />
+        </AdvancedFilterBar>
         {/* KPI Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <SummaryCard title="Total de OVs" value={formatNumber(kpis.total)} icon={FileText} variationType="neutral" variation="registros" />

@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { MultiSelect, type MultiSelectOption } from "@/components/ui/MultiSelect";
 import { MaskedInput } from "@/components/ui/MaskedInput";
 import { toast } from "sonner";
 import { Search } from "lucide-react";
@@ -43,7 +44,7 @@ const Fornecedores = () => {
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [tipoFilter, setTipoFilter] = useState<"todos" | "F" | "J">("todos");
+  const [tipoFilters, setTipoFilters] = useState<string[]>([]);
 
   const openCreate = () => {setMode("create");setForm({ ...emptyForm });setSelected(null);setModalOpen(true);};
   const openEdit = (f: Fornecedor) => {
@@ -80,11 +81,11 @@ const Fornecedores = () => {
   const filteredData = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
     return data.filter((fornecedor) => {
-      if (tipoFilter !== "todos" && fornecedor.tipo_pessoa !== tipoFilter) return false;
+      if (tipoFilters.length > 0 && !tipoFilters.includes(fornecedor.tipo_pessoa)) return false;
       if (!query) return true;
       return [fornecedor.nome_razao_social, fornecedor.nome_fantasia, fornecedor.cpf_cnpj, fornecedor.email, fornecedor.cidade, fornecedor.uf, fornecedor.telefone, fornecedor.contato].filter(Boolean).join(" ").toLowerCase().includes(query);
     });
-  }, [data, searchTerm, tipoFilter]);
+  }, [data, searchTerm, tipoFilters]);
 
   const columns = [
   { key: "nome_razao_social", label: "Razão Social", sortable: true },
@@ -97,9 +98,25 @@ const Fornecedores = () => {
 
   const fornActiveFilters = useMemo(() => {
     const chips: FilterChip[] = [];
-    if (tipoFilter !== "todos") chips.push({ key: "tipo", label: "Tipo", value: tipoFilter, displayValue: tipoFilter === "J" ? "Pessoa Jurídica" : "Pessoa Física" });
+    tipoFilters.forEach(f => {
+      chips.push({
+        key: "tipo",
+        label: "Tipo",
+        value: [f],
+        displayValue: f === "J" ? "Pessoa Jurídica" : "Pessoa Física"
+      });
+    });
     return chips;
-  }, [tipoFilter]);
+  }, [tipoFilters]);
+
+  const handleRemoveFornFilter = (key: string, value?: string) => {
+    if (key === "tipo") setTipoFilters(prev => prev.filter(v => v !== value));
+  };
+
+  const tipoOptions: MultiSelectOption[] = [
+    { label: "Pessoa Jurídica", value: "J" },
+    { label: "Pessoa Física", value: "F" },
+  ];
 
   return (
     <AppLayout>
@@ -110,17 +127,17 @@ const Fornecedores = () => {
           onSearchChange={setSearchTerm}
           searchPlaceholder="Buscar por razão social, CNPJ ou cidade..."
           activeFilters={fornActiveFilters}
-          onRemoveFilter={() => setTipoFilter("todos")}
+          onRemoveFilter={handleRemoveFornFilter}
+          onClearAll={() => setTipoFilters([])}
           count={filteredData.length}
         >
-          <Select value={tipoFilter} onValueChange={(v: any) => setTipoFilter(v)}>
-            <SelectTrigger className="h-9 w-[170px]"><SelectValue placeholder="Tipo" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todos os tipos</SelectItem>
-              <SelectItem value="J">Pessoa jurídica</SelectItem>
-              <SelectItem value="F">Pessoa física</SelectItem>
-            </SelectContent>
-          </Select>
+          <MultiSelect
+            options={tipoOptions}
+            selected={tipoFilters}
+            onChange={setTipoFilters}
+            placeholder="Tipos"
+            className="w-[150px]"
+          />
         </AdvancedFilterBar>
 
         <DataTable columns={columns} data={filteredData} loading={loading}
