@@ -1,4 +1,6 @@
 import { ReactNode, useEffect, useState } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import { useUserPreference } from '@/hooks/useUserPreference';
 import { AppSidebar } from './AppSidebar';
 import { AppHeader } from './navigation/AppHeader';
 import { MobileBottomNav } from './navigation/MobileBottomNav';
@@ -10,17 +12,17 @@ interface AppLayoutProps {
   children: ReactNode;
 }
 
-const COLLAPSED_KEY = 'erp-avizee-sidebar-collapsed';
-
 export function AppLayout({ children }: AppLayoutProps) {
   const isMobile = useIsMobile();
-  const [collapsed, setCollapsed] = useState(() => localStorage.getItem(COLLAPSED_KEY) === 'true');
+  const { user } = useAuth();
+  const {
+    value: collapsed,
+    loading: collapsedLoading,
+    save: saveCollapsedPreference,
+  } = useUserPreference<boolean>(user?.id, 'sidebar_collapsed', true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchRequested, setSearchRequested] = useState(0);
 
-  useEffect(() => {
-    localStorage.setItem(COLLAPSED_KEY, String(collapsed));
-  }, [collapsed]);
 
   useEffect(() => {
     if (!isMobile) setMobileMenuOpen(false);
@@ -31,14 +33,14 @@ export function AppLayout({ children }: AppLayoutProps) {
       <div className="hidden md:block">
         <AppSidebar
           collapsed={collapsed}
-          onToggleCollapsed={() => setCollapsed((value) => !value)}
+          onToggleCollapsed={() => saveCollapsedPreference(!collapsed)}
           mobileOpen={false}
           onCloseMobile={() => undefined}
           onOpenSearch={() => setSearchRequested((value) => value + 1)}
         />
       </div>
 
-      <div className={`min-h-screen transition-all duration-200 ${collapsed ? 'md:ml-[72px]' : 'md:ml-[240px]'}`}>
+      <div className={`min-h-screen ${collapsedLoading ? '' : 'transition-all duration-200'} ${collapsed ? 'md:ml-[72px]' : 'md:ml-[240px]'}`}>
         <AppHeader onOpenMobileMenu={() => setMobileMenuOpen(true)} searchRequest={searchRequested} />
         <main className="mx-auto max-w-[1600px] px-3 py-4 pb-28 md:px-6 md:py-6 md:pb-6">{children}</main>
       </div>
