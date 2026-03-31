@@ -13,7 +13,7 @@ export function useSidebarAlerts() {
     const load = async () => {
       const today = new Date().toISOString().slice(0, 10);
 
-      const [{ count: vencidos }, { count: baixo }] = await Promise.all([
+      const [{ count: vencidos }, { data: baixoData }] = await Promise.all([
         supabase
           .from('financeiro_lancamentos')
           .select('*', { count: 'exact', head: true })
@@ -22,15 +22,16 @@ export function useSidebarAlerts() {
           .lt('data_vencimento', today),
         supabase
           .from('produtos')
-          .select('*', { count: 'exact', head: true })
+          .select('id, estoque_atual, estoque_minimo')
           .eq('ativo', true)
-          .gt('estoque_minimo', 0)
-          .filter('estoque_atual', 'lte', 'estoque_minimo'),
+          .gt('estoque_minimo', 0),
       ]);
+
+      const baixoCount = (baixoData || []).filter((p: any) => (p.estoque_atual || 0) <= p.estoque_minimo).length;
 
       setAlerts({
         financeiroVencidos: vencidos || 0,
-        estoqueBaixo: baixo || 0,
+        estoqueBaixo: baixoCount,
       });
     };
 

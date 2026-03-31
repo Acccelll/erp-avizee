@@ -3,11 +3,7 @@ import { AppLayout } from "@/components/AppLayout";
 import { DataTable, StatusBadge } from "@/components/DataTable";
 import { ModulePage } from "@/components/ModulePage";
 import { FormModal } from "@/components/FormModal";
-import { ViewDrawerV2, ViewField, ViewSection } from "@/components/ViewDrawerV2";
 import { AdvancedFilterBar, type FilterChip } from "@/components/AdvancedFilterBar";
-import { RelationalLink } from "@/components/ui/RelationalLink";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Edit, Copy } from "lucide-react";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
 import { useRelationalNavigation } from "@/contexts/RelationalNavigationContext";
 import { Button } from "@/components/ui/button";
@@ -15,15 +11,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Plus, Trash2, RefreshCw, Package, TrendingUp, AlertTriangle, Archive, FileText, History } from "lucide-react";
-import { formatCurrency, formatDate } from "@/lib/format";
+import { Plus, Trash2, Package, FileText } from "lucide-react";
+import { formatCurrency } from "@/lib/format";
 import { FiscalAutocomplete } from "@/components/ui/FiscalAutocomplete";
 import { cfopCodes, cstIcmsCodes } from "@/lib/fiscalData";
 import { useNcmLookup } from '@/hooks/useNcmLookup';
-import { PrecosEspeciaisTab } from "@/components/precos/PrecosEspeciaisTab";
 
 interface Produto {
   id: string;sku: string;codigo_interno: string;nome: string;descricao: string;
@@ -51,7 +45,6 @@ const Produtos = () => {
   const { data, loading, create, update, remove, duplicate } = useSupabaseCrud<Produto>({ table: "produtos" });
   const { pushView } = useRelationalNavigation();
   const [modalOpen, setModalOpen] = useState(false);
-  const [selected, setSelected] = useState<Produto | null>(null);
   const [mode, setMode] = useState<"create" | "edit">("create");
   const [form, setForm] = useState(emptyProduto);
   const [saving, setSaving] = useState(false);
@@ -62,23 +55,17 @@ const Produtos = () => {
   const [estoqueFilter, setEstoqueFilter] = useState<"todos" | "baixo" | "ok">("todos");
   const [grupoFilter, setGrupoFilter] = useState<string>("todos");
   const [grupos, setGrupos] = useState<{id: string; nome: string}[]>([]);
-  const [fornecedoresProd, setFornecedoresProd] = useState<any[]>([]);
-  const [fornecedoresList, setFornecedoresList] = useState<any[]>([]);
-  const [addFornOpen, setAddFornOpen] = useState(false);
-  const [fornForm, setFornForm] = useState({ fornecedor_id: "", referencia_fornecedor: "", preco_compra: 0, lead_time_dias: 0, unidade_fornecedor: "UN", eh_principal: false, descricao_fornecedor: "" });
   const { buscarNcm, loading: ncmLoading } = useNcmLookup();
 
   useEffect(() => {
     Promise.all([
       supabase.from("grupos_produto").select("id, nome").eq("ativo", true).order("nome"),
-      supabase.from("fornecedores").select("id, nome_razao_social").eq("ativo", true).order("nome_razao_social"),
-    ]).then(([{ data: g }, { data: f }]) => {
+    ]).then(([{ data: g }]) => {
       if (g) setGrupos(g);
-      if (f) setFornecedoresList(f);
     });
   }, []);
 
-  const produtosDisponiveis = data.filter((p) => !selected || p.id !== selected.id);
+  const produtosDisponiveis = data;
 
   const custoComposto = editComposicao.reduce((s, c) => {
     const prod = data.find((p) => p.id === c.produto_filho_id);
@@ -86,16 +73,16 @@ const Produtos = () => {
   }, 0);
 
   const precoSugerido = custoComposto * (1 + margemLucro / 100);
-  const custoCompostoView = composicao.reduce((s, c) => s + c.quantidade * (c.preco_custo || 0), 0);
 
   const openCreate = () => {
-    setMode("create");setForm({ ...emptyProduto });setSelected(null);
+    setMode("create");setForm({ ...emptyProduto });
     setEditComposicao([]);setMargemLucro(30);setModalOpen(true);
   };
 
   const openEdit = async (p: Produto) => {
-    setMode("edit");setSelected(p);
+    setMode("edit");
     setForm({
+      id: p.id,
       nome: p.nome, sku: p.sku || "", codigo_interno: p.codigo_interno || "", descricao: p.descricao || "",
       unidade_medida: p.unidade_medida, preco_custo: p.preco_custo || 0, preco_venda: p.preco_venda,
       estoque_minimo: p.estoque_minimo || 0, ncm: p.ncm || "", cst: p.cst || "", cfop_padrao: p.cfop_padrao || "",
@@ -138,9 +125,15 @@ const Produtos = () => {
     try {
       const payload = { ...form, preco_custo: form.eh_composto ? custoComposto : form.preco_custo };
       let produtoId: string;
-      if (mode === "create") {const result = await create(payload);produtoId = (result as any).id;} else
-      if (selected) {await update(selected.id, payload);produtoId = selected.id;} else
-      {return;}
+      if (mode === "create") {
+        const result = await create(payload);
+        produtoId = (result as any).id;
+      } else if (form.id) {
+        await update(form.id, payload);
+        produtoId = form.id;
+      } else {
+        return;
+      }
       if (form.eh_composto) {
         await supabase.from("produto_composicoes").delete().eq("produto_pai_id", produtoId);
         if (editComposicao.length > 0) {
@@ -154,16 +147,6 @@ const Produtos = () => {
       console.error('[produtos] erro ao salvar:', err);
     }
     setSaving(false);
-  };
-
-  const recalcularCusto = async (p: Produto) => {
-    if (!p.eh_composto) return;
-    const { data: comp } = await supabase.from("produto_composicoes").
-    select("quantidade, produtos:produto_filho_id(preco_custo)").
-    eq("produto_pai_id", p.id);
-    const custo = (comp || []).reduce((s: number, c: any) => s + c.quantidade * (c.produtos?.preco_custo || 0), 0);
-    await update(p.id, { preco_custo: custo });
-    toast.success(`Custo recalculado: ${formatCurrency(custo)}`);
   };
 
   const filteredData = useMemo(() => {
@@ -198,8 +181,6 @@ const Produtos = () => {
     } },
   { key: "eh_composto", label: "Tipo", render: (p: Produto) => p.eh_composto ? <StatusBadge status="Composto" /> : <StatusBadge status="Simples" /> }];
 
-
-  const selectedMargem = selected && (selected.preco_custo || 0) > 0 ? (selected.preco_venda / (selected.preco_custo || 1) - 1) * 100 : 0;
 
   const prodActiveFilters = useMemo(() => {
     const chips: FilterChip[] = [];
@@ -276,34 +257,6 @@ const Produtos = () => {
                   <SelectItem value="PC">PC</SelectItem><SelectItem value="LT">LT</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>NCM</Label>
-              <div className="flex gap-2">
-                <Input
-                  value={form.ncm || ''}
-                  onChange={(e) => setForm({ ...form, ncm: e.target.value })}
-                  placeholder="Ex: 84713012"
-                  className="flex-1 font-mono"
-                  maxLength={8}
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="shrink-0 text-xs"
-                  disabled={ncmLoading || (form.ncm || '').replace(/\D/g, '').length < 4}
-                  onClick={async () => {
-                    const result = await buscarNcm(form.ncm || '');
-                    if (result) setForm({ ...form, ncm: result.codigo });
-                  }}
-                >
-                  {ncmLoading ? '...' : 'Verificar'}
-                </Button>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                4–8 dígitos. Clique em Verificar para confirmar na tabela TIPI da Receita Federal.
-              </p>
             </div>
             {!form.eh_composto &&
             <div className="space-y-2"><Label>Preço Custo</Label><Input type="number" step="0.01" value={form.preco_custo} onChange={(e) => setForm({ ...form, preco_custo: Number(e.target.value) })} /></div>
@@ -398,288 +351,6 @@ const Produtos = () => {
         </form>
       </FormModal>
 
-      {/* View Drawer with Tabs */}
-      <ViewDrawerV2 open={drawerOpen} onClose={() => setDrawerOpen(false)} title="Detalhes do Produto"
-      actions={selected ? <>
-          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {setDrawerOpen(false);openEdit(selected);}}><Edit className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Editar</TooltipContent></Tooltip>
-          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {setDrawerOpen(false);duplicate(selected);}}><Copy className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Duplicar</TooltipContent></Tooltip>
-          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => {setDrawerOpen(false);remove(selected.id);}}><Trash2 className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Excluir</TooltipContent></Tooltip>
-        </> : undefined}>
-        
-        {selected &&
-        <div className="space-y-5">
-            {/* Header */}
-            <div>
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="font-semibold text-lg truncate">{selected.nome}</h3>
-                  <StatusBadge status={selected.ativo ? "Ativo" : "Inativo"} />
-                </div>
-                {selected.sku && (
-                  <p className="text-sm text-muted-foreground truncate">{selected.sku}</p>
-                )}
-                {selected.codigo_interno && (
-                  <p className="text-xs text-muted-foreground font-mono mt-0.5">{selected.codigo_interno}</p>
-                )}
-              </div>
-            </div>
-
-            {/* KPI Cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div className="rounded-lg border bg-card p-4 text-center space-y-1">
-                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Preço Venda</p>
-                <p className="font-mono font-bold text-sm text-foreground">{formatCurrency(selected.preco_venda)}</p>
-              </div>
-              <div className="rounded-lg border bg-card p-4 text-center space-y-1">
-                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Custo</p>
-                <p className="font-mono font-bold text-sm text-foreground">{formatCurrency(selected.preco_custo || 0)}</p>
-              </div>
-              <div className="rounded-lg border bg-card p-4 text-center space-y-1">
-                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Margem</p>
-                <p className={`font-mono font-bold text-sm ${selectedMargem > 0 ? "text-emerald-600 dark:text-emerald-400" : selectedMargem < 0 ? "text-destructive" : "text-foreground"}`}>{(selected.preco_custo || 0) > 0 ? `${selectedMargem.toFixed(1)}%` : "—"}</p>
-              </div>
-              <div className="rounded-lg border bg-card p-4 text-center space-y-1">
-                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Estoque</p>
-                <p className={`font-mono font-bold text-sm ${(selected.estoque_atual || 0) <= (selected.estoque_minimo || 0) ? "text-destructive" : "text-foreground"}`}>{selected.estoque_atual ?? 0} {selected.unidade_medida}</p>
-              </div>
-            </div>
-
-            <Tabs defaultValue="geral" className="w-full">
-              <TabsList className="w-full grid grid-cols-6">
-                <TabsTrigger value="geral" className="text-xs">Geral</TabsTrigger>
-                <TabsTrigger value="preco" className="text-xs">Preço</TabsTrigger>
-                <TabsTrigger value="estoque" className="text-xs">Estoque</TabsTrigger>
-                <TabsTrigger value="fiscal" className="text-xs">Fiscal</TabsTrigger>
-                <TabsTrigger value="cod_fornecedor" className="text-xs">Cód. Forn.</TabsTrigger>
-                <TabsTrigger value="precos" className="text-xs">Preços</TabsTrigger>
-                <TabsTrigger value="historico" className="text-xs">Histórico</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="geral" className="space-y-3 mt-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <div><span className="text-xs text-muted-foreground">SKU</span><p className="font-mono">{selected.sku || "—"}</p></div>
-                  <div><span className="text-xs text-muted-foreground">Código</span><p className="font-mono">{selected.codigo_interno || "—"}</p></div>
-                  <div><span className="text-xs text-muted-foreground">Unidade</span><p>{selected.unidade_medida}</p></div>
-                  <div><span className="text-xs text-muted-foreground">Peso</span><p className="font-mono">{selected.peso || 0} kg</p></div>
-                </div>
-                {selected.descricao && <div><span className="text-xs text-muted-foreground">Descrição</span><p className="text-sm">{selected.descricao}</p></div>}
-                {selected.eh_composto && composicao.length > 0 &&
-              <div className="border-t pt-3">
-                    <h4 className="font-semibold text-sm mb-2 flex items-center gap-2"><Package className="w-4 h-4" /> Composição</h4>
-                    <div className="space-y-1">
-                      {composicao.map((c, idx) =>
-                  <div key={idx} className="flex justify-between text-sm py-1.5 border-b last:border-b-0">
-                          <span>{c.nome} <span className="text-muted-foreground font-mono text-xs">({c.sku})</span></span>
-                          <div className="text-right"><span className="font-mono">× {c.quantidade}</span><span className="font-mono text-muted-foreground ml-3">{formatCurrency(c.quantidade * (c.preco_custo || 0))}</span></div>
-                        </div>
-                  )}
-                      <div className="flex justify-between text-sm font-semibold pt-2"><span>Custo Composto</span><span className="font-mono text-primary">{formatCurrency(custoCompostoView)}</span></div>
-                    </div>
-                  </div>
-              }
-                {fornecedoresProd.length > 0 &&
-              <div className="border-t pt-3">
-                    <h4 className="font-semibold text-sm mb-2">Fornecedores</h4>
-                    {fornecedoresProd.map((f: any, idx: number) =>
-                <div key={idx} className="flex justify-between text-sm py-1.5 border-b last:border-b-0">
-                        <span>{f.fornecedores?.nome_razao_social || "—"}</span>
-                        <div className="text-right text-xs">
-                          {f.preco_compra && <span className="font-mono">{formatCurrency(f.preco_compra)}</span>}
-                          {f.lead_time_dias && <span className="text-muted-foreground ml-2">{f.lead_time_dias}d</span>}
-                        </div>
-                      </div>
-                )}
-                  </div>
-              }
-              </TabsContent>
-
-              <TabsContent value="preco" className="space-y-3 mt-3">
-                <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
-                  <div className="grid grid-cols-3 gap-3 text-center">
-                    <div><span className="text-xs text-muted-foreground block">Custo</span><p className="font-mono font-medium text-lg">{formatCurrency(selected.preco_custo || 0)}</p></div>
-                    <div><span className="text-xs text-muted-foreground block">Margem</span><p className={`font-mono font-semibold text-lg ${selectedMargem > 0 ? "text-success" : selectedMargem < 0 ? "text-destructive" : ""}`}>{(selected.preco_custo || 0) > 0 ? `${selectedMargem.toFixed(1)}%` : "—"}</p></div>
-                    <div><span className="text-xs text-muted-foreground block">Venda</span><p className="font-mono font-semibold text-lg text-primary">{formatCurrency(selected.preco_venda)}</p></div>
-                  </div>
-                  {(selected.preco_custo || 0) > 0 &&
-                <div className="text-center border-t pt-2">
-                      <span className="text-xs text-muted-foreground">Lucro Bruto</span>
-                      <p className="font-mono font-semibold">{formatCurrency(selected.preco_venda - (selected.preco_custo || 0))}</p>
-                    </div>
-                }
-                </div>
-                {selected.eh_composto &&
-              <Button size="sm" variant="outline" className="gap-1 w-full" onClick={() => recalcularCusto(selected)}>
-                    <RefreshCw className="w-3 h-3" /> Recalcular Custo da Composição
-                  </Button>
-              }
-              </TabsContent>
-
-              <TabsContent value="estoque" className="space-y-3 mt-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-lg border p-3 text-center">
-                    <p className="text-xs text-muted-foreground">Estoque Atual</p>
-                    <p className={`text-2xl font-bold font-mono ${Number(selected.estoque_atual) <= Number(selected.estoque_minimo) && Number(selected.estoque_minimo) > 0 ? "text-destructive" : ""}`}>{selected.estoque_atual ?? 0}</p>
-                  </div>
-                  <div className="rounded-lg border p-3 text-center">
-                    <p className="text-xs text-muted-foreground">Estoque Mínimo</p>
-                    <p className="text-2xl font-bold font-mono">{selected.estoque_minimo ?? 0}</p>
-                  </div>
-                </div>
-                {Number(selected.estoque_atual) <= Number(selected.estoque_minimo) && Number(selected.estoque_minimo) > 0 &&
-              <div className="flex items-center gap-2 text-sm text-destructive bg-destructive/10 rounded-lg p-3">
-                    <AlertTriangle className="w-4 h-4" /> Estoque abaixo do mínimo!
-                  </div>
-              }
-                {movimentos.length > 0 &&
-              <div>
-                    <h4 className="font-semibold text-sm mb-2 flex items-center gap-2"><Archive className="w-4 h-4" /> Últimas Movimentações</h4>
-                    <div className="space-y-1 max-h-[300px] overflow-y-auto">
-                      {movimentos.map((m: any, idx: number) =>
-                  <div key={idx} className="flex items-center justify-between py-1.5 border-b last:border-b-0 text-sm">
-                          <div className="flex items-center gap-2">
-                            <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${m.tipo === 'entrada' ? 'bg-success/10 text-success' : m.tipo === 'saida' ? 'bg-destructive/10 text-destructive' : 'bg-warning/10 text-warning'}`}>
-                              {m.tipo === 'entrada' ? '↑' : m.tipo === 'saida' ? '↓' : '↔'} {m.quantidade}
-                            </span>
-                            <span className="text-muted-foreground text-xs">{m.motivo || m.tipo}</span>
-                          </div>
-                          <span className="text-xs text-muted-foreground">{formatDate(m.created_at)}</span>
-                        </div>
-                  )}
-                    </div>
-                  </div>
-              }
-              </TabsContent>
-
-              <TabsContent value="fiscal" className="space-y-3 mt-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <div><span className="text-xs text-muted-foreground">NCM</span><p className="font-mono">{selected.ncm || "—"}</p></div>
-                  <div><span className="text-xs text-muted-foreground">CST</span><p className="font-mono">{selected.cst || "—"}</p></div>
-                  <div><span className="text-xs text-muted-foreground">CFOP Padrão</span><p className="font-mono">{selected.cfop_padrao || "—"}</p></div>
-                  <div><span className="text-xs text-muted-foreground">Unidade</span><p>{selected.unidade_medida}</p></div>
-                </div>
-              </TabsContent>
-
-              <TabsContent value="precos" className="space-y-3 mt-3">
-                <PrecosEspeciaisTab produtoId={selected.id} />
-              </TabsContent>
-
-              <TabsContent value="cod_fornecedor" className="space-y-3 mt-3">
-                <div className="flex items-center justify-between mb-2">
-                  <div>
-                    <h4 className="font-semibold text-sm">Códigos de Fornecedores (De/Para)</h4>
-                    <p className="text-xs text-muted-foreground">Referências usadas na importação de XML para vínculo automático de produtos.</p>
-                  </div>
-                  <Button size="sm" variant="outline" className="gap-1" onClick={() => { setAddFornOpen(true); setFornForm({ fornecedor_id: "", referencia_fornecedor: "", preco_compra: 0, lead_time_dias: 0, unidade_fornecedor: "UN", eh_principal: false, descricao_fornecedor: "" }); }}>
-                    <Plus className="w-3 h-3" /> Adicionar
-                  </Button>
-                </div>
-
-                {addFornOpen && (
-                  <div className="rounded-lg border bg-accent/30 p-3 space-y-3">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <Label className="text-xs">Fornecedor *</Label>
-                        <Select value={fornForm.fornecedor_id} onValueChange={(v) => setFornForm({ ...fornForm, fornecedor_id: v })}>
-                          <SelectTrigger className="h-8"><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                          <SelectContent>{fornecedoresList.map((f: any) => <SelectItem key={f.id} value={f.id}>{f.nome_razao_social}</SelectItem>)}</SelectContent>
-                        </Select>
-                      </div>
-                       <div className="space-y-1"><Label className="text-xs">Ref. Fornecedor</Label><Input className="h-8 text-xs font-mono" value={fornForm.referencia_fornecedor} onChange={(e) => setFornForm({ ...fornForm, referencia_fornecedor: e.target.value })} placeholder="Código do forn." /></div>
-                       <div className="space-y-1"><Label className="text-xs">Preço Compra</Label><Input className="h-8 text-xs" type="number" step="0.01" value={fornForm.preco_compra || ""} onChange={(e) => setFornForm({ ...fornForm, preco_compra: Number(e.target.value) })} /></div>
-                       <div className="space-y-1"><Label className="text-xs">Lead Time (dias)</Label><Input className="h-8 text-xs" type="number" value={fornForm.lead_time_dias || ""} onChange={(e) => setFornForm({ ...fornForm, lead_time_dias: Number(e.target.value) })} /></div>
-                       <div className="space-y-1"><Label className="text-xs">UN Fornecedor</Label><Input className="h-8 text-xs" value={fornForm.unidade_fornecedor} onChange={(e) => setFornForm({ ...fornForm, unidade_fornecedor: e.target.value })} /></div>
-                       <div className="col-span-2 space-y-1"><Label className="text-xs">Descrição do Fornecedor</Label><Input className="h-8 text-xs" value={fornForm.descricao_fornecedor || ""} onChange={(e) => setFornForm({ ...fornForm, descricao_fornecedor: e.target.value })} placeholder="Nome/descrição usada pelo fornecedor" /></div>
-                      <div className="flex items-end">
-                        <label className="flex items-center gap-2 text-xs cursor-pointer h-8">
-                          <input type="checkbox" checked={fornForm.eh_principal} onChange={(e) => setFornForm({ ...fornForm, eh_principal: e.target.checked })} className="rounded" />
-                          Principal
-                        </label>
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button size="sm" onClick={async () => {
-                        if (!fornForm.fornecedor_id || !selected) { toast.error("Fornecedor é obrigatório"); return; }
-                        const { error } = await supabase.from("produtos_fornecedores").insert({
-                          produto_id: selected.id, fornecedor_id: fornForm.fornecedor_id,
-                          referencia_fornecedor: fornForm.referencia_fornecedor || null,
-                          preco_compra: fornForm.preco_compra || null,
-                          lead_time_dias: fornForm.lead_time_dias || null,
-                          unidade_fornecedor: fornForm.unidade_fornecedor || "UN",
-                          eh_principal: fornForm.eh_principal,
-                          descricao_fornecedor: fornForm.descricao_fornecedor || null,
-                        } as any);
-                        if (error) { toast.error("Erro ao salvar: " + error.message); return; }
-                        toast.success("Fornecedor vinculado!");
-                        setAddFornOpen(false);
-                        const { data: updated } = await supabase.from("produtos_fornecedores")
-                          .select("preco_compra, lead_time_dias, referencia_fornecedor, eh_principal, unidade_fornecedor, descricao_fornecedor, fornecedores:fornecedor_id(nome_razao_social)")
-                          .eq("produto_id", selected.id);
-                        setFornecedoresProd(updated || []);
-                      }}>Salvar</Button>
-                      <Button size="sm" variant="ghost" onClick={() => setAddFornOpen(false)}>Cancelar</Button>
-                    </div>
-                  </div>
-                )}
-
-                {fornecedoresProd.length === 0 && !addFornOpen ?
-                  <p className="text-sm text-muted-foreground text-center py-4">Nenhum fornecedor vinculado</p> :
-                  fornecedoresProd.length > 0 && (
-                  <div className="rounded-lg border overflow-hidden">
-                    <table className="w-full text-sm">
-                      <thead>
-                         <tr className="bg-muted/50">
-                           <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground">Fornecedor</th>
-                           <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground">Ref. Fornecedor</th>
-                           <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground">Desc. Forn.</th>
-                           <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground">Preço Compra</th>
-                           <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground">Lead Time</th>
-                           <th className="text-center px-3 py-2 text-xs font-semibold text-muted-foreground">Princ.</th>
-                         </tr>
-                      </thead>
-                      <tbody>
-                        {fornecedoresProd.map((f: any, idx: number) => (
-                          <tr key={idx} className={idx % 2 === 0 ? "bg-muted/20" : ""}>
-                            <td className="px-3 py-2 text-xs">
-                              <RelationalLink type="fornecedor" id={f.fornecedor_id}>{f.fornecedores?.nome_razao_social || "—"}</RelationalLink>
-                            </td>
-                             <td className="px-3 py-2 text-xs font-mono font-medium text-primary">{f.referencia_fornecedor || "—"}</td>
-                             <td className="px-3 py-2 text-xs">{f.descricao_fornecedor || "—"}</td>
-                             <td className="px-3 py-2 text-xs font-mono text-right">{f.preco_compra ? formatCurrency(f.preco_compra) : "—"}</td>
-                             <td className="px-3 py-2 text-xs text-right">{f.lead_time_dias ? `${f.lead_time_dias} dias` : "—"}</td>
-                            <td className="px-3 py-2 text-xs text-center">{f.eh_principal ? "★" : ""}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  )
-                }
-              </TabsContent>
-
-              <TabsContent value="historico" className="space-y-3 mt-3">
-                {historico.length === 0 ?
-              <p className="text-sm text-muted-foreground text-center py-4">Nenhum histórico de notas</p> :
-
-              <div className="space-y-2 max-h-[350px] overflow-y-auto">
-                    {historico.map((h: any, idx: number) =>
-                <div key={idx} className="text-sm py-1.5 border-b last:border-b-0">
-                        <div className="flex justify-between">
-                          <span className="font-mono text-xs text-primary">{h.notas_fiscais?.numero}</span>
-                          <span className="text-xs text-muted-foreground">{formatDate(h.notas_fiscais?.data_emissao)}</span>
-                        </div>
-                        <div className="flex justify-between text-xs">
-                          <span>{h.notas_fiscais?.fornecedores?.nome_razao_social || "—"}</span>
-                          <span className="font-mono">Qtd: {h.quantidade} × {formatCurrency(h.valor_unitario)}</span>
-                        </div>
-                      </div>
-                )}
-                  </div>
-              }
-              </TabsContent>
-            </Tabs>
-          </div>
-        }
-      </ViewDrawerV2>
     </AppLayout>);
 
 };

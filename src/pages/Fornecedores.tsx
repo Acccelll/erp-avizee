@@ -3,11 +3,7 @@ import { AppLayout } from "@/components/AppLayout";
 import { DataTable, StatusBadge } from "@/components/DataTable";
 import { ModulePage } from "@/components/ModulePage";
 import { FormModal } from "@/components/FormModal";
-import { ViewDrawerV2, ViewField, ViewSection } from "@/components/ViewDrawerV2";
 import { AdvancedFilterBar, type FilterChip } from "@/components/AdvancedFilterBar";
-import { RelationalLink } from "@/components/ui/RelationalLink";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Edit, Copy, Trash2 } from "lucide-react";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
 import { useRelationalNavigation } from "@/contexts/RelationalNavigationContext";
 import { useViaCep } from "@/hooks/useViaCep";
@@ -17,12 +13,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MaskedInput } from "@/components/ui/MaskedInput";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Truck, Clock, AlertTriangle, ShoppingCart, DollarSign, Search } from "lucide-react";
-import { formatCurrency, formatDate } from "@/lib/format";
+import { Search } from "lucide-react";
 
 interface Fornecedor {
   id: string;tipo_pessoa: string;nome_razao_social: string;nome_fantasia: string;
@@ -49,11 +42,8 @@ const Fornecedores = () => {
   const [mode, setMode] = useState<"create" | "edit">("create");
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
-  const [comprasHist, setComprasHist] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [tipoFilter, setTipoFilter] = useState<"todos" | "F" | "J">("todos");
-  const [produtosForn, setProdutosForn] = useState<any[]>([]);
-  const [titulosForn, setTitulosForn] = useState<any[]>([]);
 
   const openCreate = () => {setMode("create");setForm({ ...emptyForm });setSelected(null);setModalOpen(true);};
   const openEdit = (f: Fornecedor) => {
@@ -81,26 +71,11 @@ const Fornecedores = () => {
       if (mode === "create") await create(form);else
       if (selected) await update(selected.id, form);
       setModalOpen(false);
-    } catch {}
+    } catch (err) {
+      console.error('[fornecedores] erro ao salvar:', err);
+    }
     setSaving(false);
   };
-
-  // Stats
-  const deliveryStats = (() => {
-    const delivered = comprasHist.filter((c: any) => c.data_entrega_real && c.data_entrega_prevista);
-    if (delivered.length === 0) return { prazoMedio: 0, atrasoMedio: 0 };
-    let totalDias = 0,totalAtraso = 0;
-    delivered.forEach((c: any) => {
-      const prev = new Date(c.data_entrega_prevista).getTime();
-      const real = new Date(c.data_entrega_real).getTime();
-      const compra = new Date(c.data_compra).getTime();
-      totalDias += (real - compra) / (1000 * 60 * 60 * 24);
-      totalAtraso += Math.max(0, (real - prev) / (1000 * 60 * 60 * 24));
-    });
-    return { prazoMedio: Math.round(totalDias / delivered.length), atrasoMedio: Math.round(totalAtraso / delivered.length) };
-  })();
-
-  const volumeComprado = comprasHist.reduce((s: number, c: any) => s + Number(c.valor_total || 0), 0);
 
   const filteredData = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
@@ -201,164 +176,6 @@ const Fornecedores = () => {
         </form>
       </FormModal>
 
-      <ViewDrawerV2 open={drawerOpen} onClose={() => setDrawerOpen(false)} title="Detalhes do Fornecedor"
-      actions={selected ? <>
-          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {setDrawerOpen(false);openEdit(selected);}}><Edit className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Editar</TooltipContent></Tooltip>
-          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {setDrawerOpen(false);duplicate(selected);}}><Copy className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Duplicar</TooltipContent></Tooltip>
-          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => {setDrawerOpen(false);remove(selected.id);}}><Trash2 className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Excluir</TooltipContent></Tooltip>
-        </> : undefined}>
-        
-        {selected &&
-        <div className="space-y-5">
-            {/* Header with identity */}
-            <div className="flex items-start gap-4">
-              <div className="flex-shrink-0 h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
-                <span className="text-primary font-bold text-lg">
-                  {(selected.nome_fantasia || selected.nome_razao_social).charAt(0).toUpperCase()}
-                </span>
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="font-semibold text-lg truncate">{selected.nome_razao_social}</h3>
-                  <StatusBadge status={selected.ativo ? "Ativo" : "Inativo"} />
-                </div>
-                {selected.nome_fantasia &&
-              <p className="text-sm text-muted-foreground truncate">{selected.nome_fantasia}</p>
-              }
-                {selected.cpf_cnpj &&
-              <p className="text-xs text-muted-foreground font-mono mt-0.5">{selected.cpf_cnpj}</p>
-              }
-              </div>
-            </div>
-
-            {/* KPI Cards */}
-            <div className="grid grid-cols-4 gap-2">
-              <div className="rounded-lg border bg-card p-3 text-center space-y-1">
-                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Prazo Médio</p>
-                <p className="font-mono font-bold text-base text-foreground">{deliveryStats.prazoMedio}<span className="text-xs font-normal text-muted-foreground ml-0.5">d</span></p>
-              </div>
-              <div className="rounded-lg border bg-card p-3 text-center space-y-1">
-                <p className="font-medium text-muted-foreground uppercase tracking-wider text-xs">Atraso</p>
-                <p className={`font-mono font-bold text-base ${deliveryStats.atrasoMedio > 0 ? "text-destructive" : "text-emerald-600 dark:text-emerald-400"}`}>{deliveryStats.atrasoMedio}<span className="text-xs font-normal text-muted-foreground ml-0.5">d</span></p>
-              </div>
-              <div className="rounded-lg border bg-card p-3 text-center space-y-1">
-                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Volume</p>
-                <p className="font-mono font-bold text-foreground truncate text-xs" title={formatCurrency(volumeComprado)}>{formatCurrency(volumeComprado)}</p>
-              </div>
-              <div className="rounded-lg border bg-card p-3 text-center space-y-1">
-                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Últ. Compra</p>
-                <p className="font-mono font-bold text-sm text-foreground truncate">{comprasHist.length > 0 ? formatDate(comprasHist[0].data_compra) : "—"}</p>
-              </div>
-            </div>
-
-            {/* Tabs */}
-            <Tabs defaultValue="cadastro" className="w-full">
-              <TabsList className="w-full grid grid-cols-4">
-                <TabsTrigger value="cadastro" className="text-xs">Cadastro</TabsTrigger>
-                <TabsTrigger value="financeiro" className="text-xs">Financeiro</TabsTrigger>
-                <TabsTrigger value="compras" className="text-xs">Compras</TabsTrigger>
-                <TabsTrigger value="produtos" className="text-xs">Produtos</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="cadastro" className="mt-3 space-y-4">
-                <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-                  {[
-                { label: "CNPJ/CPF", value: selected.cpf_cnpj, mono: true },
-                { label: "I.E.", value: selected.inscricao_estadual },
-                { label: "Telefone", value: selected.telefone },
-                { label: "E-mail", value: selected.email },
-                { label: "Contato", value: selected.contato },
-                { label: "Celular", value: selected.celular }].
-                map((field, i) =>
-                <div key={i}>
-                      <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-0.5">{field.label}</p>
-                      <p className={`text-sm ${field.mono ? "font-mono" : ""}`}>{field.value || "—"}</p>
-                    </div>
-                )}
-                </div>
-                {selected.logradouro &&
-              <div className="border-t pt-3">
-                    <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-0.5">Endereço</p>
-                    <p className="text-sm">{selected.logradouro}, {selected.numero}{selected.complemento ? ` - ${selected.complemento}` : ""} — {selected.bairro} - {selected.cidade}/{selected.uf} - CEP {selected.cep}</p>
-                  </div>
-              }
-                {selected.observacoes &&
-              <div className="border-t pt-3">
-                    <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-0.5">Observações</p>
-                    <p className="text-sm text-muted-foreground">{selected.observacoes}</p>
-                  </div>
-              }
-              </TabsContent>
-
-              <TabsContent value="financeiro" className="mt-3">
-                {titulosForn.length === 0 ?
-              <p className="text-sm text-muted-foreground text-center py-6">Nenhum título registrado</p> :
-
-              <div className="space-y-1 max-h-[350px] overflow-y-auto">
-                    {titulosForn.map((t: any, idx: number) =>
-                <div key={idx} className="flex items-center justify-between py-2 px-2 rounded-md hover:bg-muted/30 transition-colors border-b last:border-b-0">
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium truncate">{t.descricao}</p>
-                          <p className="text-[10px] text-muted-foreground">Venc: {formatDate(t.data_vencimento)}</p>
-                        </div>
-                        <div className="text-right flex-shrink-0 ml-3 space-y-0.5">
-                          <p className="font-mono text-sm font-semibold">{formatCurrency(t.valor)}</p>
-                          <StatusBadge status={t.status === "pago" ? "Pago" : t.status === "vencido" ? "Vencido" : "Aberto"} />
-                        </div>
-                      </div>
-                )}
-                  </div>
-              }
-              </TabsContent>
-
-              <TabsContent value="compras" className="mt-3">
-                {comprasHist.length === 0 ?
-              <p className="text-sm text-muted-foreground text-center py-6">Nenhuma compra registrada</p> :
-
-              <div className="space-y-1 max-h-[350px] overflow-y-auto">
-                    {comprasHist.map((c: any, idx: number) =>
-                <div key={idx} className="flex items-center justify-between py-2 px-2 rounded-md hover:bg-muted/30 transition-colors border-b last:border-b-0">
-                        <div className="min-w-0">
-                          <span className="font-mono text-xs text-primary font-semibold">{c.numero}</span>
-                          <span className="text-xs text-muted-foreground ml-2">{formatDate(c.data_compra)}</span>
-                        </div>
-                        <div className="text-right flex-shrink-0 ml-3 flex items-center gap-2">
-                          <span className="font-mono font-semibold text-sm">{formatCurrency(Number(c.valor_total || 0))}</span>
-                          <StatusBadge status={c.status} />
-                        </div>
-                      </div>
-                )}
-                  </div>
-              }
-              </TabsContent>
-
-              <TabsContent value="produtos" className="mt-3">
-                {produtosForn.length === 0 ?
-              <p className="text-sm text-muted-foreground text-center py-6">Nenhum produto vinculado</p> :
-
-              <div className="space-y-1 max-h-[350px] overflow-y-auto">
-                    {produtosForn.map((pf: any, idx: number) =>
-                <div key={idx} className="flex items-center justify-between py-2 px-2 rounded-md hover:bg-muted/30 transition-colors border-b last:border-b-0">
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium truncate">{pf.produtos?.nome}</p>
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            {pf.produtos?.sku && <span className="font-mono">{pf.produtos.sku}</span>}
-                            {pf.referencia_fornecedor && <span>Ref: {pf.referencia_fornecedor}</span>}
-                          </div>
-                        </div>
-                        <div className="text-right flex-shrink-0 ml-3 space-y-0.5">
-                          {pf.preco_compra && <p className="font-mono text-sm font-semibold">{formatCurrency(pf.preco_compra)}</p>}
-                          {pf.lead_time_dias && <p className="text-xs text-muted-foreground">{pf.lead_time_dias} dias</p>}
-                        </div>
-                      </div>
-                )}
-                  </div>
-              }
-              </TabsContent>
-            </Tabs>
-          </div>
-        }
-      </ViewDrawerV2>
     </AppLayout>);
 
 };
