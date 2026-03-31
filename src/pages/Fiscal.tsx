@@ -8,7 +8,7 @@ import { ViewField, ViewSection } from "@/components/ViewDrawer";
 import { ViewDrawerV2 } from "@/components/ViewDrawerV2";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Edit, Trash2, Upload, ArrowLeftRight } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { SummaryCard } from "@/components/SummaryCard";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
 import { useRelationalNavigation } from "@/contexts/RelationalNavigationContext";
@@ -1029,6 +1029,9 @@ const Fiscal = () => {
         <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Gerar Nota de Devolução</DialogTitle>
+            <DialogDescription>
+              Selecione os itens e as quantidades que deseja devolver da nota fiscal original.
+            </DialogDescription>
           </DialogHeader>
           {devolucaoNF && (
             <div className="space-y-5">

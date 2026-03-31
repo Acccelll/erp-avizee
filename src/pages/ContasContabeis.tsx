@@ -57,7 +57,10 @@ const ContasContabeis = () => {
       if (mode === "create") await create(payload);
       else if (selected) await update(selected.id, payload);
       setModalOpen(false);
-    } catch {}
+    } catch (err) {
+      console.error('[contas-contabeis] erro ao salvar:', err);
+      toast.error("Erro ao salvar conta contábil");
+    }
     setSaving(false);
   };
 

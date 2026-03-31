@@ -103,7 +103,10 @@ const Caixa = () => {
       // Refresh contas
       const { data: contas } = await supabase.from("contas_bancarias").select("*, bancos(nome)").eq("ativo", true);
       setContasBancarias((contas as any[]) || []);
-    } catch {}
+    } catch (err) {
+      console.error('[caixa] erro ao salvar:', err);
+      toast.error("Erro ao registrar movimentação");
+    }
     setSaving(false);
   };
 

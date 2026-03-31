@@ -98,7 +98,10 @@ const Estoque = () => {
       produtosCrud.fetchData();
       setModalOpen(false);
       setForm({ produto_id: "", tipo: "entrada", quantidade: 0, motivo: "" });
-    } catch {}
+    } catch (err) {
+      console.error('[estoque] erro ao salvar:', err);
+      toast.error("Erro ao registrar movimentação de estoque");
+    }
     setSaving(false);
   };
 

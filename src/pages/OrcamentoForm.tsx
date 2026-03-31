@@ -13,7 +13,7 @@ import { OrcamentoCondicoesCard } from "@/components/Orcamento/OrcamentoCondicoe
 import { FreteCorreiosCard } from "@/components/Orcamento/FreteCorreiosCard";
 import { OrcamentoSidebarSummary } from "@/components/Orcamento/OrcamentoSidebarSummary";
 import { OrcamentoPdfTemplate } from "@/components/Orcamento/OrcamentoPdfTemplate";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ArrowLeft, Save, Eye, FileText, Copy, Plus, Search } from "lucide-react";
@@ -446,6 +446,12 @@ export default function OrcamentoForm() {
 
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
         <DialogContent className="max-w-4xl max-h-[95vh] overflow-y-auto p-0">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Pré-visualização do Orçamento</DialogTitle>
+            <DialogDescription>
+              Visualize como o orçamento será impresso ou enviado ao cliente.
+            </DialogDescription>
+          </DialogHeader>
           <div className="p-4 border-b flex justify-between items-center sticky top-0 bg-card z-10">
             <h3 className="font-semibold">Pré-visualização do Orçamento</h3>
             <div className="flex gap-2">

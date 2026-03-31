@@ -1,5 +1,5 @@
 import { ReactNode } from "react";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 
@@ -20,6 +20,7 @@ export function ViewDrawer({ open, onClose, title, children, badge, actions }: V
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
               <SheetTitle className="text-lg truncate">{title}</SheetTitle>
+              <SheetDescription className="sr-only">Visualização de {title}</SheetDescription>
               {badge}
             </div>
             {actions && <div className="flex items-center gap-1 shrink-0">{actions}</div>}

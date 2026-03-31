@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Search } from "lucide-react";
@@ -52,6 +52,9 @@ export function ProductSelector({ produtos, onSelect, trigger }: ProductSelector
       <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Selecionar Produto</DialogTitle>
+          <DialogDescription>
+            Pesquise e selecione um produto da lista abaixo.
+          </DialogDescription>
         </DialogHeader>
         <div className="relative my-2">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -145,6 +148,9 @@ export function ClientSelector({ clientes, onSelect, trigger }: ClientSelectorPr
       <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Selecionar Cliente</DialogTitle>
+          <DialogDescription>
+            Pesquise e selecione um cliente da lista abaixo.
+          </DialogDescription>
         </DialogHeader>
         <div className="relative my-2">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />

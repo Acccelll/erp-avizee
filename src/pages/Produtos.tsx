@@ -145,6 +145,7 @@ const Produtos = () => {
       setModalOpen(false);
     } catch (err) {
       console.error('[produtos] erro ao salvar:', err);
+      toast.error("Erro ao salvar produto");
     }
     setSaving(false);
   };

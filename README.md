@@ -31,6 +31,7 @@ ERP web da AviZee construído com React, Vite, TypeScript, shadcn/ui e Supabase.
 - Relatórios
 - Remessas e rastreamento logístico
 - [Migração de Dados](MIGRACAO.md)
+- Preços Especiais (Regras de venda por cliente)
 - Configurações
 - Administração
 
@@ -84,6 +85,7 @@ A navegação foi reorganizada para reduzir poluição visual e manter contexto:
 - Menu de ações rápidas no header
 - Painel de notificações
 - Perfil do usuário e alternância de tema
+- **Navegação stacked**: Detalhes de entidades (clientes, produtos) abrem em drawers sobrepostos, mantendo o histórico de navegação.
 
 ## Rotas de apoio criadas
 

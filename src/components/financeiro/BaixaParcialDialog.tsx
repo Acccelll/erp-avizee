@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -145,6 +145,9 @@ export function BaixaParcialDialog({ open, onClose, lancamento, contasBancarias,
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Registrar Baixa</DialogTitle>
+          <DialogDescription>
+            Informe os valores e dados do pagamento para realizar a baixa total ou parcial deste título.
+          </DialogDescription>
         </DialogHeader>
 
         {lancamento && (

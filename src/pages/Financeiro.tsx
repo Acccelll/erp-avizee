@@ -21,7 +21,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { formatCurrency } from "@/lib/format";
 import { supabase } from "@/integrations/supabase/client";
@@ -181,7 +181,10 @@ const Financeiro = () => {
         await update(selected.id, basePayload);
       }
       setModalOpen(false);
-    } catch { }
+    } catch (err) {
+      console.error('[financeiro] erro ao salvar:', err);
+      toast.error("Erro ao salvar lançamento");
+    }
     setSaving(false);
   };
 
@@ -720,6 +723,9 @@ const Financeiro = () => {
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Confirmar Baixa — {selectedIds.length} título(s)</DialogTitle>
+            <DialogDescription>
+              Revise os títulos selecionados e informe os dados do pagamento para concluir a baixa.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="rounded-lg border overflow-hidden">

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Edit, Trash2, Tag, Calendar, User, Package } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/format";
@@ -35,21 +35,31 @@ export function PrecosEspeciaisTab({ clienteId, produtoId }: Props) {
 
   const fetchPrecos = async () => {
     setLoading(true);
-    let query = supabase
-      .from("precos_especiais")
-      .select("*, clientes(nome_razao_social), produtos(nome, sku, preco_venda)");
+    try {
+      let query = supabase
+        .from("precos_especiais")
+        .select("*, clientes(nome_razao_social), produtos(nome, sku, preco_venda)");
 
-    if (clienteId) query = query.eq("cliente_id", clienteId);
-    if (produtoId) query = query.eq("produto_id", produtoId);
+      if (clienteId) query = query.eq("cliente_id", clienteId);
+      if (produtoId) query = query.eq("produto_id", produtoId);
 
-    const { data, error } = await query.order("created_at", { ascending: false });
+      const { data, error, status } = await query.order("created_at", { ascending: false });
 
-    if (error) {
-      toast.error("Erro ao carregar preços especiais");
-    } else {
-      setPrecos(data || []);
+      if (error) {
+        if (status === 404) {
+          console.warn("Tabela precos_especiais não encontrada. Verifique as migrações.");
+          setPrecos([]);
+        } else {
+          toast.error("Erro ao carregar preços especiais");
+        }
+      } else {
+        setPrecos(data || []);
+      }
+    } catch (err) {
+      console.error("Erro inesperado ao buscar preços:", err);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const loadSelectionData = async () => {
@@ -103,14 +113,20 @@ export function PrecosEspeciaisTab({ clienteId, produtoId }: Props) {
     };
 
     try {
-      let error;
+      let result;
       if (editing.id) {
-        ({ error } = await supabase.from("precos_especiais").update(payload).eq("id", editing.id));
+        result = await supabase.from("precos_especiais").update(payload).eq("id", editing.id);
       } else {
-        ({ error } = await supabase.from("precos_especiais").insert(payload));
+        result = await supabase.from("precos_especiais").insert(payload);
       }
 
-      if (error) throw error;
+      if (result.error) {
+        if (result.status === 404) {
+          toast.error("Módulo de preços especiais não configurado no banco de dados.");
+          return;
+        }
+        throw result.error;
+      }
 
       toast.success("Preço especial salvo!");
       setModalOpen(false);
@@ -207,6 +223,9 @@ export function PrecosEspeciaisTab({ clienteId, produtoId }: Props) {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>{editing?.id ? "Editar" : "Novo"} Preço Especial</DialogTitle>
+            <DialogDescription>
+              Defina regras de preço customizadas para este vínculo.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             {clienteId ? (

@@ -1,5 +1,5 @@
 import { useRelationalNavigation, EntityType, ViewState } from "@/contexts/RelationalNavigationContext";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, X } from "lucide-react";
 import { ProdutoView } from "./ProdutoView";
@@ -67,6 +67,7 @@ export function RelationalDrawerStack() {
                     </Button>
                   )}
                   <SheetTitle className="text-lg truncate">{getTitle(view.type)}</SheetTitle>
+                  <SheetDescription className="sr-only">Visualização de {getTitle(view.type)}</SheetDescription>
                 </div>
                 <div className="flex items-center gap-2">
                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={clearStack}>

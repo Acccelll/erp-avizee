@@ -405,7 +405,7 @@ export default function MigracaoDados() {
                           importType?.charAt(0).toUpperCase() + importType?.slice(1)}
               </DialogTitle>
               <DialogDescription>
-                Siga os passos abaixo para realizar a carga de dados.
+                Siga os passos abaixo para realizar a carga de dados de sistemas legados para o ERP AviZee.
               </DialogDescription>
             </DialogHeader>
 

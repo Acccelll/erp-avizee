@@ -91,6 +91,7 @@ const GruposEconomicos = () => {
       setModalOpen(false);
     } catch (err) {
       console.error('[grupos-economicos] erro ao salvar:', err);
+      toast.error("Erro ao salvar grupo econômico");
     }
     setSaving(false);
   };
