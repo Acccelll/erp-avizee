@@ -8,6 +8,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Edit, Trash2, Plus, MapPin, Package as PackageIcon, Truck, Search } from "lucide-react";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
 import { supabase } from "@/integrations/supabase/client";
+import { Tables } from "@/integrations/supabase/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,35 +17,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { format } from "date-fns";
 
-
-interface Remessa {
-  id: string;
-  ordem_venda_id: string | null;
-  cliente_id: string | null;
-  transportadora_id: string | null;
-  servico: string | null;
-  codigo_rastreio: string | null;
-  data_postagem: string | null;
-  previsao_entrega: string | null;
-  status_transporte: string;
-  peso: number | null;
-  volumes: number | null;
-  valor_frete: number | null;
-  observacoes: string | null;
-  usuario_id: string | null;
-  ativo: boolean;
-  created_at: string;
-  updated_at: string;
-}
-
-interface RemessaEvento {
-  id: string;
-  remessa_id: string;
-  data_hora: string;
-  descricao: string;
-  local: string | null;
-  created_at: string;
-}
+type Remessa = Tables<"remessas">;
+type RemessaEvento = Tables<"remessa_eventos">;
 
 /** Shape of a single event object returned by the Correios tracking API. */
 interface CorreiosEvento {
@@ -81,7 +55,7 @@ const emptyForm: RemessaForm = {
 };
 
 export default function Remessas() {
-  const { data, loading, create, update, remove } = useSupabaseCrud<Remessa>({ table: "remessas" as any });
+  const { data, loading, create, update, remove } = useSupabaseCrud<Remessa>({ table: "remessas" });
   const [modalOpen, setModalOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selected, setSelected] = useState<Remessa | null>(null);
@@ -103,8 +77,15 @@ export default function Remessas() {
 
   useEffect(() => {
     if (selected && drawerOpen) {
-      supabase.from("remessa_eventos" as any).select("*").eq("remessa_id", selected.id).order("data_hora", { ascending: false })
-        .then(({ data }) => setEventos((data as any) || []));
+      supabase.from("remessa_eventos").select("*").eq("remessa_id", selected.id).order("data_hora", { ascending: false })
+        .then(({ data, error }) => {
+          if (error) {
+            console.error("[remessas] erro ao carregar eventos:", error);
+            toast.error("Erro ao carregar histórico de eventos");
+            return;
+          }
+          setEventos(data || []);
+        });
     }
   }, [selected, drawerOpen]);
 
@@ -154,23 +135,43 @@ export default function Remessas() {
   const handleAddEvento = async () => {
     if (!selected || !eventoForm.descricao.trim()) { toast.error("Descrição obrigatória"); return; }
     setSavingEvento(true);
-    const { error } = await supabase.from("remessa_eventos" as any).insert({
-      remessa_id: selected.id, descricao: eventoForm.descricao, local: eventoForm.local || null,
-    } as any);
-    if (error) { toast.error("Erro ao salvar evento"); }
-    else {
+    try {
+      const { error } = await supabase.from("remessa_eventos").insert({
+        remessa_id: selected.id,
+        descricao: eventoForm.descricao,
+        local: eventoForm.local || null,
+      });
+
+      if (error) throw error;
+
       toast.success("Evento adicionado");
       setEventoForm({ descricao: "", local: "" });
-      const { data } = await supabase.from("remessa_eventos" as any).select("*").eq("remessa_id", selected.id).order("data_hora", { ascending: false });
-      setEventos((data as any) || []);
+
+      const { data, error: fetchError } = await supabase
+        .from("remessa_eventos")
+        .select("*")
+        .eq("remessa_id", selected.id)
+        .order("data_hora", { ascending: false });
+
+      if (fetchError) throw fetchError;
+      setEventos(data || []);
+    } catch (err: any) {
+      console.error("[remessas] handleAddEvento:", err);
+      toast.error("Erro ao salvar evento: " + (err.message || "Tente novamente"));
+    } finally {
+      setSavingEvento(false);
     }
-    setSavingEvento(false);
   };
 
   const handleStatusChange = async (remessa: Remessa, newStatus: string) => {
-    await update(remessa.id, { status_transporte: newStatus } as any);
-    if (selected?.id === remessa.id) setSelected({ ...remessa, status_transporte: newStatus });
-    toast.success(`Status atualizado para ${statusMap[newStatus]?.label || newStatus}`);
+    try {
+      await update(remessa.id, { status_transporte: newStatus });
+      if (selected?.id === remessa.id) setSelected({ ...remessa, status_transporte: newStatus });
+      toast.success(`Status atualizado para ${statusMap[newStatus]?.label || newStatus}`);
+    } catch (err: any) {
+      console.error("[remessas] handleStatusChange:", err);
+      toast.error("Erro ao atualizar status");
+    }
   };
 
   const handleRastrear = async (remessa: Remessa) => {
@@ -205,7 +206,7 @@ export default function Remessas() {
       }));
 
       const { data: eventosExistentes, error: eventosExistentesError } = await supabase
-        .from("remessa_eventos" as any)
+        .from("remessa_eventos")
         .select("descricao, local, data_hora")
         .eq("remessa_id", remessa.id);
 
@@ -217,15 +218,15 @@ export default function Remessas() {
         `${evento.data_hora}::${evento.descricao}::${evento.local || ""}`;
 
       const eventosExistentesSet = new Set(
-        ((eventosExistentes as any[]) || []).map((evento) => eventKey(evento))
+        (eventosExistentes || []).map((evento) => eventKey(evento))
       );
 
       const novosEventos = eventosNormalizados.filter(
-        (evento: { descricao: string; local: string | null; data_hora: string }) => !eventosExistentesSet.has(eventKey(evento))
+        (evento) => !eventosExistentesSet.has(eventKey(evento))
       );
 
       if (novosEventos.length > 0) {
-        const { error: insertError } = await supabase.from("remessa_eventos" as any).insert(novosEventos as any);
+        const { error: insertError } = await supabase.from("remessa_eventos").insert(novosEventos);
         if (insertError) {
           throw insertError;
         }
@@ -233,7 +234,7 @@ export default function Remessas() {
 
       toast.success(`${novosEventos.length} novo(s) evento(s) incluído(s)`);
       const { data: updatedEvents, error: updatedEventsError } = await supabase
-        .from("remessa_eventos" as any)
+        .from("remessa_eventos")
         .select("*")
         .eq("remessa_id", remessa.id)
         .order("data_hora", { ascending: false });
@@ -242,7 +243,7 @@ export default function Remessas() {
         throw updatedEventsError;
       }
 
-      setEventos((updatedEvents as any) || []);
+      setEventos(updatedEvents || []);
     } catch (err: unknown) {
       console.error("[rastrear]", err);
       toast.error(err instanceof Error ? err.message : "Erro ao consultar rastreio");

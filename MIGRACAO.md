@@ -14,8 +14,9 @@ O módulo de migração foi projetado para garantir a integridade dos dados oper
 ### 1.2 Camada de Lógica (TypeScript)
 Localizada em `src/lib/importacao/`:
 - `normalizers.ts`: Padronização de strings, documentos (CPF/CNPJ), valores monetários e datas.
-- `parsers.ts`: Lógica robusta para interpretar quantidades (incluindo expressões matemáticas e unidades mistas) e datas em formato Excel serial.
-- `validators.ts`: Regras de negócio específicas para cada tipo de entidade migrada.
+- `parsers.ts`: Lógica robusta para interpretar quantidades (incluindo expressões matemáticas e unidades mistas via regex-guarded Function constructor) e datas em formato Excel serial.
+- `validators.ts`: Regras de negócio específicas para cada tipo de entidade migrada, mapeando diferentes cabeçalhos de coluna (aliases).
+- `aliases.ts`: Mapeamento de códigos de produtos de fornecedores para IDs internos.
 
 ## 2. Fluxos Implementados
 
@@ -53,6 +54,7 @@ Localizada em `src/lib/importacao/`:
 - Importação de itens de faturamento histórico não vincula automaticamente novos produtos (requer cadastro prévio).
 - O custo médio não é recalculado retroativamente durante a abertura de estoque.
 - Upload limitado pelo tamanho de memória do navegador (browser-side parsing).
+- Cálculos matemáticos em strings de quantidade (ex: "=10+2") são suportados, mas restritos a operadores básicos (+ - * /) por segurança.
 
 ## 5. Próximos Passos (Fase 2)
 - Importação de fotos de produtos em lote.

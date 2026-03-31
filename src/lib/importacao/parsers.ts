@@ -92,10 +92,11 @@ export function parseQuantidadeEstoque(value: any): ParseResult<number> {
   // Caso 1: Expressão matemática simples (começa com =)
   if (str.startsWith('=')) {
     try {
-      // Usar eval é arriscado, mas aqui restringimos a expressão para números e operadores
+      // Expressão restrita para números e operadores básicos para evitar injeção
       const expression = str.substring(1).replace(',', '.');
       if (/^[\d+\-*/().\s]+$/.test(expression)) {
-        const calculated = eval(expression);
+        // Usa o construtor Function como alternativa ligeiramente mais segura ao eval direto
+        const calculated = new Function(`return ${expression}`)();
         if (typeof calculated === 'number' && !isNaN(calculated)) {
           return { value: calculated };
         }

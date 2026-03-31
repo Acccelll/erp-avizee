@@ -172,7 +172,9 @@ const Produtos = () => {
         }
       }
       setModalOpen(false);
-    } catch {}
+    } catch (err) {
+      console.error('[produtos] erro ao salvar:', err);
+    }
     setSaving(false);
   };
 
