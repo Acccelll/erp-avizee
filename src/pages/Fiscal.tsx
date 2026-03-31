@@ -4,6 +4,7 @@ import { AppLayout } from "@/components/AppLayout";
 import { ModulePage } from "@/components/ModulePage";
 import { DataTable, StatusBadge } from "@/components/DataTable";
 import { FormModal } from "@/components/FormModal";
+import { AdvancedFilterBar, type FilterChip } from "@/components/AdvancedFilterBar";
 import { ViewField, ViewSection } from "@/components/ViewDrawer";
 import { ViewDrawerV2 } from "@/components/ViewDrawerV2";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
