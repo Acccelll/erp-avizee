@@ -64,18 +64,23 @@ export function ProdutoView({ id }: Props) {
   if (!selected) return <div className="p-8 text-center text-destructive">Produto não encontrado</div>;
 
   const selectedMargem = (selected.preco_custo || 0) > 0 ? (selected.preco_venda / (selected.preco_custo || 1) - 1) * 100 : 0;
+  const lucroBruto = selected.preco_venda - (selected.preco_custo || 0);
   const custoCompostoView = composicao.reduce((s, c) => s + c.quantidade * (c.preco_custo || 0), 0);
 
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         <div className="rounded-lg border bg-card p-4 text-center space-y-1">
-          <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Preço Venda</p>
+          <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Venda</p>
           <p className="font-mono font-bold text-sm text-foreground">{formatCurrency(selected.preco_venda)}</p>
         </div>
         <div className="rounded-lg border bg-card p-4 text-center space-y-1">
           <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Custo</p>
           <p className="font-mono font-bold text-sm text-foreground">{formatCurrency(selected.preco_custo || 0)}</p>
+        </div>
+        <div className="rounded-lg border bg-card p-4 text-center space-y-1">
+          <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Lucro Bruto</p>
+          <p className="font-mono font-bold text-sm text-primary">{formatCurrency(lucroBruto)}</p>
         </div>
         <div className="rounded-lg border bg-card p-4 text-center space-y-1">
           <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Margem</p>
@@ -128,10 +133,16 @@ export function ProdutoView({ id }: Props) {
               <h4 className="font-semibold text-sm mb-2">Fornecedores</h4>
               {fornecedoresProd.map((f: any, idx: number) => (
                 <div key={idx} className="flex justify-between text-sm py-1.5 border-b last:border-b-0">
-                  <RelationalLink onClick={() => pushView("fornecedor", f.fornecedores?.id)}>{f.fornecedores?.nome_razao_social || "—"}</RelationalLink>
+                  <div>
+                    <RelationalLink onClick={() => pushView("fornecedor", f.fornecedores?.id)}>{f.fornecedores?.nome_razao_social || "—"}</RelationalLink>
+                    {f.referencia_fornecedor && (
+                      <p className="text-[10px] text-muted-foreground">Ref: {f.referencia_fornecedor}</p>
+                    )}
+                  </div>
                   <div className="text-right text-xs">
-                    {f.preco_compra && <span className="font-mono">{formatCurrency(f.preco_compra)}</span>}
-                    {f.lead_time_dias && <span className="text-muted-foreground ml-2">{f.lead_time_dias}d</span>}
+                    {f.preco_compra && <p className="font-mono">{formatCurrency(f.preco_compra)}</p>}
+                    {f.lead_time_dias && <p className="text-muted-foreground mt-0.5">{f.lead_time_dias}d de prazo</p>}
+                    {f.eh_principal && <span className="inline-block bg-primary/10 text-primary px-1 rounded-[2px] mt-1">Principal</span>}
                   </div>
                 </div>
               ))}

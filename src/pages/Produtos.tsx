@@ -189,7 +189,16 @@ const Produtos = () => {
       const custo = Number(p.preco_custo || 0);
       const venda = Number(p.preco_venda);
       const margem = custo > 0 ? (venda / custo - 1) * 100 : 0;
-      return <span className={`font-mono text-xs ${margem > 0 ? "text-success" : margem < 0 ? "text-destructive" : ""}`}>{custo > 0 ? `${margem.toFixed(1)}%` : "—"}</span>;
+      return (
+        <div className="flex flex-col">
+          <span className={`font-mono text-xs ${margem > 0 ? "text-success" : margem < 0 ? "text-destructive" : ""}`}>
+            {custo > 0 ? `${margem.toFixed(1)}%` : "—"}
+          </span>
+          <span className="text-[10px] text-muted-foreground font-mono">
+            +{formatCurrency(venda - custo)}
+          </span>
+        </div>
+      );
     } },
   { key: "eh_composto", label: "Tipo", render: (p: Produto) => p.eh_composto ? <StatusBadge status="Composto" /> : <StatusBadge status="Simples" /> }];
 
