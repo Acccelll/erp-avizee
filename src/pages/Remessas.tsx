@@ -2,11 +2,13 @@ import { useMemo, useState, useEffect } from "react";
 import { AppLayout } from "@/components/AppLayout";
 import { ModulePage } from "@/components/ModulePage";
 import { DataTable, StatusBadge } from "@/components/DataTable";
+import { AdvancedFilterBar, type FilterChip } from "@/components/AdvancedFilterBar";
 import { FormModal } from "@/components/FormModal";
 import { ViewDrawerV2 } from "@/components/ViewDrawerV2";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Edit, Trash2, Plus, MapPin, Package as PackageIcon, Truck, Search } from "lucide-react";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
+import { useRelationalNavigation } from "@/contexts/RelationalNavigationContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Tables } from "@/integrations/supabase/types";
 import { Button } from "@/components/ui/button";
@@ -14,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { MultiSelect, type MultiSelectOption } from "@/components/ui/MultiSelect";
 import { toast } from "sonner";
 import { format } from "date-fns";
 
@@ -45,17 +48,20 @@ const statusMap: Record<string, { label: string; color: string }> = {
 interface RemessaForm {
   cliente_id: string; transportadora_id: string; servico: string; codigo_rastreio: string;
   data_postagem: string; previsao_entrega: string; status_transporte: string;
-  peso: string; volumes: string; valor_frete: string; observacoes: string; ordem_venda_id: string;
+  peso: string; volumes: string; valor_frete: string; observacoes: string;
+  ordem_venda_id: string; pedido_compra_id: string; nota_fiscal_id: string;
 }
 
 const emptyForm: RemessaForm = {
   cliente_id: "", transportadora_id: "", servico: "", codigo_rastreio: "",
   data_postagem: "", previsao_entrega: "", status_transporte: "pendente",
-  peso: "", volumes: "1", valor_frete: "", observacoes: "", ordem_venda_id: "",
+  peso: "", volumes: "1", valor_frete: "", observacoes: "",
+  ordem_venda_id: "", pedido_compra_id: "", nota_fiscal_id: "",
 };
 
 export default function Remessas() {
   const { data, loading, create, update, remove } = useSupabaseCrud<Remessa>({ table: "remessas" });
+  const { pushView } = useRelationalNavigation();
   const [modalOpen, setModalOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selected, setSelected] = useState<Remessa | null>(null);
@@ -63,9 +69,14 @@ export default function Remessas() {
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilters, setStatusFilters] = useState<string[]>([]);
+  const [transportadoraFilters, setTransportadoraFilters] = useState<string[]>([]);
 
   const [clientes, setClientes] = useState<Array<{ id: string; nome_razao_social: string }>>([]);
   const [transportadoras, setTransportadoras] = useState<Array<{ id: string; nome_razao_social: string }>>([]);
+  const [ordensVenda, setOrdensVenda] = useState<any[]>([]);
+  const [pedidosCompra, setPedidosCompra] = useState<any[]>([]);
+  const [notasFiscais, setNotasFiscais] = useState<any[]>([]);
   const [eventos, setEventos] = useState<RemessaEvento[]>([]);
   const [eventoForm, setEventoForm] = useState({ descricao: "", local: "" });
   const [savingEvento, setSavingEvento] = useState(false);
@@ -73,6 +84,9 @@ export default function Remessas() {
   useEffect(() => {
     supabase.from("clientes").select("id,nome_razao_social").eq("ativo", true).then(({ data }) => setClientes(data || []));
     supabase.from("transportadoras").select("id,nome_razao_social").eq("ativo", true).then(({ data }) => setTransportadoras(data || []));
+    supabase.from("ordens_venda").select("id, numero").eq("ativo", true).then(({ data }) => setOrdensVenda(data || []));
+    supabase.from("pedidos_compra").select("id, numero").eq("ativo", true).then(({ data }) => setPedidosCompra(data || []));
+    supabase.from("notas_fiscais").select("id, numero, tipo").eq("ativo", true).then(({ data }) => setNotasFiscais(data || []));
   }, []);
 
   useEffect(() => {
@@ -102,10 +116,15 @@ export default function Remessas() {
       status_transporte: r.status_transporte, peso: r.peso?.toString() || "",
       volumes: r.volumes?.toString() || "1", valor_frete: r.valor_frete?.toString() || "",
       observacoes: r.observacoes || "", ordem_venda_id: r.ordem_venda_id || "",
+      pedido_compra_id: (r as any).pedido_compra_id || "",
+      nota_fiscal_id: (r as any).nota_fiscal_id || "",
     });
     setModalOpen(true);
   };
-  const openView = (r: Remessa) => { setSelected(r); setDrawerOpen(true); };
+  const openView = (r: Remessa) => {
+    setSelected(r);
+    setDrawerOpen(true);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -119,6 +138,8 @@ export default function Remessas() {
       cliente_id: form.cliente_id || null,
       transportadora_id: form.transportadora_id || null,
       ordem_venda_id: form.ordem_venda_id || null,
+      pedido_compra_id: (form as any).pedido_compra_id || null,
+      nota_fiscal_id: (form as any).nota_fiscal_id || null,
       data_postagem: form.data_postagem || null,
       previsao_entrega: form.previsao_entrega || null,
     };
@@ -252,11 +273,32 @@ export default function Remessas() {
 
   const filteredData = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
-    if (!q) return data;
-    return data.filter(r =>
-      [r.codigo_rastreio, clienteMap[r.cliente_id || ""], transportadoraMap[r.transportadora_id || ""]].filter(Boolean).join(" ").toLowerCase().includes(q)
-    );
-  }, [data, searchTerm, clienteMap, transportadoraMap]);
+    return data.filter(r => {
+      if (statusFilters.length > 0 && !statusFilters.includes(r.status_transporte)) return false;
+      if (transportadoraFilters.length > 0 && !transportadoraFilters.includes(r.transportadora_id || "")) return false;
+
+      if (!q) return true;
+      return [r.codigo_rastreio, clienteMap[r.cliente_id || ""], transportadoraMap[r.transportadora_id || ""]].filter(Boolean).join(" ").toLowerCase().includes(q);
+    });
+  }, [data, searchTerm, clienteMap, transportadoraMap, statusFilters, transportadoraFilters]);
+
+  const remActiveFilters = useMemo(() => {
+    const chips: FilterChip[] = [];
+    statusFilters.forEach(f => chips.push({ key: "status", label: "Status", value: [f], displayValue: statusMap[f]?.label || f }));
+    transportadoraFilters.forEach(f => {
+      const t = transportadoras.find(x => x.id === f);
+      chips.push({ key: "transportadora", label: "Transportadora", value: [f], displayValue: t?.nome_razao_social || f });
+    });
+    return chips;
+  }, [statusFilters, transportadoraFilters, transportadoras]);
+
+  const handleRemoveRemFilter = (key: string, value?: string) => {
+    if (key === "status") setStatusFilters(prev => prev.filter(v => v !== value));
+    if (key === "transportadora") setTransportadoraFilters(prev => prev.filter(v => v !== value));
+  };
+
+  const statusOptions: MultiSelectOption[] = Object.entries(statusMap).map(([k, v]) => ({ label: v.label, value: k }));
+  const transportadoraOptions: MultiSelectOption[] = transportadoras.map(t => ({ label: t.nome_razao_social, value: t.id }));
 
   const columns = [
     { key: "codigo_rastreio", label: "Rastreio", render: (r: Remessa) => <span className="font-mono text-xs">{r.codigo_rastreio || "—"}</span> },
@@ -275,9 +317,32 @@ export default function Remessas() {
 
   return (
     <AppLayout>
-      <ModulePage title="Remessas" subtitle="Gestão de remessas e rastreamento logístico" addLabel="Nova Remessa" onAdd={openCreate} count={filteredData.length}
-        searchValue={searchTerm} onSearchChange={setSearchTerm} searchPlaceholder="Buscar por rastreio, cliente ou transportadora...">
-        <DataTable columns={columns} data={filteredData} loading={loading} onView={openView} />
+      <ModulePage title="Remessas" subtitle="Gestão de remessas e rastreamento logístico" addLabel="Nova Remessa" onAdd={openCreate}>
+        <AdvancedFilterBar
+          searchValue={searchTerm}
+          onSearchChange={setSearchTerm}
+          searchPlaceholder="Buscar por rastreio, cliente ou transportadora..."
+          activeFilters={remActiveFilters}
+          onRemoveFilter={handleRemoveRemFilter}
+          onClearAll={() => { setStatusFilters([]); setTransportadoraFilters([]); }}
+          count={filteredData.length}
+        >
+          <MultiSelect
+            options={statusOptions}
+            selected={statusFilters}
+            onChange={setStatusFilters}
+            placeholder="Status"
+            className="w-[180px]"
+          />
+          <MultiSelect
+            options={transportadoraOptions}
+            selected={transportadoraFilters}
+            onChange={setTransportadoraFilters}
+            placeholder="Transportadoras"
+            className="w-[220px]"
+          />
+        </AdvancedFilterBar>
+        <DataTable columns={columns} data={filteredData} loading={loading} onView={openView} onEdit={openEdit} />
       </ModulePage>
 
       {/* Form Modal */}
@@ -319,6 +384,41 @@ export default function Remessas() {
             <div className="space-y-2"><Label>Volumes</Label><Input type="number" min="1" value={form.volumes} onChange={e => setForm({ ...form, volumes: e.target.value })} /></div>
             <div className="space-y-2"><Label>Valor do Frete (R$)</Label><Input type="number" step="0.01" value={form.valor_frete} onChange={e => setForm({ ...form, valor_frete: e.target.value })} /></div>
           </div>
+
+          <h4 className="font-semibold text-sm pt-2 border-t">Vínculos Operacionais</h4>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label>Ordem de Venda</Label>
+              <Select value={form.ordem_venda_id} onValueChange={v => setForm({ ...form, ordem_venda_id: v === "none" ? "" : v })}>
+                <SelectTrigger><SelectValue placeholder="Opcional..." /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Nenhuma</SelectItem>
+                  {ordensVenda.map(ov => <SelectItem key={ov.id} value={ov.id}>{ov.numero}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Pedido de Compra</Label>
+              <Select value={form.pedido_compra_id} onValueChange={v => setForm({ ...form, pedido_compra_id: v === "none" ? "" : v })}>
+                <SelectTrigger><SelectValue placeholder="Opcional..." /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Nenhum</SelectItem>
+                  {pedidosCompra.map(pc => <SelectItem key={pc.id} value={pc.id}>{pc.numero}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Nota Fiscal</Label>
+              <Select value={form.nota_fiscal_id} onValueChange={v => setForm({ ...form, nota_fiscal_id: v === "none" ? "" : v })}>
+                <SelectTrigger><SelectValue placeholder="Opcional..." /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Nenhuma</SelectItem>
+                  {notasFiscais.map(nf => <SelectItem key={nf.id} value={nf.id}>{nf.numero} ({nf.tipo === 'entrada' ? 'Entr.' : 'Saída'})</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
           <div className="space-y-2"><Label>Observações</Label><Textarea value={form.observacoes} onChange={e => setForm({ ...form, observacoes: e.target.value })} /></div>
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={() => setModalOpen(false)}>Cancelar</Button>
@@ -362,6 +462,8 @@ export default function Remessas() {
                     { label: "Peso", value: selected.peso ? `${selected.peso} kg` : null },
                     { label: "Volumes", value: selected.volumes?.toString() },
                     { label: "Valor Frete", value: selected.valor_frete ? `R$ ${Number(selected.valor_frete).toFixed(2)}` : null },
+                    { label: "Ped. Compra", value: pedidosCompra.find(pc => pc.id === (selected as any).pedido_compra_id)?.numero },
+                    { label: "Nota Fiscal", value: notasFiscais.find(nf => nf.id === (selected as any).nota_fiscal_id)?.numero },
                   ].map((f, i) => (
                     <div key={i}>
                       <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-0.5">{f.label}</p>

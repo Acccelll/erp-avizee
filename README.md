@@ -19,20 +19,18 @@ ERP web da AviZee construído com React, Vite, TypeScript, shadcn/ui e Supabase.
 - Produtos e composição
 - Clientes e grupos econômicos
 - Fornecedores
-- Compras
+- Compras e Cotações
 - Orçamentos / pedidos comerciais
 - Ordens de venda
 - Estoque e movimentações
-- Fiscal
-- Financeiro
-- Fluxo de caixa
-- Contas bancárias
-- Plano de contas
-- Relatórios
-- Remessas e rastreamento logístico
+- Fiscal (Entradas e Saídas)
+- Financeiro (Pagar/Receber, Fluxo de Caixa)
+- Contas bancárias e Plano de contas
+- Relatórios (Estoque, Vendas, Financeiro)
+- Remessas e rastreamento logístico (Integração Correios)
 - [Migração de Dados](MIGRACAO.md)
-- Configurações
-- Administração
+- Preços Especiais (Regras de venda por cliente com aplicação automática)
+- Configurações e Administração
 
 ## Como rodar localmente
 
@@ -69,176 +67,67 @@ npm run lint       # lint (quando aplicável)
 
 A navegação foi reorganizada para reduzir poluição visual e manter contexto:
 
-- Dashboard sempre visível
-- Seções hierárquicas por módulo
-  - Operacional
-  - Cadastros
-  - Financeiro
-  - Fiscal
-  - Relatórios
-  - Administração
+- Dashboard sempre visível com indicadores de saúde do negócio
+- Seções hierárquicas por módulo: Operacional, Cadastros, Financeiro, Fiscal, Relatórios e Administração
 - Sidebar colapsável no desktop e drawer no mobile
 - Breadcrumb dinâmico no header
 - Busca global com `Ctrl/Cmd + K`
 - Atalho rápido para novo orçamento com `Ctrl/Cmd + N`
-- Menu de ações rápidas no header
-- Painel de notificações
-- Perfil do usuário e alternância de tema
+- Menu de ações rápidas no header e painel de notificações
+- **Navegação stacked (Relacional)**: Detalhes de entidades (clientes, produtos, orçamentos, notas, remessas) abrem em drawers sobrepostos via `RelationalNavigationContext`, permitindo navegar entre registros vinculados sem perder o contexto da tela principal.
 
-## Rotas de apoio criadas
+## Rotas e Submódulos
 
-- `/pedidos`
-- `/relatorios`
-- `/configuracoes`
-- `/remessas`
+A navegação usa query strings para contextualizar submódulos:
 
-Além disso, a navegação usa query strings para contextualizar submódulos:
-
-- `/financeiro?tipo=pagar`
-- `/financeiro?tipo=receber`
-- `/fiscal?tipo=entrada`
-- `/fiscal?tipo=saida`
-- `/fiscal?view=consulta`
-- `/relatorios?tipo=vendas`
-- `/configuracoes?tab=usuarios`
+- `/financeiro?tipo=pagar` | `tipo=receber`
+- `/fiscal?tipo=entrada` | `tipo=saida` | `view=consulta`
 - `/compras?view=cotacoes`
 - `/estoque?view=movimentacoes`
+- `/configuracoes?tab=empresa` | `tab=perfil` | `tab=usuarios`
+
+## Persistência e Cache
+
+As preferências de usuário (nome, cargo, senha, tema) são persistidas diretamente no Supabase via tabela `profiles`. Configurações funcionais do sistema como CEP da empresa são armazenadas na tabela `app_configuracoes`, que atua como a única fonte de verdade.
+
+O sistema utiliza uma estratégia de **Cache Write-Through**: o `localStorage` armazena temporariamente configurações para garantir uma UI instantânea (snappiness), mas todas as alterações são sincronizadas com o banco de dados.
 
 ## Mock data / seed inicial
 
-Foi adicionada a migration:
-
+O projeto inclui um conjunto completo de dados de demonstração em:
 - `supabase/migrations/20260317030000_seed_mock_data.sql`
 
-Ela preenche o ERP com dados de demonstração para:
-
-- contas contábeis
-- grupos de produto
-- produtos simples e compostos
-- grupos econômicos
-- clientes
-- fornecedores
-- vínculos produto-fornecedor
-- bancos e contas bancárias
-- compras e itens
-- orçamentos e itens
-- ordens de venda e itens
-- notas fiscais e itens
-- financeiro
-- caixa
-- movimentações de estoque
-- registros de comunicação com clientes
-
-### Aplicando as migrations
-
-```bash
-supabase db push
-```
-
-ou, em ambiente local Supabase:
-
+Para aplicar (ambiente local):
 ```bash
 supabase start
 supabase db reset
 ```
 
-## Configurações
+## Edge Functions e Integrações
 
-A página `/configuracoes` está organizada por seções:
+### `correios-api`
+Integração com a API REST dos Correios para:
+- **Rastreamento** automático de objetos.
+- **Cotação de frete** multi-serviço (SEDEX, PAC).
+- **Cálculo de prazo** de entrega.
 
-- Meu Perfil
-- Empresa
-- Aparência
-- Segurança
+Requer secrets `CORREIOS_USUARIO` e `CORREIOS_SENHA` no Supabase. Sem eles, o sistema opera em modo de demonstração ou exibe avisos de indisponibilidade de serviço de forma graciosa.
 
-As preferências de usuário (nome, cargo, senha, tema) são persistidas diretamente
-no Supabase via tabela `profiles`. Configurações funcionais do sistema como
-CEP da empresa são armazenadas na tabela `app_configuracoes`, que atua como a
-única fonte de verdade. O `localStorage` é utilizado estritamente como cache
-de leitura rápida para otimizar o carregamento inicial e a alternância de telas.
-
-## Relatórios
-
-O módulo de relatórios entrega uma primeira versão com:
-
-- posição de estoque
-- contas a pagar/receber
-- fluxo de caixa
-- vendas por período
-- compras por fornecedor
-- exportação CSV / XLSX
-- impressão / PDF via navegador
+### `process-email-queue`
+Processamento assíncrono de notificações do sistema.
 
 ## Estrutura do Projeto
 
 ```text
 src/
 ├── components/           # Componentes UI (shadcn, forms, layouts)
-│   ├── importacao/       # UI específica do módulo de migração
-│   ├── navigation/       # Menus e breadcrumbs
-│   └── ...
-├── contexts/             # Contextos globais (Auth, Theme)
-├── hooks/                # Hooks customizados (CRUD, Config, Importação)
-├── integrations/
-│   └── supabase/         # Cliente e tipos gerados do banco
-├── lib/
-│   ├── importacao/       # Lógica de parsing/validação de migração
-│   └── ...
-├── mocks/                # Dados mockados para desenvolvimento
-├── pages/                # Páginas principais (rotas)
-├── services/             # Serviços (Relatórios, Integrações)
-└── types/                # Definições de tipos TypeScript compartilhadas
+│   ├── Orcamento/        # Lógica comercial e grid de itens
+│   ├── views/            # Detalhes de entidades para Drawer Stack
+│   └── navigation/       # Menus e contextos de navegação
+├── contexts/             # Auth, Theme, RelationalNavigation
+├── hooks/                # useSupabaseCrud, useAppConfig, importação
+├── integrations/         # Cliente Supabase e Tipos gerados
+├── lib/                  # Utilitários, formatação e parsers de migração
+├── services/             # Relatórios, Correios, API wrappers
+└── types/                # Interfaces TypeScript globais
 ```
-
-## Supabase e tipos
-
-Para atualizar os tipos gerados do banco:
-
-```bash
-supabase gen types typescript --local > src/integrations/supabase/types.ts
-```
-
-## Edge Functions
-
-O projeto possui duas Edge Functions em `supabase/functions/`:
-
-### `correios-api`
-
-Integração com a API REST dos Correios, consumida diretamente por componentes como
-`Remessas.tsx` (rastreio) e `FreteCorreiosCard.tsx` (cotação). Oferece:
-
-- **Rastreamento de objetos** (`?action=rastrear&codigo=<CÓDIGO>`)
-- **Cotação de frete** para múltiplos serviços (`?action=cotacao_multi`)
-- **Cálculo de prazo** (`?action=prazo`)
-
-Requer os secrets no Supabase:
-
-| Secret                      | Descrição                          |
-|-----------------------------|------------------------------------|
-| `CORREIOS_USUARIO`          | Usuário/CNPJ do contrato Correios  |
-| `CORREIOS_SENHA`            | Senha do contrato                  |
-| `CORREIOS_CARTAO_POSTAGEM`  | Número do cartão de postagem (opt) |
-
-> Sem os secrets, a edge function retorna HTTP 503 com mensagem clara. O
-> frontend exibe a mensagem de erro sem quebrar a tela.
-
-### `process-email-queue`
-
-Processamento assíncrono da fila de e-mails do sistema.
-
-## O que já funciona sem configuração externa
-
-- Toda a UI e navegação
-- Autenticação via Supabase Auth
-- CRUD de todos os módulos
-- Relatórios e exportações
-- Cotação de frete (requer configurar CEP da empresa em Configurações → Empresa)
-
-## O que depende de configuração externa
-
-- **Rastreamento Correios**: requer secrets `CORREIOS_USUARIO` e `CORREIOS_SENHA` no Supabase
-- **E-mail**: requer configuração de SMTP/provider no Supabase ou serviço externo
-
-## CI
-
-O repositório possui workflow em `.github/workflows/ci.yml` para executar testes e build a cada push e pull request.

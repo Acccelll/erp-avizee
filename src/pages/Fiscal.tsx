@@ -4,13 +4,15 @@ import { AppLayout } from "@/components/AppLayout";
 import { ModulePage } from "@/components/ModulePage";
 import { DataTable, StatusBadge } from "@/components/DataTable";
 import { FormModal } from "@/components/FormModal";
+import { AdvancedFilterBar, type FilterChip } from "@/components/AdvancedFilterBar";
 import { ViewField, ViewSection } from "@/components/ViewDrawer";
 import { ViewDrawerV2 } from "@/components/ViewDrawerV2";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Edit, Trash2, Upload, ArrowLeftRight } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { SummaryCard } from "@/components/SummaryCard";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
+import { useRelationalNavigation } from "@/contexts/RelationalNavigationContext";
 import { AutocompleteSearch } from "@/components/ui/AutocompleteSearch";
 import { ItemsGrid, type GridItem } from "@/components/ui/ItemsGrid";
 import { Button } from "@/components/ui/button";
@@ -18,12 +20,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { MultiSelect, type MultiSelectOption } from "@/components/ui/MultiSelect";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { FileText, DollarSign, CheckCircle, AlertTriangle, Clock, XCircle } from "lucide-react";
+import { FileText, DollarSign, CheckCircle, AlertTriangle, Clock, XCircle, Truck } from "lucide-react";
 import { parseNFeXml, type NFeData } from "@/lib/nfeXmlParser";
 import { DanfeViewer } from "@/components/DanfeViewer";
+import { LogisticaRastreioSection } from "@/components/logistica/LogisticaRastreioSection";
 
 interface NotaFiscal {
   id: string; tipo: string; numero: string; serie: string; chave_acesso: string;
@@ -53,16 +57,17 @@ const modeloLabels: Record<string, string> = {
 };
 
 const Fiscal = () => {
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const { data, loading, create, update, remove, fetchData } = useSupabaseCrud<NotaFiscal>({
     table: "notas_fiscais", select: "*, fornecedores(nome_razao_social, cpf_cnpj), clientes(nome_razao_social), ordens_venda(numero)"
   });
+  const { pushView } = useRelationalNavigation();
   const fornecedoresCrud = useSupabaseCrud<any>({ table: "fornecedores" });
   const clientesCrud = useSupabaseCrud<any>({ table: "clientes" });
   const produtosCrud = useSupabaseCrud<any>({ table: "produtos" });
   const [ordensVenda, setOrdensVenda] = useState<any[]>([]);
   const [contasContabeis, setContasContabeis] = useState<any[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
-  const [drawerOpen, setDrawerOpen] = useState(false);
   const [selected, setSelected] = useState<NotaFiscal | null>(null);
   const [mode, setMode] = useState<"create" | "edit">("create");
   const [form, setForm] = useState({ ...emptyForm });
@@ -76,7 +81,9 @@ const Fiscal = () => {
   const xmlInputRef = useRef<HTMLInputElement>(null);
   const [danfeOpen, setDanfeOpen] = useState(false);
   const [danfeData, setDanfeData] = useState<any>(null);
-  const [filterModelo, setFilterModelo] = useState("todos");
+  const [modeloFilters, setModeloFilters] = useState<string[]>([]);
+  const [statusFilters, setStatusFilters] = useState<string[]>([]);
+  const [tipoFilters, setTipoFilters] = useState<string[]>([]);
   // B.2 — Devolução
   const [devolucaoModalOpen, setDevolucaoModalOpen] = useState(false);
   const [devolucaoNF, setDevolucaoNF] = useState<NotaFiscal | null>(null);
@@ -144,10 +151,12 @@ const Fiscal = () => {
   };
 
   const openView = async (n: NotaFiscal) => {
-    setSelected(n); setDrawerOpen(true);
+    setSelected(n);
     const { data: itens } = await supabase.from("notas_fiscais_itens")
-      .select("*, produtos(nome, sku), contas_contabeis(codigo, descricao)").eq("nota_fiscal_id", n.id);
+      .select("*, produtos(nome, sku), contas_contabeis(codigo, descricao)")
+      .eq("nota_fiscal_id", n.id);
     setViewItems(itens || []);
+    setDrawerOpen(true);
   };
 
   const openDanfe = async (n: NotaFiscal) => {
@@ -448,13 +457,42 @@ const Fiscal = () => {
     const query = consultaSearch.trim().toLowerCase();
     return data.filter((n) => {
       if (tipoParam && n.tipo !== tipoParam) return false;
-      if (filterModelo !== "todos" && (n.modelo_documento || "55") !== filterModelo) return false;
+
+      if (tipoFilters.length > 0 && !tipoFilters.includes(n.tipo)) return false;
+      if (modeloFilters.length > 0 && !modeloFilters.includes(n.modelo_documento || "55")) return false;
+      if (statusFilters.length > 0 && !statusFilters.includes(n.status)) return false;
+
       if (viewParam !== "consulta" || !query) return true;
       const parceiro = n.tipo === "entrada" ? n.fornecedores?.nome_razao_social : n.clientes?.nome_razao_social;
       const haystack = [n.numero, n.serie, n.chave_acesso, parceiro, n.ordens_venda?.numero].filter(Boolean).join(" ").toLowerCase();
       return haystack.includes(query);
     });
-  }, [consultaSearch, data, tipoParam, viewParam, filterModelo]);
+  }, [consultaSearch, data, tipoParam, viewParam, modeloFilters, statusFilters, tipoFilters]);
+
+  const fiscalActiveFilters = useMemo(() => {
+    const chips: FilterChip[] = [];
+    tipoFilters.forEach(f => chips.push({ key: "tipo", label: "Tipo", value: [f], displayValue: f === "entrada" ? "Entrada" : "Saída" }));
+    modeloFilters.forEach(f => chips.push({ key: "modelo", label: "Modelo", value: [f], displayValue: modeloLabels[f] || f }));
+    statusFilters.forEach(f => chips.push({ key: "status", label: "Status", value: [f], displayValue: f.charAt(0).toUpperCase() + f.slice(1) }));
+    return chips;
+  }, [tipoFilters, modeloFilters, statusFilters]);
+
+  const handleRemoveFiscalFilter = (key: string, value?: string) => {
+    if (key === "tipo") setTipoFilters(prev => prev.filter(v => v !== value));
+    if (key === "modelo") setModeloFilters(prev => prev.filter(v => v !== value));
+    if (key === "status") setStatusFilters(prev => prev.filter(v => v !== value));
+  };
+
+  const tipoOptions: MultiSelectOption[] = [
+    { label: "Entrada", value: "entrada" },
+    { label: "Saída", value: "saida" },
+  ];
+  const modeloOptions: MultiSelectOption[] = Object.entries(modeloLabels).map(([v, l]) => ({ label: l, value: v }));
+  const statusOptions: MultiSelectOption[] = [
+    { label: "Pendente", value: "pendente" },
+    { label: "Confirmada", value: "confirmada" },
+    { label: "Cancelada", value: "cancelada" },
+  ];
 
   const fiscalSubtitle = viewParam === "consulta"
     ? "Consulta rápida de documentos fiscais e chaves de acesso"
@@ -550,10 +588,7 @@ const Fiscal = () => {
 
   return (
     <AppLayout>
-      <ModulePage title="Fiscal" subtitle={fiscalSubtitle} addLabel="Nova NF" onAdd={openCreate} count={filteredData.length}
-        searchValue={viewParam === "consulta" ? consultaSearch : undefined}
-        onSearchChange={viewParam === "consulta" ? setConsultaSearch : undefined}
-        searchPlaceholder="Buscar por número, chave ou parceiro..."
+      <ModulePage title="Fiscal" subtitle={fiscalSubtitle} addLabel="Nova NF" onAdd={openCreate}
         headerActions={
           <>
             <input ref={xmlInputRef} type="file" accept=".xml" className="hidden" onChange={handleXmlImport} />
@@ -563,14 +598,39 @@ const Fiscal = () => {
           </>
         }
       >
-        {/* Modelo filter tabs */}
-        <div className="flex gap-1 mb-4 flex-wrap">
-          {[{ v: "todos", l: "Todos" }, { v: "55", l: "NF-e" }, { v: "65", l: "NFC-e" }, { v: "57", l: "CT-e" }, { v: "nfse", l: "NFS-e" }].map(t => (
-            <Button key={t.v} size="sm" variant={filterModelo === t.v ? "default" : "outline"} onClick={() => setFilterModelo(t.v)}>
-              {t.l}
-            </Button>
-          ))}
-        </div>
+        <AdvancedFilterBar
+          searchValue={viewParam === "consulta" ? consultaSearch : ""}
+          onSearchChange={viewParam === "consulta" ? setConsultaSearch : undefined}
+          searchPlaceholder="Buscar por número, chave ou parceiro..."
+          activeFilters={fiscalActiveFilters}
+          onRemoveFilter={handleRemoveFiscalFilter}
+          onClearAll={() => { setTipoFilters([]); setModeloFilters([]); setStatusFilters([]); }}
+          count={filteredData.length}
+        >
+          {!tipoParam && (
+            <MultiSelect
+              options={tipoOptions}
+              selected={tipoFilters}
+              onChange={setTipoFilters}
+              placeholder="Tipo"
+              className="w-[150px]"
+            />
+          )}
+          <MultiSelect
+            options={modeloOptions}
+            selected={modeloFilters}
+            onChange={setModeloFilters}
+            placeholder="Modelos"
+            className="w-[180px]"
+          />
+          <MultiSelect
+            options={statusOptions}
+            selected={statusFilters}
+            onChange={setStatusFilters}
+            placeholder="Status"
+            className="w-[180px]"
+          />
+        </AdvancedFilterBar>
 
         {/* KPI Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -581,7 +641,7 @@ const Fiscal = () => {
         </div>
 
         <DataTable columns={columns} data={filteredData} loading={loading}
-          onView={openView} />
+          onView={openView} onEdit={openEdit} />
       </ModulePage>
 
       <FormModal open={modalOpen} onClose={() => setModalOpen(false)} title={mode === "create" ? "Nova Nota Fiscal" : "Editar Nota Fiscal"} size="xl">
@@ -1010,6 +1070,14 @@ const Fiscal = () => {
                 { value: "resumo", label: "Resumo", content: tabResumo },
                 { value: "itens", label: `Itens (${viewItems.length})`, content: tabItens },
                 { value: "impostos", label: "Impostos", content: tabImpostos },
+                { value: "logistica", label: "Logística", content: (
+                  <div className="space-y-4">
+                    <h4 className="text-sm font-semibold flex items-center gap-2 px-1">
+                      <Truck className="w-4 h-4" /> Rastreamento Logístico
+                    </h4>
+                    <LogisticaRastreioSection notaFiscalId={selected.id} />
+                  </div>
+                )},
                 { value: "vinculos", label: "Vínculos", content: tabVinculos },
               ]}
               footer={drawerFooter}
@@ -1022,6 +1090,9 @@ const Fiscal = () => {
         <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Gerar Nota de Devolução</DialogTitle>
+            <DialogDescription>
+              Selecione os itens e as quantidades que deseja devolver da nota fiscal original.
+            </DialogDescription>
           </DialogHeader>
           {devolucaoNF && (
             <div className="space-y-5">

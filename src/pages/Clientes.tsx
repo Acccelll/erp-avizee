@@ -3,26 +3,21 @@ import { AppLayout } from "@/components/AppLayout";
 import { DataTable, StatusBadge } from "@/components/DataTable";
 import { ModulePage } from "@/components/ModulePage";
 import { FormModal } from "@/components/FormModal";
-import { ViewDrawerV2, ViewField, ViewSection } from "@/components/ViewDrawerV2";
 import { AdvancedFilterBar, type FilterChip } from "@/components/AdvancedFilterBar";
-import { RelationalLink } from "@/components/ui/RelationalLink";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Edit, Copy, Trash2 } from "lucide-react";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
+import { useRelationalNavigation } from "@/contexts/RelationalNavigationContext";
 import { useViaCep } from "@/hooks/useViaCep";
 import { useCnpjLookup } from "@/hooks/useCnpjLookup";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { MultiSelect, type MultiSelectOption } from "@/components/ui/MultiSelect";
 import { Textarea } from "@/components/ui/textarea";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MaskedInput } from "@/components/ui/MaskedInput";
-import { TimelineList } from "@/components/ui/TimelineList";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { MessageSquare, Plus, Building2, Clock, DollarSign, CreditCard, AlertTriangle, Search } from "lucide-react";
-import { formatCurrency, formatDate } from "@/lib/format";
+import { Building2, Search } from "lucide-react";
 
 interface Cliente {
   id: string;tipo_pessoa: string;nome_razao_social: string;nome_fantasia: string;
@@ -52,28 +47,18 @@ const relacaoOptions = [
 
 const Clientes = () => {
   const { data, loading, create, update, remove, duplicate } = useSupabaseCrud<Cliente>({ table: "clientes" });
+  const { pushView } = useRelationalNavigation();
   const { buscarCep, loading: cepLoading } = useViaCep();
   const { buscarCnpj, loading: cnpjLoading } = useCnpjLookup();
   const [modalOpen, setModalOpen] = useState(false);
-  const [drawerOpen, setDrawerOpen] = useState(false);
   const [selected, setSelected] = useState<Cliente | null>(null);
   const [mode, setMode] = useState<"create" | "edit">("create");
   const [form, setForm] = useState(emptyCliente);
   const [saving, setSaving] = useState(false);
-  const [comRecords, setComRecords] = useState<any[]>([]);
-  const [comOpen, setComOpen] = useState(false);
-  const [comForm, setComForm] = useState({ canal: "", assunto: "", descricao: "" });
   const [grupos, setGrupos] = useState<GrupoEconomico[]>([]);
-  const [empresasGrupo, setEmpresasGrupo] = useState<any[]>([]);
-  const [pmv, setPmv] = useState<number | null>(null);
-  const [pmvTitulos, setPmvTitulos] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [tipoFilter, setTipoFilter] = useState<"todos" | "F" | "J">("todos");
-  const [grupoFilter, setGrupoFilter] = useState<"todos" | "com_grupo" | "sem_grupo">("todos");
-  const [saldoAberto, setSaldoAberto] = useState(0);
-  const [titulosVencidos, setTitulosVencidos] = useState(0);
-  const [ultimaCompra, setUltimaCompra] = useState<string | null>(null);
-  const [transportadorasCliente, setTransportadorasCliente] = useState<any[]>([]);
+  const [tipoFilters, setTipoFilters] = useState<string[]>([]);
+  const [grupoFilters, setGrupoFilters] = useState<string[]>([]);
 
   useEffect(() => {
     supabase.from("grupos_economicos").select("id, nome").eq("ativo", true).order("nome").then(({ data: g }: any) => setGrupos(g || []));
@@ -98,43 +83,8 @@ const Clientes = () => {
     setModalOpen(true);
   };
 
-  const openView = async (c: Cliente) => {
-    setSelected(c);setDrawerOpen(true);
-    const [comRes, empRes, titulosRes, orcRes, transpRes] = await Promise.all([
-    supabase.from("cliente_registros_comunicacao").select("*").eq("cliente_id", c.id).order("data_hora", { ascending: false }),
-    c.grupo_economico_id ? supabase.from("clientes").
-    select("id, nome_razao_social, nome_fantasia, cpf_cnpj, tipo_relacao_grupo, cidade, uf").
-    eq("grupo_economico_id", c.grupo_economico_id).eq("ativo", true).neq("id", c.id) : Promise.resolve({ data: [] }),
-    supabase.from("financeiro_lancamentos").
-    select("id, descricao, data_vencimento, data_pagamento, valor, status").
-    eq("cliente_id", c.id).eq("tipo", "receber").eq("ativo", true).
-    order("data_vencimento", { ascending: false }).limit(50),
-    supabase.from("orcamentos").
-    select("data_orcamento").eq("cliente_id", c.id).eq("ativo", true).
-    order("data_orcamento", { ascending: false }).limit(1),
-    supabase.from("cliente_transportadoras" as any).
-    select("*, transportadoras:transportadora_id(nome_razao_social, modalidade, prazo_medio)").
-    eq("cliente_id", c.id).eq("ativo", true).order("prioridade")
-    ]);
-    setComRecords(comRes.data || []);
-    setEmpresasGrupo(empRes.data || []);
-    setTransportadorasCliente(transpRes.data || []);
-
-    const titulos = titulosRes.data || [];
-    setPmvTitulos(titulos);
-    const aberto = titulos.filter((t: any) => t.status === "aberto" || t.status === "vencido");
-    setSaldoAberto(aberto.reduce((s: number, t: any) => s + Number(t.valor || 0), 0));
-    setTitulosVencidos(aberto.filter((t: any) => t.status === "vencido").length);
-    const pagos = titulos.filter((t: any) => t.data_pagamento);
-    if (pagos.length > 0) {
-      const totalDias = pagos.reduce((acc: number, t: any) => {
-        const venc = new Date(t.data_vencimento);
-        const pag = new Date(t.data_pagamento);
-        return acc + Math.round((pag.getTime() - venc.getTime()) / (1000 * 60 * 60 * 24));
-      }, 0);
-      setPmv(Math.round(totalDias / pagos.length));
-    } else {setPmv(null);}
-    setUltimaCompra(orcRes.data?.[0]?.data_orcamento || null);
+  const openView = (c: Cliente) => {
+    pushView("cliente", c.id);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -146,18 +96,10 @@ const Clientes = () => {
       if (mode === "create") await create(payload);else
       if (selected) await update(selected.id, payload);
       setModalOpen(false);
-    } catch {}
+    } catch (err) {
+      console.error('[clientes] erro ao salvar:', err);
+    }
     setSaving(false);
-  };
-
-  const addComunicacao = async () => {
-    if (!selected || !comForm.assunto) {toast.error("Assunto é obrigatório");return;}
-    await supabase.from("cliente_registros_comunicacao").insert({ cliente_id: selected.id, ...comForm, data_hora: new Date().toISOString() });
-    toast.success("Registro adicionado!");
-    const { data: records } = await supabase.from("cliente_registros_comunicacao").select("*").eq("cliente_id", selected.id).order("data_hora", { ascending: false });
-    setComRecords(records || []);
-    setComForm({ canal: "", assunto: "", descricao: "" });
-    setComOpen(false);
   };
 
   const grupoNome = (id: string | null) => !id ? "—" : grupos.find((g) => g.id === id)?.nome || "—";
@@ -166,13 +108,24 @@ const Clientes = () => {
   const filteredData = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
     return data.filter((cliente) => {
-      if (tipoFilter !== "todos" && cliente.tipo_pessoa !== tipoFilter) return false;
-      if (grupoFilter === "com_grupo" && !cliente.grupo_economico_id) return false;
-      if (grupoFilter === "sem_grupo" && cliente.grupo_economico_id) return false;
+      if (tipoFilters.length > 0 && !tipoFilters.includes(cliente.tipo_pessoa)) return false;
+
+      if (grupoFilters.length > 0) {
+        const hasGroup = !!cliente.grupo_economico_id;
+        const groupId = cliente.grupo_economico_id || "sem_grupo";
+
+        // Se o filtro contém ids específicos de grupo OU "sem_grupo"
+        if (!grupoFilters.includes(groupId)) {
+          // Caso especial: se selecionou "com_grupo" (lógica antiga adaptada ou nova?)
+          // Vamos usar IDs específicos + "sem_grupo"
+          return false;
+        }
+      }
+
       if (!query) return true;
       return [cliente.nome_razao_social, cliente.nome_fantasia, cliente.cpf_cnpj, cliente.email, cliente.cidade, cliente.uf, cliente.telefone, cliente.contato].filter(Boolean).join(" ").toLowerCase().includes(query);
     });
-  }, [data, grupoFilter, searchTerm, tipoFilter]);
+  }, [data, grupoFilters, searchTerm, tipoFilters]);
 
   const columns = [
   { key: "nome_razao_social", label: "Nome / Razão Social", sortable: true },
@@ -187,15 +140,43 @@ const Clientes = () => {
 
   const cliActiveFilters = useMemo(() => {
     const chips: FilterChip[] = [];
-    if (tipoFilter !== "todos") chips.push({ key: "tipo", label: "Tipo", value: tipoFilter, displayValue: tipoFilter === "J" ? "Pessoa Jurídica" : "Pessoa Física" });
-    if (grupoFilter !== "todos") chips.push({ key: "grupo", label: "Grupo", value: grupoFilter, displayValue: grupoFilter === "com_grupo" ? "Com grupo" : "Sem grupo" });
-    return chips;
-  }, [tipoFilter, grupoFilter]);
 
-  const handleRemoveCliFilter = (key: string) => {
-    if (key === "tipo") setTipoFilter("todos");
-    if (key === "grupo") setGrupoFilter("todos");
+    tipoFilters.forEach(f => {
+      chips.push({
+        key: "tipo",
+        label: "Tipo",
+        value: [f],
+        displayValue: f === "J" ? "Pessoa Jurídica" : "Pessoa Física"
+      });
+    });
+
+    grupoFilters.forEach(f => {
+      const g = grupos.find(x => x.id === f);
+      chips.push({
+        key: "grupo",
+        label: "Grupo",
+        value: [f],
+        displayValue: g?.nome || "Sem grupo"
+      });
+    });
+
+    return chips;
+  }, [tipoFilters, grupoFilters, grupos]);
+
+  const handleRemoveCliFilter = (key: string, value?: string) => {
+    if (key === "tipo") setTipoFilters(prev => prev.filter(v => v !== value));
+    if (key === "grupo") setGrupoFilters(prev => prev.filter(v => v !== value));
   };
+
+  const tipoOptions: MultiSelectOption[] = [
+    { label: "Pessoa Jurídica", value: "J" },
+    { label: "Pessoa Física", value: "F" },
+  ];
+
+  const grupoOptions: MultiSelectOption[] = [
+    ...grupos.map(g => ({ label: g.nome, value: g.id })),
+    { label: "Sem grupo", value: "sem_grupo" }
+  ];
 
   return (
     <AppLayout>
@@ -207,29 +188,27 @@ const Clientes = () => {
           searchPlaceholder="Buscar por nome, CNPJ, e-mail ou cidade..."
           activeFilters={cliActiveFilters}
           onRemoveFilter={handleRemoveCliFilter}
-          onClearAll={() => { setTipoFilter("todos"); setGrupoFilter("todos"); }}
+          onClearAll={() => { setTipoFilters([]); setGrupoFilters([]); }}
           count={filteredData.length}
         >
-          <Select value={tipoFilter} onValueChange={(v: any) => setTipoFilter(v)}>
-            <SelectTrigger className="h-9 w-[170px]"><SelectValue placeholder="Tipo" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todos os tipos</SelectItem>
-              <SelectItem value="J">Pessoa jurídica</SelectItem>
-              <SelectItem value="F">Pessoa física</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={grupoFilter} onValueChange={(v: any) => setGrupoFilter(v)}>
-            <SelectTrigger className="h-9 w-[190px]"><SelectValue placeholder="Grupo econômico" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todos os grupos</SelectItem>
-              <SelectItem value="com_grupo">Com grupo econômico</SelectItem>
-              <SelectItem value="sem_grupo">Sem grupo econômico</SelectItem>
-            </SelectContent>
-          </Select>
+          <MultiSelect
+            options={tipoOptions}
+            selected={tipoFilters}
+            onChange={setTipoFilters}
+            placeholder="Tipos"
+            className="w-[150px]"
+          />
+          <MultiSelect
+            options={grupoOptions}
+            selected={grupoFilters}
+            onChange={setGrupoFilters}
+            placeholder="Grupos"
+            className="w-[200px]"
+          />
         </AdvancedFilterBar>
 
         <DataTable columns={columns} data={filteredData} loading={loading}
-        onView={openView} />
+        onView={openView} onEdit={openEdit} onDelete={(c) => remove(c.id)} />
       </ModulePage>
 
       {/* Form Modal */}
@@ -307,197 +286,6 @@ const Clientes = () => {
         </form>
       </FormModal>
 
-      {/* View Drawer with Tabs */}
-      <ViewDrawerV2 open={drawerOpen} onClose={() => setDrawerOpen(false)} title="Detalhes do Cliente"
-      actions={selected ? <>
-          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {setDrawerOpen(false);openEdit(selected);}}><Edit className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Editar</TooltipContent></Tooltip>
-          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => {setDrawerOpen(false);duplicate(selected);}}><Copy className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Duplicar</TooltipContent></Tooltip>
-          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => {setDrawerOpen(false);remove(selected.id);}}><Trash2 className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Excluir</TooltipContent></Tooltip>
-        </> : undefined}>
-        
-        {selected &&
-        <div className="space-y-4">
-            {/* Summary Header */}
-            <div className="bg-muted/30 rounded-lg p-4">
-              <div className="flex items-start justify-between mb-3">
-                <div>
-                  <p className="text-xs text-muted-foreground">{selected.tipo_pessoa === "F" ? "Pessoa Física" : "Pessoa Jurídica"} • {selected.cpf_cnpj || "—"}</p>
-                  <h3 className="font-semibold text-lg">{selected.nome_razao_social}</h3>
-                  {selected.nome_fantasia && <p className="text-sm text-muted-foreground">{selected.nome_fantasia}</p>}
-                </div>
-                <StatusBadge status={selected.ativo ? "Ativo" : "Inativo"} />
-              </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div className="text-center rounded-lg border bg-background p-2 overflow-hidden">
-                  <p className="text-[10px] text-muted-foreground uppercase">Limite</p>
-                  <p className="font-mono font-semibold text-sm truncate" title={formatCurrency(selected.limite_credito || 0)}>{formatCurrency(selected.limite_credito || 0)}</p>
-                </div>
-                <div className="text-center rounded-lg border bg-background p-2 overflow-hidden">
-                  <p className="text-[10px] text-muted-foreground uppercase">Saldo Aberto</p>
-                  <p className={`font-mono font-semibold text-sm truncate ${saldoAberto > 0 ? "text-warning" : ""}`} title={formatCurrency(saldoAberto)}>{formatCurrency(saldoAberto)}</p>
-                </div>
-                <div className="text-center rounded-lg border bg-background p-2 overflow-hidden">
-                  <p className="text-muted-foreground uppercase text-xs">PMV</p>
-                  <p className={`font-mono font-semibold text-sm truncate ${pmv !== null && pmv > 0 ? "text-warning" : pmv !== null && pmv < 0 ? "text-success" : ""}`}>
-                    {pmv !== null ? `${pmv > 0 ? "+" : ""}${pmv}d` : "—"}
-                  </p>
-                </div>
-                <div className="text-center rounded-lg border bg-background p-2 overflow-hidden">
-                  <p className="text-[10px] text-muted-foreground uppercase">Últ. Compra</p>
-                  <p className="font-mono font-semibold text-sm truncate">{ultimaCompra ? formatDate(ultimaCompra) : "—"}</p>
-                </div>
-              </div>
-              {titulosVencidos > 0 &&
-            <div className="flex items-center gap-2 text-xs text-destructive bg-destructive/10 rounded-lg p-2 mt-2">
-                  <AlertTriangle className="w-3 h-3" /> {titulosVencidos} título(s) vencido(s)
-                </div>
-            }
-            </div>
-
-            <Tabs defaultValue="cadastro" className="w-full">
-              <TabsList className="w-full grid grid-cols-6">
-                <TabsTrigger value="cadastro" className="text-xs">Cadastro</TabsTrigger>
-                <TabsTrigger value="financeiro" className="text-xs">Financeiro</TabsTrigger>
-                <TabsTrigger value="transp" className="text-xs">Transp.</TabsTrigger>
-                <TabsTrigger value="endereco" className="text-xs">Endereço</TabsTrigger>
-                <TabsTrigger value="grupo" className="text-xs">Grupo</TabsTrigger>
-                <TabsTrigger value="historico" className="text-xs">Histórico</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="cadastro" className="space-y-3 mt-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <div><span className="text-xs text-muted-foreground">E-mail</span><p>{selected.email || "—"}</p></div>
-                  <div><span className="text-xs text-muted-foreground">Contato</span><p>{selected.contato || "—"}</p></div>
-                  <div><span className="text-xs text-muted-foreground">Telefone</span><p>{selected.telefone || "—"}</p></div>
-                  <div><span className="text-xs text-muted-foreground">Celular</span><p>{selected.celular || "—"}</p></div>
-                  <div><span className="text-xs text-muted-foreground">Prazo Padrão</span><p>{selected.prazo_padrao || 30} dias</p></div>
-                  <div><span className="text-xs text-muted-foreground">I.E.</span><p className="font-mono">{selected.inscricao_estadual || "—"}</p></div>
-                </div>
-                {selected.observacoes && <div><span className="text-xs text-muted-foreground">Observações</span><p className="text-sm">{selected.observacoes}</p></div>}
-              </TabsContent>
-
-              <TabsContent value="financeiro" className="space-y-3 mt-3">
-                <div className="flex justify-end mb-1">
-                  <RelationalLink to={`/financeiro?tipo=receber`}>Ver todos os títulos →</RelationalLink>
-                </div>
-                <div className="rounded-lg border bg-muted/30 p-3">
-                  <span className="text-xs text-muted-foreground flex items-center gap-1"><Clock className="w-3 h-3" /> PMV — Prazo Médio de Vencimento</span>
-                  {pmv !== null ?
-                <div>
-                      <p className="text-2xl font-bold mt-1">{pmv > 0 ? `+${pmv}` : pmv} <span className="text-sm font-normal text-muted-foreground">dias</span></p>
-                      <p className="text-xs text-muted-foreground">Baseado em {pmvTitulos.filter((t: any) => t.data_pagamento).length} título(s)</p>
-                      {pmv > 0 && <p className="text-xs text-warning mt-1">Paga em média {pmv} dias após vencimento</p>}
-                      {pmv < 0 && <p className="text-xs text-success mt-1">Paga em média {Math.abs(pmv)} dias antes</p>}
-                      {pmv === 0 && <p className="text-xs text-success mt-1">Paga no vencimento</p>}
-                    </div> :
-                <p className="text-sm text-muted-foreground mt-1">Sem títulos pagos para cálculo</p>}
-                </div>
-                {pmvTitulos.length > 0 &&
-              <div>
-                    <h4 className="font-semibold text-sm mb-2">Últimos Títulos</h4>
-                    <div className="space-y-1 max-h-[250px] overflow-y-auto">
-                      {pmvTitulos.slice(0, 15).map((t: any) =>
-                  <div key={t.id} className="flex justify-between text-sm py-1.5 border-b last:border-b-0">
-                          <div>
-                            <p className="text-xs">{t.descricao}</p>
-                            <p className="text-[10px] text-muted-foreground">Venc: {formatDate(t.data_vencimento)}</p>
-                          </div>
-                          <div className="text-right">
-                            <p className="font-mono text-xs">{formatCurrency(t.valor)}</p>
-                            <StatusBadge status={t.status === "pago" ? "Pago" : t.status === "vencido" ? "Vencido" : "Aberto"} />
-                          </div>
-                        </div>
-                  )}
-                    </div>
-                  </div>
-              }
-              </TabsContent>
-
-              <TabsContent value="transp" className="space-y-3 mt-3">
-                {transportadorasCliente.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-6">Nenhuma transportadora vinculada</p>
-                ) : (
-                  <div className="space-y-1 max-h-[300px] overflow-y-auto">
-                    {transportadorasCliente.map((ct: any, idx: number) => (
-                      <div key={idx} className="flex items-center justify-between py-2 px-2 rounded-md hover:bg-muted/30 border-b last:border-b-0">
-                        <div className="min-w-0 flex-1">
-                          <RelationalLink to="/transportadoras">{(ct.transportadoras as any)?.nome_razao_social || "—"}</RelationalLink>
-                          <div className="flex gap-2 text-xs text-muted-foreground mt-0.5">
-                            {ct.modalidade && <span>{ct.modalidade}</span>}
-                            {ct.prazo_medio && <span>• {ct.prazo_medio}</span>}
-                          </div>
-                        </div>
-                        <span className="text-xs text-muted-foreground">P{ct.prioridade || 1}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </TabsContent>
-
-              <TabsContent value="endereco" className="space-y-3 mt-3">
-                {selected.logradouro ?
-              <div className="space-y-2">
-                    <p>{selected.logradouro}, {selected.numero}{selected.complemento ? ` - ${selected.complemento}` : ""}</p>
-                    <p>{selected.bairro} - {selected.cidade}/{selected.uf}</p>
-                    <p>CEP: {selected.cep}</p>
-                    {selected.pais && selected.pais !== "Brasil" && <p>País: {selected.pais}</p>}
-                    {selected.caixa_postal && <p>Caixa Postal: {selected.caixa_postal}</p>}
-                  </div> :
-              <p className="text-sm text-muted-foreground">Nenhum endereço cadastrado</p>}
-              </TabsContent>
-
-              <TabsContent value="grupo" className="space-y-3 mt-3">
-                {selected.grupo_economico_id ?
-              <>
-                    <div className="bg-muted/30 rounded-lg p-3">
-                      <span className="text-xs text-muted-foreground flex items-center gap-1"><Building2 className="w-3 h-3" /> Grupo Econômico</span>
-                      <p className="font-medium">{grupoNome(selected.grupo_economico_id)}</p>
-                      <p className="text-xs text-muted-foreground">{relacaoLabel[selected.tipo_relacao_grupo || "independente"]}</p>
-                    </div>
-                    {empresasGrupo.length > 0 &&
-                <div>
-                        <h4 className="font-semibold text-sm flex items-center gap-2 mb-3"><Building2 className="w-4 h-4" /> Empresas Relacionadas ({empresasGrupo.length})</h4>
-                        <div className="space-y-2">
-                          {empresasGrupo.map((emp: any) =>
-                    <div key={emp.id} className="bg-muted/30 rounded-lg p-3 flex items-center justify-between">
-                              <div>
-                                <p className="font-medium text-sm">{emp.nome_razao_social}</p>
-                                <p className="text-xs text-muted-foreground">{emp.cpf_cnpj || "—"} • {emp.cidade ? `${emp.cidade}/${emp.uf}` : "—"}</p>
-                              </div>
-                              <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">{relacaoLabel[emp.tipo_relacao_grupo || "independente"]}</span>
-                            </div>
-                    )}
-                        </div>
-                      </div>
-                }
-                  </> :
-              <p className="text-sm text-muted-foreground">Não pertence a nenhum grupo econômico</p>}
-              </TabsContent>
-
-              <TabsContent value="historico" className="space-y-3 mt-3">
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="font-semibold text-sm flex items-center gap-2"><MessageSquare className="w-4 h-4" /> Comunicações</h4>
-                  <Button size="sm" variant="outline" onClick={() => setComOpen(!comOpen)} className="gap-1"><Plus className="w-3 h-3" /> Novo</Button>
-                </div>
-                {comOpen &&
-              <div className="bg-accent/30 rounded-lg p-3 mb-3 space-y-2">
-                    <div className="grid grid-cols-2 gap-2">
-                      <Input placeholder="Canal (email, telefone...)" value={comForm.canal} onChange={(e) => setComForm({ ...comForm, canal: e.target.value })} className="h-8 text-xs" />
-                      <Input placeholder="Assunto *" value={comForm.assunto} onChange={(e) => setComForm({ ...comForm, assunto: e.target.value })} className="h-8 text-xs" />
-                    </div>
-                    <Textarea placeholder="Descrição..." value={comForm.descricao} onChange={(e) => setComForm({ ...comForm, descricao: e.target.value })} className="min-h-[60px] text-xs" />
-                    <Button size="sm" onClick={addComunicacao}>Salvar</Button>
-                  </div>
-              }
-                <TimelineList
-                items={comRecords.map((r: any) => ({ id: r.id, title: r.assunto, description: r.descricao, date: r.data_hora, type: r.canal }))}
-                emptyMessage="Nenhum registro de comunicação" />
-              
-              </TabsContent>
-            </Tabs>
-          </div>
-        }
-      </ViewDrawerV2>
     </AppLayout>);
 
 };

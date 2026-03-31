@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { formatCurrency, formatDate } from "@/lib/format";
@@ -68,6 +68,9 @@ export function DanfeViewer({ open, onClose, data }: DanfeViewerProps) {
             DANFE — NF {data.numero}
             {data.serie && <span className="text-muted-foreground text-sm">Série {data.serie}</span>}
           </DialogTitle>
+          <DialogDescription>
+            Visualização simplificada do Documento Auxiliar da Nota Fiscal Eletrônica.
+          </DialogDescription>
         </DialogHeader>
 
         {/* Header bar */}

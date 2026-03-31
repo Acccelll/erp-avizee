@@ -1,17 +1,20 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AppLayout } from "@/components/AppLayout";
 import { ModulePage } from "@/components/ModulePage";
 import { DataTable, StatusBadge } from "@/components/DataTable";
 import { SummaryCard } from "@/components/SummaryCard";
+import { AdvancedFilterBar, type FilterChip } from "@/components/AdvancedFilterBar";
 import { ViewDrawerV2, ViewField, ViewSection } from "@/components/ViewDrawerV2";
 import { RelationalLink } from "@/components/ui/RelationalLink";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Trash2, FileOutput } from "lucide-react";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
+import { useRelationalNavigation } from "@/contexts/RelationalNavigationContext";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { MultiSelect, type MultiSelectOption } from "@/components/ui/MultiSelect";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatCurrency, formatDate, daysSince, formatNumber } from "@/lib/format";
@@ -43,17 +46,24 @@ const statusFaturamentoColors: Record<string, string> = {
 
 const OrdensVenda = () => {
   const navigate = useNavigate();
+  const { pushView } = useRelationalNavigation();
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const { data, loading, remove, fetchData } = useSupabaseCrud<OrdemVenda>({
     table: "ordens_venda", select: "*, clientes(nome_razao_social), orcamentos(numero)",
   });
-  const [drawerOpen, setDrawerOpen] = useState(false);
   const [selected, setSelected] = useState<OrdemVenda | null>(null);
   const [ovItems, setOvItems] = useState<any[]>([]);
   const [loadingItems, setLoadingItems] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("todos");
-  const [faturamentoFilter, setFaturamentoFilter] = useState<string>("todos");
+  const [statusFilters, setStatusFilters] = useState<string[]>([]);
+  const [faturamentoFilters, setFaturamentoFilters] = useState<string[]>([]);
+  const [clienteFilters, setClienteFilters] = useState<string[]>([]);
+  const [clientesList, setClientesList] = useState<any[]>([]);
   const [generatingNfId, setGeneratingNfId] = useState<string | null>(null);
+
+  useEffect(() => {
+    supabase.from("clientes").select("id, nome_razao_social").eq("ativo", true).then(({ data }) => setClientesList(data || []));
+  }, []);
 
   // KPIs
   const kpis = useMemo(() => {
@@ -64,10 +74,9 @@ const OrdensVenda = () => {
     return { total, totalValue, pending, inProgress };
   }, [data]);
 
-  const handleView = async (ov: OrdemVenda) => {
-    setSelected(ov); setDrawerOpen(true); setLoadingItems(true);
-    const { data: items } = await supabase.from("ordens_venda_itens").select("*, produtos(nome)").eq("ordem_venda_id", ov.id);
-    setOvItems(items || []); setLoadingItems(false);
+  const handleView = (ov: OrdemVenda) => {
+    setSelected(ov);
+    setDrawerOpen(true);
   };
 
   const handleApprove = async (ov: OrdemVenda) => {
@@ -145,12 +154,39 @@ const OrdensVenda = () => {
   const filteredData = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
     return data.filter((ov) => {
-      if (statusFilter !== "todos" && ov.status !== statusFilter) return false;
-      if (faturamentoFilter !== "todos" && ov.status_faturamento !== faturamentoFilter) return false;
+      if (statusFilters.length > 0 && !statusFilters.includes(ov.status)) return false;
+      if (faturamentoFilters.length > 0 && !faturamentoFilters.includes(ov.status_faturamento)) return false;
+      if (clienteFilters.length > 0 && !clienteFilters.includes(ov.cliente_id || "")) return false;
+
       if (!query) return true;
       return [ov.numero, ov.clientes?.nome_razao_social, ov.orcamentos?.numero, ov.observacoes].filter(Boolean).join(" ").toLowerCase().includes(query);
     });
-  }, [data, faturamentoFilter, searchTerm, statusFilter]);
+  }, [data, faturamentoFilters, searchTerm, statusFilters, clienteFilters]);
+
+  const ovActiveFilters = useMemo(() => {
+    const chips: FilterChip[] = [];
+    statusFilters.forEach(f => {
+      chips.push({ key: "status", label: "Status", value: [f], displayValue: statusComercialLabels[f] || f });
+    });
+    faturamentoFilters.forEach(f => {
+      chips.push({ key: "faturamento", label: "Faturamento", value: [f], displayValue: statusFaturamentoLabels[f] || f });
+    });
+    clienteFilters.forEach(f => {
+      const cli = clientesList.find(x => x.id === f);
+      chips.push({ key: "cliente", label: "Cliente", value: [f], displayValue: cli?.nome_razao_social || f });
+    });
+    return chips;
+  }, [statusFilters, faturamentoFilters, clienteFilters, clientesList]);
+
+  const handleRemoveOvFilter = (key: string, value?: string) => {
+    if (key === "status") setStatusFilters(prev => prev.filter(v => v !== value));
+    if (key === "faturamento") setFaturamentoFilters(prev => prev.filter(v => v !== value));
+    if (key === "cliente") setClienteFilters(prev => prev.filter(v => v !== value));
+  };
+
+  const statusOptions: MultiSelectOption[] = Object.entries(statusComercialLabels).map(([k, v]) => ({ label: v, value: k }));
+  const faturamentoOptions: MultiSelectOption[] = Object.entries(statusFaturamentoLabels).map(([k, v]) => ({ label: v, value: k }));
+  const clienteOptions: MultiSelectOption[] = clientesList.map(c => ({ label: c.nome_razao_social, value: c.id }));
 
   const columns = [
     { key: "numero", label: "Nº OV", render: (o: OrdemVenda) => <span className="mono text-xs font-medium text-primary">{o.numero}</span> },
@@ -196,12 +232,38 @@ const OrdensVenda = () => {
       <ModulePage
         title="Ordens de Venda"
         subtitle="Gestão de pedidos comerciais e faturamento"
-        count={filteredData.length}
-        searchValue={searchTerm}
-        onSearchChange={setSearchTerm}
-        searchPlaceholder="Buscar por OV, cliente ou cotação..."
-        filters={<><Select value={statusFilter} onValueChange={setStatusFilter}><SelectTrigger className="h-9 w-[180px]"><SelectValue placeholder="Status comercial" /></SelectTrigger><SelectContent><SelectItem value="todos">Todos os status</SelectItem>{Object.entries(statusComercialLabels).map(([value, label]) => (<SelectItem key={value} value={value}>{label}</SelectItem>))}</SelectContent></Select><Select value={faturamentoFilter} onValueChange={setFaturamentoFilter}><SelectTrigger className="h-9 w-[190px]"><SelectValue placeholder="Faturamento" /></SelectTrigger><SelectContent><SelectItem value="todos">Todo faturamento</SelectItem>{Object.entries(statusFaturamentoLabels).map(([value, label]) => (<SelectItem key={value} value={value}>{label}</SelectItem>))}</SelectContent></Select></>}
       >
+        <AdvancedFilterBar
+          searchValue={searchTerm}
+          onSearchChange={setSearchTerm}
+          searchPlaceholder="Buscar por OV, cliente ou cotação..."
+          activeFilters={ovActiveFilters}
+          onRemoveFilter={handleRemoveOvFilter}
+          onClearAll={() => { setStatusFilters([]); setFaturamentoFilters([]); setClienteFilters([]); }}
+          count={filteredData.length}
+        >
+          <MultiSelect
+            options={statusOptions}
+            selected={statusFilters}
+            onChange={setStatusFilters}
+            placeholder="Status"
+            className="w-[180px]"
+          />
+          <MultiSelect
+            options={faturamentoOptions}
+            selected={faturamentoFilters}
+            onChange={setFaturamentoFilters}
+            placeholder="Faturamento"
+            className="w-[180px]"
+          />
+          <MultiSelect
+            options={clienteOptions}
+            selected={clienteFilters}
+            onChange={setClienteFilters}
+            placeholder="Clientes"
+            className="w-[200px]"
+          />
+        </AdvancedFilterBar>
         {/* KPI Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <SummaryCard title="Total de OVs" value={formatNumber(kpis.total)} icon={FileText} variationType="neutral" variation="registros" />
@@ -213,82 +275,35 @@ const OrdensVenda = () => {
         <DataTable columns={columns} data={filteredData} loading={loading} onView={handleView} />
       </ModulePage>
 
-      <ViewDrawerV2 open={drawerOpen} onClose={() => setDrawerOpen(false)} title="Detalhes da Ordem de Venda"
-        actions={selected ? <>
-          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => { setDrawerOpen(false); remove(selected.id); }}><Trash2 className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Excluir</TooltipContent></Tooltip>
-        </> : undefined}
+      <ViewDrawerV2
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        title={`OV ${selected?.numero}`}
         badge={selected ? <StatusBadge status={selected.status} label={statusComercialLabels[selected.status]} /> : undefined}
         tabs={selected ? [
-          { value: "dados", label: "Dados", content: (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <ViewField label="Nº OV"><span className="font-mono">{selected.numero}</span></ViewField>
-                <ViewField label="PO Cliente"><span className="font-mono">{selected.po_number || "—"}</span></ViewField>
-              </div>
-              <ViewField label="Cotação Origem">
-                {selected.orcamentos?.numero ? (
-                  <RelationalLink to="/orcamentos" mono>{selected.orcamentos.numero}</RelationalLink>
-                ) : "—"}
-              </ViewField>
-              <ViewField label="Cliente">
-                {selected.clientes?.nome_razao_social ? (
-                  <RelationalLink to="/clientes">{selected.clientes.nome_razao_social}</RelationalLink>
-                ) : "—"}
-              </ViewField>
-              <div className="grid grid-cols-2 gap-4">
-                <ViewField label="Emissão">{formatDate(selected.data_emissao)}</ViewField>
-                <ViewField label="Aprovação">{selected.data_aprovacao ? formatDate(selected.data_aprovacao) : "—"}</ViewField>
-              </div>
-              <ViewField label="Valor Total"><span className="font-semibold mono text-lg">{formatCurrency(Number(selected.valor_total || 0))}</span></ViewField>
-              <div className="grid grid-cols-2 gap-4">
-                <ViewField label="Faturamento">
-                  <Badge variant="outline" className={`${statusFaturamentoColors[selected.status_faturamento] || ""}`}>
-                    {statusFaturamentoLabels[selected.status_faturamento] || selected.status_faturamento}
-                  </Badge>
-                </ViewField>
-              </div>
-              {selected.observacoes && <ViewField label="Observações">{selected.observacoes}</ViewField>}
-            </div>
-          )},
-          { value: "itens", label: "Itens", content: (
-            <div>
-              {loadingItems ? (
-                <div className="flex justify-center py-4"><div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" /></div>
-              ) : ovItems.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Nenhum item</p>
-              ) : (
-                <div className="space-y-2">
-                  {ovItems.map((item: any) => (
-                    <div key={item.id} className="flex justify-between items-center py-2 px-3 bg-accent/20 rounded-lg text-sm">
-                      <div>
-                        <RelationalLink to="/produtos">{item.descricao_snapshot || item.produtos?.nome || "—"}</RelationalLink>
-                        <p className="text-xs text-muted-foreground mono">{item.codigo_snapshot || "—"} • {item.quantidade} {item.unidade}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-semibold mono">{formatCurrency(Number(item.valor_total || 0))}</p>
-                        <p className="text-xs text-muted-foreground">Fat.: {item.quantidade_faturada || 0}/{item.quantidade}</p>
-                      </div>
-                    </div>
-                  ))}
+          {
+            value: "dados", label: "Dados", content: (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <ViewField label="Número"><span className="font-mono">{selected.numero}</span></ViewField>
+                  <ViewField label="Emissão">{formatDate(selected.data_emissao)}</ViewField>
+                  <ViewField label="PO Cliente">{selected.po_number || "—"}</ViewField>
+                  <ViewField label="Total"><span className="font-semibold font-mono">{formatCurrency(selected.valor_total)}</span></ViewField>
                 </div>
-              )}
-            </div>
-          )},
-        ] : undefined}
-        footer={selected ? (
-          <div className="space-y-2">
-            {selected.status === "pendente" && (
-              <Button onClick={() => { setDrawerOpen(false); handleApprove(selected); }} className="w-full gap-2">
-                <CheckCircle className="w-4 h-4" /> Aprovar OV
-              </Button>
-            )}
-            {(selected.status === "aprovada" || selected.status === "em_separacao") && selected.status_faturamento !== "total" && (
-              <Button variant="default" onClick={() => { setDrawerOpen(false); setGeneratingNfId(selected.id); }} className="w-full gap-2">
-                <FileOutput className="w-4 h-4" /> Gerar Nota Fiscal
-              </Button>
-            )}
-          </div>
-        ) : undefined}
+                <ViewField label="Cliente">
+                  {selected.clientes?.nome_razao_social ? (
+                    <RelationalLink type="cliente" id={selected.cliente_id}>{selected.clientes.nome_razao_social}</RelationalLink>
+                  ) : "—"}
+                </ViewField>
+                {selected.orcamentos?.numero && (
+                  <ViewField label="Cotação Origem">
+                    <RelationalLink type="orcamento" id={selected.cotacao_id}>{selected.orcamentos.numero}</RelationalLink>
+                  </ViewField>
+                )}
+              </div>
+            )
+          }
+        ] : []}
       />
 
       <ConfirmDialog

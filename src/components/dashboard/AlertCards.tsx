@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom';
+import { useRelationalNavigation } from '@/contexts/RelationalNavigationContext';
 import { ClipboardList, Truck, AlertTriangle } from 'lucide-react';
 import { formatNumber, formatCurrency } from '@/lib/format';
 
@@ -40,6 +41,7 @@ interface AlertCardsProps {
 
 export function AlertCards({ backlogCount, backlogTotal, comprasCount, comprasTotal, estoqueBaixoCount }: AlertCardsProps) {
   const navigate = useNavigate();
+  const { pushView } = useRelationalNavigation();
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">

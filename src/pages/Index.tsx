@@ -13,12 +13,14 @@ import { SummaryPie } from "@/components/dashboard/SummaryPie";
 import { FluxoCaixaChart } from "@/components/dashboard/FluxoCaixaChart";
 import { DashboardSkeleton } from "@/components/dashboard/DashboardSkeleton";
 import { supabase } from "@/integrations/supabase/client";
+import { useRelationalNavigation } from "@/contexts/RelationalNavigationContext";
 import { periodToFinancialRange } from "@/lib/periodFilter";
 import { formatCurrency, formatNumber } from "@/lib/format";
 import { Package, Users, TrendingUp, DollarSign } from "lucide-react";
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const { pushView } = useRelationalNavigation();
   const [period, setPeriod] = useState<Period>('30d');
   const [stats, setStats] = useState({
     produtos: 0, clientes: 0, fornecedores: 0,

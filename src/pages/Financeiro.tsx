@@ -14,13 +14,15 @@ import { SummaryCard } from "@/components/SummaryCard";
 import { PeriodFilter, financialPeriods, type Period } from "@/components/dashboard/PeriodFilter";
 import { periodToFinancialRange } from "@/lib/periodFilter";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
+import { useRelationalNavigation } from "@/contexts/RelationalNavigationContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { MultiSelect, type MultiSelectOption } from "@/components/ui/MultiSelect";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { formatCurrency } from "@/lib/format";
 import { supabase } from "@/integrations/supabase/client";
@@ -56,6 +58,7 @@ const emptyForm: Record<string, any> = {
 };
 
 const Financeiro = () => {
+  const { pushView } = useRelationalNavigation();
   const { data, loading, create, update, remove } = useSupabaseCrud<Lancamento>({
     table: "financeiro_lancamentos",
     select: "*, clientes(nome_razao_social), fornecedores(nome_razao_social), contas_bancarias(descricao, bancos(nome))"
@@ -73,9 +76,9 @@ const Financeiro = () => {
   const [saving, setSaving] = useState(false);
   const [searchParams] = useSearchParams();
   const tipoParam = searchParams.get("tipo");
-  const [filterStatus, setFilterStatus] = useState("todos");
-  const [filterTipo, setFilterTipo] = useState<string>(tipoParam || "todos");
-  const [filterBanco, setFilterBanco] = useState("todos");
+  const [statusFilters, setStatusFilters] = useState<string[]>([]);
+  const [tipoFilters, setTipoFilters] = useState<string[]>(tipoParam ? [tipoParam] : []);
+  const [bancoFilters, setBancoFilters] = useState<string[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [period, setPeriod] = useState<Period>("30d");
@@ -92,7 +95,7 @@ const Financeiro = () => {
   const [tipoBaixa, setTipoBaixa] = useState<"total" | "parcial">("total");
   const [valorPagoBaixa, setValorPagoBaixa] = useState(0);
 
-  useEffect(() => { if (tipoParam) setFilterTipo(tipoParam); }, [tipoParam]);
+  useEffect(() => { if (tipoParam) setTipoFilters([tipoParam]); }, [tipoParam]);
 
   useEffect(() => {
     const load = async () => {
@@ -179,7 +182,10 @@ const Financeiro = () => {
         await update(selected.id, basePayload);
       }
       setModalOpen(false);
-    } catch { }
+    } catch (err) {
+      console.error('[financeiro] erro ao salvar:', err);
+      toast.error("Erro ao salvar lançamento");
+    }
     setSaving(false);
   };
 
@@ -218,16 +224,17 @@ const Financeiro = () => {
         if (dateTo && l.data_vencimento > dateTo) return false;
       }
 
-      if (filterStatus !== "todos" && effectiveStatus !== filterStatus) return false;
-      if (filterTipo !== "todos" && l.tipo !== filterTipo) return false;
-      if (filterBanco !== "todos" && l.conta_bancaria_id !== filterBanco) return false;
+      if (statusFilters.length > 0 && !statusFilters.includes(effectiveStatus)) return false;
+      if (tipoFilters.length > 0 && !tipoFilters.includes(l.tipo)) return false;
+      if (bancoFilters.length > 0 && !bancoFilters.includes(l.conta_bancaria_id || "")) return false;
+
       if (query) {
         const haystack = [l.descricao, l.clientes?.nome_razao_social, l.fornecedores?.nome_razao_social].filter(Boolean).join(" ").toLowerCase();
         if (!haystack.includes(query)) return false;
       }
       return true;
     });
-  }, [data, filterStatus, filterTipo, filterBanco, searchTerm, hoje, period]);
+  }, [data, statusFilters, tipoFilters, bancoFilters, searchTerm, hoje, period]);
 
   // KPI calculations
   const kpis = useMemo(() => {
@@ -397,22 +404,36 @@ const Financeiro = () => {
 
   const finActiveFilters = useMemo(() => {
     const chips: FilterChip[] = [];
-    if (filterTipo !== "todos") chips.push({ key: "tipo", label: "Tipo", value: filterTipo, displayValue: filterTipo === "receber" ? "A Receber" : "A Pagar" });
-    if (filterStatus !== "todos") chips.push({ key: "status", label: "Status", value: filterStatus, displayValue: filterStatus.charAt(0).toUpperCase() + filterStatus.slice(1) });
-    if (filterBanco !== "todos") {
-      const banco = contasBancarias.find(c => c.id === filterBanco);
-      chips.push({ key: "banco", label: "Banco", value: filterBanco, displayValue: banco ? `${banco.bancos?.nome} - ${banco.descricao}` : filterBanco });
-    }
+    tipoFilters.forEach(f => chips.push({ key: "tipo", label: "Tipo", value: [f], displayValue: f === "receber" ? "A Receber" : "A Pagar" }));
+    statusFilters.forEach(f => chips.push({ key: "status", label: "Status", value: [f], displayValue: f.charAt(0).toUpperCase() + f.slice(1) }));
+    bancoFilters.forEach(f => {
+      const banco = contasBancarias.find(c => c.id === f);
+      chips.push({ key: "banco", label: "Banco", value: [f], displayValue: banco ? `${banco.bancos?.nome} - ${banco.descricao}` : f });
+    });
     return chips;
-  }, [filterTipo, filterStatus, filterBanco, contasBancarias]);
+  }, [tipoFilters, statusFilters, bancoFilters, contasBancarias]);
 
-  const handleRemoveFinFilter = (key: string) => {
-    if (key === "tipo") setFilterTipo("todos");
-    if (key === "status") setFilterStatus("todos");
-    if (key === "banco") setFilterBanco("todos");
+  const handleRemoveFinFilter = (key: string, value?: string) => {
+    if (key === "tipo") setTipoFilters(prev => prev.filter(v => v !== value));
+    if (key === "status") setStatusFilters(prev => prev.filter(v => v !== value));
+    if (key === "banco") setBancoFilters(prev => prev.filter(v => v !== value));
   };
 
-  const handleClearAllFinFilters = () => { setFilterTipo("todos"); setFilterStatus("todos"); setFilterBanco("todos"); };
+  const handleClearAllFinFilters = () => { setTipoFilters([]); setStatusFilters([]); setBancoFilters([]); };
+
+  const tipoFilterOptions: MultiSelectOption[] = [
+    { label: "A Receber", value: "receber" },
+    { label: "A Pagar", value: "pagar" },
+  ];
+  const statusFilterOptions: MultiSelectOption[] = [
+    { label: "Aberto", value: "aberto" },
+    { label: "Pago", value: "pago" },
+    { label: "Vencido", value: "vencido" },
+    { label: "Cancelado", value: "cancelado" },
+  ];
+  const bancoFilterOptions: MultiSelectOption[] = contasBancarias.map(c => ({
+    label: `${c.bancos?.nome} - ${c.descricao}`, value: c.id
+  }));
 
   return (
     <AppLayout>
@@ -433,10 +454,10 @@ const Financeiro = () => {
 
         {/* KPI Summary Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <SummaryCard title="A Vencer" value={kpis.aVencer.toString()} subtitle={formatCurrency(kpis.totalAVencer)} icon={CalendarClock} variant="info" onClick={() => setFilterStatus("aberto")} />
+          <SummaryCard title="A Vencer" value={kpis.aVencer.toString()} subtitle={formatCurrency(kpis.totalAVencer)} icon={CalendarClock} variant="info" onClick={() => setStatusFilters(["aberto"])} />
           <SummaryCard title="Vence Hoje" value={kpis.venceHoje.toString()} icon={Clock} variant="warning" />
-          <SummaryCard title="Vencidos" value={kpis.vencido.toString()} subtitle={formatCurrency(kpis.totalVencido)} icon={AlertTriangle} variant="danger" onClick={() => setFilterStatus("vencido")} />
-          <SummaryCard title="Pagos" value={kpis.pagoNoPeriodo.toString()} subtitle={formatCurrency(kpis.totalPago)} icon={CheckCircle} variant="success" onClick={() => setFilterStatus("pago")} />
+          <SummaryCard title="Vencidos" value={kpis.vencido.toString()} subtitle={formatCurrency(kpis.totalVencido)} icon={AlertTriangle} variant="danger" onClick={() => setStatusFilters(["vencido"])} />
+          <SummaryCard title="Pagos" value={kpis.pagoNoPeriodo.toString()} subtitle={formatCurrency(kpis.totalPago)} icon={CheckCircle} variant="success" onClick={() => setStatusFilters(["pago"])} />
         </div>
 
         {/* AdvancedFilterBar */}
@@ -454,35 +475,27 @@ const Financeiro = () => {
             </Button>
           ) : undefined}
         >
-          <Select value={filterTipo} onValueChange={setFilterTipo}>
-            <SelectTrigger className="h-9 w-[150px]"><SelectValue placeholder="Tipo" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todos os tipos</SelectItem>
-              <SelectItem value="receber">A Receber</SelectItem>
-              <SelectItem value="pagar">A Pagar</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={filterStatus} onValueChange={setFilterStatus}>
-            <SelectTrigger className="h-9 w-[150px]"><SelectValue placeholder="Status" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todos os status</SelectItem>
-              <SelectItem value="aberto">Aberto</SelectItem>
-              <SelectItem value="pago">Pago</SelectItem>
-              <SelectItem value="vencido">Vencido</SelectItem>
-              <SelectItem value="cancelado">Cancelado</SelectItem>
-            </SelectContent>
-          </Select>
-          {contasBancarias.length > 0 && (
-            <Select value={filterBanco} onValueChange={setFilterBanco}>
-              <SelectTrigger className="h-9 w-[200px]"><SelectValue placeholder="Banco" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todos os bancos</SelectItem>
-                {contasBancarias.map(c => (
-                  <SelectItem key={c.id} value={c.id}>{c.bancos?.nome} - {c.descricao}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
+          <MultiSelect
+            options={tipoFilterOptions}
+            selected={tipoFilters}
+            onChange={setTipoFilters}
+            placeholder="Tipo"
+            className="w-[150px]"
+          />
+          <MultiSelect
+            options={statusFilterOptions}
+            selected={statusFilters}
+            onChange={setStatusFilters}
+            placeholder="Status"
+            className="w-[180px]"
+          />
+          <MultiSelect
+            options={bancoFilterOptions}
+            selected={bancoFilters}
+            onChange={setBancoFilters}
+            placeholder="Bancos"
+            className="w-[200px]"
+          />
         </AdvancedFilterBar>
 
         {viewMode === "calendario" ? (
@@ -688,13 +701,13 @@ const Financeiro = () => {
                 <div className="grid grid-cols-2 gap-4">
                   <ViewField label="Parceiro">
                     {selected.tipo === "receber" && selected.clientes?.nome_razao_social ? (
-                      <RelationalLink to="/clientes">{selected.clientes.nome_razao_social}</RelationalLink>
+                      <RelationalLink type="cliente" id={selected.cliente_id}>{selected.clientes.nome_razao_social}</RelationalLink>
                     ) : selected.tipo === "pagar" && selected.fornecedores?.nome_razao_social ? (
-                      <RelationalLink to="/fornecedores">{selected.fornecedores.nome_razao_social}</RelationalLink>
+                      <RelationalLink type="fornecedor" id={selected.fornecedor_id}>{selected.fornecedores.nome_razao_social}</RelationalLink>
                     ) : "—"}
                   </ViewField>
                   {selected.nota_fiscal_id && (
-                    <ViewField label="Origem"><RelationalLink to="/fiscal">NF vinculada</RelationalLink></ViewField>
+                    <ViewField label="Origem"><RelationalLink type="nota_fiscal" id={selected.nota_fiscal_id}>NF vinculada</RelationalLink></ViewField>
                   )}
                 </div>
                 {selected.contas_contabeis && (
@@ -718,6 +731,9 @@ const Financeiro = () => {
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Confirmar Baixa — {selectedIds.length} título(s)</DialogTitle>
+            <DialogDescription>
+              Revise os títulos selecionados e informe os dados do pagamento para concluir a baixa.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="rounded-lg border overflow-hidden">

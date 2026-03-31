@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { MultiSelect } from "@/components/ui/MultiSelect";
+import { AdvancedFilterBar, type FilterChip } from "@/components/AdvancedFilterBar";
 import { DataTable } from '@/components/DataTable';
 import { PreviewModal } from '@/components/ui/PreviewModal';
 import { BarChart3, Package, Wallet, ShoppingCart, TrendingUp, Truck, Download, RefreshCcw, Hash, AlertTriangle, DollarSign, FileText, Eye, ArrowLeftRight, FileSpreadsheet, CalendarClock, Receipt } from 'lucide-react';
@@ -130,10 +132,10 @@ export default function Relatorios() {
   const [tipo, setTipo] = useState<TipoRelatorio>(tipoInicial);
   const [dataInicio, setDataInicio] = useState('');
   const [dataFim, setDataFim] = useState('');
-  const [filtroClienteId, setFiltroClienteId] = useState('');
-  const [filtroFornecedorId, setFiltroFornecedorId] = useState('');
-  const [filtroGrupoId, setFiltroGrupoId] = useState('');
-  const [filtroStatus, setFiltroStatus] = useState('');
+  const [filtroClienteIds, setFiltroClienteIds] = useState<string[]>([]);
+  const [filtroFornecedorIds, setFiltroFornecedorIds] = useState<string[]>([]);
+  const [filtroGrupoIds, setFiltroGrupoIds] = useState<string[]>([]);
+  const [filtroTipos, setFiltroTipos] = useState<string[]>([]);
   const [dreCompetencia, setDreCompetencia] = useState<'mes' | 'trimestre' | 'ano' | 'personalizado'>('mes');
   const [dreMes, setDreMes] = useState(() => new Date().toISOString().slice(0, 7));
   const [clientes, setClientes] = useState<{ id: string; nome_razao_social: string }[]>([]);
@@ -166,7 +168,14 @@ export default function Relatorios() {
     try {
       const filtros = selectedReport === 'dre'
         ? { ...getDreDateRange(), clienteId: undefined, fornecedorId: undefined, grupoProdutoId: undefined }
-        : { dataInicio, dataFim, clienteId: filtroClienteId || undefined, fornecedorId: filtroFornecedorId || undefined, grupoProdutoId: filtroGrupoId || undefined, tipoFinanceiro: filtroStatus || undefined };
+        : {
+            dataInicio,
+            dataFim,
+            clienteIds: filtroClienteIds.length > 0 ? filtroClienteIds : undefined,
+            fornecedorIds: filtroFornecedorIds.length > 0 ? filtroFornecedorIds : undefined,
+            grupoProdutoIds: filtroGrupoIds.length > 0 ? filtroGrupoIds : undefined,
+            tiposFinanceiros: filtroTipos.length > 0 ? filtroTipos : undefined
+          };
       const report = await carregarRelatorio(tipo, filtros);
       setResultado(report);
     } catch (error: unknown) {
@@ -205,10 +214,10 @@ export default function Relatorios() {
   }, [resultado.rows, isQtyReport]);
 
   const handleSelectTipo = (nextTipo: TipoRelatorio) => {
-    setFiltroClienteId('');
-    setFiltroFornecedorId('');
-    setFiltroGrupoId('');
-    setFiltroStatus('');
+    setFiltroClienteIds([]);
+    setFiltroFornecedorIds([]);
+    setFiltroGrupoIds([]);
+    setFiltroTipos([]);
     setTipo(nextTipo);
     setSearchParams((current) => {
       const next = new URLSearchParams(current);
@@ -324,54 +333,56 @@ export default function Relatorios() {
               <div className="flex flex-wrap gap-3 items-end mt-3">
                 {['vendas', 'faturamento', 'aging', 'curva_abc', 'vendas_cliente'].includes(selectedReport || '') && (
                   <div className="space-y-1">
-                    <Label className="text-xs">Cliente</Label>
-                    <Select value={filtroClienteId || 'todos'} onValueChange={v => setFiltroClienteId(v === 'todos' ? '' : v)}>
-                      <SelectTrigger className="h-9 w-[220px]"><SelectValue placeholder="Todos os clientes" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="todos">Todos os clientes</SelectItem>
-                        {clientes.map(c => <SelectItem key={c.id} value={c.id}>{c.nome_razao_social}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
+                    <Label className="text-xs">Clientes</Label>
+                    <MultiSelect
+                      options={clientes.map(c => ({ label: c.nome_razao_social, value: c.id }))}
+                      selected={filtroClienteIds}
+                      onChange={setFiltroClienteIds}
+                      placeholder="Todos os clientes"
+                      className="w-[250px]"
+                    />
                   </div>
                 )}
 
                 {['compras', 'compras_fornecedor'].includes(selectedReport || '') && (
                   <div className="space-y-1">
-                    <Label className="text-xs">Fornecedor</Label>
-                    <Select value={filtroFornecedorId || 'todos'} onValueChange={v => setFiltroFornecedorId(v === 'todos' ? '' : v)}>
-                      <SelectTrigger className="h-9 w-[220px]"><SelectValue placeholder="Todos os fornecedores" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="todos">Todos os fornecedores</SelectItem>
-                        {fornecedores.map(f => <SelectItem key={f.id} value={f.id}>{f.nome_razao_social}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
+                    <Label className="text-xs">Fornecedores</Label>
+                    <MultiSelect
+                      options={fornecedores.map(f => ({ label: f.nome_razao_social, value: f.id }))}
+                      selected={filtroFornecedorIds}
+                      onChange={setFiltroFornecedorIds}
+                      placeholder="Todos os fornecedores"
+                      className="w-[250px]"
+                    />
                   </div>
                 )}
 
                 {['estoque', 'estoque_minimo', 'movimentos_estoque', 'margem_produtos', 'curva_abc'].includes(selectedReport || '') && (
                   <div className="space-y-1">
-                    <Label className="text-xs">Grupo de Produto</Label>
-                    <Select value={filtroGrupoId || 'todos'} onValueChange={v => setFiltroGrupoId(v === 'todos' ? '' : v)}>
-                      <SelectTrigger className="h-9 w-[200px]"><SelectValue placeholder="Todos os grupos" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="todos">Todos os grupos</SelectItem>
-                        {grupos.map(g => <SelectItem key={g.id} value={g.id}>{g.nome}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
+                    <Label className="text-xs">Grupos de Produto</Label>
+                    <MultiSelect
+                      options={grupos.map(g => ({ label: g.nome, value: g.id }))}
+                      selected={filtroGrupoIds}
+                      onChange={setFiltroGrupoIds}
+                      placeholder="Todos os grupos"
+                      className="w-[220px]"
+                    />
                   </div>
                 )}
 
                 {['financeiro', 'aging'].includes(selectedReport || '') && (
                   <div className="space-y-1">
-                    <Label className="text-xs">Tipo</Label>
-                    <Select value={filtroStatus || 'todos'} onValueChange={v => setFiltroStatus(v === 'todos' ? '' : v)}>
-                      <SelectTrigger className="h-9 w-[160px]"><SelectValue placeholder="Todos" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="todos">Todos</SelectItem>
-                        <SelectItem value="receber">A Receber</SelectItem>
-                        <SelectItem value="pagar">A Pagar</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <Label className="text-xs">Tipos</Label>
+                    <MultiSelect
+                      options={[
+                        { label: "A Receber", value: "receber" },
+                        { label: "A Pagar", value: "pagar" },
+                      ]}
+                      selected={filtroTipos}
+                      onChange={setFiltroTipos}
+                      placeholder="Todos"
+                      className="w-[180px]"
+                    />
                   </div>
                 )}
               </div>

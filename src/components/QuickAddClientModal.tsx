@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -69,6 +69,9 @@ export function QuickAddClientModal({ open, onClose, onCreated }: QuickAddClient
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Cadastro Rápido de Cliente</DialogTitle>
+          <DialogDescription>
+            Cadastre rapidamente um novo cliente para o orçamento.
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">

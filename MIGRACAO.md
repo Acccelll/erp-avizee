@@ -8,7 +8,7 @@ O módulo de migração foi projetado para garantir a integridade dos dados oper
 ### 1.1 Tabelas de Banco de Dados (Supabase)
 - `importacao_lotes`: Tabela mestre que controla os lotes de importação (status, totais, mapeamento de colunas, data-base).
 - `importacao_logs`: Registra cada evento do processamento, desde erros de validação até sucessos de carga.
-- `stg_*`: Tabelas de staging (ex: `stg_produtos`, `stg_clientes`) que armazenam o payload bruto dos arquivos antes da inserção final.
+- `stg_*`: Tabelas de staging (ex: `stg_produtos`, `stg_clientes`, `stg_financeiro`, `stg_estoque`) que armazenam o payload bruto dos arquivos antes da inserção final.
 - `produto_alias_importacao`: Tabela de equivalência para vincular códigos externos (de fornecedores ou sistemas antigos) aos IDs internos.
 
 ### 1.2 Camada de Lógica (TypeScript)
@@ -43,7 +43,7 @@ Localizada em `src/lib/importacao/`:
 ### 2.5 Financeiro em Aberto
 - **Origem**: Planilha Excel.
 - **Estratégia**: Carga de títulos pendentes (Pagar/Receber) com origem `abertura_financeiro`.
-- **Regra**: Não gera baixas automáticas.
+- **Regra**: Não gera baixas automáticas e requer vínculo com clientes/fornecedores existentes (ou via CPF/CNPJ para criação on-the-fly).
 
 ## 3. Regras de Validação e Segurança
 - **Perfis**: Acesso restrito a usuários com role `admin`.

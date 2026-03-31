@@ -13,11 +13,12 @@ import { OrcamentoCondicoesCard } from "@/components/Orcamento/OrcamentoCondicoe
 import { FreteCorreiosCard } from "@/components/Orcamento/FreteCorreiosCard";
 import { OrcamentoSidebarSummary } from "@/components/Orcamento/OrcamentoSidebarSummary";
 import { OrcamentoPdfTemplate } from "@/components/Orcamento/OrcamentoPdfTemplate";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ArrowLeft, Save, Eye, FileText, Copy, Plus } from "lucide-react";
+import { ArrowLeft, Save, Eye, FileText, Copy, Plus, Search } from "lucide-react";
 import { QuickAddClientModal } from "@/components/QuickAddClientModal";
+import { ClientSelector, type ProductWithForn } from "@/components/ui/DataSelector";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 interface ClienteSnapshot {
@@ -42,8 +43,9 @@ export default function OrcamentoForm() {
 
   const [saving, setSaving] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
-  const [clientes, setClientes] = useState<any[]>([]);
-  const [produtos, setProdutos] = useState<any[]>([]);
+  const [clientes, setClientes] = useState<Tables<"clientes">[]>([]);
+  const [produtos, setProdutos] = useState<ProductWithForn[]>([]);
+  const [precosEspeciais, setPrecosEspeciais] = useState<Tables<"precos_especiais">[]>([]);
 
   const [numero, setNumero] = useState("");
   const [dataOrcamento, setDataOrcamento] = useState(new Date().toISOString().split("T")[0]);
@@ -76,7 +78,7 @@ export default function OrcamentoForm() {
     const loadData = async () => {
       const [clientesRes, produtosRes] = await Promise.all([
         supabase.from("clientes").select("*").eq("ativo", true).order("nome_razao_social"),
-        supabase.from("produtos").select("*").eq("ativo", true).order("nome"),
+        supabase.from("produtos").select("*, produtos_fornecedores(*, fornecedores(nome_razao_social))").eq("ativo", true).order("nome"),
       ]);
       setClientes(clientesRes.data || []);
       setProdutos(produtosRes.data || []);
@@ -120,6 +122,33 @@ export default function OrcamentoForm() {
       if (c.forma_pagamento_padrao && !pagamento) setPagamento(c.forma_pagamento_padrao);
       if (c.prazo_preferencial && !prazoPagamento) setPrazoPagamento(`${c.prazo_preferencial} dias`);
       if (c.prazo_padrao && !prazoPagamento && !c.prazo_preferencial) setPrazoPagamento(`${c.prazo_padrao} dias`);
+
+      // Load special prices for this client
+      supabase.from("precos_especiais")
+        .select("*")
+        .eq("cliente_id", cId)
+        .eq("ativo", true)
+        .then(({ data }) => {
+          const rules = data || [];
+          setPrecosEspeciais(rules);
+
+          // Recalculate prices for existing items if they have special prices
+          if (items.length > 0) {
+            const nextItems = items.map(item => {
+              if (!item.produto_id) return item;
+              const rule = rules.find(r => r.produto_id === item.produto_id);
+              if (rule) {
+                const newPrice = Number(rule.preco_especial);
+                return { ...item, valor_unitario: newPrice, valor_total: item.quantidade * newPrice };
+              }
+              return item;
+            });
+            setItems(nextItems);
+            toast.info("Preços recalculados com base nas regras do cliente selecionado");
+          }
+        });
+    } else {
+      setPrecosEspeciais([]);
     }
   }, [clientes, pagamento, prazoPagamento]);
 
@@ -322,6 +351,15 @@ export default function OrcamentoForm() {
                       placeholder="Buscar por nome ou CNPJ..."
                       className="flex-1"
                     />
+                    <ClientSelector
+                      clientes={clientes}
+                      onSelect={(c) => handleClienteChange(c.id)}
+                      trigger={
+                        <Button type="button" variant="outline" size="icon" className="h-10 w-10 shrink-0" title="Ver lista completa">
+                          <Search className="h-4 w-4" />
+                        </Button>
+                      }
+                    />
                     <Button type="button" variant="outline" size="icon" className="h-10 w-10 shrink-0" onClick={() => setQuickAddOpen(true)} title="Cadastrar novo cliente">
                       <Plus className="h-4 w-4" />
                     </Button>
@@ -346,7 +384,12 @@ export default function OrcamentoForm() {
             </div>
           </div>
 
-          <OrcamentoItemsGrid items={items} onChange={setItems} produtos={produtos} />
+          <OrcamentoItemsGrid
+            items={items}
+            onChange={setItems}
+            produtos={produtos}
+            precosEspeciais={precosEspeciais}
+          />
 
           <OrcamentoTotaisCard
             totalProdutos={totalProdutos}
@@ -421,6 +464,12 @@ export default function OrcamentoForm() {
 
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
         <DialogContent className="max-w-4xl max-h-[95vh] overflow-y-auto p-0">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Pré-visualização do Orçamento</DialogTitle>
+            <DialogDescription>
+              Visualize como o orçamento será impresso ou enviado ao cliente.
+            </DialogDescription>
+          </DialogHeader>
           <div className="p-4 border-b flex justify-between items-center sticky top-0 bg-card z-10">
             <h3 className="font-semibold">Pré-visualização do Orçamento</h3>
             <div className="flex gap-2">

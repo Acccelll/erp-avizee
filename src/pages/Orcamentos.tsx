@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { AppLayout } from "@/components/AppLayout";
 import { ModulePage } from "@/components/ModulePage";
@@ -9,10 +9,12 @@ import { AdvancedFilterBar, type FilterChip } from "@/components/AdvancedFilterB
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Edit, Trash2 } from "lucide-react";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
+import { useRelationalNavigation } from "@/contexts/RelationalNavigationContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { MultiSelect, type MultiSelectOption } from "@/components/ui/MultiSelect";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Copy, ArrowRightCircle, CheckCircle, FileText, DollarSign, Clock, BarChart3, Link2 } from "lucide-react";
@@ -35,15 +37,22 @@ const statusLabels: Record<string, string> = {
 
 const Orcamentos = () => {
   const navigate = useNavigate();
-  const { data, loading, remove, fetchData } = useSupabaseCrud<Orcamento>({ table: "orcamentos", select: "*, clientes(nome_razao_social)" });
+  const { pushView } = useRelationalNavigation();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const { data, loading, remove, fetchData } = useSupabaseCrud<Orcamento>({ table: "orcamentos", select: "*, clientes(nome_razao_social)" });
   const [selected, setSelected] = useState<Orcamento | null>(null);
   const [convertingId, setConvertingId] = useState<string | null>(null);
   const [poNumberCliente, setPoNumberCliente] = useState("");
   const [dataPoCliente, setDataPoCliente] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("todos");
+  const [statusFilters, setStatusFilters] = useState<string[]>([]);
+  const [clienteFilters, setClienteFilters] = useState<string[]>([]);
+  const [clientesList, setClientesList] = useState<any[]>([]);
   const { isAdmin } = useIsAdmin();
+
+  useEffect(() => {
+    supabase.from("clientes").select("id, nome_razao_social").eq("ativo", true).then(({ data }) => setClientesList(data || []));
+  }, []);
 
   const handleSendForApproval = useCallback(async (orc: Orcamento) => {
     if (orc.status !== "rascunho") return;
@@ -157,11 +166,13 @@ const Orcamentos = () => {
   const filteredData = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
     return data.filter((orc) => {
-      if (statusFilter !== "todos" && orc.status !== statusFilter) return false;
+      if (statusFilters.length > 0 && !statusFilters.includes(orc.status)) return false;
+      if (clienteFilters.length > 0 && !clienteFilters.includes(orc.cliente_id || "")) return false;
+
       if (!query) return true;
       return [orc.numero, orc.clientes?.nome_razao_social, orc.observacoes].filter(Boolean).join(" ").toLowerCase().includes(query);
     });
-  }, [data, searchTerm, statusFilter]);
+  }, [data, searchTerm, statusFilters, clienteFilters]);
 
   const columns = [
     { key: "numero", label: "Nº", sortable: true, render: (o: Orcamento) => <span className="font-mono text-xs font-medium text-primary">{o.numero}</span> },
@@ -194,13 +205,31 @@ const Orcamentos = () => {
   ];
 
   const convertingOrc = data.find(o => o.id === convertingId);
-  const statusOptions = ["todos", "rascunho", "confirmado", "aprovado", "convertido", "cancelado", "faturado"];
 
   const orcActiveFilters = useMemo(() => {
     const chips: FilterChip[] = [];
-    if (statusFilter !== "todos") chips.push({ key: "status", label: "Status", value: statusFilter, displayValue: statusLabels[statusFilter] || statusFilter });
+    statusFilters.forEach(f => {
+      chips.push({ key: "status", label: "Status", value: [f], displayValue: statusLabels[f] || f });
+    });
+    clienteFilters.forEach(f => {
+      const cli = clientesList.find(x => x.id === f);
+      chips.push({ key: "cliente", label: "Cliente", value: [f], displayValue: cli?.nome_razao_social || f });
+    });
     return chips;
-  }, [statusFilter]);
+  }, [statusFilters, clienteFilters, clientesList]);
+
+  const handleRemoveOrcFilter = (key: string, value?: string) => {
+    if (key === "status") setStatusFilters(prev => prev.filter(v => v !== value));
+    if (key === "cliente") setClienteFilters(prev => prev.filter(v => v !== value));
+  };
+
+  const statusOptions: MultiSelectOption[] = Object.entries(statusLabels).map(([k, v]) => ({
+    label: v, value: k
+  }));
+
+  const clienteOptions: MultiSelectOption[] = clientesList.map(c => ({
+    label: c.nome_razao_social, value: c.id
+  }));
 
   return (
     <AppLayout>
@@ -222,92 +251,51 @@ const Orcamentos = () => {
           onSearchChange={setSearchTerm}
           searchPlaceholder="Buscar por número da cotação ou cliente..."
           activeFilters={orcActiveFilters}
-          onRemoveFilter={() => setStatusFilter("todos")}
+          onRemoveFilter={handleRemoveOrcFilter}
+          onClearAll={() => { setStatusFilters([]); setClienteFilters([]); }}
           count={filteredData.length}
         >
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="h-9 w-[190px]"><SelectValue placeholder="Status" /></SelectTrigger>
-            <SelectContent>
-              {statusOptions.map((status) => (
-                <SelectItem key={status} value={status}>{status === "todos" ? "Todos os status" : statusLabels[status] || status}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <MultiSelect
+            options={statusOptions}
+            selected={statusFilters}
+            onChange={setStatusFilters}
+            placeholder="Status"
+            className="w-[200px]"
+          />
+          <MultiSelect
+            options={clienteOptions}
+            selected={clienteFilters}
+            onChange={setClienteFilters}
+            placeholder="Clientes"
+            className="w-[250px]"
+          />
         </AdvancedFilterBar>
 
         <DataTable columns={columns} data={filteredData} loading={loading}
-          onView={(o) => { setSelected(o); setDrawerOpen(true); }}
+          onView={(o) => {
+            setSelected(o);
+            setDrawerOpen(true);
+          }}
         />
       </ModulePage>
 
       <ViewDrawer
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
-        title={`Cotação ${selected?.numero || ""}`}
+        title={`Cotação ${selected?.numero}`}
         badge={selected ? <StatusBadge status={selected.status} label={statusLabels[selected.status]} /> : undefined}
-        actions={selected ? <>
-          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setDrawerOpen(false); navigate(`/cotacoes/${selected.id}`); }}><Edit className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Editar</TooltipContent></Tooltip>
-          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setDrawerOpen(false); handleDuplicate(selected); }}><Copy className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Duplicar</TooltipContent></Tooltip>
-          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => { setDrawerOpen(false); remove(selected.id); }}><Trash2 className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Excluir</TooltipContent></Tooltip>
-        </> : undefined}
       >
-        {selected && (
-          <div className="space-y-5">
-            <ViewSection title="Dados Gerais">
-              <div className="grid grid-cols-2 gap-4">
-                <ViewField label="Número"><span className="font-mono font-medium">{selected.numero}</span></ViewField>
-                <ViewField label="Cliente">{selected.clientes?.nome_razao_social || "—"}</ViewField>
-                <ViewField label="Data">{formatDate(selected.data_orcamento)}</ViewField>
-                <ViewField label="Validade">{selected.validade ? formatDate(selected.validade) : "—"}</ViewField>
-              </div>
-            </ViewSection>
-
-            <ViewSection title="Valores">
-              <div className="rounded-xl bg-primary/5 border border-primary/20 p-4 text-center">
-                <span className="text-xs text-muted-foreground uppercase tracking-wider">Valor Total</span>
-                <p className="text-2xl font-bold font-mono mt-1">{formatCurrency(Number(selected.valor_total || 0))}</p>
-              </div>
-            </ViewSection>
-
-            {selected.observacoes && (
-              <ViewSection title="Observações">
-                <p className="text-sm text-muted-foreground">{selected.observacoes}</p>
-              </ViewSection>
-            )}
-
-            <div className="space-y-2 pt-2">
-              <Button onClick={() => { setDrawerOpen(false); navigate(`/cotacoes/${selected.id}`); }} className="w-full gap-2">Abrir Cotação</Button>
-              {selected.status === "rascunho" && (
-                <Button variant="secondary" onClick={() => { setDrawerOpen(false); handleSendForApproval(selected); }} className="w-full gap-2">
-                  <Send className="w-4 h-4" /> Enviar p/ Aprovação
-                </Button>
-              )}
-              {selected.status === "confirmado" && (
-                <Button variant="secondary" onClick={() => { setDrawerOpen(false); handleApprove(selected); }} className="w-full gap-2" disabled={!isAdmin}>
-                  <CheckCircle className="w-4 h-4" /> Aprovar Cotação
-                </Button>
-              )}
-              {selected.status === "aprovado" && (
-                <Button variant="default" onClick={() => { setDrawerOpen(false); setConvertingId(selected.id); }} className="w-full gap-2">
-                  <ArrowRightCircle className="w-4 h-4" /> Gerar Ordem de Venda
-                </Button>
-              )}
-              <Button variant="outline" onClick={() => { setDrawerOpen(false); handleDuplicate(selected); }} className="w-full gap-2">
-                <Copy className="w-4 h-4" /> Duplicar
-              </Button>
-              <Button variant="outline" onClick={async () => {
-                const token = crypto.randomUUID();
-                await (supabase.from('orcamentos') as any).update({ public_token: token }).eq('id', selected.id);
-                const url = `${window.location.origin}/orcamento-publico?token=${token}`;
-                await navigator.clipboard.writeText(url);
-                toast.success('Link público copiado para a área de transferência!');
-                fetchData();
-              }} className="w-full gap-2">
-                <Link2 className="w-4 h-4" /> Gerar Link Público
-              </Button>
+        {selected ? (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <ViewField label="Número"><span className="font-mono">{selected.numero}</span></ViewField>
+              <ViewField label="Data">{formatDate(selected.data_orcamento)}</ViewField>
+              <ViewField label="Validade">{selected.validade ? formatDate(selected.validade) : "—"}</ViewField>
+              <ViewField label="Total"><span className="font-semibold font-mono">{formatCurrency(selected.valor_total)}</span></ViewField>
             </div>
+            <ViewField label="Cliente">{selected.clientes?.nome_razao_social || "—"}</ViewField>
           </div>
-        )}
+        ) : null}
       </ViewDrawer>
 
       <ConfirmDialog

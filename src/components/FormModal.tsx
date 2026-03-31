@@ -2,6 +2,7 @@ import { ReactNode } from "react";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -27,6 +28,9 @@ export function FormModal({ open, onClose, title, children, size = "md" }: FormM
       <DialogContent className={`${sizeMap[size]} max-h-[90vh] overflow-y-auto`}>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
+          <DialogDescription className="sr-only">
+            Formulário para {title}
+          </DialogDescription>
         </DialogHeader>
         {children}
       </DialogContent>

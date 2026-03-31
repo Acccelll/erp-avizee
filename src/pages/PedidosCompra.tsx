@@ -10,6 +10,7 @@ import { RelationalLink } from "@/components/ui/RelationalLink";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Edit, Trash2, FileInput } from "lucide-react";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
+import { useRelationalNavigation } from "@/contexts/RelationalNavigationContext";
 import { AutocompleteSearch } from "@/components/ui/AutocompleteSearch";
 import { ItemsGrid, type GridItem } from "@/components/ui/ItemsGrid";
 import { Button } from "@/components/ui/button";
@@ -20,8 +21,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatCurrency, formatNumber } from "@/lib/format";
-import { ShoppingCart, Clock, CheckCircle2, FileText } from "lucide-react";
+import { ShoppingCart, Clock, CheckCircle2, FileText, Truck } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { LogisticaRastreioSection } from "@/components/logistica/LogisticaRastreioSection";
 
 interface PedidoCompra {
   id: string; numero: string; fornecedor_id: string; data_pedido: string;
@@ -44,10 +46,10 @@ const PedidosCompra = () => {
   const { data, loading, fetchData } = useSupabaseCrud<PedidoCompra>({
     table: "pedidos_compra", select: "*, fornecedores(nome_razao_social, cpf_cnpj)",
   });
+  const { pushView } = useRelationalNavigation();
   const fornecedoresCrud = useSupabaseCrud<any>({ table: "fornecedores" });
   const produtosCrud = useSupabaseCrud<any>({ table: "produtos" });
   const [modalOpen, setModalOpen] = useState(false);
-  const [drawerOpen, setDrawerOpen] = useState(false);
   const [selected, setSelected] = useState<PedidoCompra | null>(null);
   const [mode, setMode] = useState<"create" | "edit">("create");
   const [form, setForm] = useState(emptyForm);
@@ -87,10 +89,8 @@ const PedidosCompra = () => {
     setModalOpen(true);
   };
 
-  const openView = async (p: PedidoCompra) => {
-    setSelected(p); setDrawerOpen(true);
-    const { data: itens } = await supabase.from("pedidos_compra_itens" as any).select("*, produtos(nome, sku)").eq("pedido_compra_id", p.id);
-    setViewItems(itens || []);
+  const openView = (p: PedidoCompra) => {
+    pushView("pedido_compra", p.id);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -199,7 +199,7 @@ const PedidosCompra = () => {
           <SummaryCard title="Pendentes" value={formatNumber(kpis.pending)} icon={Clock} variationType={kpis.pending > 0 ? "negative" : "positive"} variant={kpis.pending > 0 ? "warning" : undefined} variation="aguardando" />
           <SummaryCard title="Concluídos" value={formatNumber(kpis.done)} icon={CheckCircle2} variationType="positive" variation="recebidos" />
         </div>
-        <DataTable columns={columns} data={data} loading={loading} onView={openView} />
+        <DataTable columns={columns} data={data} loading={loading} onView={openView} onEdit={openEdit} />
       </ModulePage>
 
       <FormModal open={modalOpen} onClose={() => setModalOpen(false)} title={mode === "create" ? "Novo Pedido de Compra" : "Editar Pedido"} size="xl">
@@ -252,7 +252,7 @@ const PedidosCompra = () => {
             <ViewSection title="Fornecedor">
               <ViewField label="Fornecedor">
                 {selected.fornecedor_id ? (
-                  <RelationalLink to={`/fornecedores`}>
+                  <RelationalLink type="fornecedor" id={selected.fornecedor_id}>
                     {selected.fornecedores?.nome_razao_social || "—"}
                   </RelationalLink>
                 ) : "—"}
@@ -337,6 +337,14 @@ const PedidosCompra = () => {
             tabs={[
               { value: "dados", label: "Dados", content: tabDados },
               { value: "itens", label: `Itens (${viewItems.length})`, content: tabItens },
+              { value: "logistica", label: "Logística", content: (
+                <div className="space-y-4">
+                  <h4 className="text-sm font-semibold flex items-center gap-2 px-1">
+                    <Truck className="w-4 h-4" /> Rastreamento de Entrega
+                  </h4>
+                  <LogisticaRastreioSection pedidoCompraId={selected.id} />
+                </div>
+              )},
             ]}
             footer={drawerFooter}
           />

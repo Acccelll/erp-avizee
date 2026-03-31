@@ -89,7 +89,10 @@ const GruposEconomicos = () => {
       if (mode === "create") await create(form);
       else if (selected) await update(selected.id, form);
       setModalOpen(false);
-    } catch {}
+    } catch (err) {
+      console.error('[grupos-economicos] erro ao salvar:', err);
+      toast.error("Erro ao salvar grupo econômico");
+    }
     setSaving(false);
   };
 

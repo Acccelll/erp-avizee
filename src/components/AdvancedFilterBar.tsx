@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 export interface FilterChip {
   key: string;
   label: string;
-  value: string;
+  value: string | string[];
   displayValue: string;
 }
 
@@ -17,7 +17,7 @@ interface AdvancedFilterBarProps {
   searchPlaceholder?: string;
   children?: ReactNode;
   activeFilters?: FilterChip[];
-  onRemoveFilter?: (key: string) => void;
+  onRemoveFilter?: (key: string, value?: string) => void;
   onClearAll?: () => void;
   count?: number;
   extra?: ReactNode;
@@ -78,21 +78,24 @@ export function AdvancedFilterBar({
       {hasActiveFilters && (
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs text-muted-foreground font-medium">Filtros:</span>
-          {activeFilters.map((chip) => (
-            <Badge key={chip.key} variant="secondary" className="gap-1 pr-1 text-xs font-normal">
-              <span className="text-muted-foreground">{chip.label}:</span>
-              <span className="font-medium">{chip.displayValue}</span>
-              {onRemoveFilter && (
-                <button
-                  type="button"
-                  onClick={() => onRemoveFilter(chip.key)}
-                  className="ml-0.5 rounded-full p-0.5 hover:bg-muted-foreground/20"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              )}
-            </Badge>
-          ))}
+          {activeFilters.map((chip) => {
+            const isArray = Array.isArray(chip.value);
+            return (
+              <Badge key={`${chip.key}-${chip.displayValue}`} variant="secondary" className="gap-1 pr-1 text-xs font-normal">
+                <span className="text-muted-foreground">{chip.label}:</span>
+                <span className="font-medium">{chip.displayValue}</span>
+                {onRemoveFilter && (
+                  <button
+                    type="button"
+                    onClick={() => onRemoveFilter(chip.key, Array.isArray(chip.value) ? chip.value[0] : chip.value)}
+                    className="ml-0.5 rounded-full p-0.5 hover:bg-muted-foreground/20"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                )}
+              </Badge>
+            );
+          })}
           {onClearAll && activeFilters.length > 1 && (
             <Button variant="ghost" size="sm" onClick={onClearAll} className="h-6 px-2 text-xs text-muted-foreground">
               Limpar todos

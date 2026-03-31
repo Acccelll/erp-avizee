@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { Truck, Clock, AlertTriangle } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/lib/format';
+import { useRelationalNavigation } from '@/contexts/RelationalNavigationContext';
 
 function calcDiasEntrega(compra: any) {
   if (!compra.data_entrega_prevista) return null;
@@ -11,6 +12,7 @@ function calcDiasEntrega(compra: any) {
 
 export function ComprasConfirmadasDetail({ items }: { items: any[] }) {
   const navigate = useNavigate();
+  const { pushView } = useRelationalNavigation();
   if (items.length === 0) return null;
 
   const atrasadas = items.filter((c) => {
@@ -40,7 +42,7 @@ export function ComprasConfirmadasDetail({ items }: { items: any[] }) {
             <div
               key={c.id}
               className="flex items-center justify-between py-2 px-2 border-b last:border-b-0 hover:bg-muted/20 rounded cursor-pointer"
-              onClick={() => navigate('/compras')}
+              onClick={() => pushView("pedido_compra", c.id)}
             >
               <div>
                 <p className="text-sm font-medium mono">{c.numero}</p>

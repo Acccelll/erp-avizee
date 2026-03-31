@@ -1,15 +1,17 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { AppLayout } from "@/components/AppLayout";
 import { ModulePage } from "@/components/ModulePage";
 import { DataTable, StatusBadge } from "@/components/DataTable";
 import { SummaryCard } from "@/components/SummaryCard";
+import { AdvancedFilterBar, type FilterChip } from "@/components/AdvancedFilterBar";
 import { FormModal } from "@/components/FormModal";
 import { ViewDrawerV2, ViewField, ViewSection } from "@/components/ViewDrawerV2";
 import { RelationalLink } from "@/components/ui/RelationalLink";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Edit, Trash2 } from "lucide-react";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
+import { useRelationalNavigation } from "@/contexts/RelationalNavigationContext";
 import { AutocompleteSearch } from "@/components/ui/AutocompleteSearch";
 import { ItemsGrid, type GridItem } from "@/components/ui/ItemsGrid";
 import { Button } from "@/components/ui/button";
@@ -17,6 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { MultiSelect, type MultiSelectOption } from "@/components/ui/MultiSelect";
 import { Card, CardContent } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -44,19 +47,22 @@ const statusLabels: Record<string, string> = {
 };
 
 const Compras = () => {
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const { data, loading, remove, fetchData } = useSupabaseCrud<Compra>({
     table: "compras", select: "*, fornecedores(nome_razao_social, cpf_cnpj)",
   });
+  const { pushView } = useRelationalNavigation();
   const fornecedoresCrud = useSupabaseCrud<any>({ table: "fornecedores" });
   const produtosCrud = useSupabaseCrud<any>({ table: "produtos" });
   const [modalOpen, setModalOpen] = useState(false);
-  const [drawerOpen, setDrawerOpen] = useState(false);
   const [selected, setSelected] = useState<Compra | null>(null);
   const [mode, setMode] = useState<"create" | "edit">("create");
   const [form, setForm] = useState(emptyForm);
   const [items, setItems] = useState<GridItem[]>([]);
   const [saving, setSaving] = useState(false);
   const [viewItems, setViewItems] = useState<any[]>([]);
+  const [statusFilters, setStatusFilters] = useState<string[]>([]);
+  const [fornecedorFilters, setFornecedorFilters] = useState<string[]>([]);
   const [searchParams] = useSearchParams();
 
   const valorProdutos = items.reduce((s, i) => s + (i.valor_total || 0), 0);
@@ -70,8 +76,16 @@ const Compras = () => {
   const valorTotal = valorProdutos + (form.frete_valor || 0) + (form.impostos_valor || 0);
 
   const filteredData = useMemo(() => {
-    return data.filter((compra) => (isCotacoesView ? compra.status === "rascunho" : compra.status !== "rascunho"));
-  }, [data, isCotacoesView]);
+    return data.filter((compra) => {
+      const baseMatch = isCotacoesView ? compra.status === "rascunho" : compra.status !== "rascunho";
+      if (!baseMatch) return false;
+
+      if (statusFilters.length > 0 && !statusFilters.includes(compra.status)) return false;
+      if (fornecedorFilters.length > 0 && !fornecedorFilters.includes(compra.fornecedor_id || "")) return false;
+
+      return true;
+    });
+  }, [data, isCotacoesView, statusFilters, fornecedorFilters]);
 
   // KPIs
   const kpis = useMemo(() => {
@@ -111,9 +125,10 @@ const Compras = () => {
   };
 
   const openView = async (c: Compra) => {
-    setSelected(c); setDrawerOpen(true);
+    setSelected(c);
     const { data: itens } = await supabase.from("compras_itens").select("*, produtos(nome, sku)").eq("compra_id", c.id);
     setViewItems(itens || []);
+    setDrawerOpen(true);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -152,6 +167,31 @@ const Compras = () => {
   const fornecedorOptions = fornecedoresCrud.data.map((f: any) => ({ id: f.id, label: f.nome_razao_social, sublabel: f.cpf_cnpj || "" }));
   const selectedFornecedor = fornecedoresCrud.data.find((f: any) => f.id === form.fornecedor_id);
 
+  const compActiveFilters = useMemo(() => {
+    const chips: FilterChip[] = [];
+    statusFilters.forEach(f => {
+      chips.push({ key: "status", label: "Status", value: [f], displayValue: statusLabels[f] || f });
+    });
+    fornecedorFilters.forEach(f => {
+      const forn = fornecedoresCrud.data.find(x => x.id === f);
+      chips.push({ key: "fornecedor", label: "Fornecedor", value: [f], displayValue: forn?.nome_razao_social || f });
+    });
+    return chips;
+  }, [statusFilters, fornecedorFilters, fornecedoresCrud.data]);
+
+  const handleRemoveCompFilter = (key: string, value?: string) => {
+    if (key === "status") setStatusFilters(prev => prev.filter(v => v !== value));
+    if (key === "fornecedor") setFornecedorFilters(prev => prev.filter(v => v !== value));
+  };
+
+  const statusOptions: MultiSelectOption[] = Object.entries(statusLabels)
+    .filter(([k]) => isCotacoesView ? k === "rascunho" : k !== "rascunho")
+    .map(([k, v]) => ({ label: v, value: k }));
+
+  const fornecedorFilterOptions: MultiSelectOption[] = fornecedoresCrud.data.map(f => ({
+    label: f.nome_razao_social, value: f.id
+  }));
+
   const columns = [
     { key: "numero", label: "Nº", render: (c: Compra) => <span className="font-mono text-xs font-medium text-primary">{c.numero}</span> },
     { key: "fornecedor", label: "Fornecedor", render: (c: Compra) => (c as any).fornecedores?.nome_razao_social || "—" },
@@ -162,7 +202,30 @@ const Compras = () => {
 
   return (
     <AppLayout>
-      <ModulePage title={title} subtitle={subtitle} addLabel={addLabel} onAdd={openCreate} count={filteredData.length}>
+      <ModulePage title={title} subtitle={subtitle} addLabel={addLabel} onAdd={openCreate}>
+        <AdvancedFilterBar
+          activeFilters={compActiveFilters}
+          onRemoveFilter={handleRemoveCompFilter}
+          onClearAll={() => { setStatusFilters([]); setFornecedorFilters([]); }}
+          count={filteredData.length}
+        >
+          {!isCotacoesView && (
+            <MultiSelect
+              options={statusOptions}
+              selected={statusFilters}
+              onChange={setStatusFilters}
+              placeholder="Status"
+              className="w-[200px]"
+            />
+          )}
+          <MultiSelect
+            options={fornecedorFilterOptions}
+            selected={fornecedorFilters}
+            onChange={setFornecedorFilters}
+            placeholder="Fornecedores"
+            className="w-[250px]"
+          />
+        </AdvancedFilterBar>
         {/* KPI Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <SummaryCard title="Total de Compras" value={formatNumber(kpis.total)} icon={ShoppingCart} variationType="neutral" variation="no período" />
@@ -179,7 +242,7 @@ const Compras = () => {
           </Card>
         )}
 
-        <DataTable columns={columns} data={filteredData} loading={loading} onView={openView} />
+        <DataTable columns={columns} data={filteredData} loading={loading} onView={openView} onEdit={openEdit} />
       </ModulePage>
 
       <FormModal open={modalOpen} onClose={() => setModalOpen(false)} title={mode === "create" ? addLabel : "Editar Compra"} size="xl">
@@ -259,7 +322,7 @@ const Compras = () => {
               </div>
               <ViewField label="Fornecedor">
                 {(selected as any).fornecedores?.nome_razao_social ? (
-                  <RelationalLink to="/fornecedores">{(selected as any).fornecedores.nome_razao_social}</RelationalLink>
+                  <RelationalLink type="fornecedor" id={selected.fornecedor_id}>{(selected as any).fornecedores.nome_razao_social}</RelationalLink>
                 ) : "—"}
               </ViewField>
               <div className="grid grid-cols-2 gap-4">
@@ -275,7 +338,7 @@ const Compras = () => {
                 viewItems.map((i: any, idx: number) => (
                   <div key={idx} className="flex justify-between border-b py-2 text-sm last:border-b-0">
                     <div>
-                      <RelationalLink to="/produtos">{i.produtos?.nome || "—"}</RelationalLink>
+                      <RelationalLink type="produto" id={i.produto_id}>{i.produtos?.nome || "—"}</RelationalLink>
                       <p className="text-xs text-muted-foreground font-mono">{i.produtos?.sku || "—"} × {i.quantidade}</p>
                     </div>
                     <span className="font-mono font-semibold">{formatCurrency(Number(i.valor_total))}</span>

@@ -8,10 +8,10 @@ export type TipoRelatorio = "estoque" | "movimentos_estoque" | "financeiro" | "f
 export interface FiltroRelatorio {
   dataInicio?: string;
   dataFim?: string;
-  clienteId?: string;
-  fornecedorId?: string;
-  grupoProdutoId?: string;
-  tipoFinanceiro?: string;
+  clienteIds?: string[];
+  fornecedorIds?: string[];
+  grupoProdutoIds?: string[];
+  tiposFinanceiros?: string[];
 }
 
 export interface RelatorioResultado<T = Record<string, unknown>> {
@@ -46,7 +46,7 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
         .select("codigo_interno, nome, unidade_medida, estoque_atual, estoque_minimo, preco_custo, preco_venda")
         .eq("ativo", true)
         .order("nome");
-      if (filtros.grupoProdutoId) query = query.eq('grupo_id', filtros.grupoProdutoId);
+      if (filtros.grupoProdutoIds) query = query.in('grupo_id', filtros.grupoProdutoIds);
       const { data, error } = await query;
 
       if (error) throw error;
@@ -96,7 +96,10 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
         .order("created_at", { ascending: false });
 
       query = withDateRange(query, "created_at", filtros);
-      if (filtros.grupoProdutoId) query = query.eq('grupo_id', filtros.grupoProdutoId);
+      if (filtros.grupoProdutoIds) query = query.in('produto_id', (
+        await supabase.from('produtos').select('id').in('grupo_id', filtros.grupoProdutoIds)
+      ).data?.map(p => p.id) || []);
+
       const { data, error } = await query;
       if (error) throw error;
 
@@ -144,7 +147,7 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
         .order("data_vencimento", { ascending: true });
 
       query = withDateRange(query, "data_vencimento", filtros);
-      if (filtros.tipoFinanceiro) query = query.eq('tipo', filtros.tipoFinanceiro);
+      if (filtros.tiposFinanceiros) query = query.in('tipo', filtros.tiposFinanceiros);
       const { data, error } = await query;
       if (error) throw error;
 
@@ -225,7 +228,7 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
         .order("data_emissao", { ascending: false });
 
       query = withDateRange(query, "data_emissao", filtros);
-      if (filtros.clienteId) query = query.eq('cliente_id', filtros.clienteId);
+      if (filtros.clienteIds) query = query.in('cliente_id', filtros.clienteIds);
       const { data, error } = await query;
       if (error) throw error;
 
@@ -267,7 +270,7 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
         .order("data_emissao", { ascending: false });
 
       query = withDateRange(query, "data_emissao", filtros);
-      if (filtros.clienteId) query = query.eq('cliente_id', filtros.clienteId);
+      if (filtros.clienteIds) query = query.in('cliente_id', filtros.clienteIds);
       const { data, error } = await query;
       if (error) throw error;
 
@@ -326,7 +329,7 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
         .order("data_compra", { ascending: false });
 
       query = withDateRange(query, "data_compra", filtros);
-      if (filtros.fornecedorId) query = query.eq('fornecedor_id', filtros.fornecedorId);
+      if (filtros.fornecedorIds) query = query.in('fornecedor_id', filtros.fornecedorIds);
       const { data, error } = await query;
       if (error) throw error;
 
@@ -438,8 +441,8 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
         .in("status", ["aberto", "vencido"])
         .order("data_vencimento", { ascending: true });
       query = withDateRange(query, "data_vencimento", filtros);
-      if (filtros.clienteId) query = query.eq('cliente_id', filtros.clienteId);
-      if (filtros.tipoFinanceiro) query = query.eq('tipo', filtros.tipoFinanceiro);
+      if (filtros.clienteIds) query = query.in('cliente_id', filtros.clienteIds);
+      if (filtros.tiposFinanceiros) query = query.in('tipo', filtros.tiposFinanceiros);
       const { data, error } = await query;
 
       if (error) throw error;
@@ -502,7 +505,7 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
         .eq("notas_fiscais.status", "confirmada");
 
       nfQuery = withDateRange(nfQuery, "notas_fiscais.data_emissao", filtros);
-      if (filtros.clienteId) nfQuery = nfQuery.eq('notas_fiscais.cliente_id', filtros.clienteId);
+      if (filtros.clienteIds) nfQuery = nfQuery.in('notas_fiscais.cliente_id', filtros.clienteIds);
 
       const { data, error } = await nfQuery;
       if (error) throw error;
@@ -560,7 +563,7 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
         .select("codigo_interno, nome, preco_custo, preco_venda, estoque_atual, unidade_medida")
         .eq("ativo", true)
         .order("nome");
-      if (filtros.grupoProdutoId) query = query.eq('grupo_id', filtros.grupoProdutoId);
+      if (filtros.grupoProdutoIds) query = query.in('grupo_id', filtros.grupoProdutoIds);
       const { data, error } = await query;
 
       if (error) throw error;
@@ -635,7 +638,7 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
         .select("valor_total, clientes(nome_razao_social, cpf_cnpj)")
         .eq("ativo", true);
       query = withDateRange(query, "data_emissao", filtros);
-      if (filtros.clienteId) query = query.eq('cliente_id', filtros.clienteId);
+      if (filtros.clienteIds) query = query.in('cliente_id', filtros.clienteIds);
       const { data, error } = await query;
       if (error) throw error;
 
@@ -669,7 +672,7 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
         .select("valor_total, fornecedores(nome_razao_social, cpf_cnpj)")
         .eq("ativo", true);
       query = withDateRange(query, "data_compra", filtros);
-      if (filtros.fornecedorId) query = query.eq('fornecedor_id', filtros.fornecedorId);
+      if (filtros.fornecedorIds) query = query.in('fornecedor_id', filtros.fornecedorIds);
       const { data, error } = await query;
       if (error) throw error;
 

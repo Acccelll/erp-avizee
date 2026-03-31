@@ -12,7 +12,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { MultiSelect, type MultiSelectOption } from "@/components/ui/MultiSelect";
 import { Card, CardContent } from "@/components/ui/card";
+import { AdvancedFilterBar, type FilterChip } from "@/components/AdvancedFilterBar";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatNumber, formatCurrency } from "@/lib/format";
@@ -41,7 +43,7 @@ const Estoque = () => {
   const [selected, setSelected] = useState<Movimento | null>(null);
   const [form, setForm] = useState({ produto_id: "", tipo: "entrada", quantidade: 0, motivo: "" });
   const [saving, setSaving] = useState(false);
-  const [filterTipo, setFilterTipo] = useState("todos");
+  const [tipoFilters, setTipoFilters] = useState<string[]>([]);
   const [dataInicio, setDataInicio] = useState("");
   const [dataFim, setDataFim] = useState("");
   const [searchPosicao, setSearchPosicao] = useState("");
@@ -98,16 +100,42 @@ const Estoque = () => {
       produtosCrud.fetchData();
       setModalOpen(false);
       setForm({ produto_id: "", tipo: "entrada", quantidade: 0, motivo: "" });
-    } catch {}
+    } catch (err) {
+      console.error('[estoque] erro ao salvar:', err);
+      toast.error("Erro ao registrar movimentação de estoque");
+    }
     setSaving(false);
   };
 
   const filteredData = data.filter(m => {
-    if (filterTipo !== "todos" && m.tipo !== filterTipo) return false;
+    if (tipoFilters.length > 0 && !tipoFilters.includes(m.tipo)) return false;
     if (dataInicio && m.created_at < dataInicio) return false;
     if (dataFim && m.created_at > dataFim + "T23:59:59") return false;
     return true;
   });
+
+  const movActiveFilters = useMemo(() => {
+    const chips: FilterChip[] = [];
+    tipoFilters.forEach(f => {
+      chips.push({
+        key: "tipo",
+        label: "Tipo",
+        value: [f],
+        displayValue: f === "entrada" ? "Entrada" : f === "saida" ? "Saída" : "Ajuste"
+      });
+    });
+    return chips;
+  }, [tipoFilters]);
+
+  const handleRemoveMovFilter = (key: string, value?: string) => {
+    if (key === "tipo") setTipoFilters(prev => prev.filter(v => v !== value));
+  };
+
+  const tipoOptions: MultiSelectOption[] = [
+    { label: "Entrada", value: "entrada" },
+    { label: "Saída", value: "saida" },
+    { label: "Ajuste", value: "ajuste" },
+  ];
 
   const origemLabel = (m: Movimento) => {
     if (!m.documento_tipo) return "—";
@@ -200,30 +228,33 @@ const Estoque = () => {
           </TabsContent>
 
           <TabsContent value="movimentacao">
-            {/* Filters */}
-            <div className="flex flex-wrap items-end gap-3 mb-4">
-              <div className="flex gap-1">
-                {["todos", "entrada", "saida", "ajuste"].map(t => (
-                  <Button key={t} size="sm" variant={filterTipo === t ? "default" : "outline"} onClick={() => setFilterTipo(t)} className="capitalize">
-                    {t === "todos" ? "Todos" : t === "saida" ? "Saída" : t}
-                  </Button>
-                ))}
-              </div>
-              <div className="flex items-end gap-2 ml-auto">
+            <AdvancedFilterBar
+              activeFilters={movActiveFilters}
+              onRemoveFilter={handleRemoveMovFilter}
+              onClearAll={() => setTipoFilters([])}
+              count={filteredData.length}
+            >
+              <MultiSelect
+                options={tipoOptions}
+                selected={tipoFilters}
+                onChange={setTipoFilters}
+                placeholder="Tipos de Movimento"
+                className="w-[200px]"
+              />
+              <div className="flex items-end gap-2">
                 <div className="space-y-1">
-                  <Label className="text-xs">De</Label>
-                  <Input type="date" value={dataInicio} onChange={e => setDataInicio(e.target.value)} className="h-8 w-36 text-xs" />
+                  <Label className="text-[10px] uppercase font-bold text-muted-foreground">De</Label>
+                  <Input type="date" value={dataInicio} onChange={e => setDataInicio(e.target.value)} className="h-9 w-36 text-xs" />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs">Até</Label>
-                  <Input type="date" value={dataFim} onChange={e => setDataFim(e.target.value)} className="h-8 w-36 text-xs" />
+                  <Label className="text-[10px] uppercase font-bold text-muted-foreground">Até</Label>
+                  <Input type="date" value={dataFim} onChange={e => setDataFim(e.target.value)} className="h-9 w-36 text-xs" />
                 </div>
                 {(dataInicio || dataFim) && (
-                  <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => { setDataInicio(""); setDataFim(""); }}>Limpar</Button>
+                  <Button size="sm" variant="ghost" className="h-9 text-xs" onClick={() => { setDataInicio(""); setDataFim(""); }}>Limpar Datas</Button>
                 )}
               </div>
-            </div>
-            <p className="text-sm text-muted-foreground mb-2">{filteredData.length} movimentação(ões)</p>
+            </AdvancedFilterBar>
             <DataTable columns={movColumns} data={filteredData} loading={loading}
               onView={(m) => { setSelected(m); setDrawerOpen(true); }} />
           </TabsContent>
