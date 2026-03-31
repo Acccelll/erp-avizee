@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Tables } from "@/integrations/supabase/types";
 import { StatusBadge } from "@/components/DataTable";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatCurrency, formatDate } from "@/lib/format";
@@ -20,21 +19,21 @@ export function OrcamentoView({ id }: Props) {
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
-      const { data: o } = await supabase
+      const { data: orc } = await supabase
         .from("orcamentos")
         .select("*, clientes(id, nome_razao_social)")
         .eq("id", id)
         .single();
 
-      if (!o) return;
-      setSelected(o);
+      if (!orc) return;
+      setSelected(orc);
 
-      const { data: itens } = await supabase
+      const { data: it } = await supabase
         .from("orcamentos_itens")
         .select("*, produtos(id, nome, sku)")
-        .eq("orcamento_id", o.id);
+        .eq("orcamento_id", orc.id);
 
-      setItems(itens || []);
+      setItems(it || []);
       setLoading(false);
     };
 
@@ -46,7 +45,7 @@ export function OrcamentoView({ id }: Props) {
 
   return (
     <div className="space-y-4">
-      <div className="bg-muted/30 rounded-lg p-4">
+      <div className="bg-muted/30 rounded-lg p-4 text-sm">
         <div className="flex justify-between items-start mb-3">
           <div>
             <h3 className="font-semibold text-lg font-mono text-primary">{selected.numero}</h3>
@@ -54,44 +53,25 @@ export function OrcamentoView({ id }: Props) {
           </div>
           <StatusBadge status={selected.status} />
         </div>
-        <div className="flex justify-between items-center border-t pt-3">
-          <span className="text-xs text-muted-foreground uppercase font-semibold">Total</span>
-          <span className="text-lg font-bold font-mono text-primary">{formatCurrency(selected.valor_total || 0)}</span>
+        <div className="space-y-1 border-t pt-3">
+           <div className="flex justify-between">
+             <span className="text-muted-foreground">Cliente:</span>
+             <RelationalLink onClick={() => pushView("cliente", selected.clientes?.id)}>
+               {selected.clientes?.nome_razao_social || "—"}
+             </RelationalLink>
+           </div>
+           <div className="flex justify-between font-bold mt-2">
+             <span>Total:</span>
+             <span className="font-mono text-primary">{formatCurrency(selected.valor_total || 0)}</span>
+           </div>
         </div>
       </div>
 
-      <Tabs defaultValue="dados" className="w-full">
+      <Tabs defaultValue="itens" className="w-full">
         <TabsList className="w-full grid grid-cols-2">
-          <TabsTrigger value="dados">Dados</TabsTrigger>
           <TabsTrigger value="itens">Itens</TabsTrigger>
+          <TabsTrigger value="condicoes">Condições</TabsTrigger>
         </TabsList>
-
-        <TabsContent value="dados" className="space-y-4 mt-3">
-          <div className="space-y-3">
-            <div>
-              <p className="text-[10px] text-muted-foreground uppercase font-semibold">Cliente</p>
-              <RelationalLink onClick={() => pushView("cliente", selected.clientes?.id)}>
-                {selected.clientes?.nome_razao_social || "—"}
-              </RelationalLink>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-[10px] text-muted-foreground uppercase font-semibold">Validade</p>
-                <p className="text-sm">{selected.validade ? formatDate(selected.validade) : "—"}</p>
-              </div>
-              <div>
-                <p className="text-[10px] text-muted-foreground uppercase font-semibold">Pagamento</p>
-                <p className="text-sm">{selected.pagamento || "—"}</p>
-              </div>
-            </div>
-            {selected.observacoes && (
-              <div>
-                <p className="text-[10px] text-muted-foreground uppercase font-semibold">Observações</p>
-                <p className="text-xs text-muted-foreground italic">{selected.observacoes}</p>
-              </div>
-            )}
-          </div>
-        </TabsContent>
 
         <TabsContent value="itens" className="space-y-3 mt-3">
           <div className="rounded-lg border overflow-hidden">
@@ -117,6 +97,29 @@ export function OrcamentoView({ id }: Props) {
                 ))}
               </tbody>
             </table>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="condicoes" className="space-y-4 mt-3 text-sm">
+          <div className="grid grid-cols-2 gap-4">
+             <div>
+               <p className="text-[10px] text-muted-foreground uppercase font-semibold">Pagamento</p>
+               <p>{selected.pagamento || "—"}</p>
+             </div>
+             <div>
+               <p className="text-[10px] text-muted-foreground uppercase font-semibold">Prazo</p>
+               <p>{selected.prazo_pagamento || "—"}</p>
+             </div>
+             <div>
+               <p className="text-[10px] text-muted-foreground uppercase font-semibold">Frete</p>
+               <p className="capitalize">{selected.frete_tipo || "—"} {selected.modalidade ? `(${selected.modalidade})` : ""}</p>
+             </div>
+             {selected.validade && (
+               <div>
+                 <p className="text-[10px] text-muted-foreground uppercase font-semibold">Validade</p>
+                 <p>{formatDate(selected.validade)}</p>
+               </div>
+             )}
           </div>
         </TabsContent>
       </Tabs>

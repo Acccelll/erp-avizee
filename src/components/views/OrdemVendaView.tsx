@@ -22,7 +22,7 @@ export function OrdemVendaView({ id }: Props) {
       setLoading(true);
       const { data: ov } = await supabase
         .from("ordens_venda")
-        .select("*, clientes(id, nome_razao_social)")
+        .select("*, clientes(id, nome_razao_social), orcamentos(id, numero)")
         .eq("id", id)
         .single();
 
@@ -77,6 +77,14 @@ export function OrdemVendaView({ id }: Props) {
                 {selected.clientes?.nome_razao_social || "—"}
               </RelationalLink>
             </div>
+            {selected.orcamentos && (
+              <div>
+                <p className="text-[10px] text-muted-foreground uppercase font-semibold">Orçamento de Origem</p>
+                <RelationalLink onClick={() => pushView("orcamento", selected.orcamentos.id)}>
+                  Cotação {selected.orcamentos.numero}
+                </RelationalLink>
+              </div>
+            )}
             {selected.po_number && (
               <div>
                 <p className="text-[10px] text-muted-foreground uppercase font-semibold">Pedido do Cliente (PO)</p>

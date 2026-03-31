@@ -16,9 +16,10 @@ type RemessaEvento = Tables<"remessa_eventos">;
 interface Props {
   pedidoCompraId?: string;
   notaFiscalId?: string;
+  remessaId?: string;
 }
 
-export function LogisticaRastreioSection({ pedidoCompraId, notaFiscalId }: Props) {
+export function LogisticaRastreioSection({ pedidoCompraId, notaFiscalId, remessaId }: Props) {
   const [remessas, setRemessas] = useState<Remessa[]>([]);
   const [eventos, setEventos] = useState<Record<string, RemessaEvento[]>>({});
   const [loading, setLoading] = useState(true);
@@ -28,6 +29,7 @@ export function LogisticaRastreioSection({ pedidoCompraId, notaFiscalId }: Props
     setLoading(true);
     let query = supabase.from("remessas").select("*, transportadoras(nome_razao_social)");
 
+    if (remessaId) query = query.eq("id", remessaId);
     if (pedidoCompraId) query = query.eq("pedido_compra_id", pedidoCompraId);
     if (notaFiscalId) query = query.eq("nota_fiscal_id", notaFiscalId);
 
@@ -52,7 +54,7 @@ export function LogisticaRastreioSection({ pedidoCompraId, notaFiscalId }: Props
 
   useEffect(() => {
     fetchLogistica();
-  }, [pedidoCompraId, notaFiscalId]);
+  }, [pedidoCompraId, notaFiscalId, remessaId]);
 
   const handleRastrear = async (remessa: Remessa) => {
     if (!remessa.codigo_rastreio) return;

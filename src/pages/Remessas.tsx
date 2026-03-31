@@ -74,6 +74,7 @@ export default function Remessas() {
 
   const [clientes, setClientes] = useState<Array<{ id: string; nome_razao_social: string }>>([]);
   const [transportadoras, setTransportadoras] = useState<Array<{ id: string; nome_razao_social: string }>>([]);
+  const [ordensVenda, setOrdensVenda] = useState<any[]>([]);
   const [pedidosCompra, setPedidosCompra] = useState<any[]>([]);
   const [notasFiscais, setNotasFiscais] = useState<any[]>([]);
   const [eventos, setEventos] = useState<RemessaEvento[]>([]);
@@ -83,6 +84,7 @@ export default function Remessas() {
   useEffect(() => {
     supabase.from("clientes").select("id,nome_razao_social").eq("ativo", true).then(({ data }) => setClientes(data || []));
     supabase.from("transportadoras").select("id,nome_razao_social").eq("ativo", true).then(({ data }) => setTransportadoras(data || []));
+    supabase.from("ordens_venda").select("id, numero").eq("ativo", true).then(({ data }) => setOrdensVenda(data || []));
     supabase.from("pedidos_compra").select("id, numero").eq("ativo", true).then(({ data }) => setPedidosCompra(data || []));
     supabase.from("notas_fiscais").select("id, numero, tipo").eq("ativo", true).then(({ data }) => setNotasFiscais(data || []));
   }, []);
@@ -386,8 +388,18 @@ export default function Remessas() {
           <h4 className="font-semibold text-sm pt-2 border-t">Vínculos Operacionais</h4>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             <div className="space-y-2">
+              <Label>Ordem de Venda</Label>
+              <Select value={form.ordem_venda_id} onValueChange={v => setForm({ ...form, ordem_venda_id: v === "none" ? "" : v })}>
+                <SelectTrigger><SelectValue placeholder="Opcional..." /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Nenhuma</SelectItem>
+                  {ordensVenda.map(ov => <SelectItem key={ov.id} value={ov.id}>{ov.numero}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
               <Label>Pedido de Compra</Label>
-              <Select value={form.pedido_compra_id} onValueChange={v => setForm({ ...form, pedido_compra_id: v })}>
+              <Select value={form.pedido_compra_id} onValueChange={v => setForm({ ...form, pedido_compra_id: v === "none" ? "" : v })}>
                 <SelectTrigger><SelectValue placeholder="Opcional..." /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Nenhum</SelectItem>
@@ -397,7 +409,7 @@ export default function Remessas() {
             </div>
             <div className="space-y-2">
               <Label>Nota Fiscal</Label>
-              <Select value={form.nota_fiscal_id} onValueChange={v => setForm({ ...form, nota_fiscal_id: v })}>
+              <Select value={form.nota_fiscal_id} onValueChange={v => setForm({ ...form, nota_fiscal_id: v === "none" ? "" : v })}>
                 <SelectTrigger><SelectValue placeholder="Opcional..." /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Nenhuma</SelectItem>

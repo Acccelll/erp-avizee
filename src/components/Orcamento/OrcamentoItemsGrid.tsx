@@ -1,9 +1,12 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Trash2, Search, Tag } from "lucide-react";
+import { Plus, Trash2, Search, Tag, Info } from "lucide-react";
 import { ProductSelector } from "@/components/ui/DataSelector";
+import { AutocompleteSearch } from "@/components/ui/AutocompleteSearch";
 import { Tables } from "@/integrations/supabase/types";
 import { toast } from "sonner";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { formatCurrency } from "@/lib/format";
 
 interface ProductWithForn extends Tables<"produtos"> {
   produtos_fornecedores?: (Tables<"produtos_fornecedores"> & {
@@ -40,6 +43,15 @@ const emptyItem = (): OrcamentoItem => ({
 
 export function OrcamentoItemsGrid({ items, onChange, produtos, precosEspeciais }: Props) {
   const addItem = () => onChange([...items, emptyItem()]);
+
+  const getProductOptions = () => {
+    return produtos.map(p => ({
+      id: p.id,
+      label: p.nome,
+      sublabel: p.sku || p.codigo_interno || "",
+      searchTerms: [p.sku, p.codigo_interno, p.nome].filter(Boolean) as string[]
+    }));
+  };
 
   const removeItem = (idx: number) => {
     const next = items.filter((_, i) => i !== idx);
@@ -122,16 +134,13 @@ export function OrcamentoItemsGrid({ items, onChange, produtos, precosEspeciais 
                   </td>
                   <td className="px-3 py-2">
                     <div className="flex gap-1 items-center">
-                      <select
-                        className="flex-1 h-8 text-xs border rounded-md px-2 bg-background"
+                      <AutocompleteSearch
+                        options={getProductOptions()}
                         value={item.produto_id}
-                        onChange={(e) => updateItem(idx, "produto_id", e.target.value)}
-                      >
-                        <option value="">Selecione produto...</option>
-                        {produtos.map((p: any) => (
-                          <option key={p.id} value={p.id}>{p.nome}</option>
-                        ))}
-                      </select>
+                        onChange={(val) => updateItem(idx, "produto_id", val)}
+                        placeholder="Buscar produto..."
+                        className="flex-1"
+                      />
                       <ProductSelector
                         produtos={produtos}
                         onSelect={(p) => updateItem(idx, "produto_id", p.id)}
@@ -166,21 +175,38 @@ export function OrcamentoItemsGrid({ items, onChange, produtos, precosEspeciais 
                     />
                   </td>
                   <td className="px-3 py-2">
-                    <div className="relative">
+                    <div className="relative flex items-center gap-1 justify-end">
                       <Input
-                        className={`h-8 text-xs text-right font-mono ${
-                          precosEspeciais?.some(p => p.produto_id === item.produto_id) ? "border-primary bg-primary/5" : ""
+                        className={`h-8 text-xs text-right font-mono w-24 ${
+                          precosEspeciais?.some(p => p.produto_id === item.produto_id) ? "border-primary bg-primary/5 pr-6" : ""
                         }`}
                         type="number"
                         step="0.01"
                         value={item.valor_unitario || ""}
                         onChange={(e) => updateItem(idx, "valor_unitario", Number(e.target.value))}
                       />
-                      {precosEspeciais?.some(p => p.produto_id === item.produto_id) && (
-                        <div className="absolute -top-2 -right-1">
-                          <Tag className="w-3 h-3 text-primary fill-primary" />
-                        </div>
-                      )}
+                      {(() => {
+                        const rule = precosEspeciais?.find(p => p.produto_id === item.produto_id);
+                        const prod = produtos.find(p => p.id === item.produto_id);
+                        if (!rule) return null;
+
+                        return (
+                          <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center">
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Tag className="w-3.5 h-3.5 text-primary fill-primary cursor-help" />
+                                </TooltipTrigger>
+                                <TooltipContent side="top" className="text-xs p-2 max-w-[200px]">
+                                  <p className="font-bold mb-1">Preço Especial Ativo</p>
+                                  <p>Preço Padrão: {formatCurrency(prod?.preco_venda || 0)}</p>
+                                  {rule.observacao && <p className="mt-1 italic text-[10px]">"{rule.observacao}"</p>}
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </div>
+                        );
+                      })()}
                     </div>
                   </td>
                   <td className="px-3 py-2 text-right font-mono text-sm font-semibold">

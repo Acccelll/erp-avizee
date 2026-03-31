@@ -128,7 +128,25 @@ export default function OrcamentoForm() {
         .select("*")
         .eq("cliente_id", cId)
         .eq("ativo", true)
-        .then(({ data }) => setPrecosEspeciais(data || []));
+        .then(({ data }) => {
+          const rules = data || [];
+          setPrecosEspeciais(rules);
+
+          // Recalculate prices for existing items if they have special prices
+          if (items.length > 0) {
+            const nextItems = items.map(item => {
+              if (!item.produto_id) return item;
+              const rule = rules.find(r => r.produto_id === item.produto_id);
+              if (rule) {
+                const newPrice = Number(rule.preco_especial);
+                return { ...item, valor_unitario: newPrice, valor_total: item.quantidade * newPrice };
+              }
+              return item;
+            });
+            setItems(nextItems);
+            toast.info("Preços recalculados com base nas regras do cliente selecionado");
+          }
+        });
     } else {
       setPrecosEspeciais([]);
     }

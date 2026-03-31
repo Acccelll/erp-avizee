@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { RelationalLink } from "@/components/ui/RelationalLink";
 import { useRelationalNavigation } from "@/contexts/RelationalNavigationContext";
+import { Truck, Mail, Phone, MapPin, ShoppingBag } from "lucide-react";
 
 interface Props {
   id: string;
@@ -14,8 +15,7 @@ interface Props {
 export function FornecedorView({ id }: Props) {
   const [selected, setSelected] = useState<Tables<"fornecedores"> | null>(null);
   const [loading, setLoading] = useState(true);
-  const [produtos, setProdutos] = useState<any[]>([]);
-  const [notas, setNotas] = useState<any[]>([]);
+  const [compras, setCompras] = useState<any[]>([]);
   const { pushView } = useRelationalNavigation();
 
   useEffect(() => {
@@ -25,13 +25,14 @@ export function FornecedorView({ id }: Props) {
       if (!f) return;
       setSelected(f);
 
-      const [prodRes, notasRes] = await Promise.all([
-        supabase.from("produtos_fornecedores").select("*, produtos(id, nome, sku)").eq("fornecedor_id", f.id),
-        supabase.from("notas_fiscais").select("*").eq("fornecedor_id", f.id).order("data_emissao", { ascending: false }).limit(20)
-      ]);
+      const { data: c } = await supabase
+        .from("pedidos_compra")
+        .select("id, numero, data_pedido, valor_total, status")
+        .eq("fornecedor_id", f.id)
+        .order("data_pedido", { ascending: false })
+        .limit(10);
 
-      setProdutos(prodRes.data || []);
-      setNotas(notasRes.data || []);
+      setCompras(c || []);
       setLoading(false);
     };
 
@@ -42,70 +43,65 @@ export function FornecedorView({ id }: Props) {
   if (!selected) return <div className="p-8 text-center text-destructive">Fornecedor não encontrado</div>;
 
   return (
-    <div className="space-y-4">
-      <div className="bg-muted/30 rounded-lg p-4">
-        <div className="flex items-start justify-between mb-3">
-          <div>
-            <p className="text-xs text-muted-foreground">{selected.tipo_pessoa === "F" ? "Pessoa Física" : "Pessoa Jurídica"} • {selected.cpf_cnpj || "—"}</p>
-            <h3 className="font-semibold text-lg">{selected.nome_razao_social}</h3>
-          </div>
+    <div className="space-y-5">
+      <div className="flex items-center gap-4 bg-muted/30 p-4 rounded-lg">
+        <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0">
+          <Truck className="h-6 w-6" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <h3 className="font-semibold text-lg truncate">{selected.nome_razao_social}</h3>
+          <p className="text-xs text-muted-foreground font-mono">{selected.cpf_cnpj}</p>
+        </div>
+        <div className="ml-auto">
           <StatusBadge status={selected.ativo ? "Ativo" : "Inativo"} />
         </div>
       </div>
 
-      <Tabs defaultValue="cadastro" className="w-full">
-        <TabsList className="w-full grid grid-cols-3">
-          <TabsTrigger value="cadastro">Cadastro</TabsTrigger>
-          <TabsTrigger value="produtos">Produtos</TabsTrigger>
-          <TabsTrigger value="notas">Notas Fiscais</TabsTrigger>
+      <Tabs defaultValue="geral" className="w-full">
+        <TabsList className="w-full grid grid-cols-2">
+          <TabsTrigger value="geral" className="text-sm">Geral</TabsTrigger>
+          <TabsTrigger value="compras" className="text-sm">Compras</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="cadastro" className="space-y-3 mt-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div><span className="text-xs text-muted-foreground">E-mail</span><p className="text-sm">{selected.email || "—"}</p></div>
-            <div><span className="text-xs text-muted-foreground">Telefone</span><p className="text-sm">{selected.telefone || "—"}</p></div>
-            <div><span className="text-xs text-muted-foreground">Logradouro</span><p className="text-sm">{selected.logradouro || "—"}</p></div>
-            <div><span className="text-xs text-muted-foreground">Cidade/UF</span><p className="text-sm">{selected.cidade}/{selected.uf || "—"}</p></div>
+        <TabsContent value="geral" className="space-y-4 mt-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+            <div className="space-y-2">
+              <h4 className="font-semibold flex items-center gap-2 border-b pb-1 text-muted-foreground uppercase text-[10px]"><Mail className="h-3 w-3" /> Contato</h4>
+              <p><span className="text-muted-foreground">Email:</span> {selected.email || "—"}</p>
+              <p><span className="text-muted-foreground">Telefone:</span> {selected.telefone || "—"}</p>
+              <p><span className="text-muted-foreground">Contato:</span> {selected.contato || "—"}</p>
+            </div>
+            <div className="space-y-2">
+              <h4 className="font-semibold flex items-center gap-2 border-b pb-1 text-muted-foreground uppercase text-[10px]"><MapPin className="h-3 w-3" /> Endereço</h4>
+              <p className="leading-tight">
+                {selected.logradouro}, {selected.numero}<br />
+                {selected.bairro} — {selected.cidade}/{selected.uf}<br />
+                CEP: {selected.cep}
+              </p>
+            </div>
           </div>
         </TabsContent>
 
-        <TabsContent value="produtos" className="space-y-3 mt-3">
-          <div className="space-y-2">
-            {produtos.map((p, idx) => (
-              <div key={idx} className="flex justify-between items-center p-2 border-b last:border-b-0">
-                <div>
-                  <RelationalLink onClick={() => pushView("produto", p.produtos?.id)} className="text-sm">
-                    {p.produtos?.nome}
-                  </RelationalLink>
-                  <p className="text-[10px] text-muted-foreground font-mono">{p.produtos?.sku}</p>
+        <TabsContent value="compras" className="space-y-3 mt-3">
+          <h4 className="font-semibold text-sm flex items-center gap-2"><ShoppingBag className="h-4 w-4" /> Últimos Pedidos de Compra</h4>
+          {compras.length === 0 ? (
+            <p className="text-xs text-muted-foreground text-center py-6">Nenhum pedido de compra encontrado</p>
+          ) : (
+            <div className="space-y-2">
+              {compras.map((c) => (
+                <div key={c.id} className="flex items-center justify-between p-2 rounded border bg-card hover:bg-muted/30 transition-colors text-sm">
+                  <div>
+                    <RelationalLink onClick={() => pushView("pedido_compra", c.id)} className="font-mono">PC {c.numero}</RelationalLink>
+                    <p className="text-[10px] text-muted-foreground">{formatDate(c.data_pedido)}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-semibold">{formatCurrency(c.valor_total)}</p>
+                    <StatusBadge status={c.status} className="h-4 text-[10px]" />
+                  </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-xs font-mono">{formatCurrency(p.preco_compra)}</p>
-                </div>
-              </div>
-            ))}
-            {produtos.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">Nenhum produto vinculado</p>}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="notas" className="space-y-3 mt-3">
-          <div className="space-y-2">
-            {notas.map((n, idx) => (
-              <div key={idx} className="flex justify-between items-center p-2 border-b last:border-b-0">
-                <div>
-                  <RelationalLink onClick={() => pushView("nota_fiscal", n.id)} mono className="text-sm">
-                    NF {n.numero}
-                  </RelationalLink>
-                  <p className="text-[10px] text-muted-foreground">{formatDate(n.data_emissao)}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-xs font-mono font-semibold">{formatCurrency(n.valor_total)}</p>
-                  <StatusBadge status={n.status} />
-                </div>
-              </div>
-            ))}
-            {notas.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">Nenhuma nota encontrada</p>}
-          </div>
+              ))}
+            </div>
+          )}
         </TabsContent>
       </Tabs>
     </div>
