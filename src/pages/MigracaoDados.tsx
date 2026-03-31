@@ -351,6 +351,17 @@ export default function MigracaoDados() {
               isLoading={loadingLotes}
               onView={handleViewLote}
               onImport={(id) => {
+                 const lote = lotes.find(l => l.id === id);
+                 if (lote) {
+                    if (lote.tipo_importacao === 'estoque_inicial') setActiveImportSource("estoque");
+                    else if (lote.tipo_importacao === 'compras_xml') setActiveImportSource("xml");
+                    else if (lote.tipo_importacao === 'faturamento') setActiveImportSource("faturamento");
+                    else if (lote.tipo_importacao === 'financeiro_aberto') setActiveImportSource("financeiro");
+                    else {
+                      setActiveImportSource("cadastros");
+                      setImportType(lote.tipo_importacao as ImportType);
+                    }
+                 }
                  setCurrentLoteId(id);
                  setStep(4);
                  setIsImportModalOpen(true);
