@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { downloadTextFile } from "@/lib/utils";
 import { formatCurrency, formatDate, formatNumber } from "@/lib/format";
+import { Tables } from "@/integrations/supabase/types";
 
 export type TipoRelatorio = "estoque" | "movimentos_estoque" | "financeiro" | "fluxo_caixa" | "vendas" | "compras" | "aging" | "dre" | "curva_abc" | "margem_produtos" | "estoque_minimo" | "vendas_cliente" | "compras_fornecedor" | "divergencias" | "faturamento";
 
@@ -272,16 +273,19 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
 
       const modeloLabels: Record<string, string> = { '55': 'NF-e', '65': 'NFC-e', '57': 'CT-e', 'nfse': 'NFS-e' };
 
-      const rows = (data || []).map((nf: any) => {
+      const rows = (data || []).map((nf) => {
         const totalImpostos = Number(nf.icms_valor || 0) + Number(nf.ipi_valor || 0) +
           Number(nf.pis_valor || 0) + Number(nf.cofins_valor || 0) + Number(nf.icms_st_valor || 0);
         const valorTotal = Number(nf.valor_total || 0);
+        const cliente = nf.clientes as { nome_razao_social: string } | null;
+        const ov = nf.ordens_venda as { numero: string } | null;
+
         return {
           data: nf.data_emissao,
           nf: `${nf.numero}/${nf.serie || '1'}`,
           modelo: modeloLabels[nf.modelo_documento || '55'] || nf.modelo_documento || 'NF-e',
-          cliente: (nf.clientes as any)?.nome_razao_social || '—',
-          ov: (nf.ordens_venda as any)?.numero || '—',
+          cliente: cliente?.nome_razao_social || '—',
+          ov: ov?.numero || '—',
           frete: Number(nf.frete_valor || 0),
           desconto: Number(nf.desconto_valor || 0),
           impostos: totalImpostos,
@@ -637,11 +641,11 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
 
       const map = new Map<string, { cliente: string; cnpj: string; total: number; qtd: number }>();
       for (const ov of data || []) {
-        const c = (ov as any).clientes;
+        const c = ov.clientes as { nome_razao_social: string; cpf_cnpj: string | null } | null;
         const nome = c?.nome_razao_social || "Sem cliente";
         const key = nome;
         const existing = map.get(key) || { cliente: nome, cnpj: c?.cpf_cnpj || "-", total: 0, qtd: 0 };
-        existing.total += Number((ov as any).valor_total || 0);
+        existing.total += Number(ov.valor_total || 0);
         existing.qtd += 1;
         map.set(key, existing);
       }
@@ -671,11 +675,11 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
 
       const map = new Map<string, { fornecedor: string; cnpj: string; total: number; qtd: number }>();
       for (const c of data || []) {
-        const f = (c as any).fornecedores;
+        const f = c.fornecedores as { nome_razao_social: string; cpf_cnpj: string | null } | null;
         const nome = f?.nome_razao_social || "Sem fornecedor";
         const key = nome;
         const existing = map.get(key) || { fornecedor: nome, cnpj: f?.cpf_cnpj || "-", total: 0, qtd: 0 };
-        existing.total += Number((c as any).valor_total || 0);
+        existing.total += Number(c.valor_total || 0);
         existing.qtd += 1;
         map.set(key, existing);
       }
@@ -696,7 +700,7 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
     case "divergencias": {
       // Pedidos de compra sem NF
       const { data: pedidos } = await supabase
-        .from("pedidos_compra" as any)
+        .from("pedidos_compra")
         .select("numero, fornecedor_id, valor_total, status, fornecedores(nome_razao_social)")
         .eq("ativo", true)
         .in("status", ["pendente", "aprovado"]);
@@ -704,7 +708,7 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
       // Notas fiscais sem financeiro
       const { data: nfs } = await supabase
         .from("notas_fiscais")
-        .select("numero, tipo, valor_total, data_emissao, fornecedor_id, cliente_id")
+        .select("id, numero, tipo, valor_total, data_emissao, fornecedor_id, cliente_id")
         .eq("ativo", true)
         .eq("gera_financeiro", true);
 
@@ -714,20 +718,21 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
         .eq("ativo", true);
 
       const nfIdsComFinanceiro = new Set(
-        (financeiro || []).map((f: any) => f.documento_fiscal_id || f.nota_fiscal_id).filter(Boolean)
+        (financeiro || []).map((f) => f.documento_fiscal_id || f.nota_fiscal_id).filter(Boolean)
       );
 
-      const nfsSemFinanceiro = (nfs || []).filter((nf: any) => !nfIdsComFinanceiro.has(nf.id));
+      const nfsSemFinanceiro = (nfs || []).filter((nf) => !nfIdsComFinanceiro.has(nf.id));
 
       const rows: any[] = [];
 
       for (const pc of pedidos || []) {
+        const fornecedor = pc.fornecedores as { nome_razao_social: string } | null;
         rows.push({
           tipo: "Pedido s/ NF",
-          referencia: (pc as any).numero,
-          parceiro: (pc as any).fornecedores?.nome_razao_social || "-",
-          valor: Number((pc as any).valor_total || 0),
-          status: (pc as any).status,
+          referencia: pc.numero,
+          parceiro: fornecedor?.nome_razao_social || "-",
+          valor: Number(pc.valor_total || 0),
+          status: pc.status,
           observacao: "Pedido de compra sem nota fiscal vinculada",
         });
       }

@@ -30,6 +30,7 @@ ERP web da AviZee construído com React, Vite, TypeScript, shadcn/ui e Supabase.
 - Plano de contas
 - Relatórios
 - Remessas e rastreamento logístico
+- [Migração de Dados](MIGRACAO.md)
 - Configurações
 - Administração
 
@@ -152,8 +153,9 @@ A página `/configuracoes` está organizada por seções:
 
 As preferências de usuário (nome, cargo, senha, tema) são persistidas diretamente
 no Supabase via tabela `profiles`. Configurações funcionais do sistema como
-CEP da empresa são armazenadas na tabela `app_configuracoes`, com localStorage
-usado apenas como cache de leitura rápida entre recarregamentos.
+CEP da empresa são armazenadas na tabela `app_configuracoes`, que atua como a
+única fonte de verdade. O `localStorage` é utilizado estritamente como cache
+de leitura rápida para otimizar o carregamento inicial e a alternância de telas.
 
 ## Relatórios
 
@@ -167,21 +169,25 @@ O módulo de relatórios entrega uma primeira versão com:
 - exportação CSV / XLSX
 - impressão / PDF via navegador
 
-## Estrutura sugerida
+## Estrutura do Projeto
 
 ```text
 src/
-├── components/
-│   ├── navigation/
-│   └── theme/
-├── contexts/
-├── hooks/
+├── components/           # Componentes UI (shadcn, forms, layouts)
+│   ├── importacao/       # UI específica do módulo de migração
+│   ├── navigation/       # Menus e breadcrumbs
+│   └── ...
+├── contexts/             # Contextos globais (Auth, Theme)
+├── hooks/                # Hooks customizados (CRUD, Config, Importação)
 ├── integrations/
+│   └── supabase/         # Cliente e tipos gerados do banco
 ├── lib/
-├── mocks/
-├── pages/
-├── services/
-└── test/
+│   ├── importacao/       # Lógica de parsing/validação de migração
+│   └── ...
+├── mocks/                # Dados mockados para desenvolvimento
+├── pages/                # Páginas principais (rotas)
+├── services/             # Serviços (Relatórios, Integrações)
+└── types/                # Definições de tipos TypeScript compartilhadas
 ```
 
 ## Supabase e tipos
@@ -198,7 +204,8 @@ O projeto possui duas Edge Functions em `supabase/functions/`:
 
 ### `correios-api`
 
-Integração com a API REST dos Correios para:
+Integração com a API REST dos Correios, consumida diretamente por componentes como
+`Remessas.tsx` (rastreio) e `FreteCorreiosCard.tsx` (cotação). Oferece:
 
 - **Rastreamento de objetos** (`?action=rastrear&codigo=<CÓDIGO>`)
 - **Cotação de frete** para múltiplos serviços (`?action=cotacao_multi`)

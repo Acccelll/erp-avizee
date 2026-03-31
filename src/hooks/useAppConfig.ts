@@ -58,8 +58,11 @@ export function useAppConfig<T = Json>(chave: string, defaultValue?: T) {
       const { error } = await supabase
         .from("app_configuracoes")
         .upsert(
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          { chave, valor: newValue as unknown as Json, updated_at: new Date().toISOString() } as any,
+          {
+            chave,
+            valor: newValue as unknown as Json,
+            updated_at: new Date().toISOString()
+          },
           { onConflict: "chave" }
         );
       if (error) {
