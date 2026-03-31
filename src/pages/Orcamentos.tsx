@@ -10,6 +10,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Edit, Trash2 } from "lucide-react";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -37,6 +39,8 @@ const Orcamentos = () => {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selected, setSelected] = useState<Orcamento | null>(null);
   const [convertingId, setConvertingId] = useState<string | null>(null);
+  const [poNumberCliente, setPoNumberCliente] = useState("");
+  const [dataPoCliente, setDataPoCliente] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("todos");
   const { isAdmin } = useIsAdmin();
@@ -122,6 +126,8 @@ const Orcamentos = () => {
         cliente_id: orc.cliente_id, cotacao_id: orc.id,
         status: "pendente", status_faturamento: "aguardando",
         valor_total: orc.valor_total, observacoes: orc.observacoes,
+        po_number: poNumberCliente || null,
+        data_po_cliente: dataPoCliente || null,
       }).select().single();
       if (error) throw error;
       if (items && items.length > 0 && newOV) {
@@ -137,6 +143,8 @@ const Orcamentos = () => {
       }
       await supabase.from("orcamentos").update({ status: "convertido" }).eq("id", orc.id);
       toast.success(`Ordem de Venda ${ovNumero} criada!`);
+      setPoNumberCliente("");
+      setDataPoCliente("");
       fetchData();
       navigate(`/ordens-venda`);
     } catch (err: any) {
@@ -304,11 +312,37 @@ const Orcamentos = () => {
 
       <ConfirmDialog
         open={!!convertingId}
-        onClose={() => setConvertingId(null)}
+        onClose={() => {
+          setConvertingId(null);
+          setPoNumberCliente("");
+          setDataPoCliente("");
+        }}
         onConfirm={() => convertingOrc && handleConvertToOV(convertingOrc)}
         title="Converter em Ordem de Venda"
         description={`Deseja converter a cotação ${convertingOrc?.numero} em uma Ordem de Venda?`}
-      />
+      >
+        <div className="grid grid-cols-2 gap-3 mt-3">
+          <div className="space-y-2">
+            <Label className="text-xs">Nº Pedido do Cliente (PO)</Label>
+            <Input
+              value={poNumberCliente}
+              onChange={(e) => setPoNumberCliente(e.target.value)}
+              placeholder="Ex: PO-2026-00123"
+              className="h-9"
+            />
+            <p className="text-xs text-muted-foreground">Número do pedido de compra emitido pelo cliente.</p>
+          </div>
+          <div className="space-y-2">
+            <Label className="text-xs">Data do Pedido do Cliente</Label>
+            <Input
+              type="date"
+              value={dataPoCliente}
+              onChange={(e) => setDataPoCliente(e.target.value)}
+              className="h-9"
+            />
+          </div>
+        </div>
+      </ConfirmDialog>
     </AppLayout>
   );
 };

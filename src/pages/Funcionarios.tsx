@@ -13,7 +13,6 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SummaryCard } from "@/components/SummaryCard";
-import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatCurrency, formatDate, formatNumber } from "@/lib/format";
@@ -51,7 +50,6 @@ export default function Funcionarios() {
   const [folhaForm, setFolhaForm] = useState({ competencia: "", proventos: 0, descontos: 0, observacoes: "" });
   const [folhas, setFolhas] = useState<FolhaPagamento[]>([]);
   const [loadingFolhas, setLoadingFolhas] = useState(false);
-  const [gerarFinanceiroId, setGerarFinanceiroId] = useState<string | null>(null);
 
   const kpis = useMemo(() => {
     const ativos = data.filter(f => f.ativo);
@@ -99,25 +97,54 @@ export default function Funcionarios() {
     openView(selected);
   };
 
-  const handleGerarFinanceiro = async () => {
-    const folha = folhas.find(f => f.id === gerarFinanceiroId);
-    if (!folha || !selected) return;
-    try {
-      const { error } = await supabase.from("financeiro_lancamentos").insert({
-        tipo: "pagar",
-        descricao: `Folha ${folha.competencia} - ${selected.nome}`,
-        valor: folha.valor_liquido,
-        data_vencimento: `${folha.competencia}-05`,
-        status: "aberto",
-      } as any);
-      if (error) throw error;
-      await supabase.from("folha_pagamento" as any).update({ financeiro_gerado: true } as any).eq("id", folha.id);
-      toast.success(`Conta a pagar gerada: ${formatCurrency(folha.valor_liquido)}`);
-      setGerarFinanceiroId(null);
-      openView(selected);
-    } catch (err: any) {
-      toast.error("Erro ao gerar financeiro: " + err.message);
+  const handleFecharFolha = async (folha: FolhaPagamento) => {
+    if (folha.financeiro_gerado) {
+      toast.warning('Lançamentos financeiros já foram gerados para esta folha.');
+      return;
     }
+
+    const competenciaDate = new Date(folha.competencia + '-01');
+    const mesRef = competenciaDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+
+    // Data de pagamento: 5º dia útil do mês seguinte (simplificado: dia 5)
+    const proximoMes = new Date(competenciaDate.getFullYear(), competenciaDate.getMonth() + 1, 5);
+    const dataPagamento = proximoMes.toISOString().slice(0, 10);
+
+    // Data FGTS: dia 7 do mês seguinte
+    const dataFgts = new Date(competenciaDate.getFullYear(), competenciaDate.getMonth() + 1, 7)
+      .toISOString().slice(0, 10);
+
+    // Lançamento do salário líquido
+    await supabase.from('financeiro_lancamentos').insert({
+      tipo: 'pagar',
+      descricao: `Salário ${mesRef} — ${selected?.nome}`,
+      valor: folha.valor_liquido,
+      data_vencimento: dataPagamento,
+      status: 'aberto',
+      funcionario_id: folha.funcionario_id,
+      ativo: true,
+    } as any);
+
+    // Calcular e lançar FGTS (8% do salário base)
+    const fgts = Number(folha.salario_base) * 0.08;
+    if (fgts > 0) {
+      await supabase.from('financeiro_lancamentos').insert({
+        tipo: 'pagar',
+        descricao: `FGTS ${mesRef} — ${selected?.nome}`,
+        valor: fgts,
+        data_vencimento: dataFgts,
+        status: 'aberto',
+        ativo: true,
+      } as any);
+    }
+
+    // Marcar folha como financeiro_gerado
+    await supabase.from('folha_pagamento' as any)
+      .update({ status: 'pago', financeiro_gerado: true })
+      .eq('id', folha.id);
+
+    toast.success(`Lançamentos financeiros gerados: salário (${dataPagamento}) e FGTS (${dataFgts}).`);
+    openView(selected!);
   };
 
   const filteredData = useMemo(() => {
@@ -236,11 +263,18 @@ export default function Funcionarios() {
                         <div className="flex items-center gap-2">
                           <StatusBadge status={f.status === "processada" ? "aprovada" : f.status} label={f.status === "processada" ? "Processada" : "Pendente"} />
                           {!f.financeiro_gerado && (
-                            <Button size="sm" variant="outline" className="h-6 text-xs gap-1" onClick={() => setGerarFinanceiroId(f.id)}>
-                              <DollarSign className="w-3 h-3" /> Gerar CP
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="gap-1 text-xs"
+                              onClick={() => handleFecharFolha(f)}
+                            >
+                              Gerar lançamentos financeiros
                             </Button>
                           )}
-                          {f.financeiro_gerado && <span className="text-xs text-success font-medium">✓ Financeiro</span>}
+                          {f.financeiro_gerado && (
+                            <span className="text-xs text-success">✓ Lançamentos gerados</span>
+                          )}
                         </div>
                       </div>
                       <div className="grid grid-cols-4 gap-2 text-xs">
@@ -283,15 +317,6 @@ export default function Funcionarios() {
           </div>
         </div>
       </FormModal>
-
-      {/* Confirm Gerar Financeiro */}
-      <ConfirmDialog
-        open={!!gerarFinanceiroId}
-        onClose={() => setGerarFinanceiroId(null)}
-        onConfirm={handleGerarFinanceiro}
-        title="Gerar Conta a Pagar"
-        description={`Deseja gerar uma conta a pagar no financeiro para a folha ${folhas.find(f => f.id === gerarFinanceiroId)?.competencia || ""}?`}
-      />
     </AppLayout>
   );
 }
