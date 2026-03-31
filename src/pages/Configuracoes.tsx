@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useTheme } from 'next-themes';
 import { Building2, Loader2, Lock, Moon, Palette, Save, Settings, Sun, User } from 'lucide-react';
 import { useAppConfig } from '@/hooks/useAppConfig';
+import { useUserPreference } from '@/hooks/useUserPreference';
 import { AppLayout } from '@/components/AppLayout';
 import { ModulePage } from '@/components/ModulePage';
 import { Button } from '@/components/ui/button';
@@ -10,7 +11,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
@@ -43,8 +43,12 @@ export default function Configuracoes() {
   const [newPassword, setNewPassword] = useState('');
   const [changingPassword, setChangingPassword] = useState(false);
 
-  const [menuCompacto, setMenuCompacto] = useState(false);
   const [densidade, setDensidade] = useState('confortavel');
+  const {
+    value: menuCompacto,
+    save: saveMenuCompacto,
+    loading: loadingMenuCompacto,
+  } = useUserPreference<boolean>(user?.id, 'sidebar_collapsed', true);
 
   const { value: cepEmpresa, loading: loadingCep, save: saveCepEmpresa } = useAppConfig<string>('cep_empresa', '');
   const [cepEmpresaLocal, setCepEmpresaLocal] = useState('');
@@ -223,7 +227,14 @@ export default function Configuracoes() {
                   <p className="font-medium">Menu compacto</p>
                   <p className="text-sm text-muted-foreground">Sidebar mais enxuta para ganhar espaço na tela.</p>
                 </div>
-                <Switch checked={menuCompacto} onCheckedChange={setMenuCompacto} />
+                <Switch
+                  checked={menuCompacto}
+                  disabled={loadingMenuCompacto}
+                  onCheckedChange={async (checked) => {
+                    const ok = await saveMenuCompacto(checked);
+                    if (!ok) toast.error('Não foi possível salvar a preferência do menu.');
+                  }}
+                />
               </div>
             </CardContent>
           </Card>
