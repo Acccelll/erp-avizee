@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { AppLayout } from "@/components/AppLayout";
 import { ModulePage } from "@/components/ModulePage";
@@ -46,6 +46,7 @@ const statusLabels: Record<string, string> = {
 };
 
 const Compras = () => {
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const { data, loading, remove, fetchData } = useSupabaseCrud<Compra>({
     table: "compras", select: "*, fornecedores(nome_razao_social, cpf_cnpj)",
   });
@@ -122,8 +123,11 @@ const Compras = () => {
     setModalOpen(true);
   };
 
-  const openView = (c: Compra) => {
-    pushView("pedido_compra" as any, c.id);
+  const openView = async (c: Compra) => {
+    setSelected(c);
+    const { data: itens } = await supabase.from("compras_itens").select("*, produtos(nome, sku)").eq("compra_id", c.id);
+    setViewItems(itens || []);
+    setDrawerOpen(true);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

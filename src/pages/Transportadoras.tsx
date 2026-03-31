@@ -6,7 +6,7 @@ import { FormModal } from "@/components/FormModal";
 import { ViewDrawerV2, ViewField, ViewSection } from "@/components/ViewDrawerV2";
 import { RelationalLink } from "@/components/ui/RelationalLink";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Edit, Trash2 } from "lucide-react";
+import { Edit, Trash2, Search } from "lucide-react";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
 import { useRelationalNavigation } from "@/contexts/RelationalNavigationContext";
 import { useCnpjLookup } from "@/hooks/useCnpjLookup";
@@ -18,7 +18,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MaskedInput } from "@/components/ui/MaskedInput";
 import { toast } from "sonner";
-import { Search } from "lucide-react";
 
 interface Transportadora {
   id: string;
@@ -48,11 +47,22 @@ export default function Transportadoras() {
   const { pushView } = useRelationalNavigation();
   const { buscarCnpj, loading: cnpjLoading } = useCnpjLookup();
   const [modalOpen, setModalOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [selected, setSelected] = useState<Transportadora | null>(null);
   const [mode, setMode] = useState<"create" | "edit">("create");
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [clientesVinculados, setClientesVinculados] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (selected && drawerOpen) {
+      supabase.from("clientes_transportadoras")
+        .select("*, clientes(nome_razao_social, cpf_cnpj)")
+        .eq("transportadora_id", selected.id)
+        .then(({ data }) => setClientesVinculados(data || []));
+    }
+  }, [selected, drawerOpen]);
 
   const openCreate = () => { setMode("create"); setForm({...emptyForm}); setSelected(null); setModalOpen(true); };
   const openEdit = (t: Transportadora) => {
@@ -68,7 +78,8 @@ export default function Transportadoras() {
     setModalOpen(true);
   };
   const openView = (t: Transportadora) => {
-    pushView("fornecedor" as any, t.id);
+    setSelected(t);
+    setDrawerOpen(true);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

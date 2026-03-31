@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { AppLayout } from "@/components/AppLayout";
 import { ModulePage } from "@/components/ModulePage";
@@ -38,6 +38,7 @@ const statusLabels: Record<string, string> = {
 const Orcamentos = () => {
   const navigate = useNavigate();
   const { pushView } = useRelationalNavigation();
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const { data, loading, remove, fetchData } = useSupabaseCrud<Orcamento>({ table: "orcamentos", select: "*, clientes(nome_razao_social)" });
   const [selected, setSelected] = useState<Orcamento | null>(null);
   const [convertingId, setConvertingId] = useState<string | null>(null);
@@ -271,9 +272,31 @@ const Orcamentos = () => {
         </AdvancedFilterBar>
 
         <DataTable columns={columns} data={filteredData} loading={loading}
-          onView={(o) => pushView("orcamento", o.id)}
+          onView={(o) => {
+            setSelected(o);
+            setDrawerOpen(true);
+          }}
         />
       </ModulePage>
+
+      <ViewDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        title={`Cotação ${selected?.numero}`}
+        badge={selected ? <StatusBadge status={selected.status} label={statusLabels[selected.status]} /> : undefined}
+      >
+        {selected ? (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <ViewField label="Número"><span className="font-mono">{selected.numero}</span></ViewField>
+              <ViewField label="Data">{formatDate(selected.data_orcamento)}</ViewField>
+              <ViewField label="Validade">{selected.validade ? formatDate(selected.validade) : "—"}</ViewField>
+              <ViewField label="Total"><span className="font-semibold font-mono">{formatCurrency(selected.valor_total)}</span></ViewField>
+            </div>
+            <ViewField label="Cliente">{selected.clientes?.nome_razao_social || "—"}</ViewField>
+          </div>
+        ) : null}
+      </ViewDrawer>
 
       <ConfirmDialog
         open={!!convertingId}

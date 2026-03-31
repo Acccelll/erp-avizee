@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AppLayout } from "@/components/AppLayout";
 import { ModulePage } from "@/components/ModulePage";
@@ -46,6 +46,7 @@ const statusFaturamentoColors: Record<string, string> = {
 const OrdensVenda = () => {
   const navigate = useNavigate();
   const { pushView } = useRelationalNavigation();
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const { data, loading, remove, fetchData } = useSupabaseCrud<OrdemVenda>({
     table: "ordens_venda", select: "*, clientes(nome_razao_social), orcamentos(numero)",
   });
@@ -73,7 +74,8 @@ const OrdensVenda = () => {
   }, [data]);
 
   const handleView = (ov: OrdemVenda) => {
-    pushView("ordem_venda", ov.id);
+    setSelected(ov);
+    setDrawerOpen(true);
   };
 
   const handleApprove = async (ov: OrdemVenda) => {
@@ -271,6 +273,37 @@ const OrdensVenda = () => {
 
         <DataTable columns={columns} data={filteredData} loading={loading} onView={handleView} />
       </ModulePage>
+
+      <ViewDrawerV2
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        title={`OV ${selected?.numero}`}
+        badge={selected ? <StatusBadge status={selected.status} label={statusComercialLabels[selected.status]} /> : undefined}
+        tabs={selected ? [
+          {
+            value: "dados", label: "Dados", content: (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <ViewField label="Número"><span className="font-mono">{selected.numero}</span></ViewField>
+                  <ViewField label="Emissão">{formatDate(selected.data_emissao)}</ViewField>
+                  <ViewField label="PO Cliente">{selected.po_number || "—"}</ViewField>
+                  <ViewField label="Total"><span className="font-semibold font-mono">{formatCurrency(selected.valor_total)}</span></ViewField>
+                </div>
+                <ViewField label="Cliente">
+                  {selected.clientes?.nome_razao_social ? (
+                    <RelationalLink type="cliente" id={selected.cliente_id}>{selected.clientes.nome_razao_social}</RelationalLink>
+                  ) : "—"}
+                </ViewField>
+                {selected.orcamentos?.numero && (
+                  <ViewField label="Cotação Origem">
+                    <RelationalLink type="orcamento" id={selected.cotacao_id}>{selected.orcamentos.numero}</RelationalLink>
+                  </ViewField>
+                )}
+              </div>
+            )
+          }
+        ] : []}
+      />
 
       <ConfirmDialog
         open={!!generatingNfId}

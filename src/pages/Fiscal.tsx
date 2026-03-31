@@ -56,6 +56,7 @@ const modeloLabels: Record<string, string> = {
 };
 
 const Fiscal = () => {
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const { data, loading, create, update, remove, fetchData } = useSupabaseCrud<NotaFiscal>({
     table: "notas_fiscais", select: "*, fornecedores(nome_razao_social, cpf_cnpj), clientes(nome_razao_social), ordens_venda(numero)"
   });
@@ -148,8 +149,13 @@ const Fiscal = () => {
     setModalOpen(true);
   };
 
-  const openView = (n: NotaFiscal) => {
-    pushView("nota_fiscal", n.id);
+  const openView = async (n: NotaFiscal) => {
+    setSelected(n);
+    const { data: itens } = await supabase.from("notas_fiscais_itens")
+      .select("*, produtos(nome, sku), contas_contabeis(codigo, descricao)")
+      .eq("nota_fiscal_id", n.id);
+    setViewItems(itens || []);
+    setDrawerOpen(true);
   };
 
   const openDanfe = async (n: NotaFiscal) => {

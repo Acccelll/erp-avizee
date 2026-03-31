@@ -63,6 +63,7 @@ export default function Remessas() {
   const { data, loading, create, update, remove } = useSupabaseCrud<Remessa>({ table: "remessas" });
   const { pushView } = useRelationalNavigation();
   const [modalOpen, setModalOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [selected, setSelected] = useState<Remessa | null>(null);
   const [mode, setMode] = useState<"create" | "edit">("create");
   const [form, setForm] = useState(emptyForm);
@@ -118,7 +119,10 @@ export default function Remessas() {
     });
     setModalOpen(true);
   };
-  const openView = (r: Remessa) => { pushView("remessa", r.id); };
+  const openView = (r: Remessa) => {
+    setSelected(r);
+    setDrawerOpen(true);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
