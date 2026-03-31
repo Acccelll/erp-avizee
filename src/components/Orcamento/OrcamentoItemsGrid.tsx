@@ -1,6 +1,14 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Search } from "lucide-react";
+import { ProductSelector } from "@/components/ui/DataSelector";
+import { Tables } from "@/integrations/supabase/types";
+
+interface ProductWithForn extends Tables<"produtos"> {
+  produtos_fornecedores?: (Tables<"produtos_fornecedores"> & {
+    fornecedores?: { nome_razao_social: string } | null;
+  })[];
+}
 
 export interface OrcamentoItem {
   id?: string;
@@ -19,7 +27,7 @@ export interface OrcamentoItem {
 interface Props {
   items: OrcamentoItem[];
   onChange: (items: OrcamentoItem[]) => void;
-  produtos: any[];
+  produtos: ProductWithForn[];
 }
 
 const emptyItem = (): OrcamentoItem => ({
@@ -99,16 +107,27 @@ export function OrcamentoItemsGrid({ items, onChange, produtos }: Props) {
                     />
                   </td>
                   <td className="px-3 py-2">
-                    <select
-                      className="w-full h-8 text-xs border rounded-md px-2 bg-background"
-                      value={item.produto_id}
-                      onChange={(e) => updateItem(idx, "produto_id", e.target.value)}
-                    >
-                      <option value="">Selecione produto...</option>
-                      {produtos.map((p: any) => (
-                        <option key={p.id} value={p.id}>{p.nome}</option>
-                      ))}
-                    </select>
+                    <div className="flex gap-1 items-center">
+                      <select
+                        className="flex-1 h-8 text-xs border rounded-md px-2 bg-background"
+                        value={item.produto_id}
+                        onChange={(e) => updateItem(idx, "produto_id", e.target.value)}
+                      >
+                        <option value="">Selecione produto...</option>
+                        {produtos.map((p: any) => (
+                          <option key={p.id} value={p.id}>{p.nome}</option>
+                        ))}
+                      </select>
+                      <ProductSelector
+                        produtos={produtos}
+                        onSelect={(p) => updateItem(idx, "produto_id", p.id)}
+                        trigger={
+                          <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" title="Ver lista completa">
+                            <Search className="h-3 w-3" />
+                          </Button>
+                        }
+                      />
+                    </div>
                   </td>
                   <td className="px-3 py-2">
                     <Input

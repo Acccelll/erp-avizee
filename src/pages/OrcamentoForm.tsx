@@ -16,8 +16,9 @@ import { OrcamentoPdfTemplate } from "@/components/Orcamento/OrcamentoPdfTemplat
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ArrowLeft, Save, Eye, FileText, Copy, Plus } from "lucide-react";
+import { ArrowLeft, Save, Eye, FileText, Copy, Plus, Search } from "lucide-react";
 import { QuickAddClientModal } from "@/components/QuickAddClientModal";
+import { ClientSelector, type ProductWithForn } from "@/components/ui/DataSelector";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 interface ClienteSnapshot {
@@ -42,8 +43,8 @@ export default function OrcamentoForm() {
 
   const [saving, setSaving] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
-  const [clientes, setClientes] = useState<any[]>([]);
-  const [produtos, setProdutos] = useState<any[]>([]);
+  const [clientes, setClientes] = useState<Tables<"clientes">[]>([]);
+  const [produtos, setProdutos] = useState<ProductWithForn[]>([]);
 
   const [numero, setNumero] = useState("");
   const [dataOrcamento, setDataOrcamento] = useState(new Date().toISOString().split("T")[0]);
@@ -76,7 +77,7 @@ export default function OrcamentoForm() {
     const loadData = async () => {
       const [clientesRes, produtosRes] = await Promise.all([
         supabase.from("clientes").select("*").eq("ativo", true).order("nome_razao_social"),
-        supabase.from("produtos").select("*").eq("ativo", true).order("nome"),
+        supabase.from("produtos").select("*, produtos_fornecedores(*, fornecedores(nome_razao_social))").eq("ativo", true).order("nome"),
       ]);
       setClientes(clientesRes.data || []);
       setProdutos(produtosRes.data || []);
@@ -321,6 +322,15 @@ export default function OrcamentoForm() {
                       onChange={handleClienteChange}
                       placeholder="Buscar por nome ou CNPJ..."
                       className="flex-1"
+                    />
+                    <ClientSelector
+                      clientes={clientes}
+                      onSelect={(c) => handleClienteChange(c.id)}
+                      trigger={
+                        <Button type="button" variant="outline" size="icon" className="h-10 w-10 shrink-0" title="Ver lista completa">
+                          <Search className="h-4 w-4" />
+                        </Button>
+                      }
                     />
                     <Button type="button" variant="outline" size="icon" className="h-10 w-10 shrink-0" onClick={() => setQuickAddOpen(true)} title="Cadastrar novo cliente">
                       <Plus className="h-4 w-4" />
