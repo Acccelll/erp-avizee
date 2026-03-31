@@ -6,6 +6,7 @@ import { AppHeader } from './navigation/AppHeader';
 import { MobileBottomNav } from './navigation/MobileBottomNav';
 import { MobileMenu } from './navigation/MobileMenu';
 import { MobileQuickActions } from './navigation/MobileQuickActions';
+import { RelationalDrawerStack } from './views/RelationalDrawerStack';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 interface AppLayoutProps {
@@ -52,6 +53,7 @@ export function AppLayout({ children }: AppLayoutProps) {
       />
       <MobileQuickActions />
       <MobileBottomNav onOpenMenu={() => setMobileMenuOpen(true)} />
+      <RelationalDrawerStack />
     </div>
   );
 }

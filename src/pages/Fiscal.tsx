@@ -11,6 +11,7 @@ import { Edit, Trash2, Upload, ArrowLeftRight } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { SummaryCard } from "@/components/SummaryCard";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
+import { useRelationalNavigation } from "@/contexts/RelationalNavigationContext";
 import { AutocompleteSearch } from "@/components/ui/AutocompleteSearch";
 import { ItemsGrid, type GridItem } from "@/components/ui/ItemsGrid";
 import { Button } from "@/components/ui/button";
@@ -57,13 +58,13 @@ const Fiscal = () => {
   const { data, loading, create, update, remove, fetchData } = useSupabaseCrud<NotaFiscal>({
     table: "notas_fiscais", select: "*, fornecedores(nome_razao_social, cpf_cnpj), clientes(nome_razao_social), ordens_venda(numero)"
   });
+  const { pushView } = useRelationalNavigation();
   const fornecedoresCrud = useSupabaseCrud<any>({ table: "fornecedores" });
   const clientesCrud = useSupabaseCrud<any>({ table: "clientes" });
   const produtosCrud = useSupabaseCrud<any>({ table: "produtos" });
   const [ordensVenda, setOrdensVenda] = useState<any[]>([]);
   const [contasContabeis, setContasContabeis] = useState<any[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
-  const [drawerOpen, setDrawerOpen] = useState(false);
   const [selected, setSelected] = useState<NotaFiscal | null>(null);
   const [mode, setMode] = useState<"create" | "edit">("create");
   const [form, setForm] = useState({ ...emptyForm });
@@ -144,11 +145,8 @@ const Fiscal = () => {
     setModalOpen(true);
   };
 
-  const openView = async (n: NotaFiscal) => {
-    setSelected(n); setDrawerOpen(true);
-    const { data: itens } = await supabase.from("notas_fiscais_itens")
-      .select("*, produtos(nome, sku), contas_contabeis(codigo, descricao)").eq("nota_fiscal_id", n.id);
-    setViewItems(itens || []);
+  const openView = (n: NotaFiscal) => {
+    pushView("nota_fiscal", n.id);
   };
 
   const openDanfe = async (n: NotaFiscal) => {
@@ -582,7 +580,7 @@ const Fiscal = () => {
         </div>
 
         <DataTable columns={columns} data={filteredData} loading={loading}
-          onView={openView} />
+          onView={openView} onEdit={openEdit} />
       </ModulePage>
 
       <FormModal open={modalOpen} onClose={() => setModalOpen(false)} title={mode === "create" ? "Nova Nota Fiscal" : "Editar Nota Fiscal"} size="xl">

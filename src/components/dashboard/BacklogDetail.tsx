@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { ClipboardList, Clock } from 'lucide-react';
 import { formatCurrency, daysSince } from '@/lib/format';
+import { useRelationalNavigation } from '@/contexts/RelationalNavigationContext';
 
 const faturamentoLabel: Record<string, string> = {
   aguardando: 'Aguardando',
@@ -19,6 +20,7 @@ function calcDiasDespacho(ov: any) {
 
 export function BacklogDetail({ items }: { items: any[] }) {
   const navigate = useNavigate();
+  const { pushView } = useRelationalNavigation();
   if (items.length === 0) return null;
 
   return (
@@ -37,7 +39,7 @@ export function BacklogDetail({ items }: { items: any[] }) {
             <div
               key={ov.id}
               className="flex items-center justify-between py-2 px-2 border-b last:border-b-0 hover:bg-muted/20 rounded cursor-pointer"
-              onClick={() => navigate('/ordens-venda')}
+              onClick={() => pushView("ordem_venda", ov.id)}
             >
               <div>
                 <p className="text-sm font-medium mono">{ov.numero}</p>

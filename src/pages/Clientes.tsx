@@ -9,6 +9,7 @@ import { RelationalLink } from "@/components/ui/RelationalLink";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Edit, Copy, Trash2 } from "lucide-react";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
+import { useRelationalNavigation } from "@/contexts/RelationalNavigationContext";
 import { useViaCep } from "@/hooks/useViaCep";
 import { useCnpjLookup } from "@/hooks/useCnpjLookup";
 import { Button } from "@/components/ui/button";
@@ -53,28 +54,20 @@ const relacaoOptions = [
 
 const Clientes = () => {
   const { data, loading, create, update, remove, duplicate } = useSupabaseCrud<Cliente>({ table: "clientes" });
+  const { pushView } = useRelationalNavigation();
   const { buscarCep, loading: cepLoading } = useViaCep();
   const { buscarCnpj, loading: cnpjLoading } = useCnpjLookup();
   const [modalOpen, setModalOpen] = useState(false);
-  const [drawerOpen, setDrawerOpen] = useState(false);
   const [selected, setSelected] = useState<Cliente | null>(null);
   const [mode, setMode] = useState<"create" | "edit">("create");
   const [form, setForm] = useState(emptyCliente);
   const [saving, setSaving] = useState(false);
-  const [comRecords, setComRecords] = useState<any[]>([]);
   const [comOpen, setComOpen] = useState(false);
   const [comForm, setComForm] = useState({ canal: "", assunto: "", descricao: "" });
   const [grupos, setGrupos] = useState<GrupoEconomico[]>([]);
-  const [empresasGrupo, setEmpresasGrupo] = useState<any[]>([]);
-  const [pmv, setPmv] = useState<number | null>(null);
-  const [pmvTitulos, setPmvTitulos] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [tipoFilter, setTipoFilter] = useState<"todos" | "F" | "J">("todos");
   const [grupoFilter, setGrupoFilter] = useState<"todos" | "com_grupo" | "sem_grupo">("todos");
-  const [saldoAberto, setSaldoAberto] = useState(0);
-  const [titulosVencidos, setTitulosVencidos] = useState(0);
-  const [ultimaCompra, setUltimaCompra] = useState<string | null>(null);
-  const [transportadorasCliente, setTransportadorasCliente] = useState<any[]>([]);
 
   useEffect(() => {
     supabase.from("grupos_economicos").select("id, nome").eq("ativo", true).order("nome").then(({ data: g }: any) => setGrupos(g || []));
@@ -99,43 +92,8 @@ const Clientes = () => {
     setModalOpen(true);
   };
 
-  const openView = async (c: Cliente) => {
-    setSelected(c);setDrawerOpen(true);
-    const [comRes, empRes, titulosRes, orcRes, transpRes] = await Promise.all([
-    supabase.from("cliente_registros_comunicacao").select("*").eq("cliente_id", c.id).order("data_hora", { ascending: false }),
-    c.grupo_economico_id ? supabase.from("clientes").
-    select("id, nome_razao_social, nome_fantasia, cpf_cnpj, tipo_relacao_grupo, cidade, uf").
-    eq("grupo_economico_id", c.grupo_economico_id).eq("ativo", true).neq("id", c.id) : Promise.resolve({ data: [] }),
-    supabase.from("financeiro_lancamentos").
-    select("id, descricao, data_vencimento, data_pagamento, valor, status").
-    eq("cliente_id", c.id).eq("tipo", "receber").eq("ativo", true).
-    order("data_vencimento", { ascending: false }).limit(50),
-    supabase.from("orcamentos").
-    select("data_orcamento").eq("cliente_id", c.id).eq("ativo", true).
-    order("data_orcamento", { ascending: false }).limit(1),
-    supabase.from("cliente_transportadoras" as any).
-    select("*, transportadoras:transportadora_id(nome_razao_social, modalidade, prazo_medio)").
-    eq("cliente_id", c.id).eq("ativo", true).order("prioridade")
-    ]);
-    setComRecords(comRes.data || []);
-    setEmpresasGrupo(empRes.data || []);
-    setTransportadorasCliente(transpRes.data || []);
-
-    const titulos = titulosRes.data || [];
-    setPmvTitulos(titulos);
-    const aberto = titulos.filter((t: any) => t.status === "aberto" || t.status === "vencido");
-    setSaldoAberto(aberto.reduce((s: number, t: any) => s + Number(t.valor || 0), 0));
-    setTitulosVencidos(aberto.filter((t: any) => t.status === "vencido").length);
-    const pagos = titulos.filter((t: any) => t.data_pagamento);
-    if (pagos.length > 0) {
-      const totalDias = pagos.reduce((acc: number, t: any) => {
-        const venc = new Date(t.data_vencimento);
-        const pag = new Date(t.data_pagamento);
-        return acc + Math.round((pag.getTime() - venc.getTime()) / (1000 * 60 * 60 * 24));
-      }, 0);
-      setPmv(Math.round(totalDias / pagos.length));
-    } else {setPmv(null);}
-    setUltimaCompra(orcRes.data?.[0]?.data_orcamento || null);
+  const openView = (c: Cliente) => {
+    pushView("cliente", c.id);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -230,7 +188,7 @@ const Clientes = () => {
         </AdvancedFilterBar>
 
         <DataTable columns={columns} data={filteredData} loading={loading}
-        onView={openView} />
+        onView={openView} onEdit={openEdit} onDelete={(c) => remove(c.id)} />
       </ModulePage>
 
       {/* Form Modal */}
@@ -423,7 +381,7 @@ const Clientes = () => {
                     {transportadorasCliente.map((ct: any, idx: number) => (
                       <div key={idx} className="flex items-center justify-between py-2 px-2 rounded-md hover:bg-muted/30 border-b last:border-b-0">
                         <div className="min-w-0 flex-1">
-                          <RelationalLink to="/transportadoras">{(ct.transportadoras as any)?.nome_razao_social || "—"}</RelationalLink>
+                          <RelationalLink type="fornecedor" id={ct.transportadora_id}>{(ct.transportadoras as any)?.nome_razao_social || "—"}</RelationalLink>
                           <div className="flex gap-2 text-xs text-muted-foreground mt-0.5">
                             {ct.modalidade && <span>{ct.modalidade}</span>}
                             {ct.prazo_medio && <span>• {ct.prazo_medio}</span>}

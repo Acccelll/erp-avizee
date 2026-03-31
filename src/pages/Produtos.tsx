@@ -9,6 +9,7 @@ import { RelationalLink } from "@/components/ui/RelationalLink";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Edit, Copy } from "lucide-react";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
+import { useRelationalNavigation } from "@/contexts/RelationalNavigationContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -48,14 +49,12 @@ const emptyProduto: Record<string, any> = {
 
 const Produtos = () => {
   const { data, loading, create, update, remove, duplicate } = useSupabaseCrud<Produto>({ table: "produtos" });
+  const { pushView } = useRelationalNavigation();
   const [modalOpen, setModalOpen] = useState(false);
-  const [drawerOpen, setDrawerOpen] = useState(false);
   const [selected, setSelected] = useState<Produto | null>(null);
   const [mode, setMode] = useState<"create" | "edit">("create");
   const [form, setForm] = useState(emptyProduto);
   const [saving, setSaving] = useState(false);
-  const [historico, setHistorico] = useState<any[]>([]);
-  const [composicao, setComposicao] = useState<ComposicaoItem[]>([]);
   const [editComposicao, setEditComposicao] = useState<ComposicaoItem[]>([]);
   const [margemLucro, setMargemLucro] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
@@ -63,7 +62,6 @@ const Produtos = () => {
   const [estoqueFilter, setEstoqueFilter] = useState<"todos" | "baixo" | "ok">("todos");
   const [grupoFilter, setGrupoFilter] = useState<string>("todos");
   const [grupos, setGrupos] = useState<{id: string; nome: string}[]>([]);
-  const [movimentos, setMovimentos] = useState<any[]>([]);
   const [fornecedoresProd, setFornecedoresProd] = useState<any[]>([]);
   const [fornecedoresList, setFornecedoresList] = useState<any[]>([]);
   const [addFornOpen, setAddFornOpen] = useState(false);
@@ -117,29 +115,8 @@ const Produtos = () => {
     setModalOpen(true);
   };
 
-  const openView = async (p: Produto) => {
-    setSelected(p);setDrawerOpen(true);
-    const [nfRes, compRes, movRes, fornRes] = await Promise.all([
-    supabase.from("notas_fiscais_itens").
-    select("quantidade, valor_unitario, notas_fiscais(numero, tipo, data_emissao, fornecedores(nome_razao_social))").
-    eq("produto_id", p.id).limit(20),
-    p.eh_composto ? supabase.from("produto_composicoes").
-    select("quantidade, ordem, produtos:produto_filho_id(nome, sku, preco_custo)").
-    eq("produto_pai_id", p.id).order("ordem") : Promise.resolve({ data: [] }),
-    supabase.from("estoque_movimentos").
-    select("tipo, quantidade, motivo, created_at, saldo_anterior, saldo_atual").
-    eq("produto_id", p.id).order("created_at", { ascending: false }).limit(20),
-    supabase.from("produtos_fornecedores").
-    select("preco_compra, lead_time_dias, referencia_fornecedor, eh_principal, unidade_fornecedor, fornecedores:fornecedor_id(nome_razao_social)").
-    eq("produto_id", p.id)]
-    );
-    setHistorico(nfRes.data || []);
-    setComposicao((compRes.data || []).map((c: any) => ({
-      produto_filho_id: "", quantidade: c.quantidade, ordem: c.ordem,
-      nome: c.produtos?.nome, sku: c.produtos?.sku, preco_custo: c.produtos?.preco_custo
-    })));
-    setMovimentos(movRes.data || []);
-    setFornecedoresProd(fornRes.data || []);
+  const openView = (p: Produto) => {
+    pushView("produto", p.id);
   };
 
   const addComponent = () => {
@@ -280,10 +257,10 @@ const Produtos = () => {
         </AdvancedFilterBar>
 
         <DataTable columns={columns} data={filteredData} loading={loading}
-        onView={openView} />
+        onView={openView} onEdit={openEdit} onDelete={(p) => remove(p.id)} />
       </ModulePage>
 
-      {/* Form Modal - same as before */}
+      {/* Form Modal */}
       <FormModal open={modalOpen} onClose={() => setModalOpen(false)} title={mode === "create" ? "Novo Produto" : "Editar Produto"} size="xl">
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -663,7 +640,7 @@ const Produtos = () => {
                         {fornecedoresProd.map((f: any, idx: number) => (
                           <tr key={idx} className={idx % 2 === 0 ? "bg-muted/20" : ""}>
                             <td className="px-3 py-2 text-xs">
-                              <RelationalLink to="/fornecedores">{f.fornecedores?.nome_razao_social || "—"}</RelationalLink>
+                              <RelationalLink type="fornecedor" id={f.fornecedor_id}>{f.fornecedores?.nome_razao_social || "—"}</RelationalLink>
                             </td>
                              <td className="px-3 py-2 text-xs font-mono font-medium text-primary">{f.referencia_fornecedor || "—"}</td>
                              <td className="px-3 py-2 text-xs">{f.descricao_fornecedor || "—"}</td>

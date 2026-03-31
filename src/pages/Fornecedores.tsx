@@ -9,6 +9,7 @@ import { RelationalLink } from "@/components/ui/RelationalLink";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Edit, Copy, Trash2 } from "lucide-react";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
+import { useRelationalNavigation } from "@/contexts/RelationalNavigationContext";
 import { useViaCep } from "@/hooks/useViaCep";
 import { useCnpjLookup } from "@/hooks/useCnpjLookup";
 import { Button } from "@/components/ui/button";
@@ -40,10 +41,10 @@ const emptyForm: Record<string, any> = {
 
 const Fornecedores = () => {
   const { data, loading, create, update, remove, duplicate } = useSupabaseCrud<Fornecedor>({ table: "fornecedores" });
+  const { pushView } = useRelationalNavigation();
   const { buscarCep, loading: cepLoading } = useViaCep();
   const { buscarCnpj, loading: cnpjLoading } = useCnpjLookup();
   const [modalOpen, setModalOpen] = useState(false);
-  const [drawerOpen, setDrawerOpen] = useState(false);
   const [selected, setSelected] = useState<Fornecedor | null>(null);
   const [mode, setMode] = useState<"create" | "edit">("create");
   const [form, setForm] = useState(emptyForm);
@@ -68,23 +69,8 @@ const Fornecedores = () => {
     setModalOpen(true);
   };
 
-  const openView = async (f: Fornecedor) => {
-    setSelected(f);setDrawerOpen(true);
-    const [comprasRes, prodsRes, titRes] = await Promise.all([
-    supabase.from("compras").
-    select("numero, data_compra, valor_total, status, data_entrega_prevista, data_entrega_real").
-    eq("fornecedor_id", f.id).eq("ativo", true).order("data_compra", { ascending: false }).limit(20),
-    supabase.from("produtos_fornecedores").
-    select("preco_compra, lead_time_dias, referencia_fornecedor, produtos:produto_id(nome, sku)").
-    eq("fornecedor_id", f.id),
-    supabase.from("financeiro_lancamentos").
-    select("descricao, data_vencimento, data_pagamento, valor, status").
-    eq("fornecedor_id", f.id).eq("tipo", "pagar").eq("ativo", true).
-    order("data_vencimento", { ascending: false }).limit(20)]
-    );
-    setComprasHist(comprasRes.data || []);
-    setProdutosForn(prodsRes.data || []);
-    setTitulosForn(titRes.data || []);
+  const openView = (f: Fornecedor) => {
+    pushView("fornecedor", f.id);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -163,7 +149,7 @@ const Fornecedores = () => {
         </AdvancedFilterBar>
 
         <DataTable columns={columns} data={filteredData} loading={loading}
-        onView={openView} />
+        onView={openView} onEdit={openEdit} onDelete={(f) => remove(f.id)} />
       </ModulePage>
 
       <FormModal open={modalOpen} onClose={() => setModalOpen(false)} title={mode === "create" ? "Novo Fornecedor" : "Editar Fornecedor"} size="lg">

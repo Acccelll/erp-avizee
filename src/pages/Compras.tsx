@@ -10,6 +10,7 @@ import { RelationalLink } from "@/components/ui/RelationalLink";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Edit, Trash2 } from "lucide-react";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
+import { useRelationalNavigation } from "@/contexts/RelationalNavigationContext";
 import { AutocompleteSearch } from "@/components/ui/AutocompleteSearch";
 import { ItemsGrid, type GridItem } from "@/components/ui/ItemsGrid";
 import { Button } from "@/components/ui/button";
@@ -47,10 +48,10 @@ const Compras = () => {
   const { data, loading, remove, fetchData } = useSupabaseCrud<Compra>({
     table: "compras", select: "*, fornecedores(nome_razao_social, cpf_cnpj)",
   });
+  const { pushView } = useRelationalNavigation();
   const fornecedoresCrud = useSupabaseCrud<any>({ table: "fornecedores" });
   const produtosCrud = useSupabaseCrud<any>({ table: "produtos" });
   const [modalOpen, setModalOpen] = useState(false);
-  const [drawerOpen, setDrawerOpen] = useState(false);
   const [selected, setSelected] = useState<Compra | null>(null);
   const [mode, setMode] = useState<"create" | "edit">("create");
   const [form, setForm] = useState(emptyForm);
@@ -110,10 +111,8 @@ const Compras = () => {
     setModalOpen(true);
   };
 
-  const openView = async (c: Compra) => {
-    setSelected(c); setDrawerOpen(true);
-    const { data: itens } = await supabase.from("compras_itens").select("*, produtos(nome, sku)").eq("compra_id", c.id);
-    setViewItems(itens || []);
+  const openView = (c: Compra) => {
+    pushView("pedido_compra" as any, c.id);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -179,7 +178,7 @@ const Compras = () => {
           </Card>
         )}
 
-        <DataTable columns={columns} data={filteredData} loading={loading} onView={openView} />
+        <DataTable columns={columns} data={filteredData} loading={loading} onView={openView} onEdit={openEdit} />
       </ModulePage>
 
       <FormModal open={modalOpen} onClose={() => setModalOpen(false)} title={mode === "create" ? addLabel : "Editar Compra"} size="xl">
@@ -259,7 +258,7 @@ const Compras = () => {
               </div>
               <ViewField label="Fornecedor">
                 {(selected as any).fornecedores?.nome_razao_social ? (
-                  <RelationalLink to="/fornecedores">{(selected as any).fornecedores.nome_razao_social}</RelationalLink>
+                  <RelationalLink type="fornecedor" id={selected.fornecedor_id}>{(selected as any).fornecedores.nome_razao_social}</RelationalLink>
                 ) : "—"}
               </ViewField>
               <div className="grid grid-cols-2 gap-4">
@@ -275,7 +274,7 @@ const Compras = () => {
                 viewItems.map((i: any, idx: number) => (
                   <div key={idx} className="flex justify-between border-b py-2 text-sm last:border-b-0">
                     <div>
-                      <RelationalLink to="/produtos">{i.produtos?.nome || "—"}</RelationalLink>
+                      <RelationalLink type="produto" id={i.produto_id}>{i.produtos?.nome || "—"}</RelationalLink>
                       <p className="text-xs text-muted-foreground font-mono">{i.produtos?.sku || "—"} × {i.quantidade}</p>
                     </div>
                     <span className="font-mono font-semibold">{formatCurrency(Number(i.valor_total))}</span>

@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useRelationalNavigation, type EntityType } from "@/contexts/RelationalNavigationContext";
 
 interface RelationalLinkProps {
   /** Label displayed before the value */
@@ -9,6 +10,10 @@ interface RelationalLinkProps {
   children: React.ReactNode;
   /** Route to navigate to */
   to?: string;
+  /** The entity type to open in a drawer */
+  type?: EntityType;
+  /** The specific ID of the entity */
+  id?: string;
   /** If provided, calls this instead of navigating */
   onClick?: () => void;
   className?: string;
@@ -19,18 +24,24 @@ interface RelationalLinkProps {
  * Clickable relational link that navigates to a related entity.
  * Use inside ViewDrawer / ViewDrawerV2 to make FK references interactive.
  */
-export function RelationalLink({ label, children, to, onClick, className, mono }: RelationalLinkProps) {
+export function RelationalLink({ label, children, to, type, id, onClick, className, mono }: RelationalLinkProps) {
   const navigate = useNavigate();
+  const { pushView } = useRelationalNavigation();
 
-  const handleClick = () => {
+  const handleClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
     if (onClick) {
       onClick();
+    } else if (type && id) {
+      pushView(type, id);
     } else if (to) {
       navigate(to);
     }
   };
 
-  const isClickable = !!to || !!onClick;
+  const isClickable = !!to || !!onClick || (!!type && !!id);
 
   if (!isClickable) {
     return <span className={cn(mono && "font-mono", className)}>{children}</span>;

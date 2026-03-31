@@ -8,6 +8,7 @@ import { RelationalLink } from "@/components/ui/RelationalLink";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Edit, Trash2 } from "lucide-react";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
+import { useRelationalNavigation } from "@/contexts/RelationalNavigationContext";
 import { useCnpjLookup } from "@/hooks/useCnpjLookup";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -44,20 +45,14 @@ const emptyForm: Record<string, string> = {
 
 export default function Transportadoras() {
   const { data, loading, create, update, remove } = useSupabaseCrud<Transportadora>({ table: "transportadoras" });
+  const { pushView } = useRelationalNavigation();
   const { buscarCnpj, loading: cnpjLoading } = useCnpjLookup();
   const [modalOpen, setModalOpen] = useState(false);
-  const [drawerOpen, setDrawerOpen] = useState(false);
   const [selected, setSelected] = useState<Transportadora | null>(null);
   const [mode, setMode] = useState<"create" | "edit">("create");
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  interface ClienteVinculado {
-    modalidade?: string;
-    prazo_medio?: string;
-    clientes?: { nome_razao_social: string; cpf_cnpj: string; cidade: string; uf: string };
-  }
-  const [clientesVinculados, setClientesVinculados] = useState<ClienteVinculado[]>([]);
 
   const openCreate = () => { setMode("create"); setForm({...emptyForm}); setSelected(null); setModalOpen(true); };
   const openEdit = (t: Transportadora) => {
@@ -72,12 +67,8 @@ export default function Transportadoras() {
     });
     setModalOpen(true);
   };
-  const openView = async (t: Transportadora) => {
-    setSelected(t); setDrawerOpen(true);
-    const { data: ct } = await supabase.from("cliente_transportadoras" as any)
-      .select("*, clientes:cliente_id(nome_razao_social, cpf_cnpj, cidade, uf)")
-      .eq("transportadora_id", t.id).eq("ativo", true);
-    setClientesVinculados((ct as unknown as ClienteVinculado[]) || []);
+  const openView = (t: Transportadora) => {
+    pushView("fornecedor" as any, t.id);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -115,7 +106,7 @@ export default function Transportadoras() {
     <AppLayout>
       <ModulePage title="Transportadoras" subtitle="Cadastro de transportadoras e logística" addLabel="Nova Transportadora" onAdd={openCreate} count={filteredData.length}
         searchValue={searchTerm} onSearchChange={setSearchTerm} searchPlaceholder="Buscar por nome ou CNPJ...">
-        <DataTable columns={columns} data={filteredData} loading={loading} onView={openView} />
+        <DataTable columns={columns} data={filteredData} loading={loading} onView={openView} onEdit={openEdit} />
       </ModulePage>
 
       <FormModal open={modalOpen} onClose={() => setModalOpen(false)} title={mode === "create" ? "Nova Transportadora" : "Editar Transportadora"} size="lg">

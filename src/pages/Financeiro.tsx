@@ -14,6 +14,7 @@ import { SummaryCard } from "@/components/SummaryCard";
 import { PeriodFilter, financialPeriods, type Period } from "@/components/dashboard/PeriodFilter";
 import { periodToFinancialRange } from "@/lib/periodFilter";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
+import { useRelationalNavigation } from "@/contexts/RelationalNavigationContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -56,6 +57,7 @@ const emptyForm: Record<string, any> = {
 };
 
 const Financeiro = () => {
+  const { pushView } = useRelationalNavigation();
   const { data, loading, create, update, remove } = useSupabaseCrud<Lancamento>({
     table: "financeiro_lancamentos",
     select: "*, clientes(nome_razao_social), fornecedores(nome_razao_social), contas_bancarias(descricao, bancos(nome))"
@@ -688,13 +690,13 @@ const Financeiro = () => {
                 <div className="grid grid-cols-2 gap-4">
                   <ViewField label="Parceiro">
                     {selected.tipo === "receber" && selected.clientes?.nome_razao_social ? (
-                      <RelationalLink to="/clientes">{selected.clientes.nome_razao_social}</RelationalLink>
+                      <RelationalLink type="cliente" id={selected.cliente_id}>{selected.clientes.nome_razao_social}</RelationalLink>
                     ) : selected.tipo === "pagar" && selected.fornecedores?.nome_razao_social ? (
-                      <RelationalLink to="/fornecedores">{selected.fornecedores.nome_razao_social}</RelationalLink>
+                      <RelationalLink type="fornecedor" id={selected.fornecedor_id}>{selected.fornecedores.nome_razao_social}</RelationalLink>
                     ) : "—"}
                   </ViewField>
                   {selected.nota_fiscal_id && (
-                    <ViewField label="Origem"><RelationalLink to="/fiscal">NF vinculada</RelationalLink></ViewField>
+                    <ViewField label="Origem"><RelationalLink type="nota_fiscal" id={selected.nota_fiscal_id}>NF vinculada</RelationalLink></ViewField>
                   )}
                 </div>
                 {selected.contas_contabeis && (

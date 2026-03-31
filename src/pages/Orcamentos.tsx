@@ -9,6 +9,7 @@ import { AdvancedFilterBar, type FilterChip } from "@/components/AdvancedFilterB
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Edit, Trash2 } from "lucide-react";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
+import { useRelationalNavigation } from "@/contexts/RelationalNavigationContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -35,8 +36,8 @@ const statusLabels: Record<string, string> = {
 
 const Orcamentos = () => {
   const navigate = useNavigate();
+  const { pushView } = useRelationalNavigation();
   const { data, loading, remove, fetchData } = useSupabaseCrud<Orcamento>({ table: "orcamentos", select: "*, clientes(nome_razao_social)" });
-  const [drawerOpen, setDrawerOpen] = useState(false);
   const [selected, setSelected] = useState<Orcamento | null>(null);
   const [convertingId, setConvertingId] = useState<string | null>(null);
   const [poNumberCliente, setPoNumberCliente] = useState("");
@@ -236,79 +237,9 @@ const Orcamentos = () => {
         </AdvancedFilterBar>
 
         <DataTable columns={columns} data={filteredData} loading={loading}
-          onView={(o) => { setSelected(o); setDrawerOpen(true); }}
+          onView={(o) => pushView("orcamento", o.id)}
         />
       </ModulePage>
-
-      <ViewDrawer
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        title={`Cotação ${selected?.numero || ""}`}
-        badge={selected ? <StatusBadge status={selected.status} label={statusLabels[selected.status]} /> : undefined}
-        actions={selected ? <>
-          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setDrawerOpen(false); navigate(`/cotacoes/${selected.id}`); }}><Edit className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Editar</TooltipContent></Tooltip>
-          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setDrawerOpen(false); handleDuplicate(selected); }}><Copy className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Duplicar</TooltipContent></Tooltip>
-          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => { setDrawerOpen(false); remove(selected.id); }}><Trash2 className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Excluir</TooltipContent></Tooltip>
-        </> : undefined}
-      >
-        {selected && (
-          <div className="space-y-5">
-            <ViewSection title="Dados Gerais">
-              <div className="grid grid-cols-2 gap-4">
-                <ViewField label="Número"><span className="font-mono font-medium">{selected.numero}</span></ViewField>
-                <ViewField label="Cliente">{selected.clientes?.nome_razao_social || "—"}</ViewField>
-                <ViewField label="Data">{formatDate(selected.data_orcamento)}</ViewField>
-                <ViewField label="Validade">{selected.validade ? formatDate(selected.validade) : "—"}</ViewField>
-              </div>
-            </ViewSection>
-
-            <ViewSection title="Valores">
-              <div className="rounded-xl bg-primary/5 border border-primary/20 p-4 text-center">
-                <span className="text-xs text-muted-foreground uppercase tracking-wider">Valor Total</span>
-                <p className="text-2xl font-bold font-mono mt-1">{formatCurrency(Number(selected.valor_total || 0))}</p>
-              </div>
-            </ViewSection>
-
-            {selected.observacoes && (
-              <ViewSection title="Observações">
-                <p className="text-sm text-muted-foreground">{selected.observacoes}</p>
-              </ViewSection>
-            )}
-
-            <div className="space-y-2 pt-2">
-              <Button onClick={() => { setDrawerOpen(false); navigate(`/cotacoes/${selected.id}`); }} className="w-full gap-2">Abrir Cotação</Button>
-              {selected.status === "rascunho" && (
-                <Button variant="secondary" onClick={() => { setDrawerOpen(false); handleSendForApproval(selected); }} className="w-full gap-2">
-                  <Send className="w-4 h-4" /> Enviar p/ Aprovação
-                </Button>
-              )}
-              {selected.status === "confirmado" && (
-                <Button variant="secondary" onClick={() => { setDrawerOpen(false); handleApprove(selected); }} className="w-full gap-2" disabled={!isAdmin}>
-                  <CheckCircle className="w-4 h-4" /> Aprovar Cotação
-                </Button>
-              )}
-              {selected.status === "aprovado" && (
-                <Button variant="default" onClick={() => { setDrawerOpen(false); setConvertingId(selected.id); }} className="w-full gap-2">
-                  <ArrowRightCircle className="w-4 h-4" /> Gerar Ordem de Venda
-                </Button>
-              )}
-              <Button variant="outline" onClick={() => { setDrawerOpen(false); handleDuplicate(selected); }} className="w-full gap-2">
-                <Copy className="w-4 h-4" /> Duplicar
-              </Button>
-              <Button variant="outline" onClick={async () => {
-                const token = crypto.randomUUID();
-                await (supabase.from('orcamentos') as any).update({ public_token: token }).eq('id', selected.id);
-                const url = `${window.location.origin}/orcamento-publico?token=${token}`;
-                await navigator.clipboard.writeText(url);
-                toast.success('Link público copiado para a área de transferência!');
-                fetchData();
-              }} className="w-full gap-2">
-                <Link2 className="w-4 h-4" /> Gerar Link Público
-              </Button>
-            </div>
-          </div>
-        )}
-      </ViewDrawer>
 
       <ConfirmDialog
         open={!!convertingId}

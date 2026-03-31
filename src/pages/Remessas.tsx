@@ -7,6 +7,7 @@ import { ViewDrawerV2 } from "@/components/ViewDrawerV2";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Edit, Trash2, Plus, MapPin, Package as PackageIcon, Truck, Search } from "lucide-react";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
+import { useRelationalNavigation } from "@/contexts/RelationalNavigationContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Tables } from "@/integrations/supabase/types";
 import { Button } from "@/components/ui/button";
@@ -58,8 +59,8 @@ const emptyForm: RemessaForm = {
 
 export default function Remessas() {
   const { data, loading, create, update, remove } = useSupabaseCrud<Remessa>({ table: "remessas" });
+  const { pushView } = useRelationalNavigation();
   const [modalOpen, setModalOpen] = useState(false);
-  const [drawerOpen, setDrawerOpen] = useState(false);
   const [selected, setSelected] = useState<Remessa | null>(null);
   const [mode, setMode] = useState<"create" | "edit">("create");
   const [form, setForm] = useState(emptyForm);
@@ -113,7 +114,7 @@ export default function Remessas() {
     });
     setModalOpen(true);
   };
-  const openView = (r: Remessa) => { setSelected(r); setDrawerOpen(true); };
+  const openView = (r: Remessa) => { pushView("remessa", r.id); };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -287,7 +288,7 @@ export default function Remessas() {
     <AppLayout>
       <ModulePage title="Remessas" subtitle="Gestão de remessas e rastreamento logístico" addLabel="Nova Remessa" onAdd={openCreate} count={filteredData.length}
         searchValue={searchTerm} onSearchChange={setSearchTerm} searchPlaceholder="Buscar por rastreio, cliente ou transportadora...">
-        <DataTable columns={columns} data={filteredData} loading={loading} onView={openView} />
+        <DataTable columns={columns} data={filteredData} loading={loading} onView={openView} onEdit={openEdit} />
       </ModulePage>
 
       {/* Form Modal */}

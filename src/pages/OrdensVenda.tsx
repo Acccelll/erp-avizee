@@ -9,6 +9,7 @@ import { RelationalLink } from "@/components/ui/RelationalLink";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Trash2, FileOutput } from "lucide-react";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
+import { useRelationalNavigation } from "@/contexts/RelationalNavigationContext";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -43,10 +44,10 @@ const statusFaturamentoColors: Record<string, string> = {
 
 const OrdensVenda = () => {
   const navigate = useNavigate();
+  const { pushView } = useRelationalNavigation();
   const { data, loading, remove, fetchData } = useSupabaseCrud<OrdemVenda>({
     table: "ordens_venda", select: "*, clientes(nome_razao_social), orcamentos(numero)",
   });
-  const [drawerOpen, setDrawerOpen] = useState(false);
   const [selected, setSelected] = useState<OrdemVenda | null>(null);
   const [ovItems, setOvItems] = useState<any[]>([]);
   const [loadingItems, setLoadingItems] = useState(false);
@@ -64,10 +65,8 @@ const OrdensVenda = () => {
     return { total, totalValue, pending, inProgress };
   }, [data]);
 
-  const handleView = async (ov: OrdemVenda) => {
-    setSelected(ov); setDrawerOpen(true); setLoadingItems(true);
-    const { data: items } = await supabase.from("ordens_venda_itens").select("*, produtos(nome)").eq("ordem_venda_id", ov.id);
-    setOvItems(items || []); setLoadingItems(false);
+  const handleView = (ov: OrdemVenda) => {
+    pushView("ordem_venda", ov.id);
   };
 
   const handleApprove = async (ov: OrdemVenda) => {
@@ -212,84 +211,6 @@ const OrdensVenda = () => {
 
         <DataTable columns={columns} data={filteredData} loading={loading} onView={handleView} />
       </ModulePage>
-
-      <ViewDrawerV2 open={drawerOpen} onClose={() => setDrawerOpen(false)} title="Detalhes da Ordem de Venda"
-        actions={selected ? <>
-          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => { setDrawerOpen(false); remove(selected.id); }}><Trash2 className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Excluir</TooltipContent></Tooltip>
-        </> : undefined}
-        badge={selected ? <StatusBadge status={selected.status} label={statusComercialLabels[selected.status]} /> : undefined}
-        tabs={selected ? [
-          { value: "dados", label: "Dados", content: (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <ViewField label="Nº OV"><span className="font-mono">{selected.numero}</span></ViewField>
-                <ViewField label="PO Cliente"><span className="font-mono">{selected.po_number || "—"}</span></ViewField>
-              </div>
-              <ViewField label="Cotação Origem">
-                {selected.orcamentos?.numero ? (
-                  <RelationalLink to="/orcamentos" mono>{selected.orcamentos.numero}</RelationalLink>
-                ) : "—"}
-              </ViewField>
-              <ViewField label="Cliente">
-                {selected.clientes?.nome_razao_social ? (
-                  <RelationalLink to="/clientes">{selected.clientes.nome_razao_social}</RelationalLink>
-                ) : "—"}
-              </ViewField>
-              <div className="grid grid-cols-2 gap-4">
-                <ViewField label="Emissão">{formatDate(selected.data_emissao)}</ViewField>
-                <ViewField label="Aprovação">{selected.data_aprovacao ? formatDate(selected.data_aprovacao) : "—"}</ViewField>
-              </div>
-              <ViewField label="Valor Total"><span className="font-semibold mono text-lg">{formatCurrency(Number(selected.valor_total || 0))}</span></ViewField>
-              <div className="grid grid-cols-2 gap-4">
-                <ViewField label="Faturamento">
-                  <Badge variant="outline" className={`${statusFaturamentoColors[selected.status_faturamento] || ""}`}>
-                    {statusFaturamentoLabels[selected.status_faturamento] || selected.status_faturamento}
-                  </Badge>
-                </ViewField>
-              </div>
-              {selected.observacoes && <ViewField label="Observações">{selected.observacoes}</ViewField>}
-            </div>
-          )},
-          { value: "itens", label: "Itens", content: (
-            <div>
-              {loadingItems ? (
-                <div className="flex justify-center py-4"><div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" /></div>
-              ) : ovItems.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Nenhum item</p>
-              ) : (
-                <div className="space-y-2">
-                  {ovItems.map((item: any) => (
-                    <div key={item.id} className="flex justify-between items-center py-2 px-3 bg-accent/20 rounded-lg text-sm">
-                      <div>
-                        <RelationalLink to="/produtos">{item.descricao_snapshot || item.produtos?.nome || "—"}</RelationalLink>
-                        <p className="text-xs text-muted-foreground mono">{item.codigo_snapshot || "—"} • {item.quantidade} {item.unidade}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-semibold mono">{formatCurrency(Number(item.valor_total || 0))}</p>
-                        <p className="text-xs text-muted-foreground">Fat.: {item.quantidade_faturada || 0}/{item.quantidade}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )},
-        ] : undefined}
-        footer={selected ? (
-          <div className="space-y-2">
-            {selected.status === "pendente" && (
-              <Button onClick={() => { setDrawerOpen(false); handleApprove(selected); }} className="w-full gap-2">
-                <CheckCircle className="w-4 h-4" /> Aprovar OV
-              </Button>
-            )}
-            {(selected.status === "aprovada" || selected.status === "em_separacao") && selected.status_faturamento !== "total" && (
-              <Button variant="default" onClick={() => { setDrawerOpen(false); setGeneratingNfId(selected.id); }} className="w-full gap-2">
-                <FileOutput className="w-4 h-4" /> Gerar Nota Fiscal
-              </Button>
-            )}
-          </div>
-        ) : undefined}
-      />
 
       <ConfirmDialog
         open={!!generatingNfId}
