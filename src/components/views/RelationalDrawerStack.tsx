@@ -48,6 +48,7 @@ export function RelationalDrawerStack() {
     <>
       {stack.map((view, index) => {
         const isOpen = true; // Managed by presence in stack
+        const isTop = index === stack.length - 1;
         return (
           <Sheet key={`${view.type}-${view.id}-${index}`} open={isOpen} onOpenChange={(open) => !open && popView()}>
             <SheetContent
