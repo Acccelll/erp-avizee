@@ -32,10 +32,11 @@ interface Orcamento {
   ativo: boolean; clientes?: { nome_razao_social: string };
 }
 
-const statusLabels: Record<string, string> = {
-  rascunho: "Rascunho", confirmado: "Confirmada", aprovado: "Aprovada",
-  convertido: "Convertida", cancelado: "Cancelada", faturado: "Faturada",
-};
+import { statusOrcamento, statusToOptions, getStatusLabel } from "@/lib/statusSchema";
+
+const statusLabels: Record<string, string> = Object.fromEntries(
+  Object.entries(statusOrcamento).map(([k, v]) => [k, v.label])
+);
 
 const Orcamentos = () => {
   const navigate = useNavigate();

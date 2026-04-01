@@ -263,10 +263,7 @@ const Financeiro = () => {
   };
 
   const tipoOpts: MultiSelectOption[] = [{ label: "A Receber", value: "receber" }, { label: "A Pagar", value: "pagar" }];
-  const statusOpts: MultiSelectOption[] = [
-    { label: "Aberto", value: "aberto" }, { label: "Pago", value: "pago" },
-    { label: "Vencido", value: "vencido" }, { label: "Cancelado", value: "cancelado" },
-  ];
+  const statusOpts: MultiSelectOption[] = statusToOptions(statusFinanceiroSchema);
   const bancoOpts: MultiSelectOption[] = contasBancarias.map(c => ({ label: `${c.bancos?.nome} - ${c.descricao}`, value: c.id }));
 
   return (
