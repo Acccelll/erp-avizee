@@ -157,63 +157,6 @@ export type Database = {
           },
         ]
       }
-      precos_especiais: {
-        Row: {
-          id: string
-          cliente_id: string
-          produto_id: string
-          preco_especial: number
-          desconto_percentual: number | null
-          vigencia_inicio: string | null
-          vigencia_fim: string | null
-          observacao: string | null
-          ativo: boolean
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          cliente_id: string
-          produto_id: string
-          preco_especial: number
-          desconto_percentual?: number | null
-          vigencia_inicio?: string | null
-          vigencia_fim?: string | null
-          observacao?: string | null
-          ativo?: boolean
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          cliente_id?: string
-          produto_id?: string
-          preco_especial?: number
-          desconto_percentual?: number | null
-          vigencia_inicio?: string | null
-          vigencia_fim?: string | null
-          observacao?: string | null
-          ativo?: boolean
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "precos_especiais_cliente_id_fkey"
-            columns: ["cliente_id"]
-            isOneToOne: false
-            referencedRelation: "clientes"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "precos_especiais_produto_id_fkey"
-            columns: ["produto_id"]
-            isOneToOne: false
-            referencedRelation: "produtos"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       cliente_registros_comunicacao: {
         Row: {
           assunto: string | null
@@ -2326,10 +2269,8 @@ export type Database = {
           created_at: string
           data_postagem: string | null
           id: string
-          nota_fiscal_id: string | null
           observacoes: string | null
           ordem_venda_id: string | null
-          pedido_compra_id: string | null
           peso: number | null
           previsao_entrega: string | null
           servico: string | null
@@ -2347,10 +2288,8 @@ export type Database = {
           created_at?: string
           data_postagem?: string | null
           id?: string
-          nota_fiscal_id?: string | null
           observacoes?: string | null
           ordem_venda_id?: string | null
-          pedido_compra_id?: string | null
           peso?: number | null
           previsao_entrega?: string | null
           servico?: string | null
@@ -2368,10 +2307,8 @@ export type Database = {
           created_at?: string
           data_postagem?: string | null
           id?: string
-          nota_fiscal_id?: string | null
           observacoes?: string | null
           ordem_venda_id?: string | null
-          pedido_compra_id?: string | null
           peso?: number | null
           previsao_entrega?: string | null
           servico?: string | null
@@ -2391,24 +2328,10 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "remessas_nota_fiscal_id_fkey"
-            columns: ["nota_fiscal_id"]
-            isOneToOne: false
-            referencedRelation: "notas_fiscais"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "remessas_ordem_venda_id_fkey"
             columns: ["ordem_venda_id"]
             isOneToOne: false
             referencedRelation: "ordens_venda"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "remessas_pedido_compra_id_fkey"
-            columns: ["pedido_compra_id"]
-            isOneToOne: false
-            referencedRelation: "pedidos_compra"
             referencedColumns: ["id"]
           },
           {
