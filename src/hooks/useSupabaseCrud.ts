@@ -75,8 +75,8 @@ export function useSupabaseCrud<T extends Record<string, any>>({
 
       // Server-side text search using OR ilike across specified columns
       const trimmedSearch = searchTerm.trim();
-      if (trimmedSearch && searchColumns.length > 0) {
-        const orFilter = searchColumns
+      if (trimmedSearch && searchColumnsRef.current.length > 0) {
+        const orFilter = searchColumnsRef.current
           .map(col => `${col}.ilike.%${trimmedSearch}%`)
           .join(",");
         query = query.or(orFilter);
