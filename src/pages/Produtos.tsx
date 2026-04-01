@@ -41,7 +41,8 @@ interface ComposicaoItem {
 
 const emptyProduto: Record<string, any> = {
   nome: "", sku: "", codigo_interno: "", descricao: "", unidade_medida: "UN",
-  preco_custo: 0, preco_venda: 0, estoque_minimo: 0, ncm: "", cst: "", cfop_padrao: "", peso: 0, eh_composto: false
+  preco_custo: 0, preco_venda: 0, estoque_minimo: 0, ncm: "", cst: "", cfop_padrao: "", peso: 0, eh_composto: false,
+  grupo_id: ""
 };
 
 const Produtos = () => {

@@ -105,7 +105,14 @@ const Clientes = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.nome_razao_social) {toast.error("Nome/Razão Social é obrigatório");return;}
+    const validation = validateForm(clienteFornecedorSchema, form);
+    if (!validation.success) {
+      setFormErrors(validation.errors);
+      const firstError = Object.values(validation.errors)[0];
+      toast.error(firstError || "Corrija os erros do formulário");
+      return;
+    }
+    setFormErrors({});
     setSaving(true);
     const payload = { ...form, grupo_economico_id: form.grupo_economico_id || null, caixa_postal: form.caixa_postal || null };
     try {
@@ -122,26 +129,16 @@ const Clientes = () => {
   const relacaoLabel: Record<string, string> = { matriz: "Matriz", filial: "Filial", coligada: "Coligada", independente: "Independente" };
 
   const filteredData = useMemo(() => {
-    const query = searchTerm.trim().toLowerCase();
+    // Text search is now server-side; only apply local dropdown filters
     return data.filter((cliente) => {
       if (tipoFilters.length > 0 && !tipoFilters.includes(cliente.tipo_pessoa)) return false;
-
       if (grupoFilters.length > 0) {
-        const hasGroup = !!cliente.grupo_economico_id;
         const groupId = cliente.grupo_economico_id || "sem_grupo";
-
-        // Se o filtro contém ids específicos de grupo OU "sem_grupo"
-        if (!grupoFilters.includes(groupId)) {
-          // Caso especial: se selecionou "com_grupo" (lógica antiga adaptada ou nova?)
-          // Vamos usar IDs específicos + "sem_grupo"
-          return false;
-        }
+        if (!grupoFilters.includes(groupId)) return false;
       }
-
-      if (!query) return true;
-      return [cliente.nome_razao_social, cliente.nome_fantasia, cliente.cpf_cnpj, cliente.email, cliente.cidade, cliente.uf, cliente.telefone, cliente.contato].filter(Boolean).join(" ").toLowerCase().includes(query);
+      return true;
     });
-  }, [data, grupoFilters, searchTerm, tipoFilters]);
+  }, [data, grupoFilters, tipoFilters]);
 
   const columns = [
   { key: "nome_razao_social", label: "Nome / Razão Social", sortable: true },
