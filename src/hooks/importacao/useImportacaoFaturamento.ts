@@ -216,17 +216,15 @@ export function useImportacaoFaturamento() {
         const clientId = clientMap.get(nf.cliente_nome.toUpperCase());
 
         // Criar Cabeçalho da Nota
-        const { data: newNf, error: nfError } = await supabase.from("notas_fiscais").insert({
+        const { data: newNf, error: nfError } = await (supabase.from("notas_fiscais").insert({
           tipo: "saida",
           numero: nf.numero,
           data_emissao: nf.data_emissao,
           valor_total: nf.valor_total,
           cliente_id: clientId,
           status: "confirmada",
-          origem: "importacao_historica",
-          somente_consulta: somenteConsulta,
           observacoes: `Importação histórica - Lote ${idLote}`
-        }).select().single();
+        } as any).select().single() as any);
 
         if (nfError) {
           await supabase.from("importacao_logs").insert({
