@@ -49,7 +49,21 @@ const relacaoOptions = [
 
 
 const Clientes = () => {
-  const { data, loading, create, update, remove, duplicate } = useSupabaseCrud<Cliente>({ table: "clientes" });
+  const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+
+  // Debounce search for server-side filtering
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchTerm), 350);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  const { data, loading, create, update, remove, duplicate } = useSupabaseCrud<Cliente>({
+    table: "clientes",
+    searchTerm: debouncedSearch,
+    searchColumns: ["nome_razao_social", "nome_fantasia", "cpf_cnpj", "email", "cidade"],
+  });
   const { pushView } = useRelationalNavigation();
   const { buscarCep, loading: cepLoading } = useViaCep();
   const { buscarCnpj, loading: cnpjLoading } = useCnpjLookup();
