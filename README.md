@@ -2,6 +2,10 @@
 
 [![CI](https://github.com/Acccelll/erp-avizee/actions/workflows/ci.yml/badge.svg)](https://github.com/Acccelll/erp-avizee/actions/workflows/ci.yml)
 [![Security](https://github.com/Acccelll/erp-avizee/actions/workflows/security.yml/badge.svg)](https://github.com/Acccelll/erp-avizee/actions/workflows/security.yml)
+[![Versão](https://img.shields.io/badge/versão-0.0.0-blue)](./package.json)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.8-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![React](https://img.shields.io/badge/React-18-61dafb?logo=react&logoColor=white)](https://react.dev/)
+[![Supabase](https://img.shields.io/badge/Supabase-2.x-3ecf8e?logo=supabase&logoColor=white)](https://supabase.com/)
 
 ERP web da AviZee construído com React, Vite, TypeScript, shadcn/ui e Supabase. O projeto reúne módulos operacionais, comerciais, fiscais e financeiros em uma interface única, com navegação hierárquica, busca global, quick actions e mock data inicial para demonstração.
 
@@ -417,6 +421,10 @@ Processamento assíncrono de notificações do sistema.
 
 ## Estrutura do Projeto
 
+> 📐 Para diagramas de arquitetura (visão geral, autenticação, modelo de dados, fluxo de navegação e sequência de criação de orçamento), veja [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md).  
+> 🛠️ Para guia prático de desenvolvimento (novo módulo, migrations, Edge Functions), veja [docs/DEV_GUIDE.md](./docs/DEV_GUIDE.md).  
+> 🔒 Para políticas RLS do banco de dados, veja [docs/RLS_POLICIES.md](./docs/RLS_POLICIES.md).
+
 ```text
 src/
 ├── components/           # Componentes UI (shadcn, forms, layouts)
@@ -430,3 +438,34 @@ src/
 ├── services/             # Relatórios, Correios, API wrappers
 └── types/                # Interfaces TypeScript globais
 ```
+
+## Roadmap
+
+Os próximos passos planejados para o projeto, agrupados por horizonte:
+
+### 🔜 Curto prazo (próximos sprints)
+
+- [ ] **Cobertura de testes** — ampliar testes unitários para módulo fiscal (CFOP, CSOSN, CST) e financeiro (conciliação bancária)
+- [ ] **Importação XML NF-e completa** — finalizar parser de XML para entrada de notas de fornecedor com validação de chave de acesso
+- [ ] **Relatório de inadimplência** — listagem de títulos vencidos com aging e projeção de fluxo de caixa
+- [ ] **Busca global aprimorada** — incluir resultados de orçamentos e notas fiscais no Ctrl+K
+- [ ] **Modo offline** — exibir aviso e desabilitar gravação quando sem conexão com Supabase
+
+### 📅 Médio prazo
+
+- [ ] **Permissões granulares por módulo** — tela de configuração de roles com checkboxes por funcionalidade
+- [ ] **Notificações em tempo real** — alertas de estoque crítico, vencimentos próximos e aprovações pendentes via Supabase Realtime
+- [ ] **Integração com NFe.io / SEFAZ** — emissão de NF-e diretamente pela plataforma
+- [ ] **Dashboard analítico avançado** — comparativo mensal, funil de vendas e gráficos de rentabilidade por produto/cliente
+- [ ] **Múltiplas empresas (multi-tenant)** — suporte a mais de um CNPJ por conta, com isolamento de dados por RLS
+- [ ] **App mobile (PWA)** — geração de orçamentos e consulta de estoque pelo celular
+
+### 🔭 Longo prazo
+
+- [ ] **BI e exportação para Data Warehouse** — integração com ferramentas de análise externa (Metabase, Looker Studio)
+- [ ] **API pública REST** — endpoints documentados (OpenAPI) para integração com sistemas legados e ERPs externos
+- [ ] **Módulo de RH** — folha de pagamento, banco de horas e gestão de férias
+- [ ] **Integração bancária (Open Finance)** — conciliação automática via Open Finance / OFX
+- [ ] **Assinatura digital** — orçamentos e contratos assinados digitalmente via DocuSign / D4Sign
+
+> Tem sugestões? Abra uma [Issue](https://github.com/Acccelll/erp-avizee/issues) com o label `roadmap`.
