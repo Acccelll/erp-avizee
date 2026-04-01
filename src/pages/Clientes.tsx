@@ -20,6 +20,7 @@ import { MaskedInput } from "@/components/ui/MaskedInput";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Building2, Search } from "lucide-react";
+import { clienteFornecedorSchema, validateForm } from "@/lib/validationSchemas";
 
 interface Cliente {
   id: string;tipo_pessoa: string;nome_razao_social: string;nome_fantasia: string;
