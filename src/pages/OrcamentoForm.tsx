@@ -23,6 +23,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useAuth } from "@/contexts/AuthContext";
 import { Tables } from "@/integrations/supabase/types";
 import { formatCurrency } from "@/lib/format";
+import { TemplateConfig } from "@/types/orcamento";
 
 interface ClienteSnapshot {
   nome_razao_social: string; nome_fantasia: string; cpf_cnpj: string;
@@ -38,15 +39,7 @@ interface OrcamentoTemplate {
   id: string;
   nome: string;
   escopo: "usuario" | "equipe";
-  payload: {
-    items: OrcamentoItem[];
-    pagamento: string;
-    prazoPagamento: string;
-    prazoEntrega: string;
-    modalidade: string;
-    freteTipo: string;
-    observacoes: string;
-  };
+  payload: TemplateConfig;
 }
 
 const emptyCliente: ClienteSnapshot = {
@@ -244,13 +237,43 @@ export default function OrcamentoForm() {
   const saveTemplate = async (escopo: "usuario" | "equipe") => {
     if (!templateName.trim()) { toast.error("Informe um nome para o template"); return; }
     const key = escopo === "equipe" ? `${TEAM_TEMPLATE_KEY}:${templateName.trim()}` : `orcamento_template:${user?.id}:${templateName.trim()}`;
-    const payload = {
+    const payload: TemplateConfig = {
+      items,
+      pagamento,
+      prazoPagamento,
+      prazoEntrega,
+      modalidade,
+      freteTipo,
+      observacoes,
+    };
+
+    if (escopo === "equipe") {
+      const { data: existing, error: existingError } = await supabase
+        .from("app_configuracoes")
+        .select("chave")
+        .eq("chave", key)
+        .maybeSingle();
+      if (existingError) {
+        toast.error("Não foi possível validar template existente.");
+        return;
+      }
+      if (existing) {
+        const shouldOverwrite = window.confirm("Template com este nome já existe. Deseja sobrescrever?");
+        if (!shouldOverwrite) return;
+      }
+    }
+
+    const templateRecord: OrcamentoTemplate = {
       id: key,
       nome: templateName.trim(),
       escopo,
-      payload: { items, pagamento, prazoPagamento, prazoEntrega, modalidade, freteTipo, observacoes },
+      payload,
     };
-    await supabase.from('app_configuracoes').upsert({ chave: key, valor: payload as any, updated_at: new Date().toISOString() }, { onConflict: 'chave' });
+
+    await supabase.from("app_configuracoes").upsert(
+      { chave: key, valor: templateRecord, updated_at: new Date().toISOString() },
+      { onConflict: "chave" },
+    );
     toast.success("Template salvo");
     setTemplateName("");
   };
@@ -405,10 +428,16 @@ export default function OrcamentoForm() {
 
   useEffect(() => {
     if (!user?.id) return;
-    supabase.from('app_configuracoes').select('valor, chave').or(`chave.like.orcamento_template:${user.id}:%,chave.like.${TEAM_TEMPLATE_KEY}:%`).then(({ data }) => {
-      const list = (data || []).map((row: any) => row.valor).filter(Boolean) as OrcamentoTemplate[];
-      setTemplates(list);
-    });
+    supabase
+      .from("app_configuracoes")
+      .select("valor, chave")
+      .or(`chave.like.orcamento_template:${user.id}:%,chave.like.${TEAM_TEMPLATE_KEY}:%`)
+      .then(({ data }) => {
+        const list = (data || [])
+          .map((row) => row.valor as OrcamentoTemplate | null)
+          .filter((row): row is OrcamentoTemplate => !!row?.id && !!row?.nome && !!row?.payload);
+        setTemplates(list);
+      });
   }, [user?.id]);
 
   const clienteOptions = clientes.map((c: any) => ({
