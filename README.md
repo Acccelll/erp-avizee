@@ -483,3 +483,26 @@ Os próximos passos planejados para o projeto, agrupados por horizonte:
 - [ ] **Assinatura digital** — orçamentos e contratos assinados digitalmente via DocuSign / D4Sign
 
 > Tem sugestões? Abra uma [Issue](https://github.com/Acccelll/erp-avizee/issues) com o label `roadmap`.
+
+
+## Atualização de dependências
+
+- O repositório usa `Dependabot` semanal (`.github/dependabot.yml`) para pacotes npm.
+- Política: atualizações de segurança e compatibilidade são priorizadas; breaking changes exigem PR dedicado com validação de lint/test/build.
+- Versionamento/release segue Conventional Commits + Semantic Release.
+
+## Edge Functions: secrets e falhas
+
+Configure as secrets no Supabase para funções:
+
+- `CORREIOS_USUARIO`
+- `CORREIOS_SENHA`
+- `LOVABLE_API_KEY`
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+
+Comportamento em falhas:
+- Resposta JSON padronizada: `{ success: false, error, code? }`.
+- Logs estruturados com `console.error`.
+- Timeouts para chamadas externas.
+- `correios-api` usa fallback mockado quando credenciais faltam ou API externa falha.

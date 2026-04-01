@@ -300,9 +300,11 @@ const OrdensVenda = () => {
                     <RelationalLink type="cliente" id={selected.cliente_id}>{selected.clientes.nome_razao_social}</RelationalLink>
                   ) : "—"}
                 </ViewField>
-                {selected.orcamentos?.numero && (
+                {selected.cotacao_id && (
                   <ViewField label="Cotação Origem">
-                    <RelationalLink type="orcamento" id={selected.cotacao_id}>{selected.orcamentos.numero}</RelationalLink>
+                    <RelationalLink type="orcamento" id={selected.cotacao_id}>
+                      {selected.orcamentos?.numero || "Ver cotação"}
+                    </RelationalLink>
                   </ViewField>
                 )}
               </div>

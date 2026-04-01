@@ -10,6 +10,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AdminRoute } from "@/components/AdminRoute";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
+import { OfflineBanner } from "@/components/OfflineBanner";
 
 // Lazy-loaded pages
 const Index = lazy(() => import("./pages/Index"));
@@ -82,6 +83,7 @@ const queryClient = new QueryClient({
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider>
+      <OfflineBanner />
       <TooltipProvider>
         <Sonner />
         <BrowserRouter>

@@ -1,68 +1,101 @@
 import { useEffect, useCallback, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Json } from "@/integrations/supabase/types";
+import { toast } from "sonner";
 import { useSyncedStorage } from "./useSyncedStorage";
+import { enqueueSync, processSyncQueue } from "@/services/syncQueue";
+import { useOnlineStatus } from "./useOnlineStatus";
 
-/**
- * Hook for system-level configuration values stored in the `app_configuracoes` table.
- *
- * Strategy:
- * - Primary source of truth: `app_configuracoes` table in Supabase.
- * - `useSyncedStorage` is used as a write-through cache so that the UI feels
- *   snappy between page loads and remains functional when Supabase is
- *   temporarily unreachable.
- * - The cache is always overwritten by the value returned from Supabase once
- *   the fetch completes, so there is a single source of truth.
- * - Changes made in one browser tab are automatically reflected in all other
- *   open tabs via the `storage` event, thanks to `useSyncedStorage`.
- */
+const REMOTE_TIMEOUT_MS = 8000;
+
+async function withTimeout<T>(promise: Promise<T>) {
+  return Promise.race<T>([
+    promise,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error("sync_timeout")), REMOTE_TIMEOUT_MS)),
+  ]);
+}
+
 export function useAppConfig<T = Json>(chave: string, defaultValue?: T) {
-  const { value, set: setCache } = useSyncedStorage<T | null>(
+  const isOnline = useOnlineStatus();
+  const { value, set: setCache, getMeta } = useSyncedStorage<T | null>(
     chave,
     defaultValue ?? null,
-    { namespace: 'appconfig' },
+    {
+      namespace: "appconfig",
+      onRemoteSyncError: () => {
+        toast.error("Inconsistência detectada. Recarregando configuração do servidor...");
+      },
+    },
   );
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    let cancelled = false;
-    supabase
-      .from("app_configuracoes")
-      .select("valor")
-      .eq("chave", chave)
-      .single()
-      .then(({ data }) => {
-        if (cancelled) return;
-        if (data?.valor !== undefined) {
-          setCache(data.valor as T);
-        }
-        setLoading(false);
-      });
-    return () => { cancelled = true; };
+  const reloadFromSupabase = useCallback(async () => {
+    if (!supabase) return;
+    const { data } = await supabase.from("app_configuracoes").select("valor").eq("chave", chave).single();
+    if (data?.valor !== undefined) {
+      setCache(data.valor as T);
+    }
   }, [chave, setCache]);
+
+  useEffect(() => {
+    reloadFromSupabase().finally(() => setLoading(false));
+  }, [reloadFromSupabase]);
+
+  useEffect(() => {
+    const flush = async () => {
+      if (!isOnline || !supabase) return;
+      await processSyncQueue(async (item) => {
+        if (item.scope !== "appconfig" || item.key !== chave) return false;
+        const { error } = await supabase
+          .from("app_configuracoes")
+          .upsert({ chave: item.key, valor: item.value as Json, updated_at: new Date().toISOString() }, { onConflict: "chave" });
+        return !error;
+      });
+      await reloadFromSupabase();
+    };
+
+    flush();
+  }, [isOnline, chave, reloadFromSupabase]);
 
   const save = useCallback(
     async (newValue: T) => {
-      // Optimistically update local state and cross-tab cache before round-trip.
+      const previous = value;
+      const meta = getMeta();
       setCache(newValue);
 
-      const { error } = await supabase
-        .from("app_configuracoes")
-        .upsert(
-          {
-            chave,
-            valor: newValue as unknown as Json,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "chave" },
-        );
-      if (error) {
-        console.error(`[useAppConfig] Erro ao salvar '${chave}':`, error);
+      if (!supabase || !isOnline) {
+        enqueueSync({ scope: "appconfig", key: chave, value: newValue, prevValue: previous });
+        return true;
       }
-      return !error;
+
+      const submit = async () => {
+        const { error } = await withTimeout(
+          supabase
+            .from("app_configuracoes")
+            .upsert({ chave, valor: newValue as unknown as Json, updated_at: new Date().toISOString() }, { onConflict: "chave" }),
+        );
+
+        if (error) {
+          setCache(previous as T);
+          enqueueSync({ scope: "appconfig", key: chave, value: newValue, prevValue: previous });
+          toast.error(`Falha ao salvar '${chave}'.`, {
+            action: { label: "Tentar novamente", onClick: () => void submit() },
+          });
+          return false;
+        }
+
+        const latestMeta = getMeta();
+        if (latestMeta.revision < meta.revision) {
+          await reloadFromSupabase();
+        }
+
+        return true;
+      };
+
+      return submit();
     },
-    [chave, setCache],
+    [value, getMeta, setCache, supabase, isOnline, chave, reloadFromSupabase],
   );
 
-  return { value, loading, save };
+  return { value, loading, save, reloadFromSupabase };
 }

@@ -11,6 +11,11 @@ on:
     branches:
       - main
       - develop
+    paths:
+      - 'src/**'
+      - 'tests/e2e/**'
+      - 'supabase/**'
+      - '.github/workflows/ci.yml'
 
 # Cancel in-progress runs for the same branch to save CI minutes.
 concurrency:

@@ -94,7 +94,10 @@ describe('useSyncedStorage', () => {
     const raw = localStorageMock._store[buildKey('test', 'count')];
     expect(raw).toBeDefined();
     const envelope = JSON.parse(raw);
-    expect(envelope).toEqual({ v: STORAGE_SCHEMA_VERSION, data: 42 });
+    expect(envelope.v).toBe(STORAGE_SCHEMA_VERSION);
+    expect(envelope.data).toBe(42);
+    expect(typeof envelope.updatedAt).toBe('number');
+    expect(typeof envelope.revision).toBe('number');
   });
 
   it('set(null) removes entry and resets to defaultValue', () => {
