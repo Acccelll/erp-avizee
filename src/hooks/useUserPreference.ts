@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Json } from '@/integrations/supabase/types';
-import { useSyncedStorage } from './useSyncedStorage';
+import { useSyncedStorage, buildSyncedStorageKey } from './useSyncedStorage';
 
 const PREFIX = 'erp-user-pref';
 
@@ -45,7 +45,7 @@ export function useUserPreference<T = Json>(userId: string | null | undefined, p
       if (raw !== null) {
         const parsed = JSON.parse(raw) as T;
         // Only migrate if the key does not already have a versioned entry.
-        const newKey = `erp:user-pref:${userId ?? 'anon'}:${preferenceKey}`;
+      const newKey = buildSyncedStorageKey(`user-pref:${userId ?? 'anon'}`, preferenceKey);
         if (localStorage.getItem(newKey) === null) {
           setCache(parsed);
         }

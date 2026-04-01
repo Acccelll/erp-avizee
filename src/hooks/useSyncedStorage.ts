@@ -71,7 +71,17 @@ function removeFromStorage(key: string): void {
   }
 }
 
-// ── Interface pública ─────────────────────────────────────────────────────────
+/**
+ * Builds the full localStorage key for a given namespace + logical key,
+ * matching the format used internally by `useSyncedStorage`.
+ * Exported so callers (e.g. migration logic) can derive the same key without
+ * repeating the format string.
+ */
+export function buildSyncedStorageKey(namespace: string, key: string): string {
+  return `erp:${namespace}:${key}`;
+}
+
+
 
 export interface UseSyncedStorageOptions {
   /**
