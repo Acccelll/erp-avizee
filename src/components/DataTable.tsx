@@ -230,11 +230,13 @@ export function DataTable<T extends Record<string, any>>({
   };
 
   const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-  const escapeCSV = (value: string): string => {
-    if (value.includes(';') || value.includes('"') || value.includes('\n')) {
-      return `"${value.replace(/"/g, '""')}"`;
+  const escapeCSV = (value: unknown): string => {
+    if (value === undefined || value === null) return '';
+    const stringValue = String(value);
+    if (stringValue.includes(';') || stringValue.includes('"') || stringValue.includes('\n')) {
+      return `"${stringValue.replace(/"/g, '""')}"`;
     }
-    return value;
+    return stringValue;
   };
 
   const buildExportRowsChunked = async (
@@ -281,7 +283,7 @@ export function DataTable<T extends Record<string, any>>({
 
       if (format === 'csv') {
         const header = visibleColumns.map((c) => escapeCSV(c.label)).join(';');
-        const body = rows.map((r) => visibleColumns.map((c) => escapeCSV(String(r[c.label] ?? ''))).join(';')).join('\n');
+        const body = rows.map((r) => visibleColumns.map((c) => escapeCSV(r[c.label])).join(';')).join('\n');
         const blob = new Blob([`${header}\n${body}`], { type: 'text/csv;charset=utf-8;' });
         downloadBlob(blob, `${moduleKey || 'dados'}.csv`);
         toast.success('Exportação CSV concluída', { id: toastId });
@@ -298,23 +300,30 @@ export function DataTable<T extends Record<string, any>>({
       }
 
       const pdf = new jsPDF();
-      const rowsPerPage = 50;
-      let y = 12;
-      let page = 1;
-      pdf.text(`Exportação ${moduleKey || 'dados'} - Página ${page}`, 14, y);
-      y += 8;
-      rows.forEach((row, idx) => {
-        if (idx > 0 && idx % rowsPerPage === 0) {
+      const ROWS_PER_PAGE = 50;
+      let currentRow = 0;
+      let currentPage = 1;
+
+      while (currentRow < rows.length) {
+        const pageRows = rows.slice(currentRow, currentRow + ROWS_PER_PAGE);
+
+        if (currentPage > 1) {
           pdf.addPage();
-          page += 1;
-          y = 12;
-          pdf.text(`Exportação ${moduleKey || 'dados'} - Página ${page}`, 14, y);
-          y += 8;
         }
-        const line = visibleColumns.map((c) => `${c.label}: ${String(row[c.label] ?? '')}`).join(' | ');
-        pdf.text(line.slice(0, 180), 10, y);
-        y += 5;
-      });
+
+        pdf.text(`Exportação ${moduleKey || 'dados'} - Página ${currentPage}`, 14, 12);
+
+        let y = 30;
+        pageRows.forEach((row) => {
+          const line = visibleColumns.map((c) => `${c.label}: ${String(row[c.label] ?? '')}`).join(' | ');
+          pdf.text(line.slice(0, 180), 10, y);
+          y += 8;
+        });
+
+        currentRow += ROWS_PER_PAGE;
+        currentPage += 1;
+      }
+
       pdf.save(`${moduleKey || 'dados'}.pdf`);
       toast.success('Exportação PDF concluída', { id: toastId });
     } catch (error) {
