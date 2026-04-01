@@ -1,5 +1,8 @@
 # ERP AviZee
 
+[![CI](https://github.com/Acccelll/erp-avizee/actions/workflows/ci.yml/badge.svg)](https://github.com/Acccelll/erp-avizee/actions/workflows/ci.yml)
+[![Security](https://github.com/Acccelll/erp-avizee/actions/workflows/security.yml/badge.svg)](https://github.com/Acccelll/erp-avizee/actions/workflows/security.yml)
+
 ERP web da AviZee construído com React, Vite, TypeScript, shadcn/ui e Supabase. O projeto reúne módulos operacionais, comerciais, fiscais e financeiros em uma interface única, com navegação hierárquica, busca global, quick actions e mock data inicial para demonstração.
 
 ## Stack principal
@@ -314,6 +317,59 @@ projeto Supabase dedicado para testes:
 ```bash
 npm run test:all
 ```
+
+## CI / CD
+
+O projeto usa **GitHub Actions** para verificações automáticas em cada push e pull request.
+
+### Workflows
+
+| Workflow | Arquivo | Quando executa |
+|---|---|---|
+| **CI** | `.github/workflows/ci.yml` | Push/PR nas branches `main` e `develop` |
+| **Security** | `.github/workflows/security.yml` | Push/PR em `main`/`develop` + agendado semanalmente |
+
+### Jobs do CI
+
+| Job | Comando | Descrição |
+|---|---|---|
+| `lint` | `npm run lint` | Verifica ESLint em todos os arquivos |
+| `typecheck` | `tsc --noEmit` | Verifica tipos TypeScript |
+| `unit-tests` | `npm run test:unit` | Executa testes unitários com Vitest |
+| `build` | `npm run build` | Build de produção (roda após lint/typecheck/testes) |
+| `e2e-tests` | `npm run test:e2e` | Testes Playwright (apenas em `workflow_dispatch` ou commits com `[e2e]`) |
+
+### Jobs de Segurança
+
+| Job | Ferramenta | Descrição |
+|---|---|---|
+| `npm-audit` | npm audit | Detecta dependências com vulnerabilidades high/critical |
+| `secret-scan` | TruffleHog | Escaneia o histórico de commits em busca de secrets vazados |
+| `codeql` | GitHub CodeQL | Análise estática de segurança para JavaScript/TypeScript |
+
+### Como disparar os testes E2E no CI
+
+Os testes E2E exigem uma aplicação em execução e variáveis de ambiente sensíveis.
+Por padrão eles **não rodam** em pushes normais. Para acioná-los:
+
+1. **Manualmente** — Aba *Actions* → *CI* → *Run workflow*.
+2. **Via commit** — Inclua `[e2e]` na mensagem do commit.
+
+Configure os seguintes *Repository Secrets* para execução E2E:
+
+| Secret | Descrição |
+|---|---|
+| `E2E_EMAIL` | Usuário de teste no Supabase |
+| `E2E_PASSWORD` | Senha do usuário de teste |
+| `E2E_BASE_URL` | URL da aplicação (ex.: `https://meu-app.vercel.app`) |
+| `E2E_SUPABASE_URL` | URL do projeto Supabase de teste isolado |
+| `E2E_SUPABASE_ANON_KEY` | Chave anon do projeto Supabase de teste |
+
+### Cache
+
+O CI usa `actions/cache` para:
+- **npm** — artefatos em `~/.npm` (gerenciado por `actions/setup-node`)
+- **Playwright browsers** — binários em `~/.cache/ms-playwright`, chaveados pelo hash do `package-lock.json`
 
 ## Edge Functions e Integrações
 

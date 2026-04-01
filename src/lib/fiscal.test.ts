@@ -172,7 +172,10 @@ describe('calcularStatusFaturamentoOV', () => {
   });
 
   it('retorna "total" quando tanto qtd total quanto faturado são zero', () => {
-    // 0 >= 0 → "total"
+    // Matematicamente 0 >= 0 → "total". Na prática, OVs sem itens não devem
+    // existir (validação em nível de formulário), portanto este caso borda não
+    // representa um estado de negócio válido e o comportamento é documentado
+    // apenas para cobertura da função.
     expect(calcularStatusFaturamentoOV(0, 0)).toBe('total');
   });
 });
