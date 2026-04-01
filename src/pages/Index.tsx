@@ -122,9 +122,12 @@ const DashboardContent = () => {
       const { dateFrom, dateTo } = globalRange;
       const today = new Date().toISOString().slice(0, 10);
 
-      const buildFinQuery = (tipo: string) => {
+      // KPI de saldo pendente (cards): inclui títulos antigos vencidos/abertos.
+      // Não aplicar dateFrom para não excluir pendências anteriores ao período.
+      const buildFinTotalQuery = (tipo: string) => {
         let q = supabase.from("financeiro_lancamentos").select("valor").eq("tipo", tipo as any).eq("ativo", true);
         q = q.in("status", ["aberto", "vencido"]);
+        // Aplica apenas corte superior quando houver data final do período.
         if (dateTo) q = q.lte("data_vencimento", dateTo);
         return q;
       };
@@ -154,8 +157,8 @@ const DashboardContent = () => {
         supabase.from("fornecedores").select("*", { count: "exact", head: true }).eq("ativo", true),
         supabase.from("orcamentos").select("*", { count: "exact", head: true }).eq("ativo", true).gte("data_orcamento", dateFrom),
         supabase.from("compras").select("*", { count: "exact", head: true }).eq("ativo", true).gte("data_compra", dateFrom),
-        buildFinQuery("receber"),
-        buildFinQuery("pagar"),
+        buildFinTotalQuery("receber"),
+        buildFinTotalQuery("pagar"),
         supabase.from("financeiro_lancamentos").select("valor").eq("status", "vencido").eq("ativo", true),
         supabase.from("orcamentos").select("id, numero, valor_total, status, data_orcamento, clientes(nome_razao_social)").eq("ativo", true).gte("data_orcamento", dateFrom).order("created_at", { ascending: false }).limit(5),
         supabase.from("compras").select("numero, valor_total, status, data_compra, fornecedores(nome_razao_social)").eq("ativo", true).gte("data_compra", dateFrom).order("created_at", { ascending: false }).limit(5),
