@@ -167,7 +167,7 @@ export function useImportacaoFaturamento() {
         criado_por: user?.user?.id
       }));
 
-      const { error: stagingError } = await supabase.from("stg_faturamento").insert(stagingData);
+      const { error: stagingError } = await supabase.from("stg_faturamento").insert(stagingData as any);
       if (stagingError) throw stagingError;
 
       const validos = previewData.filter(i => i.status === "valido").length;
