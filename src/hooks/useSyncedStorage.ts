@@ -71,11 +71,26 @@ function removeFromStorage(key: string): void {
   }
 }
 
+// ── Public Key Builder ────────────────────────────────────────────────────────
+
 /**
- * Builds the full localStorage key for a given namespace + logical key,
- * matching the format used internally by `useSyncedStorage`.
- * Exported so callers (e.g. migration logic) can derive the same key without
- * repeating the format string.
+ * Builds the full `localStorage` key for a given namespace + logical key,
+ * matching exactly the format used internally by `useSyncedStorage`.
+ *
+ * **Intended for external callers** that need to derive a versioned storage key
+ * without duplicating the format string — e.g. one-time migration logic in
+ * `useUserPreference` that checks whether a versioned entry already exists
+ * before adopting an old unversioned value.
+ *
+ * @param namespace  Namespace segment (e.g. `'appconfig'`, `'user-pref:abc-123'`).
+ * @param key        Logical key within that namespace (e.g. `'sidebar_collapsed'`).
+ * @returns Full storage key: `erp:<namespace>:<key>`.
+ *
+ * @example
+ * ```ts
+ * buildSyncedStorageKey('user-pref:abc', 'sidebar_collapsed')
+ * // → "erp:user-pref:abc:sidebar_collapsed"
+ * ```
  */
 export function buildSyncedStorageKey(namespace: string, key: string): string {
   return `erp:${namespace}:${key}`;

@@ -45,7 +45,7 @@ export function useUserPreference<T = Json>(userId: string | null | undefined, p
       if (raw !== null) {
         const parsed = JSON.parse(raw) as T;
         // Only migrate if the key does not already have a versioned entry.
-      const newKey = buildSyncedStorageKey(`user-pref:${userId ?? 'anon'}`, preferenceKey);
+        const newKey = buildSyncedStorageKey(namespace, preferenceKey);
         if (localStorage.getItem(newKey) === null) {
           setCache(parsed);
         }

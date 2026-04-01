@@ -171,7 +171,8 @@ describe('calcularStatusFaturamentoOV', () => {
     expect(calcularStatusFaturamentoOV(100, 0)).toBe('aguardando');
   });
 
-  it('retorna "aguardando" quando qtd total é zero', () => {
+  it('retorna "total" quando tanto qtd total quanto faturado são zero', () => {
+    // 0 >= 0 → "total"
     expect(calcularStatusFaturamentoOV(0, 0)).toBe('total');
   });
 });

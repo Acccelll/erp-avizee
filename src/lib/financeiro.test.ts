@@ -144,8 +144,9 @@ describe('getEffectiveStatus', () => {
   });
 
   it('retorna "vencido" quando o vencimento é hoje mas o horário é passado', () => {
-    // A lógica zeroa o horário do vencimento (00:00:00), então qualquer hora
-    // "hoje" posterior à meia-noite faz o vencimento estar no passado.
+    // A lógica normaliza o vencimento para 00:00:00 do dia, portanto qualquer
+    // hora posterior à meia-noite (ex.: 10:00) coloca "hoje" depois do
+    // vencimento normalizado, resultando em status "vencido".
     const hoje = new Date('2026-03-01');
     hoje.setHours(10, 0, 0, 0);
     expect(getEffectiveStatus('aberto', '2026-03-01', hoje)).toBe('vencido');
