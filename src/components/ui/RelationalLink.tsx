@@ -1,7 +1,8 @@
 import { useNavigate } from "react-router-dom";
 import { ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useRelationalNavigation, type EntityType } from "@/contexts/RelationalNavigationContext";
+import { useRelationalNavigation, type EntityType, MAX_DRAWER_DEPTH } from "@/contexts/RelationalNavigationContext";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface RelationalLinkProps {
   /** Label displayed before the value */
@@ -26,7 +27,7 @@ interface RelationalLinkProps {
  */
 export function RelationalLink({ label, children, to, type, id, onClick, className, mono }: RelationalLinkProps) {
   const navigate = useNavigate();
-  const { pushView } = useRelationalNavigation();
+  const { pushView, canPush } = useRelationalNavigation();
 
   const handleClick = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -47,7 +48,7 @@ export function RelationalLink({ label, children, to, type, id, onClick, classNa
     return <span className={cn(mono && "font-mono", className)}>{children}</span>;
   }
 
-  return (
+  const button = (
     <button
       type="button"
       onClick={handleClick}
@@ -61,4 +62,19 @@ export function RelationalLink({ label, children, to, type, id, onClick, classNa
       <ExternalLink className="h-3 w-3 shrink-0 opacity-60" />
     </button>
   );
+
+  // When pushing would trigger the jump mechanism, warn the user via tooltip.
+  const showDepthWarning = !!(type && id) && !canPush;
+  if (showDepthWarning) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>{button}</TooltipTrigger>
+        <TooltipContent side="top" className="max-w-xs text-center">
+          Limite de {MAX_DRAWER_DEPTH} drawers atingido. O drawer mais antigo será fechado ao abrir este.
+        </TooltipContent>
+      </Tooltip>
+    );
+  }
+
+  return button;
 }

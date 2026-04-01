@@ -83,6 +83,37 @@ A navegação foi reorganizada para reduzir poluição visual e manter contexto:
 - Menu de ações rápidas no header e painel de notificações
 - **Navegação stacked (Relacional)**: Detalhes de entidades (clientes, produtos, orçamentos, notas, remessas) abrem em drawers sobrepostos via `RelationalNavigationContext`, permitindo navegar entre registros vinculados sem perder o contexto da tela principal.
 
+### Drawers relacionais — comportamento detalhado
+
+O sistema de drawers é gerenciado pelo `RelationalNavigationContext` e pelo componente `RelationalDrawerStack`.
+
+#### Limite de profundidade e mecanismo de "salto"
+
+- A pilha de drawers tem **profundidade máxima de 5** (`MAX_DRAWER_DEPTH`).
+- Ao atingir o limite, abrir um novo drawer fecha o mais antigo automaticamente ("jump"), sem bloquear a navegação.
+- Um ícone de alerta (⚠) é exibido no cabeçalho do drawer mais à frente quando o limite é atingido.
+- Links relacionais (`RelationalLink`) exibem um tooltip informando que o drawer mais antigo será fechado ao abrir um novo, para que o usuário esteja ciente.
+- O método `canPush` informa se a pilha ainda tem capacidade sem acionar o mecanismo de salto.
+
+#### Atalhos de teclado
+
+| Atalho | Ação |
+|---|---|
+| `ESC` | Fecha o drawer do topo (comportamento nativo do componente Sheet) |
+| `⇧ Shift + ESC` | Fecha **todos** os drawers de uma vez |
+
+#### Persistência de estado na URL
+
+O estado da pilha de drawers é sincronizado com os query params da URL:
+
+```
+/clientes?drawer=produto:uuid-1&drawer=orcamento:uuid-2
+```
+
+- Cada entry usa o formato `tipo:id` (ex.: `cliente:abc123`, `orcamento:xyz789`).
+- Na recarga de página ou ao compartilhar o link, o estado dos drawers é restaurado automaticamente a partir da URL.
+- Os parâmetros existentes na URL (ex.: `?tipo=receber`) não são afetados.
+
 ## Rotas e Submódulos
 
 A navegação usa query strings para contextualizar submódulos:

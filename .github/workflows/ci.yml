@@ -151,7 +151,11 @@ jobs:
       - name: Start preview server and run E2E tests
         run: |
           npx vite preview --port 8080 &
-          sleep 5
+          # Poll until the server is ready (up to 30 s) instead of a fixed sleep.
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:8080 > /dev/null && break
+            sleep 1
+          done
           npm run test:e2e
 
       - name: Upload Playwright report

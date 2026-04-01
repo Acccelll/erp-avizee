@@ -5,6 +5,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { AppConfigProvider } from "@/contexts/AppConfigContext";
+import { RelationalNavigationProvider } from "@/contexts/RelationalNavigationContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AdminRoute } from "@/components/AdminRoute";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -84,6 +85,7 @@ const App = () => (
       <TooltipProvider>
         <Sonner />
         <BrowserRouter>
+          <RelationalNavigationProvider>
           <AuthProvider>
           <AppConfigProvider>
           <ErrorBoundary>
@@ -132,6 +134,7 @@ const App = () => (
           </ErrorBoundary>
           </AppConfigProvider>
           </AuthProvider>
+          </RelationalNavigationProvider>
         </BrowserRouter>
       </TooltipProvider>
     </ThemeProvider>
