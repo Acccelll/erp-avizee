@@ -33,6 +33,8 @@ export function useSupabaseCrud<T extends Record<string, any>>({
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
+  const [totalCount, setTotalCount] = useState<number | null>(null);
+  const [truncated, setTruncated] = useState(false);
   const filterRef = useRef(filter);
   filterRef.current = filter;
 
