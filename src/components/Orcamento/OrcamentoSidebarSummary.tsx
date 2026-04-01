@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { StatusBadge } from "@/components/DataTable";
+import { StatusBadge } from "@/components/StatusBadge";
 import { Save, Eye, FileText } from "lucide-react";
 
 interface Props {

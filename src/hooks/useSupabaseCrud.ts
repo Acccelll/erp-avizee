@@ -56,29 +56,34 @@ export function useSupabaseCrud<T extends Record<string, any>>({
 
   const fetchData = useCallback(async () => {
     setLoading(true);
-    let query = supabase.from(table as any).select(select).order(orderBy, { ascending });
+    try {
+      let query = supabase.from(table as any).select(select).order(orderBy, { ascending });
 
-    if (hasAtivo) {
-      query = query.eq("ativo", true);
+      if (hasAtivo) {
+        query = query.eq("ativo", true);
+      }
+
+      query = applyFilters(query);
+
+      if (pageSize) {
+        const from = page * pageSize;
+        query = query.range(from, from + pageSize - 1);
+      }
+
+      const { data: result, error } = await query;
+      if (error) {
+        console.error(`[crud] Erro ao carregar ${table}:`, error);
+        if (showToasts) toast.error("Erro ao carregar dados. Tente novamente.");
+      } else {
+        const rows = (result as unknown as T[]) || [];
+        setData(rows);
+        if (pageSize) setHasMore(rows.length === pageSize);
+      }
+    } catch (err) {
+      console.error(`[crud] Erro inesperado ao carregar ${table}:`, err);
+    } finally {
+      setLoading(false);
     }
-
-    query = applyFilters(query);
-
-    if (pageSize) {
-      const from = page * pageSize;
-      query = query.range(from, from + pageSize - 1);
-    }
-
-    const { data: result, error } = await query;
-    if (error) {
-      console.error(`[crud] Erro ao carregar ${table}:`, error);
-      if (showToasts) toast.error("Erro ao carregar dados. Tente novamente.");
-    } else {
-      const rows = (result as unknown as T[]) || [];
-      setData(rows);
-      if (pageSize) setHasMore(rows.length === pageSize);
-    }
-    setLoading(false);
   }, [table, select, orderBy, ascending, hasAtivo, applyFilters, pageSize, page, showToasts]);
 
   useEffect(() => {

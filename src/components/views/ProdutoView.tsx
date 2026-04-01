@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Tables } from "@/integrations/supabase/types";
-import { StatusBadge } from "@/components/DataTable";
+import { StatusBadge } from "@/components/StatusBadge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Package, RefreshCw, AlertTriangle, Archive, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
