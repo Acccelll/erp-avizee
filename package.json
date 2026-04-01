@@ -13,7 +13,8 @@
     "test:watch": "vitest",
     "seed:reset": "node scripts/dev-reset-seed.js --reset-only --confirm",
     "seed:data": "node scripts/dev-reset-seed.js --seed-only --confirm",
-    "dev:reset": "node scripts/dev-reset-seed.js --confirm"
+    "dev:reset": "node scripts/dev-reset-seed.js --confirm",
+    "validate:rls": "npx tsx scripts/validate-rls.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
