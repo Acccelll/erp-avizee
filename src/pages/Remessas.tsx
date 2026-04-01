@@ -39,12 +39,11 @@ interface CorreiosTrackingResponse {
   objetos?: Array<{ eventos?: CorreiosEvento[] }>;
 }
 
+import { statusRemessa } from "@/lib/statusSchema";
+
 const statusMap: Record<string, { label: string; color: string }> = {
-  pendente: { label: "Pendente", color: "Pendente" },
-  postado: { label: "Postado", color: "Enviado" },
-  em_transito: { label: "Em Trânsito", color: "Enviado" },
-  entregue: { label: "Entregue", color: "Ativo" },
-  devolvido: { label: "Devolvido", color: "Cancelado" },
+  ...statusRemessa,
+  postado: { label: "Postado", color: "info" },
 };
 
 interface RemessaForm {

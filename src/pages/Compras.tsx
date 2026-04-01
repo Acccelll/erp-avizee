@@ -43,10 +43,11 @@ const emptyForm: Record<string, any> = {
   observacoes: "", status: "rascunho",
 };
 
-const statusLabels: Record<string, string> = {
-  rascunho: "Cotação", confirmado: "Pedido Confirmado", parcial: "Recebimento Parcial",
-  entregue: "Entregue", cancelado: "Cancelado",
-};
+import { statusCompra } from "@/lib/statusSchema";
+
+const statusLabels: Record<string, string> = Object.fromEntries(
+  Object.entries(statusCompra).map(([k, v]) => [k, v.label])
+);
 
 const Compras = () => {
   const [drawerOpen, setDrawerOpen] = useState(false);
