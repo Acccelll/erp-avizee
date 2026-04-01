@@ -31,6 +31,28 @@ const sideNavItems: SideNavItem[] = [
   { key: 'seguranca', label: 'Segurança', icon: Lock },
 ];
 
+function hexToHslString(hex: string) {
+  const clean = hex.replace('#', '');
+  if (clean.length !== 6) return null;
+  const r = parseInt(clean.slice(0, 2), 16) / 255;
+  const g = parseInt(clean.slice(2, 4), 16) / 255;
+  const b = parseInt(clean.slice(4, 6), 16) / 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  const d = max - min;
+  const s = d === 0 ? 0 : d / (1 - Math.abs(2 * l - 1));
+  let h = 0;
+  if (d !== 0) {
+    if (max === r) h = ((g - b) / d) % 6;
+    else if (max === g) h = (b - r) / d + 2;
+    else h = (r - g) / d + 4;
+  }
+  h = Math.round(h * 60);
+  if (h < 0) h += 360;
+  return `${h} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`;
+}
+
 export default function Configuracoes() {
   const { user, profile } = useAuth();
   const { theme, setTheme } = useTheme();
@@ -44,11 +66,16 @@ export default function Configuracoes() {
   const [changingPassword, setChangingPassword] = useState(false);
 
   const [densidade, setDensidade] = useState('confortavel');
+  const [corPrimaria, setCorPrimaria] = useState('#6b0d0d');
+  const [corSecundaria, setCorSecundaria] = useState('#b85b2d');
   const {
     value: menuCompacto,
     save: saveMenuCompacto,
     loading: loadingMenuCompacto,
   } = useUserPreference<boolean>(user?.id, 'sidebar_collapsed', true);
+  const { value: densidadePref, save: saveDensidadePref } = useUserPreference<string>(user?.id, 'ui_density', 'confortavel');
+  const { value: fontScale, save: saveFontScale } = useUserPreference<number>(user?.id, 'ui_font_scale', 16);
+  const { value: reduceMotion, save: saveReduceMotion } = useUserPreference<boolean>(user?.id, 'ui_reduce_motion', false);
 
   const { value: cepEmpresa, loading: loadingCep, save: saveCepEmpresa } = useAppConfig<string>('cep_empresa', '');
   const [cepEmpresaLocal, setCepEmpresaLocal] = useState('');
@@ -58,6 +85,23 @@ export default function Configuracoes() {
   useEffect(() => {
     if (cepEmpresa) setCepEmpresaLocal(cepEmpresa);
   }, [cepEmpresa]);
+
+  useEffect(() => {
+    if (densidadePref) setDensidade(densidadePref);
+  }, [densidadePref]);
+
+  useEffect(() => {
+    supabase
+      .from('app_configuracoes')
+      .select('chave, valor')
+      .in('chave', ['theme_primary_color', 'theme_secondary_color'])
+      .then(({ data }) => {
+        const primary = data?.find((d) => d.chave === 'theme_primary_color')?.valor as string | undefined;
+        const secondary = data?.find((d) => d.chave === 'theme_secondary_color')?.valor as string | undefined;
+        if (primary) setCorPrimaria(primary);
+        if (secondary) setCorSecundaria(secondary);
+      });
+  }, []);
 
   const initials = (nome || user?.email || 'U').substring(0, 2).toUpperCase();
 
@@ -213,7 +257,11 @@ export default function Configuracoes() {
                 </div>
                 <div className="space-y-2">
                   <Label>Densidade</Label>
-                  <Select value={densidade} onValueChange={setDensidade}>
+                  <Select value={densidade} onValueChange={async (value) => {
+                    setDensidade(value);
+                    await saveDensidadePref(value);
+                    document.documentElement.dataset.density = value === 'compacta' ? 'compact' : 'comfortable';
+                  }}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="confortavel">Confortável</SelectItem>
@@ -221,6 +269,31 @@ export default function Configuracoes() {
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Cor primária corporativa</Label>
+                  <Input type="color" value={corPrimaria} onChange={(e) => setCorPrimaria(e.target.value)} className="h-10 p-1" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Cor secundária corporativa</Label>
+                  <Input type="color" value={corSecundaria} onChange={(e) => setCorSecundaria(e.target.value)} className="h-10 p-1" />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Tamanho base da fonte ({fontScale}px)</Label>
+                <Input
+                  type="range"
+                  min={16}
+                  max={22}
+                  step={1}
+                  value={fontScale}
+                  onChange={async (e) => {
+                    const value = Number(e.target.value);
+                    await saveFontScale(value);
+                    document.documentElement.style.setProperty('--base-font-size', `${value}px`);
+                  }}
+                />
               </div>
               <div className="flex items-center justify-between rounded-lg border p-4">
                 <div>
@@ -235,6 +308,41 @@ export default function Configuracoes() {
                     if (!ok) toast.error('Não foi possível salvar a preferência do menu.');
                   }}
                 />
+              </div>
+              <div className="flex items-center justify-between rounded-lg border p-4">
+                <div>
+                  <p className="font-medium">Reduzir animações</p>
+                  <p className="text-sm text-muted-foreground">Respeita usuários com sensibilidade a movimento.</p>
+                </div>
+                <Switch
+                  checked={reduceMotion}
+                  onCheckedChange={async (checked) => {
+                    await saveReduceMotion(checked);
+                    document.documentElement.classList.toggle('reduce-motion', checked);
+                  }}
+                />
+              </div>
+              <div className="flex justify-end">
+                <Button
+                  className="gap-2"
+                  onClick={async () => {
+                    await supabase.from('app_configuracoes').upsert(
+                      [
+                        { chave: 'theme_primary_color', valor: corPrimaria, updated_at: new Date().toISOString() },
+                        { chave: 'theme_secondary_color', valor: corSecundaria, updated_at: new Date().toISOString() },
+                      ] as any,
+                      { onConflict: 'chave' }
+                    );
+                    const primary = hexToHslString(corPrimaria);
+                    const secondary = hexToHslString(corSecundaria);
+                    if (primary) document.documentElement.style.setProperty('--primary', primary);
+                    if (secondary) document.documentElement.style.setProperty('--secondary', secondary);
+                    toast.success('Tema corporativo salvo com sucesso!');
+                  }}
+                >
+                  <Save className="h-4 w-4" />
+                  Salvar tema corporativo
+                </Button>
               </div>
             </CardContent>
           </Card>

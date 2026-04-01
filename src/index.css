@@ -7,6 +7,7 @@
 
 @layer base {
   :root {
+    --base-font-size: 16px;
     --background: 43 100% 96%;
     --foreground: 60 4% 8%;
 
@@ -98,6 +99,7 @@
     @apply bg-background text-foreground font-sans antialiased;
     font-family: 'Inter', system-ui, sans-serif;
     line-height: 1.6;
+    font-size: var(--base-font-size);
   }
 
   h1, h2, h3, h4, h5, h6 {
@@ -123,6 +125,36 @@
 
   ::-webkit-scrollbar-thumb:hover {
     background: hsl(var(--primary));
+  }
+}
+
+:root[data-density='compact'] .stat-card {
+  padding: 0.75rem;
+}
+
+:root[data-density='compact'] .sidebar-item {
+  padding-top: 0.4rem;
+  padding-bottom: 0.4rem;
+  font-size: 0.82rem;
+}
+
+:root[data-density='compact'] .page-title {
+  font-size: 1.25rem;
+}
+
+.reduce-motion * {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
   }
 }
 
