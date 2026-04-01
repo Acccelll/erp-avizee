@@ -73,7 +73,6 @@ const Clientes = () => {
   const [form, setForm] = useState(emptyCliente);
   const [saving, setSaving] = useState(false);
   const [grupos, setGrupos] = useState<GrupoEconomico[]>([]);
-  const [searchTerm, setSearchTerm] = useState("");
   const [tipoFilters, setTipoFilters] = useState<string[]>([]);
   const [grupoFilters, setGrupoFilters] = useState<string[]>([]);
 
