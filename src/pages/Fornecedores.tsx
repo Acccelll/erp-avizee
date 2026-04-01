@@ -19,6 +19,7 @@ import { MultiSelect, type MultiSelectOption } from "@/components/ui/MultiSelect
 import { MaskedInput } from "@/components/ui/MaskedInput";
 import { toast } from "sonner";
 import { Search } from "lucide-react";
+import { clienteFornecedorSchema, validateForm } from "@/lib/validationSchemas";
 
 interface Fornecedor {
   id: string;tipo_pessoa: string;nome_razao_social: string;nome_fantasia: string;
