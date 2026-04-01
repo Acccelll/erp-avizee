@@ -155,6 +155,13 @@ export type Database = {
             referencedRelation: "contas_bancarias"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "fk_caixa_conta_bancaria"
+            columns: ["conta_bancaria_id"]
+            isOneToOne: false
+            referencedRelation: "contas_bancarias"
+            referencedColumns: ["id"]
+          },
         ]
       }
       cliente_registros_comunicacao: {
@@ -191,6 +198,13 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "cliente_registros_comunicacao_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_cliente_comunicacao_cliente"
             columns: ["cliente_id"]
             isOneToOne: false
             referencedRelation: "clientes"
@@ -245,6 +259,13 @@ export type Database = {
             columns: ["transportadora_id"]
             isOneToOne: false
             referencedRelation: "transportadoras"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_cliente_transp_cliente"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
             referencedColumns: ["id"]
           },
         ]
@@ -354,6 +375,13 @@ export type Database = {
             referencedRelation: "grupos_economicos"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "fk_clientes_grupo_economico"
+            columns: ["grupo_economico_id"]
+            isOneToOne: false
+            referencedRelation: "grupos_economicos"
+            referencedColumns: ["id"]
+          },
         ]
       }
       compras: {
@@ -422,6 +450,13 @@ export type Database = {
             referencedRelation: "fornecedores"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "fk_compras_fornecedor"
+            columns: ["fornecedor_id"]
+            isOneToOne: false
+            referencedRelation: "fornecedores"
+            referencedColumns: ["id"]
+          },
         ]
       }
       compras_itens: {
@@ -462,6 +497,20 @@ export type Database = {
           },
           {
             foreignKeyName: "compras_itens_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_compras_itens_compra"
+            columns: ["compra_id"]
+            isOneToOne: false
+            referencedRelation: "compras"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_compras_itens_produto"
             columns: ["produto_id"]
             isOneToOne: false
             referencedRelation: "produtos"
@@ -514,6 +563,13 @@ export type Database = {
             referencedRelation: "bancos"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "fk_contas_bancarias_banco"
+            columns: ["banco_id"]
+            isOneToOne: false
+            referencedRelation: "bancos"
+            referencedColumns: ["id"]
+          },
         ]
       }
       contas_contabeis: {
@@ -553,6 +609,13 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "contas_contabeis_conta_pai_id_fkey"
+            columns: ["conta_pai_id"]
+            isOneToOne: false
+            referencedRelation: "contas_contabeis"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_contas_contabeis_pai"
             columns: ["conta_pai_id"]
             isOneToOne: false
             referencedRelation: "contas_contabeis"
@@ -639,6 +702,20 @@ export type Database = {
             referencedRelation: "produtos"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "fk_cotacoes_itens_cotacao"
+            columns: ["cotacao_compra_id"]
+            isOneToOne: false
+            referencedRelation: "cotacoes_compra"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_cotacoes_itens_produto"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
         ]
       }
       cotacoes_compra_propostas: {
@@ -692,6 +769,27 @@ export type Database = {
           },
           {
             foreignKeyName: "cotacoes_compra_propostas_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "cotacoes_compra_itens"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_propostas_cotacao"
+            columns: ["cotacao_compra_id"]
+            isOneToOne: false
+            referencedRelation: "cotacoes_compra"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_propostas_fornecedor"
+            columns: ["fornecedor_id"]
+            isOneToOne: false
+            referencedRelation: "fornecedores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_propostas_item"
             columns: ["item_id"]
             isOneToOne: false
             referencedRelation: "cotacoes_compra_itens"
@@ -888,6 +986,13 @@ export type Database = {
             referencedRelation: "produtos"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "fk_estoque_mov_produto"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
         ]
       }
       financeiro_baixas: {
@@ -946,6 +1051,20 @@ export type Database = {
           },
           {
             foreignKeyName: "financeiro_baixas_lancamento_id_fkey"
+            columns: ["lancamento_id"]
+            isOneToOne: false
+            referencedRelation: "financeiro_lancamentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_baixas_conta_bancaria"
+            columns: ["conta_bancaria_id"]
+            isOneToOne: false
+            referencedRelation: "contas_bancarias"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_baixas_lancamento"
             columns: ["lancamento_id"]
             isOneToOne: false
             referencedRelation: "financeiro_lancamentos"
@@ -1091,6 +1210,55 @@ export type Database = {
             referencedRelation: "notas_fiscais"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "fk_fin_lanc_cliente"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_fin_lanc_conta_bancaria"
+            columns: ["conta_bancaria_id"]
+            isOneToOne: false
+            referencedRelation: "contas_bancarias"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_fin_lanc_conta_contabil"
+            columns: ["conta_contabil_id"]
+            isOneToOne: false
+            referencedRelation: "contas_contabeis"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_fin_lanc_documento_fiscal"
+            columns: ["documento_fiscal_id"]
+            isOneToOne: false
+            referencedRelation: "notas_fiscais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_fin_lanc_documento_pai"
+            columns: ["documento_pai_id"]
+            isOneToOne: false
+            referencedRelation: "financeiro_lancamentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_fin_lanc_fornecedor"
+            columns: ["fornecedor_id"]
+            isOneToOne: false
+            referencedRelation: "fornecedores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_fin_lanc_nota_fiscal"
+            columns: ["nota_fiscal_id"]
+            isOneToOne: false
+            referencedRelation: "notas_fiscais"
+            referencedColumns: ["id"]
+          },
         ]
       }
       folha_pagamento: {
@@ -1137,6 +1305,13 @@ export type Database = {
           valor_liquido?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "fk_folha_funcionario"
+            columns: ["funcionario_id"]
+            isOneToOne: false
+            referencedRelation: "funcionarios"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "folha_pagamento_funcionario_id_fkey"
             columns: ["funcionario_id"]
@@ -1344,6 +1519,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "fk_grupos_eco_empresa_matriz"
+            columns: ["empresa_matriz_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "grupos_economicos_empresa_matriz_id_fkey"
             columns: ["empresa_matriz_id"]
             isOneToOne: false
@@ -1382,6 +1564,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "fk_grupos_produto_conta_contabil"
+            columns: ["conta_contabil_id"]
+            isOneToOne: false
+            referencedRelation: "contas_contabeis"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "grupos_produto_conta_contabil_id_fkey"
             columns: ["conta_contabil_id"]
             isOneToOne: false
@@ -1419,6 +1608,13 @@ export type Database = {
           payload?: Json | null
         }
         Relationships: [
+          {
+            foreignKeyName: "fk_importacao_logs_lote"
+            columns: ["lote_importacao_id"]
+            isOneToOne: false
+            referencedRelation: "importacao_lotes"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "importacao_logs_lote_importacao_id_fkey"
             columns: ["lote_importacao_id"]
@@ -1584,6 +1780,34 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "fk_nf_cliente"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_nf_conta_contabil"
+            columns: ["conta_contabil_id"]
+            isOneToOne: false
+            referencedRelation: "contas_contabeis"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_nf_fornecedor"
+            columns: ["fornecedor_id"]
+            isOneToOne: false
+            referencedRelation: "fornecedores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_nf_referenciada"
+            columns: ["nf_referenciada_id"]
+            isOneToOne: false
+            referencedRelation: "notas_fiscais"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "notas_fiscais_cliente_id_fkey"
             columns: ["cliente_id"]
             isOneToOne: false
@@ -1667,6 +1891,27 @@ export type Database = {
           valor_unitario?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "fk_nf_itens_conta_contabil"
+            columns: ["conta_contabil_id"]
+            isOneToOne: false
+            referencedRelation: "contas_contabeis"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_nf_itens_nota"
+            columns: ["nota_fiscal_id"]
+            isOneToOne: false
+            referencedRelation: "notas_fiscais"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_nf_itens_produto"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "notas_fiscais_itens_conta_contabil_id_fkey"
             columns: ["conta_contabil_id"]
@@ -1780,6 +2025,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "fk_orcamentos_cliente"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "orcamentos_cliente_id_fkey"
             columns: ["cliente_id"]
             isOneToOne: false
@@ -1835,6 +2087,20 @@ export type Database = {
           variacao?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "fk_orc_itens_orcamento"
+            columns: ["orcamento_id"]
+            isOneToOne: false
+            referencedRelation: "orcamentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_orc_itens_produto"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "orcamentos_itens_orcamento_id_fkey"
             columns: ["orcamento_id"]
