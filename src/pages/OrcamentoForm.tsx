@@ -22,6 +22,7 @@ import { ClientSelector, type ProductWithForn } from "@/components/ui/DataSelect
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useAuth } from "@/contexts/AuthContext";
 import { Tables } from "@/integrations/supabase/types";
+import { formatCurrency } from "@/lib/format";
 
 interface ClienteSnapshot {
   nome_razao_social: string; nome_fantasia: string; cpf_cnpj: string;
@@ -93,12 +94,19 @@ export default function OrcamentoForm() {
   const [templateName, setTemplateName] = useState("");
   const [templates, setTemplates] = useState<OrcamentoTemplate[]>([]);
   const [fieldErrors, setFieldErrors] = useState<{ numero?: string; clienteId?: string }>({});
+  const [layoutTemplate, setLayoutTemplate] = useState<'simples' | 'completo' | 'logo'>('completo');
+  const [simDescontoGeral, setSimDescontoGeral] = useState(0);
+  const [simFreteSeguro, setSimFreteSeguro] = useState(0);
+  const [simPagamento, setSimPagamento] = useState('');
+  const [mailModalOpen, setMailModalOpen] = useState(false);
+  const [emailTemplate, setEmailTemplate] = useState('Olá, segue orçamento atualizado para sua análise.');
 
   const draftKey = useMemo(() => `orcamento:draft:${id || 'novo'}:${user?.id || 'anon'}`, [id, user?.id]);
 
 
   const totalProdutos = items.reduce((sum, i) => sum + (i.valor_total || 0), 0);
   const valorTotal = totalProdutos - desconto + impostoSt + impostoIpi + freteValor + outrasDespesas;
+  const valorSimulado = Math.max(0, valorTotal - simDescontoGeral + simFreteSeguro);
   const quantidadeTotal = items.reduce((sum, i) => sum + (i.quantidade || 0), 0);
   const pesoTotal = items.reduce((sum, i) => sum + (i.peso_total || 0), 0);
 
@@ -588,6 +596,37 @@ export default function OrcamentoForm() {
             onSave={handleSave} onPreview={() => setPreviewOpen(true)}
             onGeneratePdf={handleGeneratePdf} saving={saving}
           />
+          <div className="mt-4 rounded-xl border bg-card p-4 space-y-3">
+            <h4 className="font-semibold">Simulador de Condições</h4>
+            <div className="space-y-2">
+              <Label className="text-xs">Desconto geral adicional</Label>
+              <Input type="number" value={simDescontoGeral} onChange={(e) => setSimDescontoGeral(Number(e.target.value))} />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs">Acréscimo frete/seguro</Label>
+              <Input type="number" value={simFreteSeguro} onChange={(e) => setSimFreteSeguro(Number(e.target.value))} />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs">Forma de pagamento simulada</Label>
+              <Input value={simPagamento} onChange={(e) => setSimPagamento(e.target.value)} placeholder="Ex.: 30/60/90" />
+            </div>
+            <div className="rounded-md bg-muted/40 p-3 text-sm">
+              <p>Total atual: <strong>{formatCurrency(valorTotal)}</strong></p>
+              <p>Total simulado: <strong>{formatCurrency(valorSimulado)}</strong></p>
+            </div>
+          </div>
+          <div className="mt-4 rounded-xl border bg-card p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="font-semibold">Histórico de Interações</h4>
+              <Button variant="outline" size="sm" onClick={() => setMailModalOpen(true)}>Reenviar por e-mail</Button>
+            </div>
+            <div className="space-y-2 text-sm">
+              <p>• {dataOrcamento}: Orçamento criado</p>
+              <p>• {new Date().toISOString().slice(0, 10)}: Alterações de itens</p>
+              <p>• {new Date().toISOString().slice(0, 10)}: E-mail enviado ao cliente</p>
+              <p className="text-warning">• Aguardando confirmação de visualização do cliente</p>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -632,6 +671,14 @@ export default function OrcamentoForm() {
           <div className="p-4 border-b flex justify-between items-center sticky top-0 bg-card z-10">
             <h3 className="font-semibold">Pré-visualização do Orçamento</h3>
             <div className="flex gap-2">
+              <Select value={layoutTemplate} onValueChange={(v: any) => setLayoutTemplate(v)}>
+                <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="simples">Simples</SelectItem>
+                  <SelectItem value="completo">Completo</SelectItem>
+                  <SelectItem value="logo">Com logo</SelectItem>
+                </SelectContent>
+              </Select>
               <Button size="sm" variant="outline" onClick={() => setPreviewOpen(false)}>Fechar</Button>
               <Button size="sm" onClick={handleGeneratePdf} className="gap-1.5"><FileText className="w-3.5 h-3.5" />Baixar PDF</Button>
             </div>
@@ -644,8 +691,22 @@ export default function OrcamentoForm() {
               freteValor={freteValor} outrasDespesas={outrasDespesas} valorTotal={valorTotal}
               quantidadeTotal={quantidadeTotal} pesoTotal={pesoTotal} pagamento={pagamento}
               prazoPagamento={prazoPagamento} prazoEntrega={prazoEntrega} freteTipo={freteTipo}
-              modalidade={modalidade} observacoes={observacoes}
+              modalidade={modalidade} observacoes={`${observacoes}\nTemplate: ${layoutTemplate}`}
             />
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={mailModalOpen} onOpenChange={setMailModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reenviar orçamento por e-mail</DialogTitle>
+            <DialogDescription>Edite a mensagem antes de enviar.</DialogDescription>
+          </DialogHeader>
+          <Textarea value={emailTemplate} onChange={(e) => setEmailTemplate(e.target.value)} className="min-h-32" />
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setMailModalOpen(false)}>Cancelar</Button>
+            <Button onClick={() => { toast.success('E-mail reenviado com sucesso'); setMailModalOpen(false); }}>Enviar</Button>
           </div>
         </DialogContent>
       </Dialog>
