@@ -164,7 +164,7 @@ export function useImportacaoXml() {
       const vendorMap = new Map(vendors?.map(v => [v.cpf_cnpj.replace(/\D/g, ""), v.id]));
 
       for (const item of validItems) {
-        const nfe = item.payload as NFeData;
+        const nfe = item.payload as unknown as NFeData;
         const cnpjEmit = nfe.emitente.cnpj.replace(/\D/g, "");
         let fornecedorId = vendorMap.get(cnpjEmit);
 
