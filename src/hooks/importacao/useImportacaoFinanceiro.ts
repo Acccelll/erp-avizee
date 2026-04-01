@@ -218,7 +218,7 @@ export function useImportacaoFinanceiro() {
       });
 
       if (dataToInsert.length > 0) {
-        const { error: insError } = await supabase.from("financeiro_lancamentos").insert(dataToInsert);
+        const { error: insError } = await supabase.from("financeiro_lancamentos").insert(dataToInsert as any);
         if (insError) throw insError;
       }
 
