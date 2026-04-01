@@ -175,7 +175,7 @@ export function useImportacaoXml() {
             nivel: "error",
             etapa: "carga_final",
             mensagem: `Fornecedor não cadastrado (CNPJ: ${cnpjEmit}) para a nota ${nfe.numero}`,
-            payload: { chave: nfe.chaveAcesso }
+            payload: { chave: nfe.chaveAcesso } as any
           });
           continue;
         }

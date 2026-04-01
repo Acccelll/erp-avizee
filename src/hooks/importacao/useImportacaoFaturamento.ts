@@ -232,7 +232,7 @@ export function useImportacaoFaturamento() {
             nivel: "error",
             etapa: "carga_final",
             mensagem: `Erro ao criar NF ${nf.numero}: ${nfError.message}`
-          });
+          } as any);
           continue;
         }
 
