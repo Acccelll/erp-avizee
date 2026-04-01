@@ -28,7 +28,7 @@ const Caixa = lazy(() => import("./pages/Caixa"));
 const ContasBancarias = lazy(() => import("./pages/ContasBancarias"));
 const FluxoCaixa = lazy(() => import("./pages/FluxoCaixa"));
 const ContasContabeis = lazy(() => import("./pages/ContasContabeis"));
-import Login from "./pages/Login";
+const Login = lazy(() => import("./pages/Login"));
 const Pedidos = lazy(() => import("./pages/Pedidos"));
 const Relatorios = lazy(() => import("./pages/Relatorios"));
 const Configuracoes = lazy(() => import("./pages/Configuracoes"));
@@ -36,9 +36,9 @@ const Administracao = lazy(() => import("./pages/Administracao"));
 const MigracaoDados = lazy(() => import("./pages/MigracaoDados"));
 const Auditoria = lazy(() => import("./pages/Auditoria"));
 const Perfil = lazy(() => import("./pages/Perfil"));
-import Signup from "./pages/Signup";
-import ForgotPassword from "./pages/ForgotPassword";
-import ResetPassword from "./pages/ResetPassword";
+const Signup = lazy(() => import("./pages/Signup"));
+const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const Transportadoras = lazy(() => import("./pages/Transportadoras"));
 const FormasPagamento = lazy(() => import("./pages/FormasPagamento"));
@@ -91,10 +91,10 @@ const App = () => (
           <ErrorBoundary>
           <Routes>
             <Route path="/orcamento-publico" element={<LazyPage><OrcamentoPublico /></LazyPage>} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/signup" element={<Signup />} />
-            <Route path="/forgot-password" element={<ForgotPassword />} />
-            <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/login" element={<LazyPage><Login /></LazyPage>} />
+            <Route path="/signup" element={<LazyPage><Signup /></LazyPage>} />
+            <Route path="/forgot-password" element={<LazyPage><ForgotPassword /></LazyPage>} />
+            <Route path="/reset-password" element={<LazyPage><ResetPassword /></LazyPage>} />
             <Route path="/" element={<ProtectedRoute><LazyPage><Index /></LazyPage></ProtectedRoute>} />
             <Route path="/produtos" element={<ProtectedRoute><LazyPage><Produtos /></LazyPage></ProtectedRoute>} />
             <Route path="/clientes" element={<ProtectedRoute><LazyPage><Clientes /></LazyPage></ProtectedRoute>} />
