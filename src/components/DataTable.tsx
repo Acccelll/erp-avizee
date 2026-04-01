@@ -229,55 +229,106 @@ export function DataTable<T extends Record<string, any>>({
     });
   };
 
+  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+  const escapeCSV = (value: string): string => {
+    if (value.includes(';') || value.includes('"') || value.includes('\n')) {
+      return `"${value.replace(/"/g, '""')}"`;
+    }
+    return value;
+  };
+
+  const buildExportRowsChunked = async (
+    toastId: string | number,
+    format: 'csv' | 'xlsx' | 'pdf',
+    chunkSize = 1000,
+  ) => {
+    const chunks: Array<Record<string, unknown>[]> = [];
+    const startedAt = Date.now();
+
+    for (let i = 0; i < sortedData.length; i += chunkSize) {
+      const chunk = sortedData.slice(i, i + chunkSize).map((row) => Object.fromEntries(visibleColumns.map((col) => [col.label, row[col.key]])));
+      chunks.push(chunk);
+
+      const processed = Math.min(i + chunk.length, sortedData.length);
+      const progress = Math.round((processed / sortedData.length) * 100);
+      const elapsed = Date.now() - startedAt;
+      const shouldShowEta = sortedData.length > 10000 && processed > 0;
+      const etaMs = shouldShowEta ? Math.max(0, Math.round((elapsed / processed) * (sortedData.length - processed))) : 0;
+      const etaSec = Math.ceil(etaMs / 1000);
+      const etaText = shouldShowEta ? ` · ETA ~${etaSec}s` : '';
+
+      toast.loading(`Exportando ${format.toUpperCase()}... ${progress}%${etaText}`, { id: toastId });
+      await sleep(0);
+    }
+
+    return chunks.flat();
+  };
+
+  const downloadBlob = (blob: Blob, fileName: string) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const exportData = async (format: 'csv' | 'xlsx' | 'pdf') => {
-    if (sortedData.length > 2000) {
-      const id = toast.loading('Preparando exportação... 0%');
-      let progress = 0;
-      const timer = setInterval(() => {
-        progress += 20;
-        if (progress >= 100) {
-          clearInterval(timer);
-          toast.success(`Exportação ${format.toUpperCase()} concluída`, { id });
-        } else {
-          toast.loading(`Preparando exportação... ${progress}%`, { id });
+    const toastId = toast.loading(`Iniciando exportação ${format.toUpperCase()}... 0%`);
+
+    try {
+      const rows = await buildExportRowsChunked(toastId, format, 1000);
+
+      if (format === 'csv') {
+        const header = visibleColumns.map((c) => escapeCSV(c.label)).join(';');
+        const body = rows.map((r) => visibleColumns.map((c) => escapeCSV(String(r[c.label] ?? ''))).join(';')).join('\n');
+        const blob = new Blob([`${header}\n${body}`], { type: 'text/csv;charset=utf-8;' });
+        downloadBlob(blob, `${moduleKey || 'dados'}.csv`);
+        toast.success('Exportação CSV concluída', { id: toastId });
+        return;
+      }
+
+      if (format === 'xlsx') {
+        const ws = XLSX.utils.json_to_sheet(rows);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Dados');
+        XLSX.writeFile(wb, `${moduleKey || 'dados'}.xlsx`);
+        toast.success('Exportação XLSX concluída', { id: toastId });
+        return;
+      }
+
+      const pdf = new jsPDF();
+      const rowsPerPage = 50;
+      let y = 12;
+      let page = 1;
+      pdf.text(`Exportação ${moduleKey || 'dados'} - Página ${page}`, 14, y);
+      y += 8;
+      rows.forEach((row, idx) => {
+        if (idx > 0 && idx % rowsPerPage === 0) {
+          pdf.addPage();
+          page += 1;
+          y = 12;
+          pdf.text(`Exportação ${moduleKey || 'dados'} - Página ${page}`, 14, y);
+          y += 8;
         }
-      }, 400);
-      return;
+        const line = visibleColumns.map((c) => `${c.label}: ${String(row[c.label] ?? '')}`).join(' | ');
+        pdf.text(line.slice(0, 180), 10, y);
+        y += 5;
+      });
+      pdf.save(`${moduleKey || 'dados'}.pdf`);
+      toast.success('Exportação PDF concluída', { id: toastId });
+    } catch (error) {
+      console.error('Erro ao exportar dados', error);
+      toast.error(`Falha ao exportar ${format.toUpperCase()}.`, {
+        id: toastId,
+        action: {
+          label: 'Tentar novamente',
+          onClick: () => {
+            void exportData(format);
+          },
+        },
+      });
     }
-
-    const rows = sortedData.map((row) => Object.fromEntries(visibleColumns.map((col) => [col.label, row[col.key]])));
-
-    if (format === 'csv') {
-      const header = visibleColumns.map((c) => c.label).join(';');
-      const body = rows.map((r) => visibleColumns.map((c) => String(r[c.label] ?? '')).join(';')).join('\n');
-      const blob = new Blob([`${header}\n${body}`], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${moduleKey || 'dados'}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
-      return;
-    }
-
-    if (format === 'xlsx') {
-      const ws = XLSX.utils.json_to_sheet(rows);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Dados');
-      XLSX.writeFile(wb, `${moduleKey || 'dados'}.xlsx`);
-      return;
-    }
-
-    const pdf = new jsPDF();
-    let y = 12;
-    pdf.text(`Exportação ${moduleKey || 'dados'}`, 14, y);
-    y += 8;
-    rows.slice(0, 40).forEach((row) => {
-      const line = visibleColumns.map((c) => `${c.label}: ${String(row[c.label] ?? '')}`).join(' | ');
-      pdf.text(line.slice(0, 180), 10, y);
-      y += 6;
-    });
-    pdf.save(`${moduleKey || 'dados'}.pdf`);
   };
 
   const renderActions = (item: T) => (

@@ -1,5 +1,12 @@
 import { createContext, ReactNode, useContext, useMemo, useState } from "react";
 
+const formatLocalDate = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
 export type DashboardPeriod = "today" | "week" | "month" | "30d" | "custom";
 
 interface DashboardPeriodContextValue {
@@ -16,12 +23,12 @@ const DashboardPeriodContext = createContext<DashboardPeriodContextValue | undef
 
 export function DashboardPeriodProvider({ children }: { children: ReactNode }) {
   const [period, setPeriod] = useState<DashboardPeriod>("30d");
-  const [customStart, setCustomStart] = useState<string>(new Date().toISOString().slice(0, 10));
-  const [customEnd, setCustomEnd] = useState<string>(new Date().toISOString().slice(0, 10));
+  const [customStart, setCustomStart] = useState<string>(formatLocalDate(new Date()));
+  const [customEnd, setCustomEnd] = useState<string>(formatLocalDate(new Date()));
 
   const range = useMemo(() => {
     const now = new Date();
-    const toIso = (d: Date) => d.toISOString().slice(0, 10);
+    const toIso = (d: Date) => formatLocalDate(d);
 
     if (period === "today") {
       const today = toIso(now);

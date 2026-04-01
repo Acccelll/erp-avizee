@@ -80,13 +80,13 @@ export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
 
     const term = search.trim();
     Promise.all([
-      supabase.from('clientes').select('id, nome_razao_social, documento').eq('ativo', true).ilike('nome_razao_social', `%${term}%`).limit(4),
+      supabase.from('clientes').select('id, nome_razao_social, cpf_cnpj').eq('ativo', true).ilike('nome_razao_social', `%${term}%`).limit(4),
       supabase.from('produtos').select('id, nome, codigo_interno').eq('ativo', true).ilike('nome', `%${term}%`).limit(4),
       supabase.from('orcamentos').select('id, numero, status').eq('ativo', true).ilike('numero', `%${term}%`).limit(4),
       supabase.from('notas_fiscais').select('id, numero, status, tipo').eq('ativo', true).ilike('numero', `%${term}%`).limit(4),
     ]).then(([clientes, produtos, orcamentos, notas]) => {
       const merged: EntityResult[] = [
-        ...(clientes.data || []).map((c: any) => ({ id: `cli-${c.id}`, title: c.nome_razao_social, subtitle: c.documento || 'Cliente', path: '/clientes', category: 'Clientes' as const })),
+        ...(clientes.data || []).map((c: any) => ({ id: `cli-${c.id}`, title: c.nome_razao_social, subtitle: c.cpf_cnpj || 'Cliente', path: '/clientes', category: 'Clientes' as const })),
         ...(produtos.data || []).map((p: any) => ({ id: `pro-${p.id}`, title: p.nome, subtitle: p.codigo_interno || 'Produto', path: '/produtos', category: 'Produtos' as const })),
         ...(orcamentos.data || []).map((o: any) => ({ id: `orc-${o.id}`, title: `Orçamento #${o.numero}`, subtitle: o.status || 'Orçamento', path: `/orcamentos/${o.id}`, category: 'Orçamentos' as const })),
         ...(notas.data || []).map((n: any) => ({ id: `nf-${n.id}`, title: `NF #${n.numero}`, subtitle: `${n.tipo || 'nota'} · ${n.status || ''}`, path: '/fiscal', category: 'Notas' as const })),
