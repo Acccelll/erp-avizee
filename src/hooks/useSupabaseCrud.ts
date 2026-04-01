@@ -1,10 +1,13 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
+type Primitive = string | number | boolean;
+
 interface CrudFilter {
   column: string;
-  value: string | number | boolean;
+  value: Primitive | Primitive[];
   operator?: "eq" | "neq" | "gt" | "gte" | "lt" | "lte" | "like" | "ilike" | "in";
 }
 
@@ -21,7 +24,57 @@ interface UseCrudOptions {
   searchColumns?: string[];
 }
 
-export function useSupabaseCrud<T extends Record<string, any>>({
+type QueryBuilder = {
+  eq: (column: string, value: Primitive) => QueryBuilder;
+  neq: (column: string, value: Primitive) => QueryBuilder;
+  gt: (column: string, value: Primitive) => QueryBuilder;
+  gte: (column: string, value: Primitive) => QueryBuilder;
+  lt: (column: string, value: Primitive) => QueryBuilder;
+  lte: (column: string, value: Primitive) => QueryBuilder;
+  like: (column: string, value: Primitive) => QueryBuilder;
+  ilike: (column: string, value: Primitive) => QueryBuilder;
+  in: (column: string, value: Primitive[]) => QueryBuilder;
+  or: (filters: string) => QueryBuilder;
+  range: (from: number, to: number) => QueryBuilder;
+};
+
+const applyFilters = (query: QueryBuilder, filters: CrudFilter[]) => {
+  let nextQuery = query;
+  for (const f of filters) {
+    const op = f.operator || "eq";
+    switch (op) {
+      case "neq":
+        nextQuery = nextQuery.neq(f.column, f.value as Primitive);
+        break;
+      case "gt":
+        nextQuery = nextQuery.gt(f.column, f.value as Primitive);
+        break;
+      case "gte":
+        nextQuery = nextQuery.gte(f.column, f.value as Primitive);
+        break;
+      case "lt":
+        nextQuery = nextQuery.lt(f.column, f.value as Primitive);
+        break;
+      case "lte":
+        nextQuery = nextQuery.lte(f.column, f.value as Primitive);
+        break;
+      case "like":
+        nextQuery = nextQuery.like(f.column, f.value as Primitive);
+        break;
+      case "ilike":
+        nextQuery = nextQuery.ilike(f.column, f.value as Primitive);
+        break;
+      case "in":
+        nextQuery = nextQuery.in(f.column, Array.isArray(f.value) ? f.value : [f.value]);
+        break;
+      default:
+        nextQuery = nextQuery.eq(f.column, f.value as Primitive);
+    }
+  }
+  return nextQuery;
+};
+
+export function useSupabaseCrud<T extends Record<string, unknown>>({
   table,
   select = "*",
   orderBy = "created_at",
@@ -33,135 +86,139 @@ export function useSupabaseCrud<T extends Record<string, any>>({
   searchTerm = "",
   searchColumns = [],
 }: UseCrudOptions) {
-  const [data, setData] = useState<T[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [page, setPage] = useState(0);
-  const [hasMore, setHasMore] = useState(true);
-  const [totalCount, setTotalCount] = useState<number | null>(null);
-  const [truncated, setTruncated] = useState(false);
-  const filterRef = useRef(filter);
-  filterRef.current = filter;
-  const searchColumnsRef = useRef(searchColumns);
-  searchColumnsRef.current = searchColumns;
 
-  const applyFilters = useCallback((query: any) => {
-    for (const f of filterRef.current) {
-      const op = f.operator || "eq";
-      switch (op) {
-        case "neq": query = query.neq(f.column, f.value); break;
-        case "gt": query = query.gt(f.column, f.value); break;
-        case "gte": query = query.gte(f.column, f.value); break;
-        case "lt": query = query.lt(f.column, f.value); break;
-        case "lte": query = query.lte(f.column, f.value); break;
-        case "like": query = query.like(f.column, f.value); break;
-        case "ilike": query = query.ilike(f.column, f.value); break;
-        case "in": query = query.in(f.column, Array.isArray(f.value) ? f.value : [f.value]); break;
-        default: query = query.eq(f.column, f.value);
+  const queryKey = useMemo(
+    () => [table, select, orderBy, ascending, filter, searchTerm, page],
+    [table, select, orderBy, ascending, filter, searchTerm, page],
+  );
+
+  const queryResult = useQuery({
+    queryKey,
+    queryFn: async () => {
+      if (!supabase) {
+        return { rows: [] as T[], totalCount: null as number | null, hasMore: false, truncated: false };
       }
-    }
-    return query;
-  }, []);
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    try {
-      let query = supabase.from(table as any).select(select, { count: 'exact' }).order(orderBy, { ascending });
+      let query = supabase.from(table).select(select, { count: "exact" }).order(orderBy, { ascending }) as unknown as QueryBuilder & PromiseLike<{ data: T[] | null; error: Error | null; count: number | null }>;
 
       if (hasAtivo) {
-        query = query.eq("ativo", true);
+        query = query.eq("ativo", true) as typeof query;
       }
 
-      query = applyFilters(query);
+      query = applyFilters(query, filter) as typeof query;
 
-      // Server-side text search using OR ilike across specified columns
       const trimmedSearch = searchTerm.trim();
-      if (trimmedSearch && searchColumnsRef.current.length > 0) {
-        const orFilter = searchColumnsRef.current
-          .map(col => `${col}.ilike.%${trimmedSearch}%`)
-          .join(",");
-        query = query.or(orFilter);
+      if (trimmedSearch && searchColumns.length > 0) {
+        const orFilter = searchColumns.map((col) => `${col}.ilike.%${trimmedSearch}%`).join(",");
+        query = query.or(orFilter) as typeof query;
       }
 
       if (pageSize) {
         const from = page * pageSize;
-        query = query.range(from, from + pageSize - 1);
+        query = query.range(from, from + pageSize - 1) as typeof query;
       }
 
       const { data: result, error, count } = await query;
+
       if (error) {
-        console.error(`[crud] Erro ao carregar ${table}:`, error);
         if (showToasts) toast.error("Erro ao carregar dados. Tente novamente.");
-      } else {
-        const rows = (result as unknown as T[]) || [];
-        setData(rows);
-        setTotalCount(count);
-        const isTruncated = count !== null && rows.length < count && !pageSize;
-        setTruncated(isTruncated);
-        if (isTruncated) {
-          console.warn(`[crud] Tabela ${table}: exibindo ${rows.length} de ${count} registros (limite Supabase). Considere usar paginação.`);
-        }
-        if (pageSize) setHasMore(rows.length === pageSize);
+        throw error;
       }
-    } catch (err) {
-      console.error(`[crud] Erro inesperado ao carregar ${table}:`, err);
-    } finally {
-      setLoading(false);
-    }
-  }, [table, select, orderBy, ascending, hasAtivo, applyFilters, pageSize, page, showToasts, searchTerm]);
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+      const rows = result ?? [];
+      const truncated = count !== null && rows.length < count && !pageSize;
+      const hasMore = pageSize ? rows.length === pageSize : false;
 
-  const create = async (record: Partial<T>) => {
-    const { data: result, error } = await supabase.from(table as any).insert(record as any).select().single();
-    if (error) {
-      console.error(`[crud] Erro ao criar em ${table}:`, error);
+      return { rows, totalCount: count, hasMore, truncated };
+    },
+  });
+
+  const invalidateTable = () => queryClient.invalidateQueries({ queryKey: [table] });
+
+  const createMutation = useMutation({
+    mutationFn: async (record: Partial<T>) => {
+      if (!supabase) throw new Error("Supabase não configurado");
+      const { data: result, error } = await supabase.from(table).insert(record).select().single();
+      if (error) throw error;
+      return result as T;
+    },
+    onSuccess: () => {
+      if (showToasts) toast.success("Registro criado com sucesso!");
+      invalidateTable();
+    },
+    onError: () => {
       if (showToasts) toast.error("Erro ao criar registro. Tente novamente.");
-      throw error;
-    }
-    if (showToasts) toast.success("Registro criado com sucesso!");
-    fetchData();
-    return result;
-  };
+    },
+  });
 
-  const update = async (id: string, record: Partial<T>) => {
-    const { data: result, error } = await supabase.from(table as any).update(record as any).eq("id", id).select().single();
-    if (error) {
-      console.error(`[crud] Erro ao atualizar em ${table}:`, error);
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, record }: { id: string; record: Partial<T> }) => {
+      if (!supabase) throw new Error("Supabase não configurado");
+      const { data: result, error } = await supabase.from(table).update(record).eq("id", id).select().single();
+      if (error) throw error;
+      return result as T;
+    },
+    onSuccess: () => {
+      if (showToasts) toast.success("Registro atualizado com sucesso!");
+      invalidateTable();
+    },
+    onError: () => {
       if (showToasts) toast.error("Erro ao atualizar registro. Tente novamente.");
-      throw error;
-    }
-    if (showToasts) toast.success("Registro atualizado com sucesso!");
-    fetchData();
-    return result;
-  };
+    },
+  });
 
-  const remove = async (id: string, soft = true) => {
-    if (soft && hasAtivo) {
-      const { error } = await supabase.from(table as any).update({ ativo: false } as any).eq("id", id);
-      if (error) { console.error(`[crud] Erro ao remover de ${table}:`, error); if (showToasts) toast.error("Erro ao remover registro. Tente novamente."); throw error; }
-    } else {
-      const { error } = await supabase.from(table as any).delete().eq("id", id);
-      if (error) { console.error(`[crud] Erro ao remover de ${table}:`, error); if (showToasts) toast.error("Erro ao remover registro. Tente novamente."); throw error; }
-    }
-    if (showToasts) toast.success("Registro removido com sucesso!");
-    fetchData();
-  };
+  const removeMutation = useMutation({
+    mutationFn: async ({ id, soft = true }: { id: string; soft?: boolean }) => {
+      if (!supabase) throw new Error("Supabase não configurado");
+      if (soft && hasAtivo) {
+        const { error } = await supabase.from(table).update({ ativo: false }).eq("id", id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from(table).delete().eq("id", id);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      if (showToasts) toast.success("Registro removido com sucesso!");
+      invalidateTable();
+    },
+    onError: () => {
+      if (showToasts) toast.error("Erro ao remover registro. Tente novamente.");
+    },
+  });
+
+  const create = (record: Partial<T>) => createMutation.mutateAsync(record);
+  const update = (id: string, record: Partial<T>) => updateMutation.mutateAsync({ id, record });
+  const remove = (id: string, soft = true) => removeMutation.mutateAsync({ id, soft });
 
   const duplicate = async (item: T) => {
-    const copy = { ...item } as any;
+    const copy = { ...item } as Record<string, unknown>;
     delete copy.id;
     delete copy.created_at;
     delete copy.updated_at;
-    if (copy.nome) copy.nome = `${copy.nome} (cópia)`;
-    if (copy.nome_razao_social) copy.nome_razao_social = `${copy.nome_razao_social} (cópia)`;
-    if (copy.numero) copy.numero = `${copy.numero}-CPY`;
-    if (copy.sku) copy.sku = `${copy.sku}-CPY`;
-    if (copy.cpf_cnpj) delete copy.cpf_cnpj;
-    if (copy.codigo_interno) delete copy.codigo_interno;
-    return create(copy);
+    if (typeof copy.nome === "string") copy.nome = `${copy.nome} (cópia)`;
+    if (typeof copy.nome_razao_social === "string") copy.nome_razao_social = `${copy.nome_razao_social} (cópia)`;
+    if (typeof copy.numero === "string") copy.numero = `${copy.numero}-CPY`;
+    if (typeof copy.sku === "string") copy.sku = `${copy.sku}-CPY`;
+    delete copy.cpf_cnpj;
+    delete copy.codigo_interno;
+    return create(copy as Partial<T>);
   };
 
-  return { data, loading, fetchData, create, update, remove, duplicate, page, setPage, hasMore, totalCount, truncated };
+  return {
+    data: queryResult.data?.rows ?? [],
+    loading: queryResult.isLoading,
+    fetchData: () => queryResult.refetch(),
+    create,
+    update,
+    remove,
+    duplicate,
+    page,
+    setPage,
+    hasMore: queryResult.data?.hasMore ?? false,
+    totalCount: queryResult.data?.totalCount ?? null,
+    truncated: queryResult.data?.truncated ?? false,
+  };
 }

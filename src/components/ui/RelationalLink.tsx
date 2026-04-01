@@ -70,7 +70,7 @@ export function RelationalLink({ label, children, to, type, id, onClick, classNa
       <Tooltip>
         <TooltipTrigger asChild>{button}</TooltipTrigger>
         <TooltipContent side="top" className="max-w-xs text-center">
-          Limite de {MAX_DRAWER_DEPTH} drawers atingido. O drawer mais antigo será fechado ao abrir este.
+          Limite de {MAX_DRAWER_DEPTH} drawers atingido. Você verá uma confirmação antes de fechar o drawer mais antigo e abrir este novo.
         </TooltipContent>
       </Tooltip>
     );

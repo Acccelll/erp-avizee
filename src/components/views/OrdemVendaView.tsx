@@ -77,11 +77,11 @@ export function OrdemVendaView({ id }: Props) {
                 {selected.clientes?.nome_razao_social || "—"}
               </RelationalLink>
             </div>
-            {selected.orcamentos && (
+            {selected.cotacao_id && (
               <div>
                 <p className="text-[10px] text-muted-foreground uppercase font-semibold">Orçamento de Origem</p>
-                <RelationalLink onClick={() => pushView("orcamento", selected.orcamentos.id)}>
-                  Cotação {selected.orcamentos.numero}
+                <RelationalLink type="orcamento" id={selected.cotacao_id}>
+                  {selected.orcamentos?.numero ? `Cotação ${selected.orcamentos.numero}` : "Ver cotação"}
                 </RelationalLink>
               </div>
             )}
