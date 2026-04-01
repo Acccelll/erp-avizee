@@ -16,7 +16,7 @@ import { OrcamentoPdfTemplate } from "@/components/Orcamento/OrcamentoPdfTemplat
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ArrowLeft, Save, Eye, FileText, Copy, Plus, Search, Wand2, RefreshCw } from "lucide-react";
+import { ArrowLeft, Save, Eye, FileText, Copy, Plus, Search, Wand2, RefreshCw, CheckCircle2, AlertTriangle } from "lucide-react";
 import { QuickAddClientModal } from "@/components/QuickAddClientModal";
 import { ClientSelector, type ProductWithForn } from "@/components/ui/DataSelector";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -92,6 +92,7 @@ export default function OrcamentoForm() {
   const [restoreDraftOpen, setRestoreDraftOpen] = useState(false);
   const [templateName, setTemplateName] = useState("");
   const [templates, setTemplates] = useState<OrcamentoTemplate[]>([]);
+  const [fieldErrors, setFieldErrors] = useState<{ numero?: string; clienteId?: string }>({});
 
   const draftKey = useMemo(() => `orcamento:draft:${id || 'novo'}:${user?.id || 'anon'}`, [id, user?.id]);
 
@@ -193,6 +194,16 @@ export default function OrcamentoForm() {
     }
   }, [clientes, pagamento, prazoPagamento]);
 
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const next: { numero?: string; clienteId?: string } = {};
+      if (!numero.trim()) next.numero = "Informe o número da cotação.";
+      if (!clienteId) next.clienteId = "Selecione um cliente.";
+      setFieldErrors(next);
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [numero, clienteId]);
+
 
   const buildDraftPayload = useCallback(() => ({
     numero, dataOrcamento, status, clienteId, clienteSnapshot, items, observacoes, validade,
@@ -248,7 +259,10 @@ export default function OrcamentoForm() {
   };
 
   const handleSave = async () => {
-    if (!numero) { toast.error("Número é obrigatório"); return; }
+    if (!numero || !clienteId) {
+      toast.error("Preencha os campos obrigatórios para salvar.", { description: "Verifique número e cliente." });
+      return;
+    }
     setSaving(true);
     try {
       const payload = {
@@ -281,11 +295,14 @@ export default function OrcamentoForm() {
       }
 
       localStorage.removeItem(draftKey);
-      toast.success("Cotação salva com sucesso!");
+      toast.success("Orçamento criado com sucesso", {
+        description: `Registro ${numero} salvo.`,
+        action: { label: "Visualizar", onClick: () => navigate(orcId ? `/cotacoes/${orcId}` : "/cotacoes") },
+      });
       if (!isEdit && orcId) navigate(`/cotacoes/${orcId}`, { replace: true });
     } catch (err: any) {
       console.error('[orcamento]', err);
-      toast.error("Erro ao salvar cotação. Tente novamente.");
+      toast.error("Erro ao salvar cotação.", { description: "Confira conexão, campos obrigatórios e tente novamente." });
     }
     setSaving(false);
   };
@@ -444,7 +461,19 @@ export default function OrcamentoForm() {
           <div className="bg-card rounded-xl border shadow-soft p-5">
             <h3 className="font-semibold text-foreground mb-4">Dados da Cotação</h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="space-y-1.5"><Label className="text-xs">Nº Cotação</Label><Input value={numero} onChange={(e) => setNumero(e.target.value)} className="font-mono" /></div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Nº Cotação</Label>
+                <div className="relative">
+                  <Input
+                    value={numero}
+                    onChange={(e) => setNumero(e.target.value)}
+                    className={`font-mono pr-8 ${fieldErrors.numero ? "border-destructive" : numero ? "border-success" : ""}`}
+                  />
+                  {numero && !fieldErrors.numero && <CheckCircle2 className="h-4 w-4 text-success absolute right-2 top-1/2 -translate-y-1/2" />}
+                  {fieldErrors.numero && <AlertTriangle className="h-4 w-4 text-destructive absolute right-2 top-1/2 -translate-y-1/2" />}
+                </div>
+                {fieldErrors.numero && <p className="text-[11px] text-destructive">{fieldErrors.numero}</p>}
+              </div>
               <div className="space-y-1.5"><Label className="text-xs">Data</Label><Input type="date" value={dataOrcamento} onChange={(e) => setDataOrcamento(e.target.value)} /></div>
               <div className="space-y-1.5"><Label className="text-xs">Status</Label>
                 <Select value={status} onValueChange={setStatus}>
@@ -479,6 +508,7 @@ export default function OrcamentoForm() {
                       onCreateNew={() => setQuickAddOpen(true)}
                       createNewLabel="Cadastrar novo cliente"
                     />
+                    {clienteId && !fieldErrors.clienteId && <CheckCircle2 className="h-4 w-4 text-success mt-3" />}
                     <ClientSelector
                       clientes={clientes}
                       onSelect={(c) => handleClienteChange(c.id)}
@@ -495,6 +525,7 @@ export default function OrcamentoForm() {
                 </div>
                 <div className="space-y-1.5"><Label className="text-xs">Código</Label><Input value={clienteSnapshot.codigo} readOnly className="bg-accent/30 font-mono text-xs" /></div>
               </div>
+              {fieldErrors.clienteId && <p className="text-[11px] text-destructive">{fieldErrors.clienteId}</p>}
               {clienteId && (
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm bg-accent/20 rounded-lg p-4">
                   <div className="md:col-span-2 space-y-1"><Label className="text-xs text-muted-foreground">Razão Social</Label><p className="font-medium">{clienteSnapshot.nome_razao_social}</p></div>

@@ -24,7 +24,6 @@ import jsPDF from 'jspdf';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -34,6 +33,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { TableSkeleton } from '@/components/ui/content-skeletons';
 
 export interface Column<T> {
   key: string;
@@ -101,6 +101,7 @@ export function DataTable<T extends Record<string, any>>({
   const isMobile = useIsMobile();
   const { user } = useAuth();
   const [deleteItem, setDeleteItem] = useState<T | null>(null);
+  const [skipDeleteConfirm, setSkipDeleteConfirm] = useState(() => localStorage.getItem('datatable:skip-delete-confirm') === '1');
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<SortDirection>(null);
   const [currentPage, setCurrentPage] = useState(0);
@@ -230,10 +231,17 @@ export function DataTable<T extends Record<string, any>>({
 
   const exportData = async (format: 'csv' | 'xlsx' | 'pdf') => {
     if (sortedData.length > 2000) {
-      toast.info('Volume grande detectado. Processando exportação em segundo plano...');
-      setTimeout(() => {
-        toast.success(`Exportação ${format.toUpperCase()} concluída`);
-      }, 1500);
+      const id = toast.loading('Preparando exportação... 0%');
+      let progress = 0;
+      const timer = setInterval(() => {
+        progress += 20;
+        if (progress >= 100) {
+          clearInterval(timer);
+          toast.success(`Exportação ${format.toUpperCase()} concluída`, { id });
+        } else {
+          toast.loading(`Preparando exportação... ${progress}%`, { id });
+        }
+      }, 400);
       return;
     }
 
@@ -415,7 +423,7 @@ export function DataTable<T extends Record<string, any>>({
 
       <div className="data-table">
         {loading ? (
-          <div className="p-4 space-y-3">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-5 w-full rounded" />)}</div>
+          <TableSkeleton rows={6} cols={Math.max(visibleColumns.length, 4)} />
         ) : data.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 px-4 text-center"><div className="rounded-full bg-muted p-4 mb-4"><PackageOpen className="h-8 w-8 text-muted-foreground" /></div><h3 className="text-base font-semibold text-foreground mb-1">{emptyTitle}</h3><p className="text-sm text-muted-foreground max-w-sm">{emptyDescription}</p></div>
         ) : (
@@ -475,9 +483,14 @@ export function DataTable<T extends Record<string, any>>({
         open={!!deleteItem}
         onClose={() => setDeleteItem(null)}
         title="Excluir registro"
-        description="Esta ação não pode ser desfeita. Tem certeza que deseja continuar?"
+        description={`Esta ação removerá ${deleteItem?.nome || deleteItem?.numero || 'o registro selecionado'} permanentemente.`}
         onConfirm={() => { if (deleteItem && onDelete) { onDelete(deleteItem); setDeleteItem(null); } }}
-      />
+      >
+        <label className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Checkbox checked={skipDeleteConfirm} onCheckedChange={(v) => { const checked = !!v; setSkipDeleteConfirm(checked); localStorage.setItem('datatable:skip-delete-confirm', checked ? '1' : '0'); }} />
+          Não perguntar novamente
+        </label>
+      </ConfirmDialog>
     </>
   );
 }

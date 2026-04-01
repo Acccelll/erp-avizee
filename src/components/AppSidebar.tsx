@@ -27,6 +27,9 @@ export function AppSidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMo
   const currentRoute = `${location.pathname}${location.search}`;
   const { isAdmin } = useIsAdmin();
   const alerts = useSidebarAlerts();
+  const secondsSinceSync = alerts.lastUpdatedAt
+    ? Math.max(0, Math.floor((Date.now() - new Date(alerts.lastUpdatedAt).getTime()) / 1000))
+    : null;
 
   const badgeMap: Record<string, number> = useMemo(() => ({
     financeiro: alerts.financeiroVencidos + alerts.financeiroVencer,
@@ -225,6 +228,11 @@ export function AppSidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMo
 
         {/* Footer */}
         <div className="border-t border-border p-2">
+          {!collapsed && secondsSinceSync !== null && (
+            <p className="mb-2 px-2 text-[10px] text-muted-foreground">
+              Última sincronização: há {secondsSinceSync}s
+            </p>
+          )}
           <button
             type="button"
             onClick={() => handleNavClick('/configuracoes')}

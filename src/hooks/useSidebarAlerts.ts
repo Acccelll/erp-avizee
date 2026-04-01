@@ -6,6 +6,7 @@ export interface SidebarAlerts {
   financeiroVencer: number;
   estoqueBaixo: number;
   orcamentosPendentes: number;
+  lastUpdatedAt?: string;
 }
 
 export function useSidebarAlerts() {
@@ -14,6 +15,7 @@ export function useSidebarAlerts() {
     financeiroVencer: 0,
     estoqueBaixo: 0,
     orcamentosPendentes: 0,
+    lastUpdatedAt: undefined,
   });
 
   useEffect(() => {
@@ -58,6 +60,7 @@ export function useSidebarAlerts() {
           financeiroVencer: vencer || 0,
           estoqueBaixo: baixoCount,
           orcamentosPendentes: orcPendentes || 0,
+          lastUpdatedAt: new Date().toISOString(),
         });
       } catch (err) {
         console.error('[sidebar-alerts] Error loading alerts:', err);
