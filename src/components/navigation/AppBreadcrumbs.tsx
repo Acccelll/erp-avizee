@@ -8,7 +8,8 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
-import { getRouteLabel } from '@/lib/navigation';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { getRouteLabel, navSections } from '@/lib/navigation';
 
 const configTabs: Record<string, string> = {
   geral: 'Empresa',
@@ -44,33 +45,24 @@ export function resolvePageTitle(pathname: string, searchParams: URLSearchParams
     if (tipo === 'receber') return 'Contas a Receber';
   }
 
-  if (pathname === '/fiscal') {
-    const tipo = searchParams.get('tipo');
-    const view = searchParams.get('view');
-    if (tipo === 'entrada') return 'Notas de Entrada';
-    if (tipo === 'saida') return 'Notas de Saída';
-    if (view === 'consulta') return 'Consultar NF-e';
-  }
-
-  if (pathname === '/compras') {
-    return searchParams.get('view') === 'cotacoes' ? 'Cotações de Compra' : 'Pedidos de Compra';
-  }
-
-  if (pathname === '/estoque') {
-    const labels: Record<string, string> = {
-      movimentacoes: 'Movimentações',
-      posicao: 'Posição por Data',
-      fechamento: 'Fechamento Mensal',
-    };
-    return labels[searchParams.get('view') || 'movimentacoes'] || 'Estoque';
-  }
-
   return getRouteLabel(pathname);
 }
 
 export function AppBreadcrumbs() {
   const location = useLocation();
   const [searchParams] = useSearchParams();
+
+  const siblingMap = useMemo(() => {
+    const map: Record<string, { label: string; path: string }[]> = { '/': [{ label: 'Dashboard', path: '/' }] };
+    for (const section of navSections) {
+      const items = section.items.flatMap((group) => group.items);
+      const siblingItems = items.map((x) => ({ label: x.title, path: x.path }));
+      for (const item of items) {
+        map[item.path.split('?')[0]] = siblingItems;
+      }
+    }
+    return map;
+  }, []);
 
   const items = useMemo(() => {
     const pathname = location.pathname;
@@ -95,26 +87,47 @@ export function AppBreadcrumbs() {
   }, [location.pathname, location.search, searchParams]);
 
   return (
-    <Breadcrumb>
-      <BreadcrumbList>
-        {items.map((item, index) => {
-          const isLast = index === items.length - 1;
-          return (
-            <Fragment key={`${item.path}-${index}`}>
-              <BreadcrumbItem>
-                {isLast ? (
-                  <BreadcrumbPage>{item.label}</BreadcrumbPage>
-                ) : (
-                  <BreadcrumbLink asChild>
-                    <Link to={item.path}>{item.label}</Link>
-                  </BreadcrumbLink>
-                )}
-              </BreadcrumbItem>
-              {!isLast && <BreadcrumbSeparator />}
-            </Fragment>
-          );
-        })}
-      </BreadcrumbList>
-    </Breadcrumb>
+    <div className="flex items-center gap-3">
+      <Breadcrumb>
+        <BreadcrumbList>
+          {items.map((item, index) => {
+            const isLast = index === items.length - 1;
+            const siblings = siblingMap[item.path.split('?')[0]] || [];
+            return (
+              <Fragment key={`${item.path}-${index}`}>
+                <BreadcrumbItem>
+                  {isLast ? (
+                    <BreadcrumbPage>{item.label}</BreadcrumbPage>
+                  ) : siblings.length > 1 ? (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <BreadcrumbLink asChild>
+                          <button type="button" className="hover:underline underline-offset-2">{item.label}</button>
+                        </BreadcrumbLink>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start">
+                        {siblings.map((sibling) => (
+                          <DropdownMenuItem key={sibling.path} asChild>
+                            <Link to={sibling.path}>{sibling.label}</Link>
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  ) : (
+                    <BreadcrumbLink asChild>
+                      <Link to={item.path}>{item.label}</Link>
+                    </BreadcrumbLink>
+                  )}
+                </BreadcrumbItem>
+                {!isLast && <BreadcrumbSeparator />}
+              </Fragment>
+            );
+          })}
+        </BreadcrumbList>
+      </Breadcrumb>
+      <span className="rounded-full border border-border bg-muted/40 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+        Nível {items.length} de {Math.max(items.length, 3)}
+      </span>
+    </div>
   );
 }

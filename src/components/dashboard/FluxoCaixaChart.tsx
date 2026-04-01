@@ -104,7 +104,7 @@ export function FluxoCaixaChart() {
   }
 
   return (
-    <div className="bg-card rounded-xl border p-5">
+    <figure className="bg-card rounded-xl border p-5" role="img" aria-label="Gráfico de área do fluxo de caixa dos últimos seis meses com séries de recebimentos e pagamentos realizados e previstos.">
       <h3 className="font-semibold text-foreground mb-4">Fluxo de Caixa — Realizado vs Previsto (6 meses)</h3>
       <ResponsiveContainer width="100%" height={220}>
         <AreaChart data={data}>
@@ -154,6 +154,9 @@ export function FluxoCaixaChart() {
           <span className="w-3 border-t border-dashed border-[hsl(0_84%_60%)]" />A pagar (previsto)
         </span>
       </div>
-    </div>
+      <figcaption className="sr-only">
+        O gráfico compara recebimentos e pagamentos realizados com valores previstos para facilitar o acompanhamento do caixa.
+      </figcaption>
+    </figure>
   );
 }
