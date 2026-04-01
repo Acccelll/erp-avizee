@@ -29,8 +29,17 @@ export function AppSidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMo
   const alerts = useSidebarAlerts();
 
   const badgeMap: Record<string, number> = useMemo(() => ({
-    financeiro: alerts.financeiroVencidos,
+    financeiro: alerts.financeiroVencidos + alerts.financeiroVencer,
     estoque: alerts.estoqueBaixo,
+    comercial: alerts.orcamentosPendentes,
+  }), [alerts]);
+
+  const itemBadges: Record<string, { count: number; tone: "danger" | "warning" | "info" }> = useMemo(() => ({
+    "/cotacoes": { count: alerts.orcamentosPendentes, tone: "warning" },
+    "/financeiro": { count: alerts.financeiroVencer, tone: "info" },
+    "/financeiro?tipo=receber": { count: alerts.financeiroVencer, tone: "info" },
+    "/financeiro?tipo=pagar": { count: alerts.financeiroVencidos, tone: "danger" },
+    "/estoque": { count: alerts.estoqueBaixo, tone: "danger" },
   }), [alerts]);
 
   // Filter out admin-only sections for non-admin users
@@ -46,6 +55,12 @@ export function AppSidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMo
   };
 
   const [manualSections, setManualSections] = useState<Record<string, boolean>>({});
+
+  const toneClass = {
+    danger: 'bg-destructive text-destructive-foreground',
+    warning: 'bg-warning text-warning-foreground',
+    info: 'bg-primary text-primary-foreground',
+  };
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const activeSectionKeys = useMemo(
@@ -183,13 +198,18 @@ export function AppSidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMo
                                 key={item.path}
                                 type="button"
                                 onClick={() => handleNavClick(item.path)}
-                                className={`block w-full text-left rounded-md px-3 py-1.5 text-[13px] transition ${
+                                className={`flex w-full items-center justify-between text-left rounded-md px-3 py-1.5 text-[13px] transition ${
                                   active
                                     ? 'bg-primary/10 font-medium text-primary'
                                     : 'text-muted-foreground hover:bg-accent hover:text-foreground'
                                 }`}
                               >
-                                {item.title}
+                                <span>{item.title}</span>
+                                {(itemBadges[item.path]?.count ?? 0) > 0 && (
+                                  <span className={`ml-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-semibold ${toneClass[itemBadges[item.path].tone]}`}>
+                                    {itemBadges[item.path].count}
+                                  </span>
+                                )}
                               </button>
                             );
                           })}

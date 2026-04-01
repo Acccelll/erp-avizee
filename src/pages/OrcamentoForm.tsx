@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
@@ -16,10 +16,11 @@ import { OrcamentoPdfTemplate } from "@/components/Orcamento/OrcamentoPdfTemplat
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ArrowLeft, Save, Eye, FileText, Copy, Plus, Search } from "lucide-react";
+import { ArrowLeft, Save, Eye, FileText, Copy, Plus, Search, Wand2, RefreshCw } from "lucide-react";
 import { QuickAddClientModal } from "@/components/QuickAddClientModal";
 import { ClientSelector, type ProductWithForn } from "@/components/ui/DataSelector";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useAuth } from "@/contexts/AuthContext";
 import { Tables } from "@/integrations/supabase/types";
 
 interface ClienteSnapshot {
@@ -27,6 +28,24 @@ interface ClienteSnapshot {
   inscricao_estadual: string; email: string; telefone: string; celular: string;
   contato: string; logradouro: string; numero: string; bairro: string;
   cidade: string; uf: string; cep: string; codigo: string;
+}
+
+
+const TEAM_TEMPLATE_KEY = "orcamento_template:shared";
+
+interface OrcamentoTemplate {
+  id: string;
+  nome: string;
+  escopo: "usuario" | "equipe";
+  payload: {
+    items: OrcamentoItem[];
+    pagamento: string;
+    prazoPagamento: string;
+    prazoEntrega: string;
+    modalidade: string;
+    freteTipo: string;
+    observacoes: string;
+  };
 }
 
 const emptyCliente: ClienteSnapshot = {
@@ -41,6 +60,7 @@ export default function OrcamentoForm() {
   const pdfRef = useRef<HTMLDivElement>(null);
   const isEdit = !!id;
   const isMobile = useIsMobile();
+  const { user } = useAuth();
 
   const [saving, setSaving] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -69,6 +89,12 @@ export default function OrcamentoForm() {
   const [freteTipo, setFreteTipo] = useState("");
   const [modalidade, setModalidade] = useState("");
   const [quickAddOpen, setQuickAddOpen] = useState(false);
+  const [restoreDraftOpen, setRestoreDraftOpen] = useState(false);
+  const [templateName, setTemplateName] = useState("");
+  const [templates, setTemplates] = useState<OrcamentoTemplate[]>([]);
+
+  const draftKey = useMemo(() => `orcamento:draft:${id || 'novo'}:${user?.id || 'anon'}`, [id, user?.id]);
+
 
   const totalProdutos = items.reduce((sum, i) => sum + (i.valor_total || 0), 0);
   const valorTotal = totalProdutos - desconto + impostoSt + impostoIpi + freteValor + outrasDespesas;
@@ -167,6 +193,60 @@ export default function OrcamentoForm() {
     }
   }, [clientes, pagamento, prazoPagamento]);
 
+
+  const buildDraftPayload = useCallback(() => ({
+    numero, dataOrcamento, status, clienteId, clienteSnapshot, items, observacoes, validade,
+    desconto, impostoSt, impostoIpi, freteValor, outrasDespesas,
+    pagamento, prazoPagamento, prazoEntrega, freteTipo, modalidade,
+    savedAt: new Date().toISOString(),
+  }), [numero, dataOrcamento, status, clienteId, clienteSnapshot, items, observacoes, validade, desconto, impostoSt, impostoIpi, freteValor, outrasDespesas, pagamento, prazoPagamento, prazoEntrega, freteTipo, modalidade]);
+
+  const applyDraft = (draft: any) => {
+    setNumero(draft.numero || "");
+    setDataOrcamento(draft.dataOrcamento || new Date().toISOString().split("T")[0]);
+    setStatus(draft.status || "rascunho");
+    setClienteId(draft.clienteId || "");
+    setClienteSnapshot(draft.clienteSnapshot || emptyCliente);
+    setItems(draft.items || []);
+    setObservacoes(draft.observacoes || "");
+    setValidade(draft.validade || "");
+    setDesconto(draft.desconto || 0);
+    setImpostoSt(draft.impostoSt || 0);
+    setImpostoIpi(draft.impostoIpi || 0);
+    setFreteValor(draft.freteValor || 0);
+    setOutrasDespesas(draft.outrasDespesas || 0);
+    setPagamento(draft.pagamento || "");
+    setPrazoPagamento(draft.prazoPagamento || "");
+    setPrazoEntrega(draft.prazoEntrega || "");
+    setFreteTipo(draft.freteTipo || "");
+    setModalidade(draft.modalidade || "");
+  };
+
+  const saveTemplate = async (escopo: "usuario" | "equipe") => {
+    if (!templateName.trim()) { toast.error("Informe um nome para o template"); return; }
+    const key = escopo === "equipe" ? `${TEAM_TEMPLATE_KEY}:${templateName.trim()}` : `orcamento_template:${user?.id}:${templateName.trim()}`;
+    const payload = {
+      id: key,
+      nome: templateName.trim(),
+      escopo,
+      payload: { items, pagamento, prazoPagamento, prazoEntrega, modalidade, freteTipo, observacoes },
+    };
+    await supabase.from('app_configuracoes').upsert({ chave: key, valor: payload as any, updated_at: new Date().toISOString() }, { onConflict: 'chave' });
+    toast.success("Template salvo");
+    setTemplateName("");
+  };
+
+  const applyTemplate = (tpl: OrcamentoTemplate) => {
+    setItems(tpl.payload.items || []);
+    setPagamento(tpl.payload.pagamento || "");
+    setPrazoPagamento(tpl.payload.prazoPagamento || "");
+    setPrazoEntrega(tpl.payload.prazoEntrega || "");
+    setModalidade(tpl.payload.modalidade || "");
+    setFreteTipo(tpl.payload.freteTipo || "");
+    setObservacoes(tpl.payload.observacoes || "");
+    toast.success(`Template '${tpl.nome}' aplicado`);
+  };
+
   const handleSave = async () => {
     if (!numero) { toast.error("Número é obrigatório"); return; }
     setSaving(true);
@@ -200,6 +280,7 @@ export default function OrcamentoForm() {
         if (itemsPayload.length > 0) await supabase.from("orcamentos_itens").insert(itemsPayload);
       }
 
+      localStorage.removeItem(draftKey);
       toast.success("Cotação salva com sucesso!");
       if (!isEdit && orcId) navigate(`/cotacoes/${orcId}`, { replace: true });
     } catch (err: any) {
@@ -283,8 +364,34 @@ export default function OrcamentoForm() {
     setters[field]?.(value);
   };
 
+
+  useEffect(() => {
+    const saved = localStorage.getItem(draftKey);
+    if (saved && !isEdit) setRestoreDraftOpen(true);
+  }, [draftKey, isEdit]);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const payload = buildDraftPayload();
+      localStorage.setItem(draftKey, JSON.stringify(payload));
+    }, 30000);
+    return () => clearInterval(timer);
+  }, [buildDraftPayload, draftKey]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    supabase.from('app_configuracoes').select('valor, chave').or(`chave.like.orcamento_template:${user.id}:%,chave.like.${TEAM_TEMPLATE_KEY}:%`).then(({ data }) => {
+      const list = (data || []).map((row: any) => row.valor).filter(Boolean) as OrcamentoTemplate[];
+      setTemplates(list);
+    });
+  }, [user?.id]);
+
   const clienteOptions = clientes.map((c: any) => ({
-    id: c.id, label: c.nome_razao_social, sublabel: c.cpf_cnpj || "",
+    id: c.id,
+    label: c.nome_razao_social,
+    sublabel: `${c.cpf_cnpj || "sem documento"} ${Number(c.limite_credito || 0) > 10000 ? "· Cliente Premium - 10% desconto" : ""}`.trim(),
+    rightMeta: c.cidade ? `${c.cidade}/${c.uf || ""}` : undefined,
+    searchTerms: [c.nome_razao_social, c.nome_fantasia, c.cpf_cnpj].filter(Boolean),
   }));
 
   return (
@@ -304,6 +411,10 @@ export default function OrcamentoForm() {
           <Button variant="outline" onClick={() => setPreviewOpen(true)} className="gap-2"><Eye className="w-4 h-4" />Visualizar</Button>
           <Button variant="secondary" onClick={handleGeneratePdf} className="gap-2"><FileText className="w-4 h-4" />Gerar PDF</Button>
           {isEdit && <Button variant="outline" onClick={handleDuplicate} className="gap-2"><Copy className="w-4 h-4" />Duplicar</Button>}
+          <Select onValueChange={(value) => { const tpl = templates.find((t) => t.id === value); if (tpl) applyTemplate(tpl); }}><SelectTrigger className="w-[220px]"><SelectValue placeholder="Aplicar template" /></SelectTrigger><SelectContent>{templates.map((tpl) => <SelectItem key={tpl.id} value={tpl.id}>{tpl.nome} ({tpl.escopo})</SelectItem>)}</SelectContent></Select>
+          <Input value={templateName} onChange={(e) => setTemplateName(e.target.value)} placeholder="Nome do template" className="w-[180px]" />
+          <Button variant="outline" onClick={() => saveTemplate("usuario")} className="gap-2"><Wand2 className="w-4 h-4" />Salvar Meu</Button>
+          <Button variant="outline" onClick={() => saveTemplate("equipe")} className="gap-2"><Wand2 className="w-4 h-4" />Compartilhar</Button>
         </div>
         {isMobile && (
           <div className="grid grid-cols-2 gap-3 rounded-2xl border bg-card p-4 shadow-sm">
@@ -365,6 +476,8 @@ export default function OrcamentoForm() {
                       onChange={handleClienteChange}
                       placeholder="Buscar por nome ou CNPJ..."
                       className="flex-1"
+                      onCreateNew={() => setQuickAddOpen(true)}
+                      createNewLabel="Cadastrar novo cliente"
                     />
                     <ClientSelector
                       clientes={clientes}
@@ -517,6 +630,20 @@ export default function OrcamentoForm() {
           </div>
         </div>
       )}
+
+
+      <Dialog open={restoreDraftOpen} onOpenChange={setRestoreDraftOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Restaurar rascunho não finalizado?</DialogTitle>
+            <DialogDescription>Encontramos um rascunho salvo automaticamente para esta cotação.</DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => { localStorage.removeItem(draftKey); setRestoreDraftOpen(false); }}>Descartar</Button>
+            <Button onClick={() => { const raw = localStorage.getItem(draftKey); if (raw) applyDraft(JSON.parse(raw)); setRestoreDraftOpen(false); }} className="gap-2"><RefreshCw className="h-4 w-4" />Restaurar</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <QuickAddClientModal
         open={quickAddOpen}
