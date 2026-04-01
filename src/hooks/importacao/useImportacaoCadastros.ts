@@ -129,7 +129,7 @@ export function useImportacaoCadastros() {
         criado_por: user?.user?.id
       }));
 
-      const { error: stagingError } = await supabase.from(stagingTable as any).insert(stagingData);
+      const { error: stagingError } = await supabase.from(stagingTable as any).insert(stagingData as any);
       if (stagingError) throw stagingError;
 
       // 3. Atualizar Lote com contagens
@@ -174,11 +174,11 @@ export function useImportacaoCadastros() {
       // 2. Carregar registros válidos de staging
       const stagingTable = `stg_${batchType === "produtos" ? "produtos" : batchType === "clientes" ? "clientes" : "fornecedores"}`;
 
-      const { data: validItems, error: fetchError } = await supabase
+      const { data: validItems, error: fetchError } = await (supabase
         .from(stagingTable as any)
         .select("payload, linha_origem")
         .eq("lote_importacao_id", idLote)
-        .eq("status_validacao", "valido");
+        .eq("status_validacao", "valido") as any);
 
       if (fetchError) throw fetchError;
       if (!validItems || validItems.length === 0) {

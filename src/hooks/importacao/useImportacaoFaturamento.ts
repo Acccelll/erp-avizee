@@ -167,7 +167,7 @@ export function useImportacaoFaturamento() {
         criado_por: user?.user?.id
       }));
 
-      const { error: stagingError } = await supabase.from("stg_faturamento").insert(stagingData);
+      const { error: stagingError } = await supabase.from("stg_faturamento").insert(stagingData as any);
       if (stagingError) throw stagingError;
 
       const validos = previewData.filter(i => i.status === "valido").length;
@@ -212,21 +212,19 @@ export function useImportacaoFaturamento() {
 
       let importedCount = 0;
       for (const item of validItems) {
-        const nf = item.payload as GroupedNF;
+        const nf = item.payload as unknown as GroupedNF;
         const clientId = clientMap.get(nf.cliente_nome.toUpperCase());
 
         // Criar Cabeçalho da Nota
-        const { data: newNf, error: nfError } = await supabase.from("notas_fiscais").insert({
+        const { data: newNf, error: nfError } = await (supabase.from("notas_fiscais").insert({
           tipo: "saida",
           numero: nf.numero,
           data_emissao: nf.data_emissao,
           valor_total: nf.valor_total,
           cliente_id: clientId,
           status: "confirmada",
-          origem: "importacao_historica",
-          somente_consulta: somenteConsulta,
           observacoes: `Importação histórica - Lote ${idLote}`
-        }).select().single();
+        } as any).select().single() as any);
 
         if (nfError) {
           await supabase.from("importacao_logs").insert({
@@ -234,7 +232,7 @@ export function useImportacaoFaturamento() {
             nivel: "error",
             etapa: "carga_final",
             mensagem: `Erro ao criar NF ${nf.numero}: ${nfError.message}`
-          });
+          } as any);
           continue;
         }
 

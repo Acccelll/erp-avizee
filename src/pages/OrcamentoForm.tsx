@@ -20,6 +20,7 @@ import { ArrowLeft, Save, Eye, FileText, Copy, Plus, Search } from "lucide-react
 import { QuickAddClientModal } from "@/components/QuickAddClientModal";
 import { ClientSelector, type ProductWithForn } from "@/components/ui/DataSelector";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { Tables } from "@/integrations/supabase/types";
 
 interface ClienteSnapshot {
   nome_razao_social: string; nome_fantasia: string; cpf_cnpj: string;

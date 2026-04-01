@@ -141,7 +141,7 @@ export function useImportacaoFinanceiro() {
         criado_por: user?.user?.id
       }));
 
-      const { error: stagingError } = await supabase.from("stg_financeiro_aberto").insert(stagingData);
+      const { error: stagingError } = await supabase.from("stg_financeiro_aberto").insert(stagingData as any);
       if (stagingError) throw stagingError;
 
       const validos = previewData.filter(i => i._valid).length;
@@ -218,7 +218,7 @@ export function useImportacaoFinanceiro() {
       });
 
       if (dataToInsert.length > 0) {
-        const { error: insError } = await supabase.from("financeiro_lancamentos").insert(dataToInsert);
+        const { error: insError } = await supabase.from("financeiro_lancamentos").insert(dataToInsert as any);
         if (insError) throw insError;
       }
 

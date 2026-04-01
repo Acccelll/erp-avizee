@@ -1390,6 +1390,92 @@ export type Database = {
           },
         ]
       }
+      importacao_logs: {
+        Row: {
+          created_at: string
+          etapa: string | null
+          id: string
+          lote_importacao_id: string
+          mensagem: string | null
+          nivel: string
+          payload: Json | null
+        }
+        Insert: {
+          created_at?: string
+          etapa?: string | null
+          id?: string
+          lote_importacao_id: string
+          mensagem?: string | null
+          nivel?: string
+          payload?: Json | null
+        }
+        Update: {
+          created_at?: string
+          etapa?: string | null
+          id?: string
+          lote_importacao_id?: string
+          mensagem?: string | null
+          nivel?: string
+          payload?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "importacao_logs_lote_importacao_id_fkey"
+            columns: ["lote_importacao_id"]
+            isOneToOne: false
+            referencedRelation: "importacao_lotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      importacao_lotes: {
+        Row: {
+          arquivo_nome: string | null
+          created_at: string
+          criado_por: string | null
+          id: string
+          mapeamento: Json | null
+          observacoes: string | null
+          status: string
+          tipo_importacao: string
+          total_erros: number | null
+          total_importados: number | null
+          total_lidos: number | null
+          total_validos: number | null
+          updated_at: string
+        }
+        Insert: {
+          arquivo_nome?: string | null
+          created_at?: string
+          criado_por?: string | null
+          id?: string
+          mapeamento?: Json | null
+          observacoes?: string | null
+          status?: string
+          tipo_importacao: string
+          total_erros?: number | null
+          total_importados?: number | null
+          total_lidos?: number | null
+          total_validos?: number | null
+          updated_at?: string
+        }
+        Update: {
+          arquivo_nome?: string | null
+          created_at?: string
+          criado_por?: string | null
+          id?: string
+          mapeamento?: Json | null
+          observacoes?: string | null
+          status?: string
+          tipo_importacao?: string
+          total_erros?: number | null
+          total_importados?: number | null
+          total_lidos?: number | null
+          total_validos?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       notas_fiscais: {
         Row: {
           ativo: boolean
@@ -2017,6 +2103,60 @@ export type Database = {
           },
         ]
       }
+      precos_especiais: {
+        Row: {
+          ativo: boolean
+          cliente_id: string
+          created_at: string
+          id: string
+          observacao: string | null
+          preco_especial: number
+          produto_id: string
+          updated_at: string
+          vigencia_fim: string | null
+          vigencia_inicio: string | null
+        }
+        Insert: {
+          ativo?: boolean
+          cliente_id: string
+          created_at?: string
+          id?: string
+          observacao?: string | null
+          preco_especial?: number
+          produto_id: string
+          updated_at?: string
+          vigencia_fim?: string | null
+          vigencia_inicio?: string | null
+        }
+        Update: {
+          ativo?: boolean
+          cliente_id?: string
+          created_at?: string
+          id?: string
+          observacao?: string | null
+          preco_especial?: number
+          produto_id?: string
+          updated_at?: string
+          vigencia_fim?: string | null
+          vigencia_inicio?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "precos_especiais_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "precos_especiais_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       produto_composicoes: {
         Row: {
           created_at: string
@@ -2269,8 +2409,10 @@ export type Database = {
           created_at: string
           data_postagem: string | null
           id: string
+          nota_fiscal_id: string | null
           observacoes: string | null
           ordem_venda_id: string | null
+          pedido_compra_id: string | null
           peso: number | null
           previsao_entrega: string | null
           servico: string | null
@@ -2288,8 +2430,10 @@ export type Database = {
           created_at?: string
           data_postagem?: string | null
           id?: string
+          nota_fiscal_id?: string | null
           observacoes?: string | null
           ordem_venda_id?: string | null
+          pedido_compra_id?: string | null
           peso?: number | null
           previsao_entrega?: string | null
           servico?: string | null
@@ -2307,8 +2451,10 @@ export type Database = {
           created_at?: string
           data_postagem?: string | null
           id?: string
+          nota_fiscal_id?: string | null
           observacoes?: string | null
           ordem_venda_id?: string | null
+          pedido_compra_id?: string | null
           peso?: number | null
           previsao_entrega?: string | null
           servico?: string | null
@@ -2328,6 +2474,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "remessas_nota_fiscal_id_fkey"
+            columns: ["nota_fiscal_id"]
+            isOneToOne: false
+            referencedRelation: "notas_fiscais"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "remessas_ordem_venda_id_fkey"
             columns: ["ordem_venda_id"]
             isOneToOne: false
@@ -2335,10 +2488,196 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "remessas_pedido_compra_id_fkey"
+            columns: ["pedido_compra_id"]
+            isOneToOne: false
+            referencedRelation: "pedidos_compra"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "remessas_transportadora_id_fkey"
             columns: ["transportadora_id"]
             isOneToOne: false
             referencedRelation: "transportadoras"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stg_compras_xml: {
+        Row: {
+          arquivo_origem: string | null
+          created_at: string
+          criado_por: string | null
+          id: string
+          lote_importacao_id: string
+          motivo_erro: string | null
+          payload: Json | null
+          status_validacao: string
+        }
+        Insert: {
+          arquivo_origem?: string | null
+          created_at?: string
+          criado_por?: string | null
+          id?: string
+          lote_importacao_id: string
+          motivo_erro?: string | null
+          payload?: Json | null
+          status_validacao?: string
+        }
+        Update: {
+          arquivo_origem?: string | null
+          created_at?: string
+          criado_por?: string | null
+          id?: string
+          lote_importacao_id?: string
+          motivo_erro?: string | null
+          payload?: Json | null
+          status_validacao?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stg_compras_xml_lote_importacao_id_fkey"
+            columns: ["lote_importacao_id"]
+            isOneToOne: false
+            referencedRelation: "importacao_lotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stg_estoque_inicial: {
+        Row: {
+          aba_origem: string | null
+          arquivo_origem: string | null
+          created_at: string
+          criado_por: string | null
+          id: string
+          linha_origem: number | null
+          lote_importacao_id: string
+          motivo_erro: string | null
+          payload: Json | null
+          status_validacao: string
+        }
+        Insert: {
+          aba_origem?: string | null
+          arquivo_origem?: string | null
+          created_at?: string
+          criado_por?: string | null
+          id?: string
+          linha_origem?: number | null
+          lote_importacao_id: string
+          motivo_erro?: string | null
+          payload?: Json | null
+          status_validacao?: string
+        }
+        Update: {
+          aba_origem?: string | null
+          arquivo_origem?: string | null
+          created_at?: string
+          criado_por?: string | null
+          id?: string
+          linha_origem?: number | null
+          lote_importacao_id?: string
+          motivo_erro?: string | null
+          payload?: Json | null
+          status_validacao?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stg_estoque_inicial_lote_importacao_id_fkey"
+            columns: ["lote_importacao_id"]
+            isOneToOne: false
+            referencedRelation: "importacao_lotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stg_faturamento: {
+        Row: {
+          aba_origem: string | null
+          arquivo_origem: string | null
+          created_at: string
+          criado_por: string | null
+          id: string
+          lote_importacao_id: string
+          motivo_erro: string | null
+          payload: Json | null
+          status_validacao: string
+        }
+        Insert: {
+          aba_origem?: string | null
+          arquivo_origem?: string | null
+          created_at?: string
+          criado_por?: string | null
+          id?: string
+          lote_importacao_id: string
+          motivo_erro?: string | null
+          payload?: Json | null
+          status_validacao?: string
+        }
+        Update: {
+          aba_origem?: string | null
+          arquivo_origem?: string | null
+          created_at?: string
+          criado_por?: string | null
+          id?: string
+          lote_importacao_id?: string
+          motivo_erro?: string | null
+          payload?: Json | null
+          status_validacao?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stg_faturamento_lote_importacao_id_fkey"
+            columns: ["lote_importacao_id"]
+            isOneToOne: false
+            referencedRelation: "importacao_lotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stg_financeiro_aberto: {
+        Row: {
+          aba_origem: string | null
+          arquivo_origem: string | null
+          created_at: string
+          criado_por: string | null
+          id: string
+          linha_origem: number | null
+          lote_importacao_id: string
+          motivo_erro: string | null
+          payload: Json | null
+          status_validacao: string
+        }
+        Insert: {
+          aba_origem?: string | null
+          arquivo_origem?: string | null
+          created_at?: string
+          criado_por?: string | null
+          id?: string
+          linha_origem?: number | null
+          lote_importacao_id: string
+          motivo_erro?: string | null
+          payload?: Json | null
+          status_validacao?: string
+        }
+        Update: {
+          aba_origem?: string | null
+          arquivo_origem?: string | null
+          created_at?: string
+          criado_por?: string | null
+          id?: string
+          linha_origem?: number | null
+          lote_importacao_id?: string
+          motivo_erro?: string | null
+          payload?: Json | null
+          status_validacao?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stg_financeiro_aberto_lote_importacao_id_fkey"
+            columns: ["lote_importacao_id"]
+            isOneToOne: false
+            referencedRelation: "importacao_lotes"
             referencedColumns: ["id"]
           },
         ]

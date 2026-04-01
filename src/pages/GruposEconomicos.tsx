@@ -15,6 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { Building2, DollarSign, AlertTriangle } from "lucide-react";
 import { formatCurrency } from "@/lib/format";
+import { toast } from "sonner";
 
 interface GrupoEconomico {
   id: string;
