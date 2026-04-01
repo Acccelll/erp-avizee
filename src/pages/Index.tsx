@@ -124,7 +124,7 @@ const DashboardContent = () => {
 
       const buildFinQuery = (tipo: string) => {
         let q = supabase.from("financeiro_lancamentos").select("valor").eq("tipo", tipo as any).eq("ativo", true);
-        q = q.in("status", ["aberto", "vencido"]).gte("data_vencimento", dateFrom);
+        q = q.in("status", ["aberto", "vencido"]);
         if (dateTo) q = q.lte("data_vencimento", dateTo);
         return q;
       };
