@@ -1,20 +1,19 @@
 #!/usr/bin/env node
-// scripts/check-seed-environment.js
-// Uso: node scripts/check-seed-environment.js
-//
-// Verifica se o ambiente é seguro para executar scripts de seed.
-// Falha se VITE_SUPABASE_URL não apontar para localhost ou 127.0.0.1.
-
 const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
-const isLocalSupabase = !!supabaseUrl &&
-                        (supabaseUrl.includes('localhost') || supabaseUrl.includes('127.0.0.1'));
+const hasSeedEnabled = process.env.SEED_ENABLED === 'true';
+const safeLocal = supabaseUrl.includes('localhost:54321');
+const allowedHosts = (process.env.SEED_ALLOWED_HOSTS || '').split(',').map((h) => h.trim()).filter(Boolean);
+let safeByList = false;
+try {
+  safeByList = allowedHosts.includes(new URL(supabaseUrl).host);
+} catch {
+  safeByList = false;
+}
 
-if (!isLocalSupabase) {
-  console.error('\x1b[31m%s\x1b[0m', '⚠️  ATENÇÃO: VITE_SUPABASE_URL não parece ser local!');
-  console.error(`   URL atual: ${supabaseUrl || '(não definida)'}`);
-  console.error('   Seed só deve ser executado em ambiente de desenvolvimento local.\n');
+if (process.env.NODE_ENV === 'production' || !hasSeedEnabled || !(safeLocal || safeByList)) {
+  console.error('\x1b[31m%s\x1b[0m', '⚠️  ATENÇÃO: ambiente bloqueado para seed');
   process.exit(1);
 }
 
-console.log('\x1b[32m%s\x1b[0m', '✅ Ambiente verificado: Supabase local detectado');
+console.log('\x1b[32m%s\x1b[0m', '✅ Ambiente seguro para seed');
 process.exit(0);

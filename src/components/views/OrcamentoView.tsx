@@ -23,9 +23,14 @@ export function OrcamentoView({ id }: Props) {
         .from("orcamentos")
         .select("*, clientes(id, nome_razao_social)")
         .eq("id", id)
-        .single();
+        .maybeSingle();
 
-      if (!orc) return;
+      if (!orc) {
+        setSelected(null);
+        setItems([]);
+        setLoading(false);
+        return;
+      }
       setSelected(orc);
 
       const { data: it } = await supabase

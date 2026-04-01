@@ -24,9 +24,14 @@ export function OrdemVendaView({ id }: Props) {
         .from("ordens_venda")
         .select("*, clientes(id, nome_razao_social), orcamentos(id, numero)")
         .eq("id", id)
-        .single();
+        .maybeSingle();
 
-      if (!ov) return;
+      if (!ov) {
+        setSelected(null);
+        setItems([]);
+        setLoading(false);
+        return;
+      }
       setSelected(ov);
 
       const { data: itens } = await supabase
@@ -77,11 +82,11 @@ export function OrdemVendaView({ id }: Props) {
                 {selected.clientes?.nome_razao_social || "—"}
               </RelationalLink>
             </div>
-            {selected.orcamentos && (
+            {selected.cotacao_id && (
               <div>
                 <p className="text-[10px] text-muted-foreground uppercase font-semibold">Orçamento de Origem</p>
-                <RelationalLink onClick={() => pushView("orcamento", selected.orcamentos.id)}>
-                  Cotação {selected.orcamentos.numero}
+                <RelationalLink type="orcamento" id={selected.cotacao_id}>
+                  {selected.orcamentos?.numero ? `Cotação ${selected.orcamentos.numero}` : "Ver cotação"}
                 </RelationalLink>
               </div>
             )}

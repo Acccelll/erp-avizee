@@ -1,227 +1,143 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 
-/**
- * Versão do esquema de armazenamento.
- *
- * Incremente este número sempre que a estrutura interna dos dados persistidos
- * mudar de forma incompatível (ex.: renomear campos, alterar tipo de um campo).
- * Ao detectar uma versão desatualizada no localStorage, o valor é descartado e
- * o estado é inicializado com `defaultValue`, evitando erros de runtime por
- * dados obsoletos.
- */
-export const STORAGE_SCHEMA_VERSION = 1;
+export const STORAGE_SCHEMA_VERSION = 2;
 
-/**
- * Envelope que envolve cada valor persistido no localStorage, adicionando
- * metadados de versão para suporte ao mecanismo de invalidação de cache.
- */
 interface StoredEnvelope<T> {
-  /** Versão do esquema na época em que o valor foi escrito. */
   v: number;
-  /** Valor serializado. */
   data: T;
+  updatedAt: number;
+  revision: number;
 }
 
-/**
- * Lê e desserializa um valor do localStorage, verificando a versão do envelope.
- * Retorna `null` se a entrada não existir, for inválida ou estiver em versão
- * desatualizada.
- */
-function readFromStorage<T>(key: string): T | null {
+function readFromStorage<T>(key: string): StoredEnvelope<T> | null {
   try {
     const raw = localStorage.getItem(key);
     if (raw === null) return null;
     const envelope = JSON.parse(raw) as StoredEnvelope<T>;
-    if (
-      typeof envelope !== 'object' ||
-      envelope === null ||
-      envelope.v !== STORAGE_SCHEMA_VERSION
-    ) {
-      // Versão incompatível — descarta a entrada antiga.
+    if (!envelope || envelope.v !== STORAGE_SCHEMA_VERSION) {
       localStorage.removeItem(key);
       return null;
     }
-    return envelope.data;
+    return envelope;
   } catch {
     return null;
   }
 }
 
-/**
- * Serializa e persiste um valor no localStorage com o envelope de versão.
- * Erros de escrita (ex.: quota excedida) são ignorados silenciosamente.
- */
-function writeToStorage<T>(key: string, value: T): void {
-  try {
-    const envelope: StoredEnvelope<T> = { v: STORAGE_SCHEMA_VERSION, data: value };
-    localStorage.setItem(key, JSON.stringify(envelope));
-  } catch {
-    // Quota excedida ou ambiente sem localStorage — ignora.
-  }
+function writeToStorage<T>(key: string, value: T, revision: number): StoredEnvelope<T> {
+  const envelope: StoredEnvelope<T> = { v: STORAGE_SCHEMA_VERSION, data: value, updatedAt: Date.now(), revision };
+  localStorage.setItem(key, JSON.stringify(envelope));
+  return envelope;
 }
 
-/**
- * Remove uma entrada do localStorage de forma silenciosa.
- */
 function removeFromStorage(key: string): void {
-  try {
-    localStorage.removeItem(key);
-  } catch {
-    // Ignora.
-  }
+  try { localStorage.removeItem(key); } catch { /* noop */ }
 }
 
-// ── Public Key Builder ────────────────────────────────────────────────────────
-
-/**
- * Builds the full `localStorage` key for a given namespace + logical key,
- * matching exactly the format used internally by `useSyncedStorage`.
- *
- * **Intended for external callers** that need to derive a versioned storage key
- * without duplicating the format string — e.g. one-time migration logic in
- * `useUserPreference` that checks whether a versioned entry already exists
- * before adopting an old unversioned value.
- *
- * @param namespace  Namespace segment (e.g. `'appconfig'`, `'user-pref:abc-123'`).
- * @param key        Logical key within that namespace (e.g. `'sidebar_collapsed'`).
- * @returns Full storage key: `erp:<namespace>:<key>`.
- *
- * @example
- * ```ts
- * buildSyncedStorageKey('user-pref:abc', 'sidebar_collapsed')
- * // → "erp:user-pref:abc:sidebar_collapsed"
- * ```
- */
 export function buildSyncedStorageKey(namespace: string, key: string): string {
   return `erp:${namespace}:${key}`;
 }
 
-
-
 export interface UseSyncedStorageOptions {
-  /**
-   * Namespace para isolar grupos de chaves (ex.: 'appconfig', 'user-pref').
-   * A chave final no localStorage será `erp:<namespace>:<key>`.
-   *
-   * @default 'erp'
-   */
   namespace?: string;
+  onRemoteSyncError?: (info: { key: string; reason: string; expectedRevision: number; actualRevision: number | null }) => void;
 }
 
 export interface UseSyncedStorageResult<T> {
-  /** Valor atual (sincronizado entre abas). */
   value: T;
-  /**
-   * Persiste um novo valor no localStorage e notifica todas as abas abertas.
-   * Passa `null` para remover a entrada.
-   */
-  set: (next: T | null) => void;
-  /** Remove a entrada do localStorage e redefine o estado para `defaultValue`. */
+  set: (next: T | null) => { revision: number };
   remove: () => void;
+  getMeta: () => { revision: number; updatedAt: number };
 }
 
-// ── Hook ──────────────────────────────────────────────────────────────────────
-
-/**
- * `useSyncedStorage`
- *
- * Gerencia estado persistido no `localStorage` com sincronização automática
- * entre múltiplas abas do navegador, via evento nativo `storage`.
- *
- * Características:
- * - **Namespace**: permite isolar conjuntos de chaves (ex.: por módulo ou usuário).
- * - **Versionamento**: cada entrada é envolvida em um envelope `{ v, data }`.
- *   Se o valor no localStorage foi escrito com uma versão diferente de
- *   `STORAGE_SCHEMA_VERSION`, ele é descartado e `defaultValue` é usado.
- * - **Cross-tab sync**: o evento `window.storage` é escutado; quando outra aba
- *   altera a mesma chave, o estado desta aba é atualizado automaticamente.
- * - **Nenhum efeito colateral extra**: o hook não realiza chamadas de rede.
- *   A camada de persistência remota (Supabase) fica nos hooks de domínio
- *   (`useAppConfig`, `useUserPreference`) que utilizam este hook.
- *
- * @param key          Chave lógica dentro do namespace (ex.: 'sidebar_collapsed').
- * @param defaultValue Valor inicial usado quando não há entrada no localStorage
- *                     ou quando a versão do envelope é incompatível.
- * @param options      Opções adicionais (namespace).
- *
- * @example
- * ```tsx
- * const { value: collapsed, set: setCollapsed } = useSyncedStorage(
- *   'sidebar_collapsed',
- *   false,
- *   { namespace: 'user-pref' },
- * );
- * ```
- */
-export function useSyncedStorage<T>(
-  key: string,
-  defaultValue: T,
-  options: UseSyncedStorageOptions = {},
-): UseSyncedStorageResult<T> {
+export function useSyncedStorage<T>(key: string, defaultValue: T, options: UseSyncedStorageOptions = {}): UseSyncedStorageResult<T> {
   const namespace = options.namespace ?? 'erp';
   const storageKey = `erp:${namespace}:${key}`;
 
-  // Keep storageKey in a ref so the storage-event handler always has the
-  // latest value without needing to be re-registered.
   const storageKeyRef = useRef(storageKey);
   storageKeyRef.current = storageKey;
 
   const defaultValueRef = useRef(defaultValue);
   defaultValueRef.current = defaultValue;
 
+  const metaRef = useRef<{ revision: number; updatedAt: number }>({ revision: 0, updatedAt: Date.now() });
+
   const [value, setValue] = useState<T>(() => {
     const cached = readFromStorage<T>(storageKey);
-    return cached !== null ? cached : defaultValue;
+    if (cached !== null) {
+      metaRef.current = { revision: cached.revision, updatedAt: cached.updatedAt };
+      return cached.data;
+    }
+    return defaultValue;
   });
 
-  // Re-read from storage whenever the key changes (e.g., different userId).
   useEffect(() => {
     const cached = readFromStorage<T>(storageKey);
-    setValue(cached !== null ? cached : defaultValueRef.current);
+    if (cached !== null) {
+      metaRef.current = { revision: cached.revision, updatedAt: cached.updatedAt };
+      setValue(cached.data);
+    } else {
+      setValue(defaultValueRef.current);
+    }
   }, [storageKey]);
 
-  // Listen for changes made by other tabs / windows.
   useEffect(() => {
     const handleStorage = (event: StorageEvent) => {
       if (event.key !== storageKeyRef.current) return;
-
       if (event.newValue === null) {
-        // Entry was removed in another tab.
         setValue(defaultValueRef.current);
+        metaRef.current = { revision: 0, updatedAt: Date.now() };
         return;
       }
 
       const parsed = readFromStorage<T>(storageKeyRef.current);
       if (parsed !== null) {
-        setValue(parsed);
+        metaRef.current = { revision: parsed.revision, updatedAt: parsed.updatedAt };
+        setValue(parsed.data);
       } else {
-        // The new value in the other tab has a different schema version
-        // — fall back to the default.
         setValue(defaultValueRef.current);
       }
     };
 
     window.addEventListener('storage', handleStorage);
     return () => window.removeEventListener('storage', handleStorage);
-  }, []); // Intentionally empty: we use refs for mutable values.
+  }, []);
 
-  const set = useCallback(
-    (next: T | null) => {
-      if (next === null) {
-        removeFromStorage(storageKeyRef.current);
-        setValue(defaultValueRef.current);
-      } else {
-        writeToStorage(storageKeyRef.current, next);
-        setValue(next);
-      }
-    },
-    [],
-  );
+  const set = useCallback((next: T | null) => {
+    if (next === null) {
+      removeFromStorage(storageKeyRef.current);
+      setValue(defaultValueRef.current);
+      metaRef.current = { revision: 0, updatedAt: Date.now() };
+      return { revision: 0 };
+    }
+
+    const nextRevision = metaRef.current.revision + 1;
+    const env = writeToStorage(storageKeyRef.current, next, nextRevision);
+    setValue(next);
+    metaRef.current = { revision: env.revision, updatedAt: env.updatedAt };
+    return { revision: nextRevision };
+  }, []);
 
   const remove = useCallback(() => {
     removeFromStorage(storageKeyRef.current);
     setValue(defaultValueRef.current);
+    metaRef.current = { revision: 0, updatedAt: Date.now() };
   }, []);
 
-  return { value, set, remove };
+  const getMeta = useCallback(() => metaRef.current, []);
+
+  // simple inconsistency detector for domain hooks
+  useEffect(() => {
+    const cached = readFromStorage<T>(storageKeyRef.current);
+    if (cached && cached.revision < metaRef.current.revision) {
+      options.onRemoteSyncError?.({
+        key: storageKeyRef.current,
+        reason: 'local_revision_ahead_of_storage',
+        expectedRevision: metaRef.current.revision,
+        actualRevision: cached.revision,
+      });
+    }
+  }, [options]);
+
+  return { value, set, remove, getMeta };
 }
