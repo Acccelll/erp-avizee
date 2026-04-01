@@ -735,3 +735,30 @@ a avaliação das políticas.
 4. Documentar a nova tabela neste arquivo na seção correspondente.
 5. A lista `CRITICAL_TABLES` em `scripts/validate-rls.ts` deve ser atualizada para
    incluir a nova tabela se ela for crítica.
+
+
+## Exemplos práticos (permitido x negado)
+
+### Perfil `cliente` (anon/public)
+- ✅ `select * from orcamentos where public_token = <token>` (apenas orçamento público ativo).
+- ❌ `select * from clientes`.
+- ❌ `update clientes set ...`.
+
+### Perfil `funcionário` (authenticated)
+- ✅ leitura de tabelas operacionais com política `Auth users can read ...`.
+- ✅ escrita somente nas tabelas/políticas permitidas por role (`vendedor`, `financeiro`, `estoquista`).
+- ❌ ações administrativas em `user_roles` sem role `admin`.
+
+### Perfil `admin`
+- ✅ CRUD completo nas tabelas com política `Admins can manage ...`.
+- ✅ leitura de `auditoria_logs`.
+
+## Validação automatizada
+
+O script `scripts/test-rls.ts` executa um smoke test de segurança comparando comportamento entre `anon` e `service_role`.
+
+Execução local:
+
+```bash
+RLS_SUPABASE_URL=... RLS_ANON_KEY=... RLS_SERVICE_ROLE_KEY=... npx tsx scripts/test-rls.ts
+```

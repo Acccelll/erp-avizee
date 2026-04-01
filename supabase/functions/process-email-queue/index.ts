@@ -7,6 +7,9 @@ const DEFAULT_SEND_DELAY_MS = 200
 const DEFAULT_AUTH_TTL_MINUTES = 15
 const DEFAULT_TRANSACTIONAL_TTL_MINUTES = 60
 
+const jsonResponse = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
+
 // Check if an error is a rate-limit (429) response.
 // Uses EmailAPIError.status when available (email-js >=0.x with structured errors),
 // falls back to parsing the error message for older versions.
@@ -44,6 +47,7 @@ function parseJwtClaims(token: string): Record<string, unknown> | null {
 }
 
 Deno.serve(async (req) => {
+  try {
   const apiKey = Deno.env.get('LOVABLE_API_KEY')
   const supabaseUrl = Deno.env.get('SUPABASE_URL')
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
@@ -343,4 +347,9 @@ Deno.serve(async (req) => {
     JSON.stringify({ processed: totalProcessed }),
     { headers: { 'Content-Type': 'application/json' } }
   )
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    console.error(JSON.stringify({ level: 'error', function: 'process-email-queue', message }))
+    return jsonResponse({ success: false, error: message, code: 'UNHANDLED' }, 500)
+  }
 })

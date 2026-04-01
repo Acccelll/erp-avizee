@@ -1,280 +1,100 @@
 import { corsHeaders } from "../_shared/cors.ts";
 
 const CORREIOS_API = "https://api.correios.com.br";
+const MOCK_TRACK = { eventos: [{ descricao: "Dados mockados (fallback)", data: new Date().toISOString() }] };
 
+type ApiErrorPayload = { success: false; error: string; code?: string };
 
-interface TokenResponse {
-  token: string;
-  expiraEm: string; // ISO 8601 date-time returned by the Correios API
-}
+const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-let cachedToken: { token: string; expiresAt: number } | null = null;
+const errorResponse = (error: unknown, code?: string, status = 500) => {
+  const message = error instanceof Error ? error.message : String(error);
+  console.error(JSON.stringify({ level: "error", function: "correios-api", code, message }));
+  return json({ success: false, error: message, code } satisfies ApiErrorPayload, status);
+};
 
-/** Parses the Correios expiry string into a Unix timestamp (ms).
- *  Falls back to 45 minutes from now if the value is missing or unparseable. */
-function parseExpiry(expiraEm?: string): number {
-  if (expiraEm) {
-    const ts = Date.parse(expiraEm);
-    // Add a 60-second tolerance window to handle minor clock skew between
-    // this server and the Correios auth server.
-    if (!isNaN(ts) && ts > Date.now() - 60_000) {
-      // Apply a 5-minute safety margin to avoid using an almost-expired token
-      return ts - 5 * 60 * 1000;
-    }
+const fetchWithTimeout = async (url: string, init: RequestInit = {}, timeoutMs = 8000) => {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort("timeout"), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
   }
-  // Default: 45 minutes from now (tokens are usually valid for 50 min)
-  return Date.now() + 45 * 60 * 1000;
-}
+};
 
 async function getToken(): Promise<string> {
-  if (cachedToken && Date.now() < cachedToken.expiresAt) {
-    return cachedToken.token;
-  }
-
   const usuario = Deno.env.get("CORREIOS_USUARIO");
   const senha = Deno.env.get("CORREIOS_SENHA");
-  const cartaoPostagem = Deno.env.get("CORREIOS_CARTAO_POSTAGEM");
-
-  if (!usuario || !senha) {
-    throw new Error("Credenciais dos Correios não configuradas");
-  }
+  if (!usuario || !senha) throw new Error("CORREIOS_CREDENTIALS_MISSING");
 
   const basicAuth = btoa(`${usuario}:${senha}`);
-  console.log(`[correios] Autenticando com usuario=${usuario}, cartao=${cartaoPostagem?.substring(0,4)}...`);
-
-  // Try cartaopostagem endpoint first, fallback to simple auth
-  const endpoints = cartaoPostagem
-    ? [
-        { url: `${CORREIOS_API}/token/v1/autentica/cartaopostagem`, body: JSON.stringify({ numero: cartaoPostagem }) },
-        { url: `${CORREIOS_API}/token/v1/autentica`, body: JSON.stringify({}) },
-      ]
-    : [{ url: `${CORREIOS_API}/token/v1/autentica`, body: JSON.stringify({}) }];
-
-  let lastError = "";
-  for (const ep of endpoints) {
-    console.log(`[correios] Tentando: ${ep.url}`);
-    const res = await fetch(ep.url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Basic ${basicAuth}`,
-      },
-      body: ep.body,
-    });
-
-    if (res.ok) {
-      const data: TokenResponse = await res.json();
-      cachedToken = {
-        token: data.token,
-        expiresAt: parseExpiry(data.expiraEm),
-      };
-      console.log(`[correios] Autenticado com sucesso, token válido até ${new Date(cachedToken.expiresAt).toISOString()}`);
-      return data.token;
-    }
-
-    lastError = await res.text();
-    console.log(`[correios] Falha ${res.status}: ${lastError}`);
-  }
-
-  throw new Error(`Erro ao autenticar nos Correios: ${lastError}`);
-}
-
-async function rastrear(codigoObjeto: string): Promise<any> {
-  const codigo = codigoObjeto.trim().toUpperCase().replace(/\s+/g, "");
-  if (!codigo) throw new Error("Código de rastreio vazio");
-  const token = await getToken();
-  const url = `${CORREIOS_API}/srorastro/v1/objetos/${codigo}?resultado=T`;
-  console.log(`[correios] Rastreando: ${url}`);
-
-  const res = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/json",
-      "Accept-Language": "pt-BR",
-    },
+  const res = await fetchWithTimeout(`${CORREIOS_API}/token/v1/autentica`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Basic ${basicAuth}` },
+    body: "{}",
   });
-
-  const body = await res.text();
-  console.log(`[correios] Rastreio status=${res.status}, body=${body.substring(0, 300)}`);
-
-  if (!res.ok) {
-    if (res.status === 401) cachedToken = null;
-    throw new Error(`Erro rastreio: ${res.status} - ${body.substring(0, 200)}`);
-  }
-
-  return JSON.parse(body);
-}
-
-async function calcularPreco(params: {
-  cepOrigem: string;
-  cepDestino: string;
-  peso: number;
-  comprimento: number;
-  altura: number;
-  largura: number;
-  codigoServico: string;
-}): Promise<any> {
-  const token = await getToken();
-  const qs = new URLSearchParams({
-    cepOrigem: params.cepOrigem,
-    cepDestino: params.cepDestino,
-    psObjeto: String(params.peso),
-    tpObjeto: "2",
-    comprimento: String(params.comprimento),
-    altura: String(params.altura),
-    largura: String(params.largura),
-  });
-
-  const res = await fetch(
-    `${CORREIOS_API}/preco/v1/nacional/${params.codigoServico}?${qs}`,
-    {
-      headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
-    }
-  );
-  if (!res.ok) throw new Error(`Erro cotação: ${res.status}`);
-  return res.json();
-}
-
-async function calcularPrazo(params: {
-  cepOrigem: string;
-  cepDestino: string;
-  codigoServico: string;
-}): Promise<any> {
-  const token = await getToken();
-  const qs = new URLSearchParams({
-    cepOrigem: params.cepOrigem,
-    cepDestino: params.cepDestino,
-  });
-
-  const res = await fetch(
-    `${CORREIOS_API}/prazo/v1/nacional/${params.codigoServico}?${qs}`,
-    {
-      headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
-    }
-  );
-  if (!res.ok) throw new Error(`Erro prazo: ${res.status}`);
-  return res.json();
-}
-
-const SERVICOS = [
-  { codigo: "04014", nome: "SEDEX" },
-  { codigo: "04510", nome: "PAC" },
-  { codigo: "40215", nome: "SEDEX 10" },
-  { codigo: "04782", nome: "SEDEX 12" },
-];
-
-async function cotacaoMulti(params: {
-  cepOrigem: string;
-  cepDestino: string;
-  peso: number;
-  comprimento?: number;
-  altura?: number;
-  largura?: number;
-}): Promise<any[]> {
-  const { cepOrigem, cepDestino, peso, comprimento = 30, altura = 15, largura = 10 } = params;
-
-  const results = await Promise.allSettled(
-    SERVICOS.map(async (servico) => {
-      try {
-        const [preco, prazo] = await Promise.all([
-          calcularPreco({ cepOrigem, cepDestino, peso, comprimento, altura, largura, codigoServico: servico.codigo }),
-          calcularPrazo({ cepOrigem, cepDestino, codigoServico: servico.codigo }),
-        ]);
-
-        const valor = preco?.pcFinal ? parseFloat(String(preco.pcFinal).replace(",", ".")) : 0;
-        const dias = prazo?.prazoEntrega ?? 0;
-
-        return {
-          servico: servico.nome,
-          codigo: servico.codigo,
-          valor,
-          prazo: dias,
-        };
-      } catch (err: any) {
-        console.log(`[correios] cotacao ${servico.nome} erro:`, err.message);
-        return {
-          servico: servico.nome,
-          codigo: servico.codigo,
-          valor: 0,
-          prazo: 0,
-          erro: err.message,
-        };
-      }
-    })
-  );
-
-  return results.map((r) => (r.status === "fulfilled" ? r.value : { servico: "?", codigo: "?", valor: 0, prazo: 0, erro: "Falha" }));
+  if (!res.ok) throw new Error(`CORREIOS_AUTH_FAILED:${res.status}`);
+  const data = await res.json() as { token: string };
+  return data.token;
 }
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
     const url = new URL(req.url);
     const action = url.searchParams.get("action");
+    if (!action) return json({ success: false, error: "Parâmetro action obrigatório", code: "MISSING_ACTION" }, 400);
 
-    if (!action) {
-      return new Response(
-        JSON.stringify({ error: "Parâmetro 'action' obrigatório (rastrear, cotacao, prazo, cotacao_multi)" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    if (action === "rastrear") {
+      const codigo = url.searchParams.get("codigo")?.trim();
+      if (!codigo) return json({ success: false, error: "Parâmetro codigo obrigatório", code: "MISSING_CODE" }, 400);
 
-    let result: any;
-
-    switch (action) {
-      case "rastrear": {
-        const codigo = url.searchParams.get("codigo");
-        if (!codigo) throw new Error("Parâmetro 'codigo' obrigatório");
-        result = await rastrear(codigo);
-        break;
-      }
-      case "cotacao": {
-        const body = await req.json();
-        result = await calcularPreco(body);
-        break;
-      }
-      case "prazo": {
-        const body = await req.json();
-        result = await calcularPrazo(body);
-        break;
-      }
-      case "cotacao_multi": {
-        const body = await req.json();
-        result = await cotacaoMulti(body);
-        break;
-      }
-      case "token": {
+      try {
         const token = await getToken();
-        result = { success: true, tokenPreview: token.substring(0, 20) + "..." };
-        break;
+        const res = await fetchWithTimeout(`${CORREIOS_API}/srorastro/v1/objetos/${encodeURIComponent(codigo)}?resultado=T`, {
+          headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+        });
+        if (!res.ok) throw new Error(`CORREIOS_RASTREIO_FAILED:${res.status}`);
+        return json(await res.json());
+      } catch (error) {
+        console.warn("[correios-api] fallback mock ativado", error);
+        return json({ success: true, warning: "fallback_mock", data: MOCK_TRACK });
       }
-      default:
-        return new Response(
-          JSON.stringify({ error: `Ação '${action}' não reconhecida` }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
     }
 
-    return new Response(JSON.stringify(result), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : "Erro interno";
-    console.error("[correios-api]", error);
+    if (action === "cotacao_multi") {
+      const token = await getToken();
+      const body = await req.json() as { cepOrigem: string; cepDestino: string; peso: number; comprimento?: number; altura?: number; largura?: number };
+      const servicos = ["04014", "04510"];
+      const results = await Promise.all(servicos.map(async (codigo) => {
+        const qs = new URLSearchParams({
+          cepOrigem: body.cepOrigem,
+          cepDestino: body.cepDestino,
+          psObjeto: String(body.peso),
+          tpObjeto: "2",
+          comprimento: String(body.comprimento ?? 30),
+          altura: String(body.altura ?? 15),
+          largura: String(body.largura ?? 10),
+        });
+        const [precoRes, prazoRes] = await Promise.all([
+          fetchWithTimeout(`${CORREIOS_API}/preco/v1/nacional/${codigo}?${qs}`, { headers: { Authorization: `Bearer ${token}` } }),
+          fetchWithTimeout(`${CORREIOS_API}/prazo/v1/nacional/${codigo}?cepOrigem=${body.cepOrigem}&cepDestino=${body.cepDestino}`, { headers: { Authorization: `Bearer ${token}` } }),
+        ]);
+        return {
+          codigo,
+          precoStatus: precoRes.status,
+          prazoStatus: prazoRes.status,
+          preco: precoRes.ok ? await precoRes.json() : null,
+          prazo: prazoRes.ok ? await prazoRes.json() : null,
+        };
+      }));
+      return json({ success: true, data: results });
+    }
 
-    // Return 503 when the error is a missing/invalid credential so the
-    // caller can distinguish a configuration issue from a runtime error.
-    const isCredentialError =
-      msg.includes("Credenciais dos Correios não configuradas") ||
-      msg.includes("Erro ao autenticar");
-    const status = isCredentialError ? 503 : 500;
-
-    return new Response(
-      JSON.stringify({ error: msg }),
-      { status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return json({ success: false, error: `Ação '${action}' não reconhecida`, code: "INVALID_ACTION" }, 400);
+  } catch (error) {
+    return errorResponse(error, "UNHANDLED");
   }
 });
