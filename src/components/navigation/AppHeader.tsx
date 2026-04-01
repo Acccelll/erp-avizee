@@ -136,7 +136,7 @@ export function AppHeader({ onOpenMobileMenu: _onOpenMobileMenu, searchRequest =
                 <Button variant="outline" size="icon" className="h-10 w-10 rounded-full" onClick={() => setSearchOpen(true)} aria-label="Abrir busca global" title="Buscar">
                   <Search className="h-4 w-4" />
                 </Button>
-                <Button variant="outline" size="icon" className="rounded-full" onClick={() => setShortcutsOpen(true)} aria-label="Abrir atalhos de teclado" title="Atalhos"><Keyboard className="h-4 w-4" /></Button>
+                <Button variant="outline" size="icon" className="rounded-full" onClick={() => setShortcutsOpen(true)}><Keyboard className="h-4 w-4" /></Button>
 
               <NotificationsPanel />
                 <DropdownMenu>
@@ -208,7 +208,7 @@ export function AppHeader({ onOpenMobileMenu: _onOpenMobileMenu, searchRequest =
                 </DropdownMenuContent>
               </DropdownMenu>
 
-              <Button variant="outline" size="icon" className="rounded-full" onClick={() => setShortcutsOpen(true)} aria-label="Abrir atalhos de teclado" title="Atalhos"><Keyboard className="h-4 w-4" /></Button>
+              <Button variant="outline" size="icon" className="rounded-full" onClick={() => setShortcutsOpen(true)}><Keyboard className="h-4 w-4" /></Button>
 
               <NotificationsPanel />
 
