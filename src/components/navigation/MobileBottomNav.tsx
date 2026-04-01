@@ -14,7 +14,7 @@ export function MobileBottomNav({ onOpenMenu }: MobileBottomNavProps) {
   const activeKey = getNavSectionKey(currentRoute);
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 px-2 pb-[calc(env(safe-area-inset-bottom)+0.35rem)] pt-2 shadow-[0_-10px_30px_rgba(0,0,0,0.08)] backdrop-blur md:hidden">
+    <nav aria-label="Navegação mobile" className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 px-2 pb-[calc(env(safe-area-inset-bottom)+0.35rem)] pt-2 shadow-[0_-10px_30px_rgba(0,0,0,0.08)] backdrop-blur md:hidden">
       <div className="grid grid-cols-5 gap-1">
         {mobileBottomTabs.map((tab) => {
           const Icon = tab.icon;
@@ -24,6 +24,7 @@ export function MobileBottomNav({ onOpenMenu }: MobileBottomNavProps) {
               key={tab.key}
               type="button"
               onClick={() => tab.path && navigate(tab.path)}
+              aria-current={active ? 'page' : undefined}
               className={cn(
                 'flex min-h-[52px] flex-col items-center justify-center gap-1 rounded-xl px-2 py-2 text-[11px] font-medium transition-colors',
                 active ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-accent hover:text-foreground',

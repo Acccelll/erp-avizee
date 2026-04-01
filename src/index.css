@@ -95,6 +95,13 @@
     @apply border-border;
   }
 
+  /* Keyboard focus — visible ring for all interactive elements */
+  *:focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+    border-radius: calc(var(--radius) - 2px);
+  }
+
   body {
     @apply bg-background text-foreground font-sans antialiased;
     font-family: 'Inter', system-ui, sans-serif;

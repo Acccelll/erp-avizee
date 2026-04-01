@@ -1,32 +1,27 @@
-import { useState, useEffect, useCallback } from "react";
+import { useEffect, useCallback, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Json } from "@/integrations/supabase/types";
+import { useSyncedStorage } from "./useSyncedStorage";
 
 /**
  * Hook for system-level configuration values stored in the `app_configuracoes` table.
  *
  * Strategy:
  * - Primary source of truth: `app_configuracoes` table in Supabase.
- * - localStorage is used as a short-lived write-through cache so that the UI
- *   feels snappy between page loads and remains functional when Supabase is
+ * - `useSyncedStorage` is used as a write-through cache so that the UI feels
+ *   snappy between page loads and remains functional when Supabase is
  *   temporarily unreachable.
- * - The localStorage entry is always overwritten by the value returned from
- *   Supabase once the fetch completes, so there is a single source of truth.
+ * - The cache is always overwritten by the value returned from Supabase once
+ *   the fetch completes, so there is a single source of truth.
+ * - Changes made in one browser tab are automatically reflected in all other
+ *   open tabs via the `storage` event, thanks to `useSyncedStorage`.
  */
 export function useAppConfig<T = Json>(chave: string, defaultValue?: T) {
-  const storageKey = `erp-appconfig:${chave}`;
-
-  // Seed initial state from the localStorage cache to avoid a flash of the
-  // default value on every mount.
-  const [value, setValue] = useState<T | null>(() => {
-    try {
-      const raw = localStorage.getItem(storageKey);
-      if (raw !== null) return JSON.parse(raw) as T;
-    } catch {
-      // Ignore parse errors; fall through to default.
-    }
-    return defaultValue ?? null;
-  });
+  const { value, set: setCache } = useSyncedStorage<T | null>(
+    chave,
+    defaultValue ?? null,
+    { namespace: 'appconfig' },
+  );
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -39,21 +34,17 @@ export function useAppConfig<T = Json>(chave: string, defaultValue?: T) {
       .then(({ data }) => {
         if (cancelled) return;
         if (data?.valor !== undefined) {
-          const v = data.valor as T;
-          setValue(v);
-          // Keep localStorage cache in sync with the DB value.
-          try { localStorage.setItem(storageKey, JSON.stringify(v)); } catch { /* quota full – ignore */ }
+          setCache(data.valor as T);
         }
         setLoading(false);
       });
     return () => { cancelled = true; };
-  }, [chave, storageKey]);
+  }, [chave, setCache]);
 
   const save = useCallback(
     async (newValue: T) => {
-      // Optimistically update local state and cache before the round-trip.
-      setValue(newValue);
-      try { localStorage.setItem(storageKey, JSON.stringify(newValue)); } catch { /* quota full – ignore */ }
+      // Optimistically update local state and cross-tab cache before round-trip.
+      setCache(newValue);
 
       const { error } = await supabase
         .from("app_configuracoes")
@@ -61,16 +52,16 @@ export function useAppConfig<T = Json>(chave: string, defaultValue?: T) {
           {
             chave,
             valor: newValue as unknown as Json,
-            updated_at: new Date().toISOString()
+            updated_at: new Date().toISOString(),
           },
-          { onConflict: "chave" }
+          { onConflict: "chave" },
         );
       if (error) {
         console.error(`[useAppConfig] Erro ao salvar '${chave}':`, error);
       }
       return !error;
     },
-    [chave, storageKey]
+    [chave, setCache],
   );
 
   return { value, loading, save };

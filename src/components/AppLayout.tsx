@@ -7,6 +7,7 @@ import { MobileBottomNav } from './navigation/MobileBottomNav';
 import { MobileMenu } from './navigation/MobileMenu';
 import { MobileQuickActions } from './navigation/MobileQuickActions';
 import { RelationalDrawerStack } from './views/RelationalDrawerStack';
+import { SkipLink } from './SkipLink';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { ContrastDevTool } from './accessibility/ContrastDevTool';
 

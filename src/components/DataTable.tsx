@@ -291,7 +291,7 @@ export function DataTable<T extends Record<string, any>>({
       )}
       {onView && (
         <Tooltip><TooltipTrigger asChild>
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); onView(item); }}>
+          <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Visualizar registro" onClick={(e) => { e.stopPropagation(); onView(item); }}>
             <Eye className="h-4 w-4" />
           </Button>
         </TooltipTrigger><TooltipContent>Visualizar</TooltipContent></Tooltip>

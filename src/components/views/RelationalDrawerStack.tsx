@@ -1,7 +1,8 @@
-import { useRelationalNavigation, EntityType, ViewState } from "@/contexts/RelationalNavigationContext";
+import { useRelationalNavigation, EntityType, ViewState, MAX_DRAWER_DEPTH } from "@/contexts/RelationalNavigationContext";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, X } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { ArrowLeft, X, AlertTriangle } from "lucide-react";
 import { ProdutoView } from "./ProdutoView";
 import { ClienteView } from "./ClienteView";
 import { FornecedorView } from "./FornecedorView";
@@ -13,6 +14,7 @@ import { OrdemVendaView } from "./OrdemVendaView";
 
 export function RelationalDrawerStack() {
   const { stack, popView, clearStack } = useRelationalNavigation();
+  const atLimit = stack.length >= MAX_DRAWER_DEPTH;
 
   const renderView = (view: ViewState) => {
     switch (view.type) {
@@ -91,9 +93,31 @@ export function RelationalDrawerStack() {
                     <SheetTitle className="text-base truncate">{getTitle(view.type)}</SheetTitle>
                     <SheetDescription className="sr-only">Visualização de {getTitle(view.type)}</SheetDescription>
                   </div>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={clearStack}>
-                    <X className="h-4 w-4" />
-                  </Button>
+                  <div className="flex items-center gap-1 shrink-0">
+                    {/* Depth-limit warning — visible only on the topmost drawer when at limit */}
+                    {isTop && atLimit && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="flex items-center justify-center h-8 w-8 text-amber-500">
+                            <AlertTriangle className="h-4 w-4" />
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" className="max-w-xs text-center">
+                          Profundidade máxima atingida ({MAX_DRAWER_DEPTH} drawers). Ao abrir um novo, o mais antigo será fechado automaticamente.
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={clearStack}>
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom">
+                        Fechar tudo <kbd className="ml-1 text-xs opacity-70">⇧ ESC</kbd>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
                 </div>
               </SheetHeader>
 

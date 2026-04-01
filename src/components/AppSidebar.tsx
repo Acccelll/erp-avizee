@@ -149,6 +149,7 @@ export function AppSidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMo
           <Link
             to={dashboardItem.path}
             onClick={onCloseMobile}
+            aria-current={location.pathname === dashboardItem.path ? 'page' : undefined}
             className={`sidebar-item mb-3 ${location.pathname === dashboardItem.path ? 'sidebar-item-active' : 'sidebar-item-inactive'} ${collapsed ? 'justify-center' : ''}`}
             title={collapsed ? dashboardItem.title : undefined}
           >
@@ -169,6 +170,8 @@ export function AppSidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMo
                       if (collapsed) { onToggleCollapsed(); return; }
                       setManualSections((c) => ({ ...c, [section.key]: !isOpen }));
                     }}
+                    aria-expanded={!collapsed && isOpen}
+                    aria-controls={`sidebar-section-${section.key}`}
                     className={`relative flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-medium transition ${
                       sectionActive
                         ? 'text-primary'
@@ -197,7 +200,7 @@ export function AppSidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMo
                   </button>
 
                   {!collapsed && isOpen && (
-                    <div className="ml-3 space-y-0.5 border-l border-border pl-3 py-1">
+                    <div id={`sidebar-section-${section.key}`} className="ml-3 space-y-0.5 border-l border-border pl-3 py-1">
                       {section.items.map((group) => (
                         <Fragment key={group.title}>
                           {section.items.length > 1 && (

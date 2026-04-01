@@ -166,7 +166,7 @@ export function useImportacaoXml() {
       for (const item of validItems) {
         const nfe = item.payload as unknown as NFeData;
         const cnpjEmit = nfe.emitente.cnpj.replace(/\D/g, "");
-        let fornecedorId = vendorMap.get(cnpjEmit);
+        const fornecedorId = vendorMap.get(cnpjEmit);
 
         // Se fornecedor não existe, cria um básico (opcional, aqui daremos erro para segurança)
         if (!fornecedorId) {

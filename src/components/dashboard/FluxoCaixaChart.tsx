@@ -106,40 +106,71 @@ export function FluxoCaixaChart() {
   return (
     <figure className="bg-card rounded-xl border p-5" role="img" aria-label="Gráfico de área do fluxo de caixa dos últimos seis meses com séries de recebimentos e pagamentos realizados e previstos.">
       <h3 className="font-semibold text-foreground mb-4">Fluxo de Caixa — Realizado vs Previsto (6 meses)</h3>
-      <ResponsiveContainer width="100%" height={220}>
-        <AreaChart data={data}>
-          <defs>
-            <linearGradient id="colorEntradas" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="hsl(142 76% 36%)" stopOpacity={0.3} />
-              <stop offset="95%" stopColor="hsl(142 76% 36%)" stopOpacity={0} />
-            </linearGradient>
-            <linearGradient id="colorSaidas" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="hsl(0 84% 60%)" stopOpacity={0.3} />
-              <stop offset="95%" stopColor="hsl(0 84% 60%)" stopOpacity={0} />
-            </linearGradient>
-          </defs>
-          <CartesianGrid strokeDasharray="3 3" className="stroke-border/30" />
-          <XAxis dataKey="mes" tick={{ fontSize: 11 }} className="fill-muted-foreground" />
-          <YAxis hide />
-          <Tooltip
-            formatter={(value: number, name: string) => [
-              formatCurrency(value),
-              name === 'entradas_real'
-                ? 'Recebimentos realizados'
-                : name === 'saidas_real'
-                  ? 'Pagamentos realizados'
-                  : name === 'entradas_prev'
-                    ? 'A receber (previsto)'
-                    : 'A pagar (previsto)',
-            ]}
-            contentStyle={{ fontSize: 12, borderRadius: 8 }}
-          />
-          <Area type="monotone" dataKey="entradas_real" stroke="hsl(142 76% 36%)" fill="url(#colorEntradas)" strokeWidth={2} />
-          <Area type="monotone" dataKey="saidas_real" stroke="hsl(0 84% 60%)" fill="url(#colorSaidas)" strokeWidth={2} />
-          <Area type="monotone" dataKey="entradas_prev" stroke="hsl(142 76% 36%)" fill="none" strokeDasharray="5 3" strokeWidth={1.5} opacity={0.6} />
-          <Area type="monotone" dataKey="saidas_prev" stroke="hsl(0 84% 60%)" fill="none" strokeDasharray="5 3" strokeWidth={1.5} opacity={0.6} />
-        </AreaChart>
-      </ResponsiveContainer>
+      <div
+        role="img"
+        aria-label={`Gráfico de área: fluxo de caixa dos últimos 6 meses. ${data.map((p) => `${p.mes}: recebimentos realizados ${formatCurrency(p.entradas_real)}, pagamentos realizados ${formatCurrency(p.saidas_real)}`).join('; ')}`}
+      >
+        <ResponsiveContainer width="100%" height={220}>
+          <AreaChart data={data}>
+            <defs>
+              <linearGradient id="colorEntradas" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="hsl(142 76% 36%)" stopOpacity={0.3} />
+                <stop offset="95%" stopColor="hsl(142 76% 36%)" stopOpacity={0} />
+              </linearGradient>
+              <linearGradient id="colorSaidas" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="hsl(0 84% 60%)" stopOpacity={0.3} />
+                <stop offset="95%" stopColor="hsl(0 84% 60%)" stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" className="stroke-border/30" />
+            <XAxis dataKey="mes" tick={{ fontSize: 11 }} className="fill-muted-foreground" />
+            <YAxis hide />
+            <Tooltip
+              formatter={(value: number, name: string) => [
+                formatCurrency(value),
+                name === 'entradas_real'
+                  ? 'Recebimentos realizados'
+                  : name === 'saidas_real'
+                    ? 'Pagamentos realizados'
+                    : name === 'entradas_prev'
+                      ? 'A receber (previsto)'
+                      : 'A pagar (previsto)',
+              ]}
+              contentStyle={{ fontSize: 12, borderRadius: 8 }}
+            />
+            <Area type="monotone" dataKey="entradas_real" stroke="hsl(142 76% 36%)" fill="url(#colorEntradas)" strokeWidth={2} />
+            <Area type="monotone" dataKey="saidas_real" stroke="hsl(0 84% 60%)" fill="url(#colorSaidas)" strokeWidth={2} />
+            <Area type="monotone" dataKey="entradas_prev" stroke="hsl(142 76% 36%)" fill="none" strokeDasharray="5 3" strokeWidth={1.5} opacity={0.6} />
+            <Area type="monotone" dataKey="saidas_prev" stroke="hsl(0 84% 60%)" fill="none" strokeDasharray="5 3" strokeWidth={1.5} opacity={0.6} />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+      {/* Accessible data table for screen readers */}
+      <div className="sr-only">
+        <table>
+          <caption>Fluxo de Caixa — Realizado vs Previsto (6 meses)</caption>
+          <thead>
+            <tr>
+              <th scope="col">Mês</th>
+              <th scope="col">Recebimentos Realizados</th>
+              <th scope="col">Pagamentos Realizados</th>
+              <th scope="col">A Receber (Previsto)</th>
+              <th scope="col">A Pagar (Previsto)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.map((p) => (
+              <tr key={p.mes}>
+                <td>{p.mes}</td>
+                <td>{formatCurrency(p.entradas_real)}</td>
+                <td>{formatCurrency(p.saidas_real)}</td>
+                <td>{formatCurrency(p.entradas_prev)}</td>
+                <td>{formatCurrency(p.saidas_prev)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
       <div className="flex gap-6 mt-3 text-xs text-muted-foreground justify-center flex-wrap">
         <span className="flex items-center gap-1.5">
           <span className="w-3 h-0.5 bg-[hsl(142_76%_36%)]" />Recebimentos realizados
