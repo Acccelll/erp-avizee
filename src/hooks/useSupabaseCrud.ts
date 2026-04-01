@@ -30,6 +30,8 @@ export function useSupabaseCrud<T extends Record<string, any>>({
   hasAtivo = true,
   pageSize,
   showToasts = true,
+  searchTerm = "",
+  searchColumns = [],
 }: UseCrudOptions) {
   const [data, setData] = useState<T[]>([]);
   const [loading, setLoading] = useState(true);
