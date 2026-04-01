@@ -17,6 +17,8 @@ interface UseCrudOptions {
   hasAtivo?: boolean;
   pageSize?: number;
   showToasts?: boolean;
+  searchTerm?: string;
+  searchColumns?: string[];
 }
 
 export function useSupabaseCrud<T extends Record<string, any>>({
