@@ -90,7 +90,8 @@ const Produtos = () => {
       nome: p.nome, sku: p.sku || "", codigo_interno: p.codigo_interno || "", descricao: p.descricao || "",
       unidade_medida: p.unidade_medida, preco_custo: p.preco_custo || 0, preco_venda: p.preco_venda,
       estoque_minimo: p.estoque_minimo || 0, ncm: p.ncm || "", cst: p.cst || "", cfop_padrao: p.cfop_padrao || "",
-      peso: p.peso || 0, eh_composto: p.eh_composto || false
+      peso: p.peso || 0, eh_composto: p.eh_composto || false,
+      grupo_id: p.grupo_id || ""
     });
     if (p.eh_composto) {
       const { data: comp } = await supabase.from("produto_composicoes").
