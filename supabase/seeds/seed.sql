@@ -952,8 +952,8 @@ VALUES
 ON CONFLICT (id) DO NOTHING;
 
 -- Movimentos de caixa
--- CORREÇÃO DE SCHEMA: colunas data_movimento/observacoes/ativo não existem na tabela.
--- O campo tipo usa o enum tipo_caixa: abertura|suprimento|sangria|fechamento|venda|pagamento
+-- Colunas disponíveis: id, tipo (enum tipo_caixa), descricao, valor, conta_bancaria_id
+-- Enum tipo_caixa: abertura | suprimento | sangria | fechamento | venda | pagamento
 -- Recebimentos de clientes → 'venda'  |  Pagamentos a fornecedores/despesas → 'pagamento'/'sangria'
 INSERT INTO public.caixa_movimentos (
   id, tipo, descricao, valor, conta_bancaria_id

@@ -37,10 +37,17 @@ const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL |
 
 function isProductionUrl(url) {
   if (!url) return false;
-  // URLs de produção costumam ser do tipo *.supabase.co mas sem localhost nem 127.0.0.1
-  const isLocal = url.includes('localhost') || url.includes('127.0.0.1') || url.includes('0.0.0.0');
-  const isSupabaseCloud = url.includes('.supabase.co') || url.includes('.supabase.com');
-  return isSupabaseCloud && !isLocal;
+  try {
+    const { hostname } = new URL(url);
+    // Local development hostnames are never production
+    if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '0.0.0.0') {
+      return false;
+    }
+    // Cloud Supabase hostnames end with .supabase.co or .supabase.com
+    return hostname.endsWith('.supabase.co') || hostname.endsWith('.supabase.com');
+  } catch {
+    return false;
+  }
 }
 
 if (process.env.NODE_ENV === 'production') {
