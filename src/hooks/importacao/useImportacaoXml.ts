@@ -55,12 +55,12 @@ export function useImportacaoXml() {
       // Validar duplicidades no banco (chaves de acesso)
       const chaves = results.map(r => r.data?.chaveAcesso).filter(Boolean) as string[];
       if (chaves.length > 0) {
-        const { data: existentes } = await supabase
-          .from("compras")
+        const { data: existentes } = await (supabase
+          .from("compras" as any)
           .select("chave_acesso")
-          .in("chave_acesso", chaves);
+          .in("chave_acesso", chaves) as any);
 
-        const chavesExistentes = new Set(existentes?.map(e => e.chave_acesso));
+        const chavesExistentes = new Set((existentes || []).map((e: any) => e.chave_acesso));
 
         results.forEach(r => {
           if (r.data && chavesExistentes.has(r.data.chaveAcesso)) {
