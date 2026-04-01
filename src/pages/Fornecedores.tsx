@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AppLayout } from "@/components/AppLayout";
 import { DataTable } from "@/components/DataTable";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -19,6 +19,7 @@ import { MultiSelect, type MultiSelectOption } from "@/components/ui/MultiSelect
 import { MaskedInput } from "@/components/ui/MaskedInput";
 import { toast } from "sonner";
 import { Search } from "lucide-react";
+import { clienteFornecedorSchema, validateForm } from "@/lib/validationSchemas";
 
 interface Fornecedor {
   id: string;tipo_pessoa: string;nome_razao_social: string;nome_fantasia: string;
@@ -36,7 +37,20 @@ const emptyForm: Record<string, any> = {
 };
 
 const Fornecedores = () => {
-  const { data, loading, create, update, remove, duplicate } = useSupabaseCrud<Fornecedor>({ table: "fornecedores" });
+  const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchTerm), 350);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  const { data, loading, create, update, remove, duplicate } = useSupabaseCrud<Fornecedor>({
+    table: "fornecedores",
+    searchTerm: debouncedSearch,
+    searchColumns: ["nome_razao_social", "nome_fantasia", "cpf_cnpj", "email", "cidade"],
+  });
   const { pushView } = useRelationalNavigation();
   const { buscarCep, loading: cepLoading } = useViaCep();
   const { buscarCnpj, loading: cnpjLoading } = useCnpjLookup();
@@ -45,7 +59,6 @@ const Fornecedores = () => {
   const [mode, setMode] = useState<"create" | "edit">("create");
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
   const [tipoFilters, setTipoFilters] = useState<string[]>([]);
 
   const openCreate = () => {setMode("create");setForm({ ...emptyForm });setSelected(null);setModalOpen(true);};
@@ -68,7 +81,14 @@ const Fornecedores = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.nome_razao_social) {toast.error("Razão Social é obrigatória");return;}
+    const validation = validateForm(clienteFornecedorSchema, form);
+    if (!validation.success) {
+      setFormErrors(validation.errors);
+      const firstError = Object.values(validation.errors)[0];
+      toast.error(firstError || "Corrija os erros do formulário");
+      return;
+    }
+    setFormErrors({});
     setSaving(true);
     try {
       if (mode === "create") await create(form);else
@@ -81,13 +101,12 @@ const Fornecedores = () => {
   };
 
   const filteredData = useMemo(() => {
-    const query = searchTerm.trim().toLowerCase();
+    // Text search is now server-side; only apply local dropdown filters
     return data.filter((fornecedor) => {
       if (tipoFilters.length > 0 && !tipoFilters.includes(fornecedor.tipo_pessoa)) return false;
-      if (!query) return true;
-      return [fornecedor.nome_razao_social, fornecedor.nome_fantasia, fornecedor.cpf_cnpj, fornecedor.email, fornecedor.cidade, fornecedor.uf, fornecedor.telefone, fornecedor.contato].filter(Boolean).join(" ").toLowerCase().includes(query);
+      return true;
     });
-  }, [data, searchTerm, tipoFilters]);
+  }, [data, tipoFilters]);
 
   const columns = [
   { key: "nome_razao_social", label: "Razão Social", sortable: true },

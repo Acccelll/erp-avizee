@@ -41,7 +41,8 @@ interface ComposicaoItem {
 
 const emptyProduto: Record<string, any> = {
   nome: "", sku: "", codigo_interno: "", descricao: "", unidade_medida: "UN",
-  preco_custo: 0, preco_venda: 0, estoque_minimo: 0, ncm: "", cst: "", cfop_padrao: "", peso: 0, eh_composto: false
+  preco_custo: 0, preco_venda: 0, estoque_minimo: 0, ncm: "", cst: "", cfop_padrao: "", peso: 0, eh_composto: false,
+  grupo_id: ""
 };
 
 const Produtos = () => {
@@ -89,7 +90,8 @@ const Produtos = () => {
       nome: p.nome, sku: p.sku || "", codigo_interno: p.codigo_interno || "", descricao: p.descricao || "",
       unidade_medida: p.unidade_medida, preco_custo: p.preco_custo || 0, preco_venda: p.preco_venda,
       estoque_minimo: p.estoque_minimo || 0, ncm: p.ncm || "", cst: p.cst || "", cfop_padrao: p.cfop_padrao || "",
-      peso: p.peso || 0, eh_composto: p.eh_composto || false
+      peso: p.peso || 0, eh_composto: p.eh_composto || false,
+      grupo_id: p.grupo_id || ""
     });
     if (p.eh_composto) {
       const { data: comp } = await supabase.from("produto_composicoes").
@@ -328,6 +330,15 @@ const Produtos = () => {
                 <input type="checkbox" checked={form.eh_composto} onChange={(e) => setForm({ ...form, eh_composto: e.target.checked })} className="rounded" />
                 Produto Composto
               </label>
+            </div>
+            <div className="space-y-2"><Label>Grupo de Produto</Label>
+              <Select value={form.grupo_id || "nenhum"} onValueChange={(v) => setForm({ ...form, grupo_id: v === "nenhum" ? "" : v })}>
+                <SelectTrigger><SelectValue placeholder="Nenhum" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="nenhum">Nenhum</SelectItem>
+                  {grupos.map((g) => <SelectItem key={g.id} value={g.id}>{g.nome}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 

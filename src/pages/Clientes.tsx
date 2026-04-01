@@ -20,6 +20,7 @@ import { MaskedInput } from "@/components/ui/MaskedInput";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Building2, Search } from "lucide-react";
+import { clienteFornecedorSchema, validateForm } from "@/lib/validationSchemas";
 
 interface Cliente {
   id: string;tipo_pessoa: string;nome_razao_social: string;nome_fantasia: string;
@@ -48,7 +49,21 @@ const relacaoOptions = [
 
 
 const Clientes = () => {
-  const { data, loading, create, update, remove, duplicate } = useSupabaseCrud<Cliente>({ table: "clientes" });
+  const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+
+  // Debounce search for server-side filtering
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchTerm), 350);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  const { data, loading, create, update, remove, duplicate } = useSupabaseCrud<Cliente>({
+    table: "clientes",
+    searchTerm: debouncedSearch,
+    searchColumns: ["nome_razao_social", "nome_fantasia", "cpf_cnpj", "email", "cidade"],
+  });
   const { pushView } = useRelationalNavigation();
   const { buscarCep, loading: cepLoading } = useViaCep();
   const { buscarCnpj, loading: cnpjLoading } = useCnpjLookup();
@@ -58,7 +73,6 @@ const Clientes = () => {
   const [form, setForm] = useState(emptyCliente);
   const [saving, setSaving] = useState(false);
   const [grupos, setGrupos] = useState<GrupoEconomico[]>([]);
-  const [searchTerm, setSearchTerm] = useState("");
   const [tipoFilters, setTipoFilters] = useState<string[]>([]);
   const [grupoFilters, setGrupoFilters] = useState<string[]>([]);
 
@@ -91,7 +105,14 @@ const Clientes = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.nome_razao_social) {toast.error("Nome/Razão Social é obrigatório");return;}
+    const validation = validateForm(clienteFornecedorSchema, form);
+    if (!validation.success) {
+      setFormErrors(validation.errors);
+      const firstError = Object.values(validation.errors)[0];
+      toast.error(firstError || "Corrija os erros do formulário");
+      return;
+    }
+    setFormErrors({});
     setSaving(true);
     const payload = { ...form, grupo_economico_id: form.grupo_economico_id || null, caixa_postal: form.caixa_postal || null };
     try {
@@ -108,26 +129,16 @@ const Clientes = () => {
   const relacaoLabel: Record<string, string> = { matriz: "Matriz", filial: "Filial", coligada: "Coligada", independente: "Independente" };
 
   const filteredData = useMemo(() => {
-    const query = searchTerm.trim().toLowerCase();
+    // Text search is now server-side; only apply local dropdown filters
     return data.filter((cliente) => {
       if (tipoFilters.length > 0 && !tipoFilters.includes(cliente.tipo_pessoa)) return false;
-
       if (grupoFilters.length > 0) {
-        const hasGroup = !!cliente.grupo_economico_id;
         const groupId = cliente.grupo_economico_id || "sem_grupo";
-
-        // Se o filtro contém ids específicos de grupo OU "sem_grupo"
-        if (!grupoFilters.includes(groupId)) {
-          // Caso especial: se selecionou "com_grupo" (lógica antiga adaptada ou nova?)
-          // Vamos usar IDs específicos + "sem_grupo"
-          return false;
-        }
+        if (!grupoFilters.includes(groupId)) return false;
       }
-
-      if (!query) return true;
-      return [cliente.nome_razao_social, cliente.nome_fantasia, cliente.cpf_cnpj, cliente.email, cliente.cidade, cliente.uf, cliente.telefone, cliente.contato].filter(Boolean).join(" ").toLowerCase().includes(query);
+      return true;
     });
-  }, [data, grupoFilters, searchTerm, tipoFilters]);
+  }, [data, grupoFilters, tipoFilters]);
 
   const columns = [
   { key: "nome_razao_social", label: "Nome / Razão Social", sortable: true },
@@ -239,11 +250,11 @@ const Clientes = () => {
                 uf: result.uf || prev.uf,
                 cep: result.cep || prev.cep,
               }));
-            }}><Search className="h-4 w-4" /></Button></div></div>
+            }}><Search className="h-4 w-4" /></Button></div>{formErrors.cpf_cnpj && <p className="text-xs text-destructive">{formErrors.cpf_cnpj}</p>}</div>
             <div className="space-y-2"><Label>I.E.</Label><Input value={form.inscricao_estadual} onChange={(e) => setForm({ ...form, inscricao_estadual: e.target.value })} /></div>
-            <div className="col-span-2 md:col-span-3 space-y-2"><Label>Nome / Razão Social *</Label><Input value={form.nome_razao_social} onChange={(e) => setForm({ ...form, nome_razao_social: e.target.value })} required /></div>
+            <div className="col-span-2 md:col-span-3 space-y-2"><Label>Nome / Razão Social *</Label><Input value={form.nome_razao_social} onChange={(e) => setForm({ ...form, nome_razao_social: e.target.value })} required className={formErrors.nome_razao_social ? "border-destructive" : ""} />{formErrors.nome_razao_social && <p className="text-xs text-destructive">{formErrors.nome_razao_social}</p>}</div>
             <div className="col-span-2 md:col-span-3 space-y-2"><Label>Nome Fantasia</Label><Input value={form.nome_fantasia} onChange={(e) => setForm({ ...form, nome_fantasia: e.target.value })} /></div>
-            <div className="space-y-2"><Label>E-mail</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
+            <div className="space-y-2"><Label>E-mail</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className={formErrors.email ? "border-destructive" : ""} />{formErrors.email && <p className="text-xs text-destructive">{formErrors.email}</p>}</div>
             <div className="space-y-2"><Label>Telefone</Label><MaskedInput mask="telefone" value={form.telefone} onChange={(v) => setForm({ ...form, telefone: v })} /></div>
             <div className="space-y-2"><Label>Celular</Label><MaskedInput mask="celular" value={form.celular} onChange={(v) => setForm({ ...form, celular: v })} /></div>
             <div className="space-y-2"><Label>Contato</Label><Input value={form.contato} onChange={(e) => setForm({ ...form, contato: e.target.value })} /></div>
