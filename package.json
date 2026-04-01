@@ -15,9 +15,9 @@
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "test:e2e": "playwright test",
     "test:all": "npm run test:unit && npm run test:integration && npm run test:e2e",
-    "seed:reset": "node scripts/dev-reset-seed.js --reset-only --confirm",
-    "seed:data": "node scripts/dev-reset-seed.js --seed-only --confirm",
-    "dev:reset": "node scripts/dev-reset-seed.js --confirm",
+    "seed:reset": "node scripts/check-seed-environment.js && ALLOW_SEED=true node scripts/dev-reset-seed.js --reset-only --confirm",
+    "seed:data": "node scripts/check-seed-environment.js && ALLOW_SEED=true node scripts/dev-reset-seed.js --seed-only --confirm",
+    "dev:reset": "node scripts/check-seed-environment.js && ALLOW_SEED=true node scripts/dev-reset-seed.js --confirm",
     "validate:rls": "npx tsx scripts/validate-rls.ts",
     "prepare": "husky"
   },

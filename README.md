@@ -231,12 +231,25 @@ npm run seed:reset
 npm run seed:data
 ```
 
-### Proteções incluídas
+### Proteções de Segurança
 
-- O script verifica se `NODE_ENV=production` e **interrompe** a execução
-- O script verifica se `VITE_SUPABASE_URL` aponta para um banco remoto/produção e **interrompe** a execução
-- Os scripts `seed:reset` e `seed:data` passam `--confirm` automaticamente por conveniência em dev local
-- Para uso manual: `node scripts/dev-reset-seed.js --confirm` (o flag `--confirm` é obrigatório)
+O seed possui **três camadas de proteção**:
+
+1. **Verificação de URL**: Só executa se `VITE_SUPABASE_URL` contiver `localhost` ou `127.0.0.1`
+2. **Flag explícita**: Requer `ALLOW_SEED=true` no ambiente
+3. **Confirmação interativa**: Usuário deve digitar `"CONFIRMAR"` (pulada automaticamente quando `--confirm` é usado)
+
+O script também bloqueia se `NODE_ENV=production`.
+
+### Exemplo de execução segura
+
+```bash
+# Via npm (recomendado — verificações e flags já configurados):
+npm run dev:reset
+
+# Execução manual explícita:
+ALLOW_SEED=true node scripts/dev-reset-seed.js
+```
 
 ### O que os dados de exemplo incluem
 
