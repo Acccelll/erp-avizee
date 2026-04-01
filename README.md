@@ -58,8 +58,12 @@ VITE_SUPABASE_PUBLISHABLE_KEY=...
 ```bash
 npm run dev        # ambiente local
 npm run build      # build de produção
-npm run test       # testes unitários/integrados
-npm run test:watch # modo watch
+npm run test       # testes unitários (alias para test:unit)
+npm run test:unit        # testes unitários com Vitest
+npm run test:integration # testes de integração com Vitest
+npm run test:e2e         # testes E2E com Playwright
+npm run test:all         # executa unit + integration + e2e em sequência
+npm run test:watch # modo watch (testes unitários)
 npm run lint       # lint (quando aplicável)
 ```
 
@@ -213,6 +217,103 @@ As migrations em `supabase/migrations/` gerenciam **evolução de schema** apena
 O seed destrutivo que existia em `20260401200000_seed_completo.sql` foi removido;
 esse arquivo agora é um marcador neutro. Para recriar dados de teste, use os
 scripts acima conscientemente.
+
+## Testes
+
+O projeto possui três camadas de teste:
+
+| Camada | Ferramenta | Local | Script |
+|--------|-----------|-------|--------|
+| Unitários | Vitest | `src/**/*.test.ts` | `npm run test:unit` |
+| Integração | Vitest | `src/tests/integration/` | `npm run test:integration` |
+| E2E | Playwright | `tests/e2e/` | `npm run test:e2e` |
+
+### Testes Unitários
+
+Testam funções puras e determinísticas sem dependências externas:
+
+```bash
+npm run test:unit
+# ou em modo watch:
+npm run test:watch
+```
+
+Principais arquivos:
+
+| Arquivo | O que testa |
+|---------|-------------|
+| `src/lib/financeiro.test.ts` | Cálculos de juros, multa, baixa parcial, status de vencimento |
+| `src/lib/fiscal.test.ts` | Totais de NF, parcelas, impostos, CFOP de devolução, status de faturamento OV |
+| `src/lib/precos-especiais.test.ts` | Vigência de regras, aplicação de preço fixo/desconto percentual, lote |
+| `src/hooks/__tests__/useSyncedStorage.test.ts` | Cache localStorage cross-tab, versionamento |
+
+### Testes de Integração
+
+Testam fluxos de negócio completos usando as funções puras em conjunto (Supabase mockado):
+
+```bash
+npm run test:integration
+```
+
+| Arquivo | Fluxo coberto |
+|---------|--------------|
+| `src/tests/integration/fluxo-venda.test.ts` | Orçamento → NF → Parcelamento → Pagamento → Inadimplência |
+
+### Testes E2E (Playwright)
+
+Testam a interface do usuário em um browser real. Requerem a aplicação em execução.
+
+#### Configuração
+
+1. Copie `.env.example` (ou crie `.env.e2e`) com:
+
+```env
+BASE_URL=http://localhost:8080
+E2E_EMAIL=usuario@teste.com
+E2E_PASSWORD=senhateste
+
+# Projeto Supabase isolado para E2E (opcional mas recomendado)
+E2E_SUPABASE_URL=https://<projeto-teste>.supabase.co
+E2E_SUPABASE_ANON_KEY=<anon-key-do-projeto-teste>
+```
+
+2. Inicie a aplicação local:
+
+```bash
+npm run dev
+```
+
+3. Execute os testes:
+
+```bash
+npm run test:e2e
+# Ou filtrando por suite:
+npm run test:e2e -- --grep "Fluxo Comercial"
+npm run test:e2e -- --grep "Navegação"
+```
+
+#### Projeto Supabase separado para E2E
+
+Para evitar que os testes E2E contaminem dados de desenvolvimento, configure um
+projeto Supabase dedicado para testes:
+
+1. Crie um novo projeto no [Supabase Dashboard](https://supabase.com/dashboard).
+2. Execute as migrations: `supabase db push --db-url <URL_DO_PROJETO_TESTE>`.
+3. Insira dados de seed: `npm run seed:data` (com `VITE_SUPABASE_URL` apontando para o projeto de teste).
+4. Defina `E2E_SUPABASE_URL` e `E2E_SUPABASE_ANON_KEY` no ambiente de CI/local.
+
+#### Especs disponíveis
+
+| Arquivo | O que cobre |
+|---------|------------|
+| `tests/e2e/fluxo-comercial.spec.ts` | Criação de orçamento, preços especiais, PDF, desconto global |
+| `tests/e2e/navegacao.spec.ts` | Sidebar, busca global (Ctrl+K), navegação stacked (drawers), breadcrumbs |
+
+#### Execução completa (unit + integration + e2e)
+
+```bash
+npm run test:all
+```
 
 ## Edge Functions e Integrações
 

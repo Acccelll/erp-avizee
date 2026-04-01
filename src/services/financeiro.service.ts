@@ -1,5 +1,10 @@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import {
+  calcularPagamentoParcialLote,
+  calcularNovoSaldo,
+  statusPosBaixa,
+} from "@/lib/financeiro";
 
 export interface BaixaLoteParams {
   selectedIds: string[];
@@ -39,9 +44,9 @@ export async function processarBaixaLote(params: BaixaLoteParams): Promise<boole
       for (const id of selectedIds) {
         const l = selectedLancamentos.find(x => x.id === id);
         const saldo = l ? Number(l.saldo_restante != null ? l.saldo_restante : l.valor) : 0;
-        const pagoParcial = Math.round(saldo * ratio * 100) / 100;
-        const novoSaldo = Math.max(0, saldo - pagoParcial);
-        const novoStatus = novoSaldo <= 0.01 ? "pago" : "parcial";
+        const pagoParcial = calcularPagamentoParcialLote(saldo, ratio);
+        const novoSaldo = calcularNovoSaldo(saldo, pagoParcial, 0);
+        const novoStatus = statusPosBaixa(novoSaldo);
         await supabase.from("financeiro_lancamentos").update({
           status: novoStatus,
           data_pagamento: novoStatus === "pago" ? baixaDate : null,
@@ -82,12 +87,5 @@ export async function processarEstorno(lancamentoId: string): Promise<boolean> {
   }
 }
 
-export function getEffectiveStatus(status: string, dataVencimento: string, hoje: Date): string {
-  const s = (status || "").toLowerCase();
-  if (s === "aberto" && dataVencimento) {
-    const vencimento = new Date(dataVencimento);
-    vencimento.setHours(0, 0, 0, 0);
-    if (vencimento < hoje) return "vencido";
-  }
-  return s || "aberto";
-}
+/** Re-exported from `@/lib/financeiro` for backward compatibility. */
+export { getEffectiveStatus } from "@/lib/financeiro";

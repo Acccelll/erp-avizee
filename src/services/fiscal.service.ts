@@ -1,5 +1,11 @@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import {
+  calcularTotalNF,
+  calcularValorParcela,
+  calcularVencimentoParcela,
+  calcularStatusFaturamentoOV,
+} from "@/lib/fiscal";
 
 interface ConfirmarNFParams {
   nf: {
@@ -50,11 +56,10 @@ export async function confirmarNotaFiscal({ nf, parcelas }: ConfirmarNFParams) {
     } else {
       const numParcelas = parcelas || 1;
       for (let i = 0; i < numParcelas; i++) {
-        const venc = new Date(nf.data_emissao);
-        venc.setDate(venc.getDate() + 30 * (i + 1));
+        const vencimento = calcularVencimentoParcela(nf.data_emissao, i + 1);
         await supabase.from("financeiro_lancamentos").insert({
           tipo: tipo_fin, descricao: `NF ${nf.numero} - Parcela ${i + 1}/${numParcelas}`,
-          valor: valorFin / numParcelas, data_vencimento: venc.toISOString().split("T")[0],
+          valor: calcularValorParcela(valorFin, numParcelas), data_vencimento: vencimento,
           status: "aberto",
           fornecedor_id: nf.fornecedor_id || null, cliente_id: nf.cliente_id || null,
           nota_fiscal_id: nf.id, documento_fiscal_id: nf.id,
@@ -122,7 +127,7 @@ export async function estornarNotaFiscal(nf: {
           .select("quantidade, quantidade_faturada").eq("ordem_venda_id", nf.ordem_venda_id);
         const totalQ = (updatedItems || []).reduce((s: number, i: any) => s + Number(i.quantidade), 0);
         const totalF = (updatedItems || []).reduce((s: number, i: any) => s + Number(i.quantidade_faturada || 0), 0);
-        const newSt = totalF >= totalQ ? "total" : totalF > 0 ? "parcial" : "aguardando";
+        const newSt = calcularStatusFaturamentoOV(totalQ, totalF);
         await supabase.from("ordens_venda").update({ status_faturamento: newSt }).eq("id", nf.ordem_venda_id);
       }
     }
@@ -148,17 +153,15 @@ async function updateOVFaturamento(ordemVendaId: string, nfItens: any[]) {
       .select("quantidade, quantidade_faturada").eq("ordem_venda_id", ordemVendaId);
     const totalQtd = (updatedItems || []).reduce((s: number, i: any) => s + Number(i.quantidade), 0);
     const totalFaturado = (updatedItems || []).reduce((s: number, i: any) => s + Number(i.quantidade_faturada || 0), 0);
-    const newStatus = totalFaturado >= totalQtd ? "total" : totalFaturado > 0 ? "parcial" : "aguardando";
+    const newStatus = calcularStatusFaturamentoOV(totalQtd, totalFaturado);
     await supabase.from("ordens_venda").update({ status_faturamento: newStatus }).eq("id", ordemVendaId);
   } catch (err: any) {
     console.error("Erro ao atualizar faturamento OV:", err);
   }
 }
 
-export function calcularCfopDevolucao(cfopOriginal: string | null) {
-  if (!cfopOriginal) return "5201";
-  return cfopOriginal.startsWith("6") ? "6201" : "5201";
-}
+/** Re-exported from `@/lib/fiscal` for backward compatibility. */
+export { calcularCfopDevolucao } from "@/lib/fiscal";
 
 export async function processarDevolucao(params: {
   devolucaoNF: { id: string; numero: string; serie: string; cliente_id: string; modelo_documento: string };
