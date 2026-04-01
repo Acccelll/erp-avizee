@@ -9,8 +9,8 @@ const Toaster = ({ ...props }: ToasterProps) => {
   return (
     <Sonner
       theme={theme as ToasterProps["theme"]}
+      containerAriaLabel="Notificações do sistema"
       className="toaster group"
-      containerAriaLabel="Notificações"
       aria-live="polite"
       toastOptions={{
         classNames: {

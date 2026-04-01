@@ -8,8 +8,10 @@ interface PieItem {
 }
 
 export function SummaryPie({ data }: { data: PieItem[] }) {
+  const textualSummary = data.map((item) => `${item.name}: ${formatNumber(item.value)}`).join(', ');
+
   return (
-    <div className="bg-card rounded-xl border p-5">
+    <figure className="bg-card rounded-xl border p-5" role="img" aria-label={`Gráfico de pizza das ordens de venda por status. ${textualSummary}`}>
       <h3 className="font-semibold text-foreground mb-4">Ordens de Venda por Status</h3>
       <div
         role="img"
@@ -57,6 +59,7 @@ export function SummaryPie({ data }: { data: PieItem[] }) {
           </div>
         ))}
       </div>
-    </div>
+      <figcaption className="sr-only">{textualSummary}</figcaption>
+    </figure>
   );
 }

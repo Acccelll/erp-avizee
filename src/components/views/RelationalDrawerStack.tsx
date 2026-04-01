@@ -48,17 +48,16 @@ export function RelationalDrawerStack() {
     <>
       {stack.map((view, index) => {
         const isOpen = true; // Managed by presence in stack
-        const isTop = index === stack.length - 1;
-
         return (
           <Sheet key={`${view.type}-${view.id}-${index}`} open={isOpen} onOpenChange={(open) => !open && popView()}>
             <SheetContent
               side="right"
-              className="w-full sm:max-w-xl overflow-y-auto p-0 flex flex-col focus-visible:outline-none"
+              className="w-full sm:max-w-xl overflow-y-auto p-0 flex flex-col focus-visible:outline-none transition-all duration-300 ease-out border-l"
               style={{
                 zIndex: 50 + index,
-                // Optional: slight offset for stacked drawers if desired
-                // transform: `translateX(${index * 4}px)`
+                transform: `translateX(${Math.max(0, (stack.length - 1 - index) * -8)}px)`,
+                boxShadow: `${(index + 1) * -6}px 0 ${(index + 1) * 16}px rgba(15, 23, 42, 0.12)`,
+                borderLeftColor: `hsl(var(--primary) / ${Math.min(0.18 + index * 0.06, 0.45)})`
               }}
             >
               <SheetHeader className="sticky top-0 z-10 bg-card border-b px-6 py-4 flex flex-col gap-1.5 space-y-0">
@@ -86,8 +85,9 @@ export function RelationalDrawerStack() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3 min-w-0">
                     {index > 0 && (
-                      <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={popView}>
+                      <Button variant="ghost" size="sm" className="h-8 shrink-0 gap-1" onClick={popView}>
                         <ArrowLeft className="h-4 w-4" />
+                        <span className="text-xs">Voltar para {getTitle(stack[index - 1].type)}</span>
                       </Button>
                     )}
                     <SheetTitle className="text-base truncate">{getTitle(view.type)}</SheetTitle>

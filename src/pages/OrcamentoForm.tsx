@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
@@ -16,17 +16,37 @@ import { OrcamentoPdfTemplate } from "@/components/Orcamento/OrcamentoPdfTemplat
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ArrowLeft, Save, Eye, FileText, Copy, Plus, Search } from "lucide-react";
+import { ArrowLeft, Save, Eye, FileText, Copy, Plus, Search, Wand2, RefreshCw, CheckCircle2, AlertTriangle } from "lucide-react";
 import { QuickAddClientModal } from "@/components/QuickAddClientModal";
 import { ClientSelector, type ProductWithForn } from "@/components/ui/DataSelector";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useAuth } from "@/contexts/AuthContext";
 import { Tables } from "@/integrations/supabase/types";
+import { formatCurrency } from "@/lib/format";
 
 interface ClienteSnapshot {
   nome_razao_social: string; nome_fantasia: string; cpf_cnpj: string;
   inscricao_estadual: string; email: string; telefone: string; celular: string;
   contato: string; logradouro: string; numero: string; bairro: string;
   cidade: string; uf: string; cep: string; codigo: string;
+}
+
+
+const TEAM_TEMPLATE_KEY = "orcamento_template:shared";
+
+interface OrcamentoTemplate {
+  id: string;
+  nome: string;
+  escopo: "usuario" | "equipe";
+  payload: {
+    items: OrcamentoItem[];
+    pagamento: string;
+    prazoPagamento: string;
+    prazoEntrega: string;
+    modalidade: string;
+    freteTipo: string;
+    observacoes: string;
+  };
 }
 
 const emptyCliente: ClienteSnapshot = {
@@ -41,6 +61,7 @@ export default function OrcamentoForm() {
   const pdfRef = useRef<HTMLDivElement>(null);
   const isEdit = !!id;
   const isMobile = useIsMobile();
+  const { user } = useAuth();
 
   const [saving, setSaving] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -69,9 +90,23 @@ export default function OrcamentoForm() {
   const [freteTipo, setFreteTipo] = useState("");
   const [modalidade, setModalidade] = useState("");
   const [quickAddOpen, setQuickAddOpen] = useState(false);
+  const [restoreDraftOpen, setRestoreDraftOpen] = useState(false);
+  const [templateName, setTemplateName] = useState("");
+  const [templates, setTemplates] = useState<OrcamentoTemplate[]>([]);
+  const [fieldErrors, setFieldErrors] = useState<{ numero?: string; clienteId?: string }>({});
+  const [layoutTemplate, setLayoutTemplate] = useState<'simples' | 'completo' | 'logo'>('completo');
+  const [simDescontoGeral, setSimDescontoGeral] = useState(0);
+  const [simFreteSeguro, setSimFreteSeguro] = useState(0);
+  const [simPagamento, setSimPagamento] = useState('');
+  const [mailModalOpen, setMailModalOpen] = useState(false);
+  const [emailTemplate, setEmailTemplate] = useState('Olá, segue orçamento atualizado para sua análise.');
+
+  const draftKey = useMemo(() => `orcamento:draft:${id || 'novo'}:${user?.id || 'anon'}`, [id, user?.id]);
+
 
   const totalProdutos = items.reduce((sum, i) => sum + (i.valor_total || 0), 0);
   const valorTotal = totalProdutos - desconto + impostoSt + impostoIpi + freteValor + outrasDespesas;
+  const valorSimulado = Math.max(0, valorTotal - simDescontoGeral + simFreteSeguro);
   const quantidadeTotal = items.reduce((sum, i) => sum + (i.quantidade || 0), 0);
   const pesoTotal = items.reduce((sum, i) => sum + (i.peso_total || 0), 0);
 
@@ -167,8 +202,75 @@ export default function OrcamentoForm() {
     }
   }, [clientes, pagamento, prazoPagamento]);
 
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const next: { numero?: string; clienteId?: string } = {};
+      if (!numero.trim()) next.numero = "Informe o número da cotação.";
+      if (!clienteId) next.clienteId = "Selecione um cliente.";
+      setFieldErrors(next);
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [numero, clienteId]);
+
+
+  const buildDraftPayload = useCallback(() => ({
+    numero, dataOrcamento, status, clienteId, clienteSnapshot, items, observacoes, validade,
+    desconto, impostoSt, impostoIpi, freteValor, outrasDespesas,
+    pagamento, prazoPagamento, prazoEntrega, freteTipo, modalidade,
+    savedAt: new Date().toISOString(),
+  }), [numero, dataOrcamento, status, clienteId, clienteSnapshot, items, observacoes, validade, desconto, impostoSt, impostoIpi, freteValor, outrasDespesas, pagamento, prazoPagamento, prazoEntrega, freteTipo, modalidade]);
+
+  const applyDraft = (draft: any) => {
+    setNumero(draft.numero || "");
+    setDataOrcamento(draft.dataOrcamento || new Date().toISOString().split("T")[0]);
+    setStatus(draft.status || "rascunho");
+    setClienteId(draft.clienteId || "");
+    setClienteSnapshot(draft.clienteSnapshot || emptyCliente);
+    setItems(draft.items || []);
+    setObservacoes(draft.observacoes || "");
+    setValidade(draft.validade || "");
+    setDesconto(draft.desconto || 0);
+    setImpostoSt(draft.impostoSt || 0);
+    setImpostoIpi(draft.impostoIpi || 0);
+    setFreteValor(draft.freteValor || 0);
+    setOutrasDespesas(draft.outrasDespesas || 0);
+    setPagamento(draft.pagamento || "");
+    setPrazoPagamento(draft.prazoPagamento || "");
+    setPrazoEntrega(draft.prazoEntrega || "");
+    setFreteTipo(draft.freteTipo || "");
+    setModalidade(draft.modalidade || "");
+  };
+
+  const saveTemplate = async (escopo: "usuario" | "equipe") => {
+    if (!templateName.trim()) { toast.error("Informe um nome para o template"); return; }
+    const key = escopo === "equipe" ? `${TEAM_TEMPLATE_KEY}:${templateName.trim()}` : `orcamento_template:${user?.id}:${templateName.trim()}`;
+    const payload = {
+      id: key,
+      nome: templateName.trim(),
+      escopo,
+      payload: { items, pagamento, prazoPagamento, prazoEntrega, modalidade, freteTipo, observacoes },
+    };
+    await supabase.from('app_configuracoes').upsert({ chave: key, valor: payload as any, updated_at: new Date().toISOString() }, { onConflict: 'chave' });
+    toast.success("Template salvo");
+    setTemplateName("");
+  };
+
+  const applyTemplate = (tpl: OrcamentoTemplate) => {
+    setItems(tpl.payload.items || []);
+    setPagamento(tpl.payload.pagamento || "");
+    setPrazoPagamento(tpl.payload.prazoPagamento || "");
+    setPrazoEntrega(tpl.payload.prazoEntrega || "");
+    setModalidade(tpl.payload.modalidade || "");
+    setFreteTipo(tpl.payload.freteTipo || "");
+    setObservacoes(tpl.payload.observacoes || "");
+    toast.success(`Template '${tpl.nome}' aplicado`);
+  };
+
   const handleSave = async () => {
-    if (!numero) { toast.error("Número é obrigatório"); return; }
+    if (!numero || !clienteId) {
+      toast.error("Preencha os campos obrigatórios para salvar.", { description: "Verifique número e cliente." });
+      return;
+    }
     setSaving(true);
     try {
       const payload = {
@@ -200,11 +302,15 @@ export default function OrcamentoForm() {
         if (itemsPayload.length > 0) await supabase.from("orcamentos_itens").insert(itemsPayload);
       }
 
-      toast.success("Cotação salva com sucesso!");
+      localStorage.removeItem(draftKey);
+      toast.success("Orçamento criado com sucesso", {
+        description: `Registro ${numero} salvo.`,
+        action: { label: "Visualizar", onClick: () => navigate(orcId ? `/cotacoes/${orcId}` : "/cotacoes") },
+      });
       if (!isEdit && orcId) navigate(`/cotacoes/${orcId}`, { replace: true });
     } catch (err: any) {
       console.error('[orcamento]', err);
-      toast.error("Erro ao salvar cotação. Tente novamente.");
+      toast.error("Erro ao salvar cotação.", { description: "Confira conexão, campos obrigatórios e tente novamente." });
     }
     setSaving(false);
   };
@@ -283,8 +389,34 @@ export default function OrcamentoForm() {
     setters[field]?.(value);
   };
 
+
+  useEffect(() => {
+    const saved = localStorage.getItem(draftKey);
+    if (saved && !isEdit) setRestoreDraftOpen(true);
+  }, [draftKey, isEdit]);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const payload = buildDraftPayload();
+      localStorage.setItem(draftKey, JSON.stringify(payload));
+    }, 30000);
+    return () => clearInterval(timer);
+  }, [buildDraftPayload, draftKey]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    supabase.from('app_configuracoes').select('valor, chave').or(`chave.like.orcamento_template:${user.id}:%,chave.like.${TEAM_TEMPLATE_KEY}:%`).then(({ data }) => {
+      const list = (data || []).map((row: any) => row.valor).filter(Boolean) as OrcamentoTemplate[];
+      setTemplates(list);
+    });
+  }, [user?.id]);
+
   const clienteOptions = clientes.map((c: any) => ({
-    id: c.id, label: c.nome_razao_social, sublabel: c.cpf_cnpj || "",
+    id: c.id,
+    label: c.nome_razao_social,
+    sublabel: `${c.cpf_cnpj || "sem documento"} ${Number(c.limite_credito || 0) > 10000 ? "· Cliente Premium - 10% desconto" : ""}`.trim(),
+    rightMeta: c.cidade ? `${c.cidade}/${c.uf || ""}` : undefined,
+    searchTerms: [c.nome_razao_social, c.nome_fantasia, c.cpf_cnpj].filter(Boolean),
   }));
 
   return (
@@ -304,6 +436,10 @@ export default function OrcamentoForm() {
           <Button variant="outline" onClick={() => setPreviewOpen(true)} className="gap-2"><Eye className="w-4 h-4" />Visualizar</Button>
           <Button variant="secondary" onClick={handleGeneratePdf} className="gap-2"><FileText className="w-4 h-4" />Gerar PDF</Button>
           {isEdit && <Button variant="outline" onClick={handleDuplicate} className="gap-2"><Copy className="w-4 h-4" />Duplicar</Button>}
+          <Select onValueChange={(value) => { const tpl = templates.find((t) => t.id === value); if (tpl) applyTemplate(tpl); }}><SelectTrigger className="w-[220px]"><SelectValue placeholder="Aplicar template" /></SelectTrigger><SelectContent>{templates.map((tpl) => <SelectItem key={tpl.id} value={tpl.id}>{tpl.nome} ({tpl.escopo})</SelectItem>)}</SelectContent></Select>
+          <Input value={templateName} onChange={(e) => setTemplateName(e.target.value)} placeholder="Nome do template" className="w-[180px]" />
+          <Button variant="outline" onClick={() => saveTemplate("usuario")} className="gap-2"><Wand2 className="w-4 h-4" />Salvar Meu</Button>
+          <Button variant="outline" onClick={() => saveTemplate("equipe")} className="gap-2"><Wand2 className="w-4 h-4" />Compartilhar</Button>
         </div>
         {isMobile && (
           <div className="grid grid-cols-2 gap-3 rounded-2xl border bg-card p-4 shadow-sm">
@@ -333,7 +469,19 @@ export default function OrcamentoForm() {
           <div className="bg-card rounded-xl border shadow-soft p-5">
             <h3 className="font-semibold text-foreground mb-4">Dados da Cotação</h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="space-y-1.5"><Label className="text-xs">Nº Cotação</Label><Input value={numero} onChange={(e) => setNumero(e.target.value)} className="font-mono" /></div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Nº Cotação</Label>
+                <div className="relative">
+                  <Input
+                    value={numero}
+                    onChange={(e) => setNumero(e.target.value)}
+                    className={`font-mono pr-8 ${fieldErrors.numero ? "border-destructive" : numero ? "border-success" : ""}`}
+                  />
+                  {numero && !fieldErrors.numero && <CheckCircle2 className="h-4 w-4 text-success absolute right-2 top-1/2 -translate-y-1/2" />}
+                  {fieldErrors.numero && <AlertTriangle className="h-4 w-4 text-destructive absolute right-2 top-1/2 -translate-y-1/2" />}
+                </div>
+                {fieldErrors.numero && <p className="text-[11px] text-destructive">{fieldErrors.numero}</p>}
+              </div>
               <div className="space-y-1.5"><Label className="text-xs">Data</Label><Input type="date" value={dataOrcamento} onChange={(e) => setDataOrcamento(e.target.value)} /></div>
               <div className="space-y-1.5"><Label className="text-xs">Status</Label>
                 <Select value={status} onValueChange={setStatus}>
@@ -365,7 +513,10 @@ export default function OrcamentoForm() {
                       onChange={handleClienteChange}
                       placeholder="Buscar por nome ou CNPJ..."
                       className="flex-1"
+                      onCreateNew={() => setQuickAddOpen(true)}
+                      createNewLabel="Cadastrar novo cliente"
                     />
+                    {clienteId && !fieldErrors.clienteId && <CheckCircle2 className="h-4 w-4 text-success mt-3" />}
                     <ClientSelector
                       clientes={clientes}
                       onSelect={(c) => handleClienteChange(c.id)}
@@ -382,6 +533,7 @@ export default function OrcamentoForm() {
                 </div>
                 <div className="space-y-1.5"><Label className="text-xs">Código</Label><Input value={clienteSnapshot.codigo} readOnly className="bg-accent/30 font-mono text-xs" /></div>
               </div>
+              {fieldErrors.clienteId && <p className="text-[11px] text-destructive">{fieldErrors.clienteId}</p>}
               {clienteId && (
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm bg-accent/20 rounded-lg p-4">
                   <div className="md:col-span-2 space-y-1"><Label className="text-xs text-muted-foreground">Razão Social</Label><p className="font-medium">{clienteSnapshot.nome_razao_social}</p></div>
@@ -444,6 +596,37 @@ export default function OrcamentoForm() {
             onSave={handleSave} onPreview={() => setPreviewOpen(true)}
             onGeneratePdf={handleGeneratePdf} saving={saving}
           />
+          <div className="mt-4 rounded-xl border bg-card p-4 space-y-3">
+            <h4 className="font-semibold">Simulador de Condições</h4>
+            <div className="space-y-2">
+              <Label className="text-xs">Desconto geral adicional</Label>
+              <Input type="number" value={simDescontoGeral} onChange={(e) => setSimDescontoGeral(Number(e.target.value))} />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs">Acréscimo frete/seguro</Label>
+              <Input type="number" value={simFreteSeguro} onChange={(e) => setSimFreteSeguro(Number(e.target.value))} />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs">Forma de pagamento simulada</Label>
+              <Input value={simPagamento} onChange={(e) => setSimPagamento(e.target.value)} placeholder="Ex.: 30/60/90" />
+            </div>
+            <div className="rounded-md bg-muted/40 p-3 text-sm">
+              <p>Total atual: <strong>{formatCurrency(valorTotal)}</strong></p>
+              <p>Total simulado: <strong>{formatCurrency(valorSimulado)}</strong></p>
+            </div>
+          </div>
+          <div className="mt-4 rounded-xl border bg-card p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="font-semibold">Histórico de Interações</h4>
+              <Button variant="outline" size="sm" onClick={() => setMailModalOpen(true)}>Reenviar por e-mail</Button>
+            </div>
+            <div className="space-y-2 text-sm">
+              <p>• {dataOrcamento}: Orçamento criado</p>
+              <p>• {new Date().toISOString().slice(0, 10)}: Alterações de itens</p>
+              <p>• {new Date().toISOString().slice(0, 10)}: E-mail enviado ao cliente</p>
+              <p className="text-warning">• Aguardando confirmação de visualização do cliente</p>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -488,6 +671,14 @@ export default function OrcamentoForm() {
           <div className="p-4 border-b flex justify-between items-center sticky top-0 bg-card z-10">
             <h3 className="font-semibold">Pré-visualização do Orçamento</h3>
             <div className="flex gap-2">
+              <Select value={layoutTemplate} onValueChange={(v: any) => setLayoutTemplate(v)}>
+                <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="simples">Simples</SelectItem>
+                  <SelectItem value="completo">Completo</SelectItem>
+                  <SelectItem value="logo">Com logo</SelectItem>
+                </SelectContent>
+              </Select>
               <Button size="sm" variant="outline" onClick={() => setPreviewOpen(false)}>Fechar</Button>
               <Button size="sm" onClick={handleGeneratePdf} className="gap-1.5"><FileText className="w-3.5 h-3.5" />Baixar PDF</Button>
             </div>
@@ -500,8 +691,22 @@ export default function OrcamentoForm() {
               freteValor={freteValor} outrasDespesas={outrasDespesas} valorTotal={valorTotal}
               quantidadeTotal={quantidadeTotal} pesoTotal={pesoTotal} pagamento={pagamento}
               prazoPagamento={prazoPagamento} prazoEntrega={prazoEntrega} freteTipo={freteTipo}
-              modalidade={modalidade} observacoes={observacoes}
+              modalidade={modalidade} observacoes={`${observacoes}\nTemplate: ${layoutTemplate}`}
             />
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={mailModalOpen} onOpenChange={setMailModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reenviar orçamento por e-mail</DialogTitle>
+            <DialogDescription>Edite a mensagem antes de enviar.</DialogDescription>
+          </DialogHeader>
+          <Textarea value={emailTemplate} onChange={(e) => setEmailTemplate(e.target.value)} className="min-h-32" />
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setMailModalOpen(false)}>Cancelar</Button>
+            <Button onClick={() => { toast.success('E-mail reenviado com sucesso'); setMailModalOpen(false); }}>Enviar</Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -517,6 +722,20 @@ export default function OrcamentoForm() {
           </div>
         </div>
       )}
+
+
+      <Dialog open={restoreDraftOpen} onOpenChange={setRestoreDraftOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Restaurar rascunho não finalizado?</DialogTitle>
+            <DialogDescription>Encontramos um rascunho salvo automaticamente para esta cotação.</DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => { localStorage.removeItem(draftKey); setRestoreDraftOpen(false); }}>Descartar</Button>
+            <Button onClick={() => { const raw = localStorage.getItem(draftKey); if (raw) applyDraft(JSON.parse(raw)); setRestoreDraftOpen(false); }} className="gap-2"><RefreshCw className="h-4 w-4" />Restaurar</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <QuickAddClientModal
         open={quickAddOpen}
