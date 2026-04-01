@@ -63,7 +63,6 @@ export function useSupabaseCrud<T extends Record<string, any>>({
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      // Use count query to detect truncation
       let query = supabase.from(table as any).select(select, { count: 'exact' }).order(orderBy, { ascending });
 
       if (hasAtivo) {
@@ -71,6 +70,15 @@ export function useSupabaseCrud<T extends Record<string, any>>({
       }
 
       query = applyFilters(query);
+
+      // Server-side text search using OR ilike across specified columns
+      const trimmedSearch = searchTerm.trim();
+      if (trimmedSearch && searchColumns.length > 0) {
+        const orFilter = searchColumns
+          .map(col => `${col}.ilike.%${trimmedSearch}%`)
+          .join(",");
+        query = query.or(orFilter);
+      }
 
       if (pageSize) {
         const from = page * pageSize;
@@ -97,7 +105,7 @@ export function useSupabaseCrud<T extends Record<string, any>>({
     } finally {
       setLoading(false);
     }
-  }, [table, select, orderBy, ascending, hasAtivo, applyFilters, pageSize, page, showToasts]);
+  }, [table, select, orderBy, ascending, hasAtivo, applyFilters, pageSize, page, showToasts, searchTerm, searchColumns]);
 
   useEffect(() => {
     fetchData();
