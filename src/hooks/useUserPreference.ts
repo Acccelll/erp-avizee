@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Json } from '@/integrations/supabase/types';
+import { useSyncedStorage } from './useSyncedStorage';
 
 const PREFIX = 'erp-user-pref';
 
@@ -12,35 +13,57 @@ function buildDbKey(userId: string, preferenceKey: string) {
   return `user_pref:${userId}:${preferenceKey}`;
 }
 
-function readCachedValue<T>(storageKey: string, defaultValue: T) {
-  try {
-    const raw = localStorage.getItem(storageKey);
-    if (raw !== null) {
-      return JSON.parse(raw) as T;
-    }
-  } catch {
-    // Ignore cache parse errors and fallback to default.
-  }
-  return defaultValue;
-}
-
 export function useUserPreference<T = Json>(userId: string | null | undefined, preferenceKey: string, defaultValue: T) {
-  const storageKey = useMemo(() => buildStorageKey(userId, preferenceKey), [userId, preferenceKey]);
-  const [value, setValue] = useState<T>(() => readCachedValue(storageKey, defaultValue));
+  // Derive the namespaced key so that useSyncedStorage tracks per-user prefs.
+  // The namespace includes the userId so that switching users in the same tab
+  // does not leak cached data between accounts.
+  const namespace = useMemo(
+    () => `user-pref:${userId ?? 'anon'}`,
+    [userId],
+  );
+
+  const { value, set: setCache } = useSyncedStorage<T>(
+    preferenceKey,
+    defaultValue,
+    { namespace },
+  );
   const [loading, setLoading] = useState(true);
 
+  // Build the legacy raw storageKey for backward-compatibility migration.
+  // Old entries used `erp-user-pref:<userId>:<key>` format without the
+  // versioned envelope. We attempt a one-time migration on mount.
+  const legacyKey = useMemo(
+    () => buildStorageKey(userId, preferenceKey),
+    [userId, preferenceKey],
+  );
+
   useEffect(() => {
-    setValue(readCachedValue(storageKey, defaultValue));
-  }, [defaultValue, storageKey]);
+    // One-time migration: if an old (unversioned) entry exists, adopt its value
+    // and remove the legacy key so it is not read again.
+    try {
+      const raw = localStorage.getItem(legacyKey);
+      if (raw !== null) {
+        const parsed = JSON.parse(raw) as T;
+        // Only migrate if the key does not already have a versioned entry.
+        const newKey = `erp:user-pref:${userId ?? 'anon'}:${preferenceKey}`;
+        if (localStorage.getItem(newKey) === null) {
+          setCache(parsed);
+        }
+        localStorage.removeItem(legacyKey);
+      }
+    } catch {
+      // Ignore migration errors.
+    }
+  // Run once when component mounts for a given userId/preferenceKey.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [legacyKey]);
 
   useEffect(() => {
     let cancelled = false;
 
     if (!userId) {
       setLoading(false);
-      return () => {
-        cancelled = true;
-      };
+      return () => { cancelled = true; };
     }
 
     setLoading(true);
@@ -54,31 +77,18 @@ export function useUserPreference<T = Json>(userId: string | null | undefined, p
         if (cancelled) return;
 
         if (!error && data?.valor !== undefined && data?.valor !== null) {
-          const fetched = data.valor as T;
-          setValue(fetched);
-          try {
-            localStorage.setItem(storageKey, JSON.stringify(fetched));
-          } catch {
-            // Cache quota errors should not block UX.
-          }
+          setCache(data.valor as T);
         }
 
         setLoading(false);
       });
 
-    return () => {
-      cancelled = true;
-    };
-  }, [userId, preferenceKey, storageKey]);
+    return () => { cancelled = true; };
+  }, [userId, preferenceKey, setCache]);
 
   const save = useCallback(
     async (nextValue: T) => {
-      setValue(nextValue);
-      try {
-        localStorage.setItem(storageKey, JSON.stringify(nextValue));
-      } catch {
-        // Ignore cache write errors.
-      }
+      setCache(nextValue);
 
       if (!userId) return true;
 
@@ -88,7 +98,7 @@ export function useUserPreference<T = Json>(userId: string | null | undefined, p
           valor: nextValue as unknown as Json,
           updated_at: new Date().toISOString(),
         },
-        { onConflict: 'chave' }
+        { onConflict: 'chave' },
       );
 
       if (error) {
@@ -97,7 +107,7 @@ export function useUserPreference<T = Json>(userId: string | null | undefined, p
 
       return !error;
     },
-    [preferenceKey, storageKey, userId]
+    [preferenceKey, setCache, userId],
   );
 
   return { value, loading, save };

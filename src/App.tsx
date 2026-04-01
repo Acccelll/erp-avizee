@@ -4,6 +4,7 @@ import { BrowserRouter, Route, Routes, Navigate, useParams } from "react-router-
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { AppConfigProvider } from "@/contexts/AppConfigContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AdminRoute } from "@/components/AdminRoute";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -84,6 +85,7 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <AuthProvider>
+          <AppConfigProvider>
           <ErrorBoundary>
           <Routes>
             <Route path="/orcamento-publico" element={<LazyPage><OrcamentoPublico /></LazyPage>} />
@@ -128,6 +130,7 @@ const App = () => (
             <Route path="*" element={<LazyPage><NotFound /></LazyPage>} />
           </Routes>
           </ErrorBoundary>
+          </AppConfigProvider>
           </AuthProvider>
         </BrowserRouter>
       </TooltipProvider>

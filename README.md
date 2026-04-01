@@ -88,9 +88,71 @@ A navegação usa query strings para contextualizar submódulos:
 
 ## Persistência e Cache
 
-As preferências de usuário (nome, cargo, senha, tema) são persistidas diretamente no Supabase via tabela `profiles`. Configurações funcionais do sistema como CEP da empresa são armazenadas na tabela `app_configuracoes`, que atua como a única fonte de verdade.
+### Estratégia geral
 
-O sistema utiliza uma estratégia de **Cache Write-Through**: o `localStorage` armazena temporariamente configurações para garantir uma UI instantânea (snappiness), mas todas as alterações são sincronizadas com o banco de dados.
+O sistema adota uma estratégia de **Cache Write-Through com sincronização cross-tab**:
+
+1. **Fonte de verdade**: o banco de dados Supabase (`app_configuracoes`, `profiles`).
+2. **Cache local**: `localStorage`, para garantir UI instantânea (*snappiness*) entre page-loads e durante indisponibilidade temporária do Supabase.
+3. **Sincronização entre abas**: via evento nativo `window.storage`, qualquer alteração feita em uma aba é automaticamente refletida em todas as outras abas abertas no mesmo navegador.
+
+### `useSyncedStorage` — o primitivo de cache
+
+Localização: `src/hooks/useSyncedStorage.ts`
+
+Hook de baixo nível que encapsula toda a lógica de persistência no `localStorage`:
+
+```ts
+const { value, set, remove } = useSyncedStorage(
+  'sidebar_collapsed',   // chave lógica
+  false,                 // valor padrão
+  { namespace: 'user-pref:abc-123' }, // namespace (opcional)
+);
+```
+
+**Características:**
+- **Namespace**: a chave final no `localStorage` segue o formato `erp:<namespace>:<key>`, permitindo isolar grupos de dados (por módulo, por usuário, etc.).
+- **Versionamento de esquema**: cada entrada é persistida em um envelope `{ v, data }` onde `v` é `STORAGE_SCHEMA_VERSION`. Se a versão lida do `localStorage` diferir da versão atual, a entrada é descartada automaticamente — evitando erros de runtime por dados desatualizados após um deploy.
+- **Cross-tab sync**: escuta `window.addEventListener('storage', ...)`. Quando outra aba altera a mesma chave (escreve, atualiza ou remove), o estado desta aba é atualizado automaticamente sem necessidade de polling.
+- **Sem chamadas de rede**: o hook é puramente de armazenamento local; a camada de persistência remota fica nos hooks de domínio.
+
+### Como incrementar a versão do esquema
+
+Edite a constante em `src/hooks/useSyncedStorage.ts`:
+
+```ts
+export const STORAGE_SCHEMA_VERSION = 2; // era 1
+```
+
+Na próxima vez que um usuário abrir o app, todas as entradas com `v !== 2` serão descartadas e os valores serão recarregados do Supabase.
+
+### Hooks de domínio
+
+| Hook | Namespace | Backend |
+|------|-----------|---------|
+| `useAppConfig(chave)` | `appconfig` | `app_configuracoes` |
+| `useUserPreference(userId, key, default)` | `user-pref:<userId>` | `app_configuracoes` |
+
+Ambos usam `useSyncedStorage` internamente e adicionam:
+- Leitura inicial do Supabase (substituindo o cache).
+- Persistência no Supabase ao salvar (`upsert`).
+- Atualização otimista (estado local atualiza antes da confirmação do servidor).
+
+### `AppConfigContext`
+
+Localização: `src/contexts/AppConfigContext.tsx`
+
+Contexto React que centraliza as configurações mais utilizadas (`cepEmpresa`, `sidebarCollapsed`). Útil para componentes que precisam de múltiplas configurações ao mesmo tempo:
+
+```tsx
+const { cepEmpresa, sidebarCollapsed, saveSidebarCollapsed } = useAppConfigContext();
+```
+
+O `AppConfigProvider` deve ser montado dentro do `AuthProvider` (pois depende do `user.id`) e está registrado em `App.tsx`.
+
+### Migração de chaves legadas
+
+As entradas antigas no `localStorage` usavam o formato `erp-user-pref:<userId>:<key>` sem envelope de versão. O hook `useUserPreference` executa uma migração automática na primeira montagem: lê a entrada legada, adota seu valor (se não houver já uma entrada versionada) e remove a chave antiga.
 
 ## Dados de exemplo / Seed de desenvolvimento
 
