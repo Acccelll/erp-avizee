@@ -216,6 +216,7 @@ scripts/
 
 > ⚠️ **ATENÇÃO**: Esses comandos apagam todos os dados operacionais do banco.
 > Use **apenas** em ambiente de desenvolvimento local.
+> Execute `supabase db seed` **somente em desenvolvimento local** (nunca em produção).
 
 ```bash
 # Inicie o Supabase local (se ainda não estiver rodando)
