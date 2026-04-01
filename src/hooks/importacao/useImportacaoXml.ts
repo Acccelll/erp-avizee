@@ -111,7 +111,7 @@ export function useImportacaoXml() {
         criado_por: user?.user?.id
       }));
 
-      const { error: stagingError } = await supabase.from("stg_compras_xml").insert(stagingData);
+      const { error: stagingError } = await supabase.from("stg_compras_xml").insert(stagingData as any);
       if (stagingError) throw stagingError;
 
       const validos = xmlData.filter(i => i.status === "valido").length;
