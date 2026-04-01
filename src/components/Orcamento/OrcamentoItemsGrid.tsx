@@ -113,6 +113,21 @@ export function OrcamentoItemsGrid({ items, onChange, produtos, precosEspeciais 
 
   const subtotal = useMemo(() => items.reduce((acc, item) => acc + Number(item.valor_total || 0), 0), [items]);
   const activeDetailProduct = produtos.find((p) => p.id === detailProductId);
+  const productMap = useMemo(() => {
+    const map = new Map<string, ProductWithForn>();
+    const addTerm = (term: string | null | undefined, product: ProductWithForn) => {
+      if (!term) return;
+      map.set(term.toLowerCase(), product);
+    };
+
+    for (const prod of produtos) {
+      addTerm(prod.sku, prod);
+      addTerm(prod.codigo_interno, prod);
+      addTerm(prod.nome, prod);
+    }
+
+    return map;
+  }, [produtos]);
 
   const onDropIndex = (targetIndex: number) => {
     if (draggingIndex === null || draggingIndex === targetIndex) return;
@@ -123,13 +138,28 @@ export function OrcamentoItemsGrid({ items, onChange, produtos, precosEspeciais 
     onChange(next);
   };
 
-  const importFromText = () => {
+  const importFromText = async () => {
     const lines = importText.split("\n").map((l) => l.trim()).filter(Boolean);
     const parsed: OrcamentoItem[] = [];
 
-    for (const line of lines) {
+    for (let index = 0; index < lines.length; index += 1) {
+      const line = lines[index];
       const [codigo = "", descricao = "", qtd = "1", unit = "0"] = line.split(/[;|,]/).map((p) => p.trim());
-      const prod = produtos.find((p) => [p.sku, p.codigo_interno, p.nome].filter(Boolean).some((x) => String(x).toLowerCase() === codigo.toLowerCase() || String(x).toLowerCase() === descricao.toLowerCase()));
+      const codigoKey = codigo.toLowerCase();
+      const descricaoKey = descricao.toLowerCase();
+
+      let prod = productMap.get(codigoKey);
+      if (!prod && descricaoKey) {
+        prod = productMap.get(descricaoKey);
+      }
+      if (!prod && codigoKey) {
+        prod = produtos.find((p) =>
+          String(p.nome || "").toLowerCase().includes(codigoKey) ||
+          String(p.sku || "").toLowerCase().includes(codigoKey) ||
+          String(p.codigo_interno || "").toLowerCase().includes(codigoKey),
+        );
+      }
+
       parsed.push(recalc({
         ...emptyItem(),
         produto_id: prod?.id || "",
@@ -139,6 +169,10 @@ export function OrcamentoItemsGrid({ items, onChange, produtos, precosEspeciais 
         valor_unitario: Number(unit) || Number(prod?.preco_venda || 0),
         peso_unitario: Number(prod?.peso || 0),
       }));
+
+      if (index % 25 === 0) {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      }
     }
 
     onChange([...items, ...parsed]);
