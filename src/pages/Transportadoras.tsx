@@ -58,7 +58,7 @@ export default function Transportadoras() {
 
   useEffect(() => {
     if (selected && drawerOpen) {
-      supabase.from("clientes_transportadoras")
+      supabase.from("cliente_transportadoras")
         .select("*, clientes(nome_razao_social, cpf_cnpj)")
         .eq("transportadora_id", selected.id)
         .then(({ data }) => setClientesVinculados(data || []));

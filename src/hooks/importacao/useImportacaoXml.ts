@@ -181,16 +181,14 @@ export function useImportacaoXml() {
         }
 
         // Criar a Compra
-        const { data: compra, error: cError } = await supabase.from("compras").insert({
+        const { data: compra, error: cError } = await (supabase.from("compras" as any).insert({
           fornecedor_id: fornecedorId,
-          numero_nota: nfe.numero,
-          serie: nfe.serie,
-          chave_acesso: nfe.chaveAcesso,
-          data_emissao: nfe.dataEmissao,
+          numero: nfe.numero,
+          data_compra: nfe.dataEmissao,
           valor_total: nfe.valorTotal,
-          status: "recebido",
-          origem: "migracao_xml"
-        }).select().single();
+          status: "confirmado",
+          observacoes: `Importação XML - Chave: ${nfe.chaveAcesso}`
+        } as any).select().single() as any);
 
         if (cError) {
            await supabase.from("importacao_logs").insert({

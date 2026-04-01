@@ -138,10 +138,10 @@ export default function Administracao() {
             corPrimaria: (appConfig.geral as any)?.corPrimaria || defaultConfig.geral.corPrimaria,
             corSecundaria: (appConfig.geral as any)?.corSecundaria || defaultConfig.geral.corSecundaria,
           },
-          usuarios: { ...defaultConfig.usuarios, ...(appConfig.usuarios || {}) },
-          email: { ...defaultConfig.email, ...(appConfig.email || {}) },
-          fiscal: { ...defaultConfig.fiscal, ...(appConfig.fiscal || {}) },
-          financeiro: { ...defaultConfig.financeiro, ...(appConfig.financeiro || {}) },
+          usuarios: { ...defaultConfig.usuarios, ...((appConfig.usuarios as any) || {}) },
+          email: { ...defaultConfig.email, ...((appConfig.email as any) || {}) },
+          fiscal: { ...defaultConfig.fiscal, ...((appConfig.fiscal as any) || {}) },
+          financeiro: { ...defaultConfig.financeiro, ...((appConfig.financeiro as any) || {}) },
         };
         if (mounted) {
           setEmpresaConfigId(empresa?.id || null);

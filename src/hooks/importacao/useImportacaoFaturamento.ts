@@ -212,7 +212,7 @@ export function useImportacaoFaturamento() {
 
       let importedCount = 0;
       for (const item of validItems) {
-        const nf = item.payload as GroupedNF;
+        const nf = item.payload as unknown as GroupedNF;
         const clientId = clientMap.get(nf.cliente_nome.toUpperCase());
 
         // Criar Cabeçalho da Nota

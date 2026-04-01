@@ -56,6 +56,7 @@ const PedidosCompra = () => {
   const [form, setForm] = useState(emptyForm);
   const [items, setItems] = useState<GridItem[]>([]);
   const [saving, setSaving] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [viewItems, setViewItems] = useState<any[]>([]);
   const navigate = useNavigate();
 

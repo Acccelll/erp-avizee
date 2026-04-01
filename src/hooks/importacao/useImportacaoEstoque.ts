@@ -240,7 +240,7 @@ export function useImportacaoEstoque() {
         // Usaremos uma estratégia de upsert para as colunas específicas
         const { error: updError } = await supabase
           .from("produtos")
-          .upsert(productUpdates, { onConflict: "id" });
+          .upsert(productUpdates as any, { onConflict: "id" });
 
         if (updError) throw updError;
       }
