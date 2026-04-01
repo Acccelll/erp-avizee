@@ -41,6 +41,8 @@ export function useSupabaseCrud<T extends Record<string, any>>({
   const [truncated, setTruncated] = useState(false);
   const filterRef = useRef(filter);
   filterRef.current = filter;
+  const searchColumnsRef = useRef(searchColumns);
+  searchColumnsRef.current = searchColumns;
 
   const applyFilters = useCallback((query: any) => {
     for (const f of filterRef.current) {
