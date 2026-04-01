@@ -28,6 +28,8 @@ const Dashboard = () => {
     contasPagar: 0, contasVencidas: 0,
     totalReceber: 0, totalPagar: 0,
   });
+  const [ovStats, setOvStats] = useState({ pendente: 0, aprovada: 0, em_separacao: 0, faturada: 0 });
+  const [faturamento, setFaturamento] = useState({ mesAtual: 0, mesAnterior: 0 });
   const [loading, setLoading] = useState(true);
   const [recentOrcamentos, setRecentOrcamentos] = useState<any[]>([]);
   const [recentCompras, setRecentCompras] = useState<any[]>([]);
@@ -72,6 +74,9 @@ const Dashboard = () => {
         { data: backlog },
         { data: compAguardando },
         { data: estMin },
+        { data: ovData },
+        { data: nfAtual },
+        { data: nfAnterior },
       ] = await Promise.all([
         supabase.from("produtos").select("*", { count: "exact", head: true }).eq("ativo", true),
         supabase.from("clientes").select("*", { count: "exact", head: true }).eq("ativo", true),
@@ -91,6 +96,21 @@ const Dashboard = () => {
           .order("data_emissao", { ascending: true }).limit(15),
         supabase.from("compras").select("id, numero, valor_total, data_compra, data_entrega_prevista, fornecedores(nome_razao_social)").eq("ativo", true).eq("status", "confirmado").is("data_entrega_real", null).order("data_entrega_prevista", { ascending: true }).limit(10),
         supabase.from("produtos").select("id, nome, codigo_interno, estoque_atual, estoque_minimo, unidade_medida").eq("ativo", true).not("estoque_minimo", "is", null).limit(100),
+        supabase.from('ordens_venda').select('status').eq('ativo', true),
+        (() => {
+          const now = new Date();
+          const inicioMesAtual = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+          return supabase.from('notas_fiscais').select('valor_total').eq('ativo', true).eq('tipo', 'saida').eq('status', 'confirmada').gte('data_emissao', inicioMesAtual);
+        })(),
+        (() => {
+          const now = new Date();
+          const inicioMesAnterior = (() => {
+            const d = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+          })();
+          const fimMesAnterior = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+          return supabase.from('notas_fiscais').select('valor_total').eq('ativo', true).eq('tipo', 'saida').eq('status', 'confirmada').gte('data_emissao', inicioMesAnterior).lt('data_emissao', fimMesAnterior);
+        })(),
       ]);
 
       setStats({
@@ -102,6 +122,15 @@ const Dashboard = () => {
         contasReceber: (receber || []).length,
         contasPagar: (pagar || []).length,
       });
+      setOvStats({
+        pendente: (ovData || []).filter((o: any) => o.status === 'pendente').length,
+        aprovada: (ovData || []).filter((o: any) => o.status === 'aprovada').length,
+        em_separacao: (ovData || []).filter((o: any) => o.status === 'em_separacao').length,
+        faturada: (ovData || []).filter((o: any) => o.status === 'faturada').length,
+      });
+      const fatAtual = (nfAtual || []).reduce((s: number, n: any) => s + Number(n.valor_total || 0), 0);
+      const fatAnterior = (nfAnterior || []).reduce((s: number, n: any) => s + Number(n.valor_total || 0), 0);
+      setFaturamento({ mesAtual: fatAtual, mesAnterior: fatAnterior });
       setRecentOrcamentos(orcRecent || []);
       setRecentCompras(compRecent || []);
       setBacklogOVs(backlog || []);
@@ -151,11 +180,12 @@ const Dashboard = () => {
     },
   ];
 
-  const stockPie = [
-    { name: "Orçamentos", value: stats.orcamentos || 1, color: "hsl(var(--primary))" },
-    { name: "Compras", value: stats.compras || 1, color: "hsl(var(--secondary))" },
-    { name: "Fornecedores", value: stats.fornecedores || 1, color: "hsl(var(--success))" },
-  ];
+  const ovPieData = [
+    { name: 'Pendente', value: ovStats.pendente || 0, color: 'hsl(var(--warning))' },
+    { name: 'Aprovada', value: ovStats.aprovada || 0, color: 'hsl(var(--info))' },
+    { name: 'Em Separação', value: ovStats.em_separacao || 0, color: 'hsl(var(--primary))' },
+    { name: 'Faturada', value: ovStats.faturada || 0, color: 'hsl(var(--success))' },
+  ].filter(item => item.value > 0);
 
   if (loading) {
     return (
@@ -171,6 +201,35 @@ const Dashboard = () => {
         <div>
           <h1 className="page-title">Dashboard</h1>
           <p className="text-muted-foreground text-sm mt-1">Visão geral do sistema ERP AviZee</p>
+        </div>
+      </div>
+
+      {/* Faturamento KPIs */}
+      <div className="mb-4 rounded-lg border border-border/60 bg-muted/10 p-4">
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+          Faturamento (NFs confirmadas)
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <SummaryCard
+            title="Mês Atual"
+            value={formatCurrency(faturamento.mesAtual)}
+            icon={TrendingUp}
+            variation={
+              faturamento.mesAnterior > 0
+                ? `${faturamento.mesAtual >= faturamento.mesAnterior ? '+' : ''}${(((faturamento.mesAtual - faturamento.mesAnterior) / faturamento.mesAnterior) * 100).toFixed(1)}% vs mês ant.`
+                : 'Sem dados do mês anterior'
+            }
+            variationType={faturamento.mesAtual >= faturamento.mesAnterior ? 'positive' : 'negative'}
+            onClick={() => navigate('/relatorios')}
+          />
+          <SummaryCard
+            title="Mês Anterior"
+            value={formatCurrency(faturamento.mesAnterior)}
+            icon={DollarSign}
+            variation="mês concluído"
+            variationType="neutral"
+            onClick={() => navigate('/relatorios')}
+          />
         </div>
       </div>
 
@@ -214,7 +273,7 @@ const Dashboard = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
         <RecentOrcamentos items={recentOrcamentos} loading={loading} />
-        <SummaryPie data={stockPie} />
+        <SummaryPie data={ovPieData.length > 0 ? ovPieData : [{ name: 'Sem OVs', value: 1, color: 'hsl(var(--muted))' }]} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">

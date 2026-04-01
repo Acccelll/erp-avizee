@@ -17,9 +17,10 @@ interface Props {
   pedidoCompraId?: string;
   notaFiscalId?: string;
   remessaId?: string;
+  ordemVendaId?: string;
 }
 
-export function LogisticaRastreioSection({ pedidoCompraId, notaFiscalId, remessaId }: Props) {
+export function LogisticaRastreioSection({ pedidoCompraId, notaFiscalId, remessaId, ordemVendaId }: Props) {
   const [remessas, setRemessas] = useState<Remessa[]>([]);
   const [eventos, setEventos] = useState<Record<string, RemessaEvento[]>>({});
   const [loading, setLoading] = useState(true);
@@ -32,6 +33,7 @@ export function LogisticaRastreioSection({ pedidoCompraId, notaFiscalId, remessa
     if (remessaId) query = query.eq("id", remessaId);
     if (pedidoCompraId) query = query.eq("pedido_compra_id", pedidoCompraId);
     if (notaFiscalId) query = query.eq("nota_fiscal_id", notaFiscalId);
+    if (ordemVendaId) query = query.eq("ordem_venda_id", ordemVendaId);
 
     const { data, error } = await query.eq("ativo", true);
 
@@ -54,7 +56,7 @@ export function LogisticaRastreioSection({ pedidoCompraId, notaFiscalId, remessa
 
   useEffect(() => {
     fetchLogistica();
-  }, [pedidoCompraId, notaFiscalId, remessaId]);
+  }, [pedidoCompraId, notaFiscalId, remessaId, ordemVendaId]);
 
   const handleRastrear = async (remessa: Remessa) => {
     if (!remessa.codigo_rastreio) return;
@@ -93,7 +95,7 @@ export function LogisticaRastreioSection({ pedidoCompraId, notaFiscalId, remessa
     return (
       <div className="py-8 text-center border rounded-lg bg-muted/20">
         <Truck className="w-8 h-8 mx-auto text-muted-foreground/50 mb-2" />
-        <p className="text-sm text-muted-foreground">Nenhuma remessa vinculada a esta compra.</p>
+        <p className="text-sm text-muted-foreground">Nenhuma remessa vinculada.</p>
         <Button variant="link" size="sm" className="mt-1" onClick={() => window.location.href = '/remessas'}>
           Ir para Remessas
         </Button>

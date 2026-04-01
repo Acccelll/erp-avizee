@@ -124,28 +124,42 @@ export default function OrcamentoForm() {
       if (c.prazo_preferencial && !prazoPagamento) setPrazoPagamento(`${c.prazo_preferencial} dias`);
       if (c.prazo_padrao && !prazoPagamento && !c.prazo_preferencial) setPrazoPagamento(`${c.prazo_padrao} dias`);
 
-      // Load special prices for this client
+      // Load special prices for this client (only active and within validity period)
+      const today = new Date().toISOString().slice(0, 10);
       supabase.from("precos_especiais")
         .select("*")
         .eq("cliente_id", cId)
         .eq("ativo", true)
+        .or(`vigencia_fim.is.null,vigencia_fim.gte.${today}`)
+        .or(`vigencia_inicio.is.null,vigencia_inicio.lte.${today}`)
         .then(({ data }) => {
           const rules = data || [];
           setPrecosEspeciais(rules);
 
           // Recalculate prices for existing items if they have special prices
           if (items.length > 0) {
+            let applied = false;
             const nextItems = items.map(item => {
               if (!item.produto_id) return item;
               const rule = rules.find(r => r.produto_id === item.produto_id);
               if (rule) {
-                const newPrice = Number(rule.preco_especial);
+                let newPrice: number;
+                if (rule.preco_especial && Number(rule.preco_especial) > 0) {
+                  newPrice = Number(rule.preco_especial);
+                } else if (rule.desconto_percentual && Number(rule.desconto_percentual) > 0) {
+                  newPrice = item.valor_unitario * (1 - Number(rule.desconto_percentual) / 100);
+                } else {
+                  return item;
+                }
+                applied = true;
                 return { ...item, valor_unitario: newPrice, valor_total: item.quantidade * newPrice };
               }
               return item;
             });
             setItems(nextItems);
-            toast.info("Preços recalculados com base nas regras do cliente selecionado");
+            if (applied) {
+              toast.info("Preços recalculados com base nas regras do cliente selecionado");
+            }
           }
         });
     } else {

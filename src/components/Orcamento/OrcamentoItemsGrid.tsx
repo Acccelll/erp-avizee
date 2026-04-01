@@ -69,19 +69,27 @@ export function OrcamentoItemsGrid({ items, onChange, produtos, precosEspeciais 
         item.descricao_snapshot = prod.nome;
         item.unidade = prod.unidade_medida || "UN";
 
-        // Check for special price
+        // Check for special price (fixed price or percentage discount)
         const precoEspecial = precosEspeciais?.find(p =>
           p.produto_id === value &&
           (!p.vigencia_inicio || new Date(p.vigencia_inicio + "T00:00:00") <= new Date()) &&
           (!p.vigencia_fim || new Date(p.vigencia_fim + "T23:59:59") >= new Date())
         );
 
-        item.valor_unitario = precoEspecial ? Number(precoEspecial.preco_especial) : (prod.preco_venda || 0);
-        item.peso_unitario = prod.peso || 0;
-
+        const precoBase = prod.preco_venda || 0;
         if (precoEspecial) {
+          if (precoEspecial.preco_especial && Number(precoEspecial.preco_especial) > 0) {
+            item.valor_unitario = Number(precoEspecial.preco_especial);
+          } else if (precoEspecial.desconto_percentual && Number(precoEspecial.desconto_percentual) > 0) {
+            item.valor_unitario = precoBase * (1 - Number(precoEspecial.desconto_percentual) / 100);
+          } else {
+            item.valor_unitario = precoBase;
+          }
           toast.info(`Preço especial aplicado para ${prod.nome}`);
+        } else {
+          item.valor_unitario = precoBase;
         }
+        item.peso_unitario = prod.peso || 0;
       }
     }
 
@@ -200,6 +208,12 @@ export function OrcamentoItemsGrid({ items, onChange, produtos, precosEspeciais 
                                 <TooltipContent side="top" className="text-xs p-2 max-w-[200px]">
                                   <p className="font-bold mb-1">Preço Especial Ativo</p>
                                   <p>Preço Padrão: {formatCurrency(prod?.preco_venda || 0)}</p>
+                                  {rule.preco_especial && Number(rule.preco_especial) > 0 && (
+                                    <p>Preço Fixo: {formatCurrency(Number(rule.preco_especial))}</p>
+                                  )}
+                                  {rule.desconto_percentual && Number(rule.desconto_percentual) > 0 && (
+                                    <p>Desconto: {rule.desconto_percentual}%</p>
+                                  )}
                                   {rule.observacao && <p className="mt-1 italic text-[10px]">"{rule.observacao}"</p>}
                                 </TooltipContent>
                               </Tooltip>
