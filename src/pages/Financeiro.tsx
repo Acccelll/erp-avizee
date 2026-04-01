@@ -29,6 +29,7 @@ import { BaixaParcialDialog } from "@/components/financeiro/BaixaParcialDialog";
 import { BaixaLoteModal } from "@/components/financeiro/BaixaLoteModal";
 import { FinanceiroDrawer } from "@/components/financeiro/FinanceiroDrawer";
 import { getEffectiveStatus, processarEstorno } from "@/services/financeiro.service";
+import { statusFinanceiro as statusFinanceiroSchema, statusToOptions } from "@/lib/statusSchema";
 
 interface Lancamento {
   id: string; tipo: string; descricao: string; valor: number;
