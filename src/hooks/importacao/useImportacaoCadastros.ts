@@ -129,7 +129,7 @@ export function useImportacaoCadastros() {
         criado_por: user?.user?.id
       }));
 
-      const { error: stagingError } = await supabase.from(stagingTable as any).insert(stagingData);
+      const { error: stagingError } = await supabase.from(stagingTable as any).insert(stagingData as any);
       if (stagingError) throw stagingError;
 
       // 3. Atualizar Lote com contagens
