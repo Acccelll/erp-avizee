@@ -29,39 +29,48 @@ export function ClienteView({ id }: Props) {
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
-      const { data: c } = await supabase.from("clientes").select("*, grupos_economicos(nome)").eq("id", id).single();
-      if (!c) return;
-      setSelected(c);
+      try {
+        const { data: c } = await supabase.from("clientes").select("*, grupos_economicos(nome)").eq("id", id).maybeSingle();
+        if (!c) {
+          setSelected(null);
+          return;
+        }
+        setSelected(c);
 
-      const [vRes, fRes, commRes, transRes] = await Promise.all([
-        supabase
-        .from("ordens_venda")
-        .select("id, numero, data_emissao, valor_total, status")
-        .eq("cliente_id", c.id)
-        .order("data_emissao", { ascending: false })
-        .limit(10),
-        supabase
-        .from("financeiro_lancamentos")
-        .select("*")
-        .eq("cliente_id", c.id)
-        .order("data_vencimento", { ascending: false })
-        .limit(10),
-        supabase
-        .from("cliente_registros_comunicacao")
-        .select("*")
-        .eq("cliente_id", c.id)
-        .order("data_hora", { ascending: false }),
-        supabase
-        .from("cliente_transportadoras")
-        .select("*, transportadoras(nome_razao_social)")
-        .eq("cliente_id", c.id)
-      ]);
+        const [vRes, fRes, commRes, transRes] = await Promise.all([
+          supabase
+          .from("ordens_venda")
+          .select("id, numero, data_emissao, valor_total, status")
+          .eq("cliente_id", c.id)
+          .order("data_emissao", { ascending: false })
+          .limit(10),
+          supabase
+          .from("financeiro_lancamentos")
+          .select("*")
+          .eq("cliente_id", c.id)
+          .order("data_vencimento", { ascending: false })
+          .limit(10),
+          supabase
+          .from("cliente_registros_comunicacao")
+          .select("*")
+          .eq("cliente_id", c.id)
+          .order("data_hora", { ascending: false }),
+          supabase
+          .from("cliente_transportadoras")
+          .select("*, transportadoras(nome_razao_social)")
+          .eq("cliente_id", c.id)
+        ]);
 
-      setVendas(vRes.data || []);
-      setFinanceiro(fRes.data || []);
-      setComunicacao(commRes.data || []);
-      setTransportadoras(transRes.data || []);
-      setLoading(false);
+        setVendas(vRes.data || []);
+        setFinanceiro(fRes.data || []);
+        setComunicacao(commRes.data || []);
+        setTransportadoras(transRes.data || []);
+      } catch (error) {
+        console.error("Erro ao carregar dados do cliente:", error);
+        setSelected(null);
+      } finally {
+        setLoading(false);
+      }
     };
 
     fetchData();
