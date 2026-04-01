@@ -14,26 +14,32 @@ interface DashboardPeriodContextValue {
 
 const DashboardPeriodContext = createContext<DashboardPeriodContextValue | undefined>(undefined);
 
+const formatLocalDate = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
 export function DashboardPeriodProvider({ children }: { children: ReactNode }) {
   const [period, setPeriod] = useState<DashboardPeriod>("30d");
-  const [customStart, setCustomStart] = useState<string>(new Date().toISOString().slice(0, 10));
-  const [customEnd, setCustomEnd] = useState<string>(new Date().toISOString().slice(0, 10));
+  const [customStart, setCustomStart] = useState<string>(formatLocalDate(new Date()));
+  const [customEnd, setCustomEnd] = useState<string>(formatLocalDate(new Date()));
 
   const range = useMemo(() => {
     const now = new Date();
-    const toIso = (d: Date) => d.toISOString().slice(0, 10);
 
     if (period === "today") {
-      const today = toIso(now);
+      const today = formatLocalDate(now);
       return { dateFrom: today, dateTo: today };
     }
     if (period === "week") {
       const first = new Date(now);
       first.setDate(now.getDate() - now.getDay());
-      return { dateFrom: toIso(first), dateTo: toIso(now) };
+      return { dateFrom: formatLocalDate(first), dateTo: formatLocalDate(now) };
     }
     if (period === "month") {
-      return { dateFrom: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`, dateTo: toIso(now) };
+      return { dateFrom: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`, dateTo: formatLocalDate(now) };
     }
     if (period === "custom") {
       return { dateFrom: customStart, dateTo: customEnd };
@@ -41,7 +47,7 @@ export function DashboardPeriodProvider({ children }: { children: ReactNode }) {
 
     const past30 = new Date(now);
     past30.setDate(now.getDate() - 30);
-    return { dateFrom: toIso(past30), dateTo: toIso(now) };
+    return { dateFrom: formatLocalDate(past30), dateTo: formatLocalDate(now) };
   }, [customEnd, customStart, period]);
 
   return (
