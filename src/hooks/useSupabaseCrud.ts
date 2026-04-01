@@ -59,7 +59,8 @@ export function useSupabaseCrud<T extends Record<string, any>>({
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      let query = supabase.from(table as any).select(select).order(orderBy, { ascending });
+      // Use count query to detect truncation
+      let query = supabase.from(table as any).select(select, { count: 'exact' }).order(orderBy, { ascending });
 
       if (hasAtivo) {
         query = query.eq("ativo", true);
@@ -72,13 +73,19 @@ export function useSupabaseCrud<T extends Record<string, any>>({
         query = query.range(from, from + pageSize - 1);
       }
 
-      const { data: result, error } = await query;
+      const { data: result, error, count } = await query;
       if (error) {
         console.error(`[crud] Erro ao carregar ${table}:`, error);
         if (showToasts) toast.error("Erro ao carregar dados. Tente novamente.");
       } else {
         const rows = (result as unknown as T[]) || [];
         setData(rows);
+        setTotalCount(count);
+        const isTruncated = count !== null && rows.length < count && !pageSize;
+        setTruncated(isTruncated);
+        if (isTruncated) {
+          console.warn(`[crud] Tabela ${table}: exibindo ${rows.length} de ${count} registros (limite Supabase). Considere usar paginação.`);
+        }
         if (pageSize) setHasMore(rows.length === pageSize);
       }
     } catch (err) {
