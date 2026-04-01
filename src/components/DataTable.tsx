@@ -484,7 +484,7 @@ export function DataTable<T extends Record<string, any>>({
       <div className="data-table">
         {loading ? (
           <TableSkeleton rows={6} cols={Math.max(visibleColumns.length, 4)} />
-        ) : data.length === 0 ? (
+        ) : sortedData.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 px-4 text-center"><div className="rounded-full bg-muted p-4 mb-4"><PackageOpen className="h-8 w-8 text-muted-foreground" /></div><h3 className="text-base font-semibold text-foreground mb-1">{emptyTitle}</h3><p className="text-sm text-muted-foreground max-w-sm">{emptyDescription}</p></div>
         ) : (
           <>
