@@ -107,7 +107,7 @@ export function useSupabaseCrud<T extends Record<string, any>>({
     } finally {
       setLoading(false);
     }
-  }, [table, select, orderBy, ascending, hasAtivo, applyFilters, pageSize, page, showToasts, searchTerm, searchColumns]);
+  }, [table, select, orderBy, ascending, hasAtivo, applyFilters, pageSize, page, showToasts, searchTerm]);
 
   useEffect(() => {
     fetchData();
