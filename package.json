@@ -10,7 +10,10 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "seed:reset": "node scripts/dev-reset-seed.js --reset-only --confirm",
+    "seed:data": "node scripts/dev-reset-seed.js --seed-only --confirm",
+    "dev:reset": "node scripts/dev-reset-seed.js --confirm"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

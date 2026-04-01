@@ -92,16 +92,65 @@ As preferências de usuário (nome, cargo, senha, tema) são persistidas diretam
 
 O sistema utiliza uma estratégia de **Cache Write-Through**: o `localStorage` armazena temporariamente configurações para garantir uma UI instantânea (snappiness), mas todas as alterações são sincronizadas com o banco de dados.
 
-## Mock data / seed inicial
+## Dados de exemplo / Seed de desenvolvimento
 
-O projeto inclui um conjunto completo de dados de demonstração em:
-- `supabase/migrations/20260317030000_seed_mock_data.sql`
+O projeto inclui um conjunto completo de dados de demonstração para testes ponta a ponta.
+Os dados cobrem o fluxo completo: cadastros → cotações → compras → vendas → fiscal → financeiro → estoque → logística.
 
-Para aplicar (ambiente local):
-```bash
-supabase start
-supabase db reset
+### Estrutura
+
 ```
+supabase/seeds/
+├── reset.sql   — Limpeza controlada de dados (DELETE em ordem reversa de FK)
+└── seed.sql    — Inserção de dados de exemplo (schema-compatible)
+
+scripts/
+└── dev-reset-seed.js  — Script Node.js com proteção de ambiente
+```
+
+### Como usar (ambiente local)
+
+> ⚠️ **ATENÇÃO**: Esses comandos apagam todos os dados operacionais do banco.
+> Use **apenas** em ambiente de desenvolvimento local.
+
+```bash
+# Inicie o Supabase local (se ainda não estiver rodando)
+supabase start
+
+# Reset completo + seed (limpeza + inserção de dados de exemplo)
+npm run dev:reset
+
+# Somente limpeza (sem reinserir dados)
+npm run seed:reset
+
+# Somente inserção de dados (sem limpar antes)
+npm run seed:data
+```
+
+### Proteções incluídas
+
+- O script verifica se `NODE_ENV=production` e **interrompe** a execução
+- O script verifica se `VITE_SUPABASE_URL` aponta para um banco remoto/produção e **interrompe** a execução
+- Os scripts `seed:reset` e `seed:data` passam `--confirm` automaticamente por conveniência em dev local
+- Para uso manual: `node scripts/dev-reset-seed.js --confirm` (o flag `--confirm` é obrigatório)
+
+### O que os dados de exemplo incluem
+
+- 3 transportadoras, 6 formas de pagamento, 2 grupos econômicos, 7 grupos de produto
+- 6 clientes com perfis variados (excelente pagador, inadimplente, novo cliente, grande porte)
+- 5 fornecedores com diferentes prazos e históricos
+- 12 produtos em 7 categorias + BOM (composição de produtos)
+- Cotações, compras, orçamentos, ordens de venda, notas fiscais
+- Lançamentos financeiros (a receber / a pagar), baixas, movimentos de caixa
+- Movimentos de estoque e remessas com rastreamento
+- Comunicações com clientes
+
+### Migrations vs. Seed
+
+As migrations em `supabase/migrations/` gerenciam **evolução de schema** apenas.
+O seed destrutivo que existia em `20260401200000_seed_completo.sql` foi removido;
+esse arquivo agora é um marcador neutro. Para recriar dados de teste, use os
+scripts acima conscientemente.
 
 ## Edge Functions e Integrações
 
