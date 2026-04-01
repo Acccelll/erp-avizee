@@ -41,6 +41,8 @@ export function useSupabaseCrud<T extends Record<string, any>>({
   const [truncated, setTruncated] = useState(false);
   const filterRef = useRef(filter);
   filterRef.current = filter;
+  const searchColumnsRef = useRef(searchColumns);
+  searchColumnsRef.current = searchColumns;
 
   const applyFilters = useCallback((query: any) => {
     for (const f of filterRef.current) {
@@ -73,8 +75,8 @@ export function useSupabaseCrud<T extends Record<string, any>>({
 
       // Server-side text search using OR ilike across specified columns
       const trimmedSearch = searchTerm.trim();
-      if (trimmedSearch && searchColumns.length > 0) {
-        const orFilter = searchColumns
+      if (trimmedSearch && searchColumnsRef.current.length > 0) {
+        const orFilter = searchColumnsRef.current
           .map(col => `${col}.ilike.%${trimmedSearch}%`)
           .join(",");
         query = query.or(orFilter);
@@ -105,7 +107,7 @@ export function useSupabaseCrud<T extends Record<string, any>>({
     } finally {
       setLoading(false);
     }
-  }, [table, select, orderBy, ascending, hasAtivo, applyFilters, pageSize, page, showToasts, searchTerm, searchColumns]);
+  }, [table, select, orderBy, ascending, hasAtivo, applyFilters, pageSize, page, showToasts, searchTerm]);
 
   useEffect(() => {
     fetchData();
