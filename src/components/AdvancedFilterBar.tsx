@@ -79,7 +79,6 @@ export function AdvancedFilterBar({
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs text-muted-foreground font-medium">Filtros:</span>
           {activeFilters.map((chip) => {
-            const isArray = Array.isArray(chip.value);
             return (
               <Badge key={`${chip.key}-${chip.displayValue}`} variant="secondary" className="gap-1 pr-1 text-xs font-normal">
                 <span className="text-muted-foreground">{chip.label}:</span>
@@ -87,7 +86,7 @@ export function AdvancedFilterBar({
                 {onRemoveFilter && (
                   <button
                     type="button"
-                    onClick={() => onRemoveFilter(chip.key, Array.isArray(chip.value) ? chip.value[0] : chip.value)}
+                    onClick={() => onRemoveFilter(chip.key, Array.isArray(chip.value) ? chip.value[0] : chip.value as string)}
                     className="ml-0.5 rounded-full p-0.5 hover:bg-muted-foreground/20"
                   >
                     <X className="h-3 w-3" />

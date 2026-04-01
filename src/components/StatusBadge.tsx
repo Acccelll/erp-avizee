@@ -53,5 +53,3 @@ export function StatusBadge({ status, label, className }: StatusBadgeProps) {
     </Badge>
   );
 }
-
-export default StatusBadge;

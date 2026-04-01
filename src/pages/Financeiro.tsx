@@ -1,9 +1,11 @@
 import { useState, useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { AppLayout } from "@/components/AppLayout";
-import { AdvancedFilterBar, type FilterChip } from "@/components/AdvancedFilterBar";
+import { AdvancedFilterBar } from "@/components/AdvancedFilterBar";
+import type { FilterChip } from "@/components/AdvancedFilterBar";
 import { ModulePage } from "@/components/ModulePage";
-import { DataTable, StatusBadge } from "@/components/DataTable";
+import { DataTable } from "@/components/DataTable";
+import { StatusBadge } from "@/components/StatusBadge";
 import { FormModal } from "@/components/FormModal";
 import { ViewDrawerV2, ViewField, ViewSection } from "@/components/ViewDrawerV2";
 import { RelationalLink } from "@/components/ui/RelationalLink";

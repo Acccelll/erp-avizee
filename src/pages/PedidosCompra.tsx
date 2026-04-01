@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
 import { AppLayout } from "@/components/AppLayout";
 import { ModulePage } from "@/components/ModulePage";
-import { DataTable, StatusBadge } from "@/components/DataTable";
+import { DataTable } from "@/components/DataTable";
+import { StatusBadge } from "@/components/StatusBadge";
 import { SummaryCard } from "@/components/SummaryCard";
 import { FormModal } from "@/components/FormModal";
 import { ViewDrawerV2 } from "@/components/ViewDrawerV2";

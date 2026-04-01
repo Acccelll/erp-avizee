@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Tables } from "@/integrations/supabase/types";
 import { Button } from "@/components/ui/button";
-import { StatusBadge } from "@/components/DataTable";
+import { StatusBadge } from "@/components/StatusBadge";
 import { Search, MapPin, Truck, ExternalLink, Package } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";

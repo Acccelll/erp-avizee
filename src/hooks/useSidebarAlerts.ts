@@ -11,28 +11,32 @@ export function useSidebarAlerts() {
 
   useEffect(() => {
     const load = async () => {
-      const today = new Date().toISOString().slice(0, 10);
+      try {
+        const today = new Date().toISOString().slice(0, 10);
 
-      const [{ count: vencidos }, { data: baixoData }] = await Promise.all([
-        supabase
-          .from('financeiro_lancamentos')
-          .select('*', { count: 'exact', head: true })
-          .eq('ativo', true)
-          .in('status', ['aberto', 'vencido'])
-          .lt('data_vencimento', today),
-        supabase
-          .from('produtos')
-          .select('id, estoque_atual, estoque_minimo')
-          .eq('ativo', true)
-          .gt('estoque_minimo', 0),
-      ]);
+        const [{ count: vencidos }, { data: baixoData }] = await Promise.all([
+          supabase
+            .from('financeiro_lancamentos')
+            .select('*', { count: 'exact', head: true })
+            .eq('ativo', true)
+            .in('status', ['aberto', 'vencido'])
+            .lt('data_vencimento', today),
+          supabase
+            .from('produtos')
+            .select('id, estoque_atual, estoque_minimo')
+            .eq('ativo', true)
+            .gt('estoque_minimo', 0),
+        ]);
 
-      const baixoCount = (baixoData || []).filter((p: any) => (p.estoque_atual || 0) <= p.estoque_minimo).length;
+        const baixoCount = (baixoData || []).filter((p: any) => (p.estoque_atual || 0) <= p.estoque_minimo).length;
 
-      setAlerts({
-        financeiroVencidos: vencidos || 0,
-        estoqueBaixo: baixoCount,
-      });
+        setAlerts({
+          financeiroVencidos: vencidos || 0,
+          estoqueBaixo: baixoCount,
+        });
+      } catch (err) {
+        console.error('[sidebar-alerts] Error loading alerts:', err);
+      }
     };
 
     load();

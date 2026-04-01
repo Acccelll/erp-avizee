@@ -67,7 +67,7 @@ export function DataTable<T extends Record<string, any>>({
   );
   const hasActions = !!onView;
   const visibleColumns = columns.filter((c) => !hiddenKeys.has(c.key));
-  const primaryColumn = visibleColumns[0];
+  const primaryColumn = visibleColumns[0] || { key: 'id', label: 'ID' };
   const secondaryColumns = visibleColumns.slice(1);
 
   const toggleColumnVisibility = (key: string) => {
@@ -221,8 +221,23 @@ export function DataTable<T extends Record<string, any>>({
                   key={item.id || idx}
                   role={onView || onRowClick ? "button" : undefined}
                   tabIndex={onView || onRowClick ? 0 : -1}
-                  onClick={() => onView ? onView(item) : onRowClick?.(item)}
-                  onKeyDown={(event) => { if ((event.key === "Enter" || event.key === " ") && (onView || onRowClick)) { event.preventDefault(); onView ? onView(item) : onRowClick?.(item); } }}
+                  onClick={() => {
+                    if (onView) {
+                      onView(item);
+                    } else if (onRowClick) {
+                      onRowClick(item);
+                    }
+                  }}
+                  onKeyDown={(event) => {
+                    if ((event.key === "Enter" || event.key === " ") && (onView || onRowClick)) {
+                      event.preventDefault();
+                      if (onView) {
+                        onView(item);
+                      } else if (onRowClick) {
+                        onRowClick(item);
+                      }
+                    }
+                  }}
                   className="w-full rounded-xl border bg-background p-4 text-left shadow-sm transition hover:border-primary/30 hover:bg-accent/20"
                 >
                   <div className="min-w-0 flex-1">
@@ -326,6 +341,4 @@ export function DataTable<T extends Record<string, any>>({
   );
 }
 
-// Re-export StatusBadge from its dedicated module for backward compatibility
-export { StatusBadge } from '@/components/StatusBadge';
 

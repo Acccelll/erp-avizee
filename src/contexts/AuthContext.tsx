@@ -36,6 +36,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const manualSignOut = useRef(false);
 
   useEffect(() => {
+    // Safety timeout to prevent infinite loading if getSession hangs
+    const safetyTimeout = setTimeout(() => {
+      if (loading) {
+        console.warn("[auth] Auth initialization timed out. Forcing loading false.");
+        setLoading(false);
+      }
+    }, 5000);
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT' && !manualSignOut.current && user) {
         toast.error("Sua sessão expirou. Faça login novamente.");
@@ -56,17 +64,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
     });
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchProfile(session.user.id);
-        fetchRoles(session.user.id);
-      }
-      setLoading(false);
-    });
+    supabase.auth.getSession()
+      .then(({ data: { session } }) => {
+        setSession(session);
+        setUser(session?.user ?? null);
+        if (session?.user) {
+          fetchProfile(session.user.id);
+          fetchRoles(session.user.id);
+        }
+      })
+      .catch((err) => {
+        console.error("[auth] Error getting session:", err);
+      })
+      .finally(() => {
+        clearTimeout(safetyTimeout);
+        setLoading(false);
+      });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      clearTimeout(safetyTimeout);
+      subscription.unsubscribe();
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
