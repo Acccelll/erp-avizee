@@ -109,13 +109,13 @@ export function AppHeader({ onOpenMobileMenu: _onOpenMobileMenu, searchRequest =
 
   return (
     <>
-      <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+      <header role="banner" className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
         <div className="mx-auto flex h-16 max-w-[1600px] items-center gap-3 px-3 md:px-6">
           {isMobile ? (
             <>
               <div className="flex min-w-0 flex-1 items-center gap-2">
                 {location.pathname !== '/' && (
-                  <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full" onClick={() => navigate(-1)}>
+                  <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full" onClick={() => navigate(-1)} aria-label="Voltar para a tela anterior" title="Voltar">
                     <ArrowLeft className="h-4 w-4" />
                   </Button>
                 )}
@@ -133,7 +133,7 @@ export function AppHeader({ onOpenMobileMenu: _onOpenMobileMenu, searchRequest =
               </div>
 
               <div className="flex items-center gap-2">
-                <Button variant="outline" size="icon" className="h-10 w-10 rounded-full" onClick={() => setSearchOpen(true)}>
+                <Button variant="outline" size="icon" className="h-10 w-10 rounded-full" onClick={() => setSearchOpen(true)} aria-label="Abrir busca global" title="Buscar">
                   <Search className="h-4 w-4" />
                 </Button>
                 <Button variant="outline" size="icon" className="rounded-full" onClick={() => setShortcutsOpen(true)}><Keyboard className="h-4 w-4" /></Button>
@@ -141,7 +141,7 @@ export function AppHeader({ onOpenMobileMenu: _onOpenMobileMenu, searchRequest =
               <NotificationsPanel />
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="h-10 w-10 rounded-full p-0">
+                    <Button variant="ghost" className="h-10 w-10 rounded-full p-0" aria-label="Abrir menu da conta">
                       <Avatar className="h-9 w-9 border border-border">
                         <AvatarFallback className="bg-primary text-primary-foreground">{initials}</AvatarFallback>
                       </Avatar>
@@ -217,13 +217,15 @@ export function AppHeader({ onOpenMobileMenu: _onOpenMobileMenu, searchRequest =
                 size="icon"
                 className="rounded-full"
                 onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                aria-label={theme === 'dark' ? 'Ativar tema claro' : 'Ativar tema escuro'}
+                title={theme === 'dark' ? 'Tema claro' : 'Tema escuro'}
               >
                 {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
               </Button>
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="h-10 gap-2 rounded-full px-2">
+                  <Button variant="ghost" className="h-10 gap-2 rounded-full px-2" aria-label="Abrir menu da conta">
                     <Avatar className="h-9 w-9 border border-border">
                       <AvatarFallback className="bg-primary text-primary-foreground">{initials}</AvatarFallback>
                     </Avatar>

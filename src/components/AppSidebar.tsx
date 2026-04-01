@@ -93,6 +93,8 @@ export function AppSidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMo
     <>
       {mobileOpen && <div className="fixed inset-0 z-40 bg-black/40 md:hidden" onClick={onCloseMobile} />}
       <aside
+        role="complementary"
+        aria-label="Barra lateral principal"
         className={[
           'fixed inset-y-0 left-0 z-50 flex h-screen flex-col border-r border-border bg-card transition-all duration-200',
           containerClasses,
@@ -110,7 +112,14 @@ export function AppSidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMo
               </div>
             )}
           </div>
-          <Button variant="ghost" size="icon" className="hidden md:inline-flex" onClick={onToggleCollapsed}>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="hidden md:inline-flex"
+            onClick={onToggleCollapsed}
+            aria-label={collapsed ? "Expandir menu lateral" : "Recolher menu lateral"}
+            title={collapsed ? "Expandir menu lateral" : "Recolher menu lateral"}
+          >
             <ChevronRight className={`h-4 w-4 transition-transform ${collapsed ? '' : 'rotate-180'}`} />
           </Button>
         </div>
@@ -122,6 +131,7 @@ export function AppSidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMo
             onClick={onOpenSearch}
             className={`flex w-full items-center gap-2 rounded-lg border bg-background px-3 py-2 text-sm text-muted-foreground transition hover:border-primary/30 hover:text-foreground ${collapsed ? 'justify-center px-0' : ''}`}
             title="Buscar módulos (Ctrl/Cmd + K)"
+            aria-label="Abrir busca global"
           >
             <Search className="h-4 w-4" />
             {!collapsed && (
@@ -134,7 +144,7 @@ export function AppSidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMo
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto px-2 py-3">
+        <nav className="flex-1 overflow-y-auto px-2 py-3" role="navigation" aria-label="Módulos do sistema">
           {/* Dashboard */}
           <Link
             to={dashboardItem.path}
@@ -165,6 +175,7 @@ export function AppSidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMo
                         : 'text-foreground hover:bg-accent'
                     } ${collapsed ? 'justify-center px-0' : ''}`}
                     title={collapsed ? section.title : undefined}
+                    aria-label={collapsed ? `Abrir seção ${section.title}` : undefined}
                   >
                     <section.icon className="h-4.5 w-4.5 shrink-0" />
                     {!collapsed && (
@@ -238,6 +249,7 @@ export function AppSidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMo
             onClick={() => handleNavClick('/configuracoes')}
             className={`sidebar-item ${isPathActive(location.pathname, '/configuracoes') ? 'sidebar-item-active' : 'sidebar-item-inactive'} ${collapsed ? 'justify-center' : ''}`}
             title={collapsed ? 'Configurações' : undefined}
+            aria-label="Abrir configurações"
           >
             <Settings className="h-5 w-5 shrink-0" />
             {!collapsed && <span>Configurações</span>}

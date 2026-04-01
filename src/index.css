@@ -24,7 +24,7 @@
     --secondary-foreground: 0 0% 100%;
 
     --muted: 40 33% 92%;
-    --muted-foreground: 220 9% 46%;
+    --muted-foreground: 220 9% 34%;
 
     --accent: 43 100% 96%;
     --accent-foreground: 60 4% 8%;
@@ -70,7 +70,7 @@
     --secondary: 21 63% 44%;
     --secondary-foreground: 0 0% 100%;
     --muted: 60 3% 16%;
-    --muted-foreground: 220 9% 55%;
+    --muted-foreground: 220 9% 72%;
     --accent: 60 3% 18%;
     --accent-foreground: 40 33% 92%;
     --destructive: 0 62% 30%;
@@ -126,6 +126,51 @@
   ::-webkit-scrollbar-thumb:hover {
     background: hsl(var(--primary));
   }
+
+  :where(
+      a,
+      button,
+      input,
+      select,
+      textarea,
+      [role="button"],
+      [tabindex]:not([tabindex="-1"])
+    ):focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+    box-shadow: 0 0 0 4px hsl(var(--ring) / 0.25);
+    border-radius: 0.5rem;
+  }
+}
+
+:root[data-density='compact'] .stat-card {
+  padding: 0.75rem;
+}
+
+:root[data-density='compact'] .sidebar-item {
+  padding-top: 0.4rem;
+  padding-bottom: 0.4rem;
+  font-size: 0.82rem;
+}
+
+:root[data-density='compact'] .page-title {
+  font-size: 1.25rem;
+}
+
+.reduce-motion * {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 :root[data-density='compact'] .stat-card {
@@ -169,6 +214,10 @@
 }
 
 @layer utilities {
+  .skip-link {
+    @apply sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[120] focus:rounded-md focus:bg-primary focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-primary-foreground;
+  }
+
   .erp-gradient {
     background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--secondary)));
   }
