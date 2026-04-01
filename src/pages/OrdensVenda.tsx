@@ -34,6 +34,8 @@ interface OrdemVenda {
   orcamentos?: { numero: string };
 }
 
+import { statusOrdemVenda } from "@/lib/statusSchema";
+
 const statusComercialLabels: Record<string, string> = {
   pendente: "Pendente", aprovada: "Aprovada", em_separacao: "Em Separação", cancelada: "Cancelada",
 };
