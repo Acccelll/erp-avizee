@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/command';
 import { flatNavItems, quickActions } from '@/lib/navigation';
 import { supabase } from '@/integrations/supabase/client';
+import { useDebounce } from '@/hooks/useDebounce';
 
 interface GlobalSearchProps {
   open: boolean;
@@ -51,6 +52,7 @@ function highlight(text: string, term: string) {
 export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search, 300);
   const [entityResults, setEntityResults] = useState<EntityResult[]>([]);
   const [recentSearches, setRecentSearches] = useState<string[]>(() => {
     try {
@@ -73,18 +75,21 @@ export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
   }, [open, onOpenChange]);
 
   useEffect(() => {
-    if (search.trim().length < 2) {
+    if (debouncedSearch.trim().length < 2) {
       setEntityResults([]);
       return;
     }
 
-    const term = search.trim();
+    const term = debouncedSearch.trim();
+    let active = true;
+
     Promise.all([
       supabase.from('clientes').select('id, nome_razao_social, cpf_cnpj').eq('ativo', true).ilike('nome_razao_social', `%${term}%`).limit(4),
       supabase.from('produtos').select('id, nome, codigo_interno').eq('ativo', true).ilike('nome', `%${term}%`).limit(4),
       supabase.from('orcamentos').select('id, numero, status').eq('ativo', true).ilike('numero', `%${term}%`).limit(4),
       supabase.from('notas_fiscais').select('id, numero, status, tipo').eq('ativo', true).ilike('numero', `%${term}%`).limit(4),
     ]).then(([clientes, produtos, orcamentos, notas]) => {
+      if (!active) return;
       const merged: EntityResult[] = [
         ...(clientes.data || []).map((c: any) => ({ id: `cli-${c.id}`, title: c.nome_razao_social, subtitle: c.cpf_cnpj || 'Cliente', path: '/clientes', category: 'Clientes' as const })),
         ...(produtos.data || []).map((p: any) => ({ id: `pro-${p.id}`, title: p.nome, subtitle: p.codigo_interno || 'Produto', path: '/produtos', category: 'Produtos' as const })),
@@ -93,7 +98,11 @@ export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
       ];
       setEntityResults(merged);
     });
-  }, [search]);
+
+    return () => {
+      active = false;
+    };
+  }, [debouncedSearch]);
 
   const navigationResults = useMemo(
     () =>
