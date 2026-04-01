@@ -81,7 +81,14 @@ const Fornecedores = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.nome_razao_social) {toast.error("Razão Social é obrigatória");return;}
+    const validation = validateForm(clienteFornecedorSchema, form);
+    if (!validation.success) {
+      setFormErrors(validation.errors);
+      const firstError = Object.values(validation.errors)[0];
+      toast.error(firstError || "Corrija os erros do formulário");
+      return;
+    }
+    setFormErrors({});
     setSaving(true);
     try {
       if (mode === "create") await create(form);else
@@ -94,13 +101,12 @@ const Fornecedores = () => {
   };
 
   const filteredData = useMemo(() => {
-    const query = searchTerm.trim().toLowerCase();
+    // Text search is now server-side; only apply local dropdown filters
     return data.filter((fornecedor) => {
       if (tipoFilters.length > 0 && !tipoFilters.includes(fornecedor.tipo_pessoa)) return false;
-      if (!query) return true;
-      return [fornecedor.nome_razao_social, fornecedor.nome_fantasia, fornecedor.cpf_cnpj, fornecedor.email, fornecedor.cidade, fornecedor.uf, fornecedor.telefone, fornecedor.contato].filter(Boolean).join(" ").toLowerCase().includes(query);
+      return true;
     });
-  }, [data, searchTerm, tipoFilters]);
+  }, [data, tipoFilters]);
 
   const columns = [
   { key: "nome_razao_social", label: "Razão Social", sortable: true },
