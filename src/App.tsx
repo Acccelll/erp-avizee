@@ -45,11 +45,25 @@ const PedidosCompra = lazy(() => import("./pages/PedidosCompra"));
 const Remessas = lazy(() => import("./pages/Remessas"));
 const Funcionarios = lazy(() => import("./pages/Funcionarios"));
 const OrcamentoPublico = lazy(() => import("./pages/OrcamentoPublico"));
+const Conciliacao = lazy(() => import("./pages/Conciliacao"));
 
 // Redirect component that properly maps :id param
 function CotacaoIdRedirect() {
   const { id } = useParams();
   return <Navigate to={`/orcamentos/${id}`} replace />;
+}
+
+// Per-route Suspense wrapper — shows loading spinner only in the content area
+function LazyPage({ children }: { children: React.ReactNode }) {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center flex-1 min-h-[calc(100vh-4rem)]">
+        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
+      </div>
+    }>
+      {children}
+    </Suspense>
+  );
 }
 
 const queryClient = new QueryClient({
@@ -63,12 +77,6 @@ const queryClient = new QueryClient({
   },
 });
 
-const PageLoader = () => (
-  <div className="flex items-center justify-center min-h-screen">
-    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-  </div>
-);
-
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider>
@@ -77,49 +85,48 @@ const App = () => (
         <BrowserRouter>
           <AuthProvider>
           <ErrorBoundary>
-          <Suspense fallback={<PageLoader />}>
           <Routes>
-            <Route path="/orcamento-publico" element={<OrcamentoPublico />} />
+            <Route path="/orcamento-publico" element={<LazyPage><OrcamentoPublico /></LazyPage>} />
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
-            <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-            <Route path="/produtos" element={<ProtectedRoute><Produtos /></ProtectedRoute>} />
-            <Route path="/clientes" element={<ProtectedRoute><Clientes /></ProtectedRoute>} />
-            <Route path="/fornecedores" element={<ProtectedRoute><Fornecedores /></ProtectedRoute>} />
-            <Route path="/transportadoras" element={<ProtectedRoute><Transportadoras /></ProtectedRoute>} />
-            <Route path="/formas-pagamento" element={<ProtectedRoute><FormasPagamento /></ProtectedRoute>} />
-            <Route path="/grupos-economicos" element={<ProtectedRoute><GruposEconomicos /></ProtectedRoute>} />
-            <Route path="/funcionarios" element={<ProtectedRoute><Funcionarios /></ProtectedRoute>} />
-            <Route path="/compras" element={<ProtectedRoute><Compras /></ProtectedRoute>} />
-            <Route path="/cotacoes-compra" element={<ProtectedRoute><CotacoesCompra /></ProtectedRoute>} />
-            <Route path="/pedidos-compra" element={<ProtectedRoute><PedidosCompra /></ProtectedRoute>} />
-            <Route path="/remessas" element={<ProtectedRoute><Remessas /></ProtectedRoute>} />
+            <Route path="/" element={<ProtectedRoute><LazyPage><Index /></LazyPage></ProtectedRoute>} />
+            <Route path="/produtos" element={<ProtectedRoute><LazyPage><Produtos /></LazyPage></ProtectedRoute>} />
+            <Route path="/clientes" element={<ProtectedRoute><LazyPage><Clientes /></LazyPage></ProtectedRoute>} />
+            <Route path="/fornecedores" element={<ProtectedRoute><LazyPage><Fornecedores /></LazyPage></ProtectedRoute>} />
+            <Route path="/transportadoras" element={<ProtectedRoute><LazyPage><Transportadoras /></LazyPage></ProtectedRoute>} />
+            <Route path="/formas-pagamento" element={<ProtectedRoute><LazyPage><FormasPagamento /></LazyPage></ProtectedRoute>} />
+            <Route path="/grupos-economicos" element={<ProtectedRoute><LazyPage><GruposEconomicos /></LazyPage></ProtectedRoute>} />
+            <Route path="/funcionarios" element={<ProtectedRoute><LazyPage><Funcionarios /></LazyPage></ProtectedRoute>} />
+            <Route path="/compras" element={<ProtectedRoute><LazyPage><Compras /></LazyPage></ProtectedRoute>} />
+            <Route path="/cotacoes-compra" element={<ProtectedRoute><LazyPage><CotacoesCompra /></LazyPage></ProtectedRoute>} />
+            <Route path="/pedidos-compra" element={<ProtectedRoute><LazyPage><PedidosCompra /></LazyPage></ProtectedRoute>} />
+            <Route path="/remessas" element={<ProtectedRoute><LazyPage><Remessas /></LazyPage></ProtectedRoute>} />
             <Route path="/cotacoes" element={<Navigate to="/orcamentos" replace />} />
             <Route path="/cotacoes/novo" element={<Navigate to="/orcamentos/novo" replace />} />
             <Route path="/cotacoes/:id" element={<CotacaoIdRedirect />} />
-            <Route path="/orcamentos" element={<ProtectedRoute><Orcamentos /></ProtectedRoute>} />
-            <Route path="/orcamentos/novo" element={<ProtectedRoute><OrcamentoForm /></ProtectedRoute>} />
-            <Route path="/orcamentos/:id" element={<ProtectedRoute><OrcamentoForm /></ProtectedRoute>} />
-            <Route path="/ordens-venda" element={<ProtectedRoute><OrdensVenda /></ProtectedRoute>} />
-            <Route path="/pedidos" element={<ProtectedRoute><Pedidos /></ProtectedRoute>} />
-            <Route path="/estoque" element={<ProtectedRoute><Estoque /></ProtectedRoute>} />
-            <Route path="/fiscal" element={<ProtectedRoute><Fiscal /></ProtectedRoute>} />
-            <Route path="/financeiro" element={<ProtectedRoute><Financeiro /></ProtectedRoute>} />
-            <Route path="/contas-bancarias" element={<ProtectedRoute><ContasBancarias /></ProtectedRoute>} />
-            <Route path="/fluxo-caixa" element={<ProtectedRoute><FluxoCaixa /></ProtectedRoute>} />
-            <Route path="/caixa" element={<ProtectedRoute><Caixa /></ProtectedRoute>} />
-            <Route path="/relatorios" element={<ProtectedRoute><Relatorios /></ProtectedRoute>} />
-            <Route path="/configuracoes" element={<ProtectedRoute><Configuracoes /></ProtectedRoute>} />
-            <Route path="/administracao" element={<AdminRoute><Administracao /></AdminRoute>} />
-            <Route path="/migracao-dados" element={<AdminRoute><MigracaoDados /></AdminRoute>} />
-            <Route path="/auditoria" element={<AdminRoute><Auditoria /></AdminRoute>} />
-            <Route path="/perfil" element={<ProtectedRoute><Perfil /></ProtectedRoute>} />
-            <Route path="/contas-contabeis-plano" element={<ProtectedRoute><ContasContabeis /></ProtectedRoute>} />
-            <Route path="*" element={<NotFound />} />
+            <Route path="/orcamentos" element={<ProtectedRoute><LazyPage><Orcamentos /></LazyPage></ProtectedRoute>} />
+            <Route path="/orcamentos/novo" element={<ProtectedRoute><LazyPage><OrcamentoForm /></LazyPage></ProtectedRoute>} />
+            <Route path="/orcamentos/:id" element={<ProtectedRoute><LazyPage><OrcamentoForm /></LazyPage></ProtectedRoute>} />
+            <Route path="/ordens-venda" element={<ProtectedRoute><LazyPage><OrdensVenda /></LazyPage></ProtectedRoute>} />
+            <Route path="/pedidos" element={<ProtectedRoute><LazyPage><Pedidos /></LazyPage></ProtectedRoute>} />
+            <Route path="/estoque" element={<ProtectedRoute><LazyPage><Estoque /></LazyPage></ProtectedRoute>} />
+            <Route path="/fiscal" element={<ProtectedRoute><LazyPage><Fiscal /></LazyPage></ProtectedRoute>} />
+            <Route path="/financeiro" element={<ProtectedRoute><LazyPage><Financeiro /></LazyPage></ProtectedRoute>} />
+            <Route path="/contas-bancarias" element={<ProtectedRoute><LazyPage><ContasBancarias /></LazyPage></ProtectedRoute>} />
+            <Route path="/fluxo-caixa" element={<ProtectedRoute><LazyPage><FluxoCaixa /></LazyPage></ProtectedRoute>} />
+            <Route path="/caixa" element={<ProtectedRoute><LazyPage><Caixa /></LazyPage></ProtectedRoute>} />
+            <Route path="/relatorios" element={<ProtectedRoute><LazyPage><Relatorios /></LazyPage></ProtectedRoute>} />
+            <Route path="/configuracoes" element={<ProtectedRoute><LazyPage><Configuracoes /></LazyPage></ProtectedRoute>} />
+            <Route path="/administracao" element={<AdminRoute><LazyPage><Administracao /></LazyPage></AdminRoute>} />
+            <Route path="/migracao-dados" element={<AdminRoute><LazyPage><MigracaoDados /></LazyPage></AdminRoute>} />
+            <Route path="/auditoria" element={<AdminRoute><LazyPage><Auditoria /></LazyPage></AdminRoute>} />
+            <Route path="/perfil" element={<ProtectedRoute><LazyPage><Perfil /></LazyPage></ProtectedRoute>} />
+            <Route path="/contas-contabeis-plano" element={<ProtectedRoute><LazyPage><ContasContabeis /></LazyPage></ProtectedRoute>} />
+            <Route path="/conciliacao" element={<ProtectedRoute><LazyPage><Conciliacao /></LazyPage></ProtectedRoute>} />
+            <Route path="*" element={<LazyPage><NotFound /></LazyPage>} />
           </Routes>
-          </Suspense>
           </ErrorBoundary>
           </AuthProvider>
         </BrowserRouter>

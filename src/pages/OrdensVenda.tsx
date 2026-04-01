@@ -21,6 +21,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatCurrency, formatDate, daysSince, formatNumber } from "@/lib/format";
 import { CheckCircle, Package, FileText, DollarSign, Clock, Truck } from "lucide-react";
+import { LogisticaRastreioSection } from "@/components/logistica/LogisticaRastreioSection";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 interface OrdemVenda {
@@ -305,6 +306,13 @@ const OrdensVenda = () => {
                   </ViewField>
                 )}
               </div>
+            )
+          },
+          {
+            value: "logistica",
+            label: "Logística",
+            content: (
+              <LogisticaRastreioSection ordemVendaId={selected.id} />
             )
           }
         ] : []}

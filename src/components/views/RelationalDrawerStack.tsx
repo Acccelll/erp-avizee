@@ -59,18 +59,39 @@ export function RelationalDrawerStack() {
                 // transform: `translateX(${index * 4}px)`
               }}
             >
-              <SheetHeader className="sticky top-0 z-10 bg-card border-b px-6 py-4 flex flex-row items-center justify-between space-y-0">
-                <div className="flex items-center gap-3 min-w-0">
-                  {index > 0 && (
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={popView}>
-                      <ArrowLeft className="h-4 w-4" />
-                    </Button>
-                  )}
-                  <SheetTitle className="text-lg truncate">{getTitle(view.type)}</SheetTitle>
-                  <SheetDescription className="sr-only">Visualização de {getTitle(view.type)}</SheetDescription>
-                </div>
-                <div className="flex items-center gap-2">
-                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={clearStack}>
+              <SheetHeader className="sticky top-0 z-10 bg-card border-b px-6 py-4 flex flex-col gap-1.5 space-y-0">
+                {/* Breadcrumb trail — shown only when stack depth > 1 */}
+                {stack.length > 1 && (
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground overflow-x-auto pb-1">
+                    {stack.slice(0, index).map((prev, i) => (
+                      <span key={i} className="flex items-center gap-1 shrink-0">
+                        <button
+                          type="button"
+                          className="hover:text-foreground transition-colors hover:underline underline-offset-2"
+                          onClick={() => {
+                            const stepsBack = index - i;
+                            for (let s = 0; s < stepsBack; s++) popView();
+                          }}
+                        >
+                          {getTitle(prev.type)}
+                        </button>
+                        <span className="opacity-40">›</span>
+                      </span>
+                    ))}
+                    <span className="font-medium text-foreground shrink-0">{getTitle(view.type)}</span>
+                  </div>
+                )}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3 min-w-0">
+                    {index > 0 && (
+                      <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={popView}>
+                        <ArrowLeft className="h-4 w-4" />
+                      </Button>
+                    )}
+                    <SheetTitle className="text-base truncate">{getTitle(view.type)}</SheetTitle>
+                    <SheetDescription className="sr-only">Visualização de {getTitle(view.type)}</SheetDescription>
+                  </div>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={clearStack}>
                     <X className="h-4 w-4" />
                   </Button>
                 </div>
