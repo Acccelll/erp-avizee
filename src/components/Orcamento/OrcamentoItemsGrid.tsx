@@ -1,17 +1,19 @@
+import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Trash2, Search, Tag, Info } from "lucide-react";
+import { Plus, Trash2, Search, Tag, Info, AlertTriangle, CheckCircle2, Copy, GripVertical, Upload } from "lucide-react";
 import { ProductSelector } from "@/components/ui/DataSelector";
 import { AutocompleteSearch } from "@/components/ui/AutocompleteSearch";
 import { Tables } from "@/integrations/supabase/types";
 import { toast } from "sonner";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { formatCurrency } from "@/lib/format";
+import { ViewDrawerV2 } from "@/components/ViewDrawerV2";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 
 interface ProductWithForn extends Tables<"produtos"> {
-  produtos_fornecedores?: (Tables<"produtos_fornecedores"> & {
-    fornecedores?: { nome_razao_social: string } | null;
-  })[];
+  produtos_fornecedores?: (Tables<"produtos_fornecedores"> & { fornecedores?: { nome_razao_social: string } | null })[];
 }
 
 export interface OrcamentoItem {
@@ -23,9 +25,11 @@ export interface OrcamentoItem {
   quantidade: number;
   unidade: string;
   valor_unitario: number;
+  desconto_percentual?: number;
   valor_total: number;
   peso_unitario: number;
   peso_total: number;
+  override_justificativa?: string;
 }
 
 interface Props {
@@ -37,30 +41,41 @@ interface Props {
 
 const emptyItem = (): OrcamentoItem => ({
   produto_id: "", codigo_snapshot: "", descricao_snapshot: "", variacao: "",
-  quantidade: 0, unidade: "UN", valor_unitario: 0, valor_total: 0,
+  quantidade: 1, unidade: "UN", valor_unitario: 0, desconto_percentual: 0, valor_total: 0,
   peso_unitario: 0, peso_total: 0,
 });
 
 export function OrcamentoItemsGrid({ items, onChange, produtos, precosEspeciais }: Props) {
+  const [detailProductId, setDetailProductId] = useState<string | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
+  const [importText, setImportText] = useState("");
+  const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
+
   const addItem = () => onChange([...items, emptyItem()]);
 
-  const getProductOptions = () => {
-    return produtos.map(p => ({
-      id: p.id,
-      label: p.nome,
-      sublabel: p.sku || p.codigo_interno || "",
-      searchTerms: [p.sku, p.codigo_interno, p.nome].filter(Boolean) as string[]
-    }));
-  };
+  const getProductOptions = () => produtos.map((p) => ({
+    id: p.id,
+    label: p.nome,
+    sublabel: `${p.sku || p.codigo_interno || ""} · ${formatCurrency(p.preco_venda || 0)}`,
+    rightMeta: `Estoque: ${p.estoque_atual ?? 0}`,
+    imageUrl: null,
+    searchTerms: [p.sku, p.codigo_interno, p.nome].filter(Boolean) as string[],
+  }));
 
-  const removeItem = (idx: number) => {
-    const next = items.filter((_, i) => i !== idx);
-    onChange(next);
+  const removeItem = (idx: number) => onChange(items.filter((_, i) => i !== idx));
+  const duplicateItem = (idx: number) => onChange([...items.slice(0, idx + 1), { ...items[idx] }, ...items.slice(idx + 1)]);
+
+  const recalc = (item: OrcamentoItem) => {
+    const qty = Number(item.quantidade || 0);
+    const unit = Number(item.valor_unitario || 0);
+    const desconto = Number(item.desconto_percentual || 0);
+    const subtotal = qty * unit * (1 - desconto / 100);
+    return { ...item, valor_total: subtotal, peso_total: qty * (item.peso_unitario || 0) };
   };
 
   const updateItem = (idx: number, field: string, value: any) => {
     const next = [...items];
-    const item = { ...next[idx], [field]: value };
+    let item = { ...next[idx], [field]: value };
 
     if (field === "produto_id" && value) {
       const prod = produtos.find((p: any) => p.id === value);
@@ -68,14 +83,9 @@ export function OrcamentoItemsGrid({ items, onChange, produtos, precosEspeciais 
         item.codigo_snapshot = prod.sku || prod.codigo_interno || "";
         item.descricao_snapshot = prod.nome;
         item.unidade = prod.unidade_medida || "UN";
+        item.peso_unitario = prod.peso || 0;
 
-        // Check for special price (fixed price or percentage discount)
-        const precoEspecial = precosEspeciais?.find(p =>
-          p.produto_id === value &&
-          (!p.vigencia_inicio || new Date(p.vigencia_inicio + "T00:00:00") <= new Date()) &&
-          (!p.vigencia_fim || new Date(p.vigencia_fim + "T23:59:59") >= new Date())
-        );
-
+        const precoEspecial = precosEspeciais?.find((p) => p.produto_id === value);
         const precoBase = prod.preco_venda || 0;
         if (precoEspecial) {
           if (precoEspecial.preco_especial && Number(precoEspecial.preco_especial) > 0) {
@@ -85,158 +95,160 @@ export function OrcamentoItemsGrid({ items, onChange, produtos, precosEspeciais 
           } else {
             item.valor_unitario = precoBase;
           }
-          toast.info(`Preço especial aplicado para ${prod.nome}`);
+          toast.info(`Preço especial para este cliente aplicado em ${prod.nome}`);
         } else {
           item.valor_unitario = precoBase;
         }
-        item.peso_unitario = prod.peso || 0;
       }
     }
 
-    if (field === "quantidade" || field === "valor_unitario") {
-      const qty = field === "quantidade" ? Number(value) : item.quantidade;
-      const price = field === "valor_unitario" ? Number(value) : item.valor_unitario;
-      item.valor_total = qty * price;
-      item.peso_total = qty * item.peso_unitario;
+    if (field === "valor_unitario" && precosEspeciais?.some((p) => p.produto_id === item.produto_id)) {
+      item.override_justificativa = item.override_justificativa || "";
     }
 
+    item = recalc(item);
     next[idx] = item;
     onChange(next);
+  };
+
+  const subtotal = useMemo(() => items.reduce((acc, item) => acc + Number(item.valor_total || 0), 0), [items]);
+  const activeDetailProduct = produtos.find((p) => p.id === detailProductId);
+
+  const onDropIndex = (targetIndex: number) => {
+    if (draggingIndex === null || draggingIndex === targetIndex) return;
+    const next = [...items];
+    const [moved] = next.splice(draggingIndex, 1);
+    next.splice(targetIndex, 0, moved);
+    setDraggingIndex(null);
+    onChange(next);
+  };
+
+  const importFromText = () => {
+    const lines = importText.split("\n").map((l) => l.trim()).filter(Boolean);
+    const parsed: OrcamentoItem[] = [];
+
+    for (const line of lines) {
+      const [codigo = "", descricao = "", qtd = "1", unit = "0"] = line.split(/[;|,]/).map((p) => p.trim());
+      const prod = produtos.find((p) => [p.sku, p.codigo_interno, p.nome].filter(Boolean).some((x) => String(x).toLowerCase() === codigo.toLowerCase() || String(x).toLowerCase() === descricao.toLowerCase()));
+      parsed.push(recalc({
+        ...emptyItem(),
+        produto_id: prod?.id || "",
+        codigo_snapshot: codigo || prod?.sku || prod?.codigo_interno || "",
+        descricao_snapshot: descricao || prod?.nome || "",
+        quantidade: Number(qtd) || 1,
+        valor_unitario: Number(unit) || Number(prod?.preco_venda || 0),
+        peso_unitario: Number(prod?.peso || 0),
+      }));
+    }
+
+    onChange([...items, ...parsed]);
+    setImportText("");
+    setImportOpen(false);
+    toast.success(`${parsed.length} itens importados`);
   };
 
   return (
     <div className="bg-card rounded-xl border shadow-soft overflow-hidden">
       <div className="flex items-center justify-between p-4 border-b">
         <h3 className="font-semibold text-foreground">Itens do Orçamento</h3>
-        <Button size="sm" onClick={addItem} className="gap-1.5">
-          <Plus className="w-4 h-4" /> Adicionar Item
-        </Button>
+        <div className="flex items-center gap-2">
+          <div className="rounded-md border bg-muted/30 px-2 py-1 text-xs font-medium">Parcial: {formatCurrency(subtotal)}</div>
+          <Button size="sm" variant="outline" onClick={() => setImportOpen(true)} className="gap-1"><Upload className="h-3.5 w-3.5" />Importar texto</Button>
+          <Button size="sm" onClick={addItem} className="gap-1.5"><Plus className="w-4 h-4" />Adicionar Item</Button>
+        </div>
       </div>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[800px]">
+        <table className="w-full min-w-[1150px]">
           <thead>
             <tr className="bg-accent/50 border-b">
-              <th className="text-left text-xs font-semibold text-foreground uppercase tracking-wider px-3 py-2.5 w-[12%]">Código</th>
-              <th className="text-left text-xs font-semibold text-foreground uppercase tracking-wider px-3 py-2.5 w-[30%]">Descrição do Material</th>
-              <th className="text-left text-xs font-semibold text-foreground uppercase tracking-wider px-3 py-2.5 w-[10%]">Variação</th>
-              <th className="text-right text-xs font-semibold text-foreground uppercase tracking-wider px-3 py-2.5 w-[8%]">Qtd.</th>
-              <th className="text-center text-xs font-semibold text-foreground uppercase tracking-wider px-3 py-2.5 w-[7%]">Un.</th>
-              <th className="text-right text-xs font-semibold text-foreground uppercase tracking-wider px-3 py-2.5 w-[13%]">Unitário</th>
-              <th className="text-right text-xs font-semibold text-foreground uppercase tracking-wider px-3 py-2.5 w-[13%]">Total</th>
-              <th className="w-[7%]"></th>
+              <th className="w-8" />
+              <th className="text-left text-xs font-semibold uppercase tracking-wider px-3 py-2.5">Código</th>
+              <th className="text-left text-xs font-semibold uppercase tracking-wider px-3 py-2.5">Descrição</th>
+              <th className="text-right text-xs font-semibold uppercase tracking-wider px-3 py-2.5">Qtd.</th>
+              <th className="text-right text-xs font-semibold uppercase tracking-wider px-3 py-2.5">Unitário</th>
+              <th className="text-right text-xs font-semibold uppercase tracking-wider px-3 py-2.5">Desc. %</th>
+              <th className="text-right text-xs font-semibold uppercase tracking-wider px-3 py-2.5">Subtotal</th>
+              <th className="text-right text-xs font-semibold uppercase tracking-wider px-3 py-2.5">Ações</th>
             </tr>
           </thead>
           <tbody>
             {items.length === 0 ? (
               <tr><td colSpan={8} className="text-center text-muted-foreground py-8 text-sm">Nenhum item adicionado</td></tr>
-            ) : (
-              items.map((item, idx) => (
-                <tr key={idx} className="border-b last:border-b-0 hover:bg-muted/20">
-                  <td className="px-3 py-2">
-                    <Input
-                      className="h-8 text-xs font-mono"
-                      value={item.codigo_snapshot}
-                      onChange={(e) => updateItem(idx, "codigo_snapshot", e.target.value)}
-                      placeholder="Código"
-                    />
-                  </td>
+            ) : items.map((item, idx) => {
+              const prod = produtos.find((p) => p.id === item.produto_id);
+              const lowStock = item.quantidade > 0 && (prod?.estoque_atual ?? 0) <= item.quantidade;
+              const hasSpecial = precosEspeciais?.some((p) => p.produto_id === item.produto_id);
+              return (
+                <tr
+                  key={idx}
+                  className={`border-b ${lowStock ? "bg-warning/10" : "hover:bg-muted/20"}`}
+                  draggable
+                  onDragStart={() => setDraggingIndex(idx)}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={() => onDropIndex(idx)}
+                >
+                  <td className="px-2 text-muted-foreground"><GripVertical className="h-4 w-4" /></td>
+                  <td className="px-3 py-2"><Input className="h-8 text-xs font-mono" value={item.codigo_snapshot} onChange={(e) => updateItem(idx, "codigo_snapshot", e.target.value)} /></td>
                   <td className="px-3 py-2">
                     <div className="flex gap-1 items-center">
-                      <AutocompleteSearch
-                        options={getProductOptions()}
-                        value={item.produto_id}
-                        onChange={(val) => updateItem(idx, "produto_id", val)}
-                        placeholder="Buscar produto..."
-                        className="flex-1"
-                      />
-                      <ProductSelector
-                        produtos={produtos}
-                        onSelect={(p) => updateItem(idx, "produto_id", p.id)}
-                        trigger={
-                          <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" title="Ver lista completa">
-                            <Search className="h-3 w-3" />
-                          </Button>
-                        }
-                      />
+                      <AutocompleteSearch options={getProductOptions()} value={item.produto_id} onChange={(val) => updateItem(idx, "produto_id", val)} placeholder="Buscar produto..." className="flex-1" onCreateNew={() => window.open('/produtos', '_blank')} createNewLabel="Produto não encontrado? Cadastrar" />
+                      <ProductSelector produtos={produtos} onSelect={(p) => updateItem(idx, "produto_id", p.id)} trigger={<Button variant="outline" size="icon" className="h-8 w-8"><Search className="h-3 w-3" /></Button>} />
+                      {item.produto_id && <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setDetailProductId(item.produto_id)}><Info className="h-3 w-3" /></Button>}
                     </div>
+                    {hasSpecial && <p className="text-[11px] text-primary mt-1">Preço especial para este cliente aplicado.</p>}
                   </td>
+                  <td className="px-3 py-2"><Input type="number" className="h-8 text-right" value={item.quantidade || ""} onChange={(e) => updateItem(idx, "quantidade", Number(e.target.value))} /></td>
                   <td className="px-3 py-2">
-                    <Input
-                      className="h-8 text-xs"
-                      value={item.variacao}
-                      onChange={(e) => updateItem(idx, "variacao", e.target.value)}
-                    />
+                    <Input type="number" className="h-8 text-right" value={item.valor_unitario || ""} onChange={(e) => updateItem(idx, "valor_unitario", Number(e.target.value))} />
+                    {hasSpecial && (
+                      <div className="mt-1">
+                        <Input
+                          placeholder="Justificativa de override"
+                          className={`h-7 text-xs ${item.valor_unitario !== (prod?.preco_venda || 0) && !item.override_justificativa ? 'border-destructive' : ''}`}
+                          value={item.override_justificativa || ''}
+                          onChange={(e) => updateItem(idx, 'override_justificativa', e.target.value)}
+                        />
+                      </div>
+                    )}
                   </td>
+                  <td className="px-3 py-2"><Input type="number" className="h-8 text-right" value={item.desconto_percentual || 0} onChange={(e) => updateItem(idx, "desconto_percentual", Number(e.target.value))} /></td>
+                  <td className="px-3 py-2 text-right font-semibold">{formatCurrency(item.valor_total || 0)}</td>
                   <td className="px-3 py-2">
-                    <Input
-                      className="h-8 text-xs text-right font-mono"
-                      type="number"
-                      value={item.quantidade || ""}
-                      onChange={(e) => updateItem(idx, "quantidade", Number(e.target.value))}
-                    />
-                  </td>
-                  <td className="px-3 py-2">
-                    <Input
-                      className="h-8 text-xs text-center"
-                      value={item.unidade}
-                      onChange={(e) => updateItem(idx, "unidade", e.target.value)}
-                    />
-                  </td>
-                  <td className="px-3 py-2">
-                    <div className="relative flex items-center gap-1 justify-end">
-                      <Input
-                        className={`h-8 text-xs text-right font-mono w-24 ${
-                          precosEspeciais?.some(p => p.produto_id === item.produto_id) ? "border-primary bg-primary/5 pr-6" : ""
-                        }`}
-                        type="number"
-                        step="0.01"
-                        value={item.valor_unitario || ""}
-                        onChange={(e) => updateItem(idx, "valor_unitario", Number(e.target.value))}
-                      />
-                      {(() => {
-                        const rule = precosEspeciais?.find(p => p.produto_id === item.produto_id);
-                        const prod = produtos.find(p => p.id === item.produto_id);
-                        if (!rule) return null;
-
-                        return (
-                          <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center">
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Tag className="w-3.5 h-3.5 text-primary fill-primary cursor-help" />
-                                </TooltipTrigger>
-                                <TooltipContent side="top" className="text-xs p-2 max-w-[200px]">
-                                  <p className="font-bold mb-1">Preço Especial Ativo</p>
-                                  <p>Preço Padrão: {formatCurrency(prod?.preco_venda || 0)}</p>
-                                  {rule.preco_especial && Number(rule.preco_especial) > 0 && (
-                                    <p>Preço Fixo: {formatCurrency(Number(rule.preco_especial))}</p>
-                                  )}
-                                  {rule.desconto_percentual && Number(rule.desconto_percentual) > 0 && (
-                                    <p>Desconto: {rule.desconto_percentual}%</p>
-                                  )}
-                                  {rule.observacao && <p className="mt-1 italic text-[10px]">"{rule.observacao}"</p>}
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                          </div>
-                        );
-                      })()}
+                    <div className="flex justify-end gap-1">
+                      <Button variant="ghost" size="icon" onClick={() => duplicateItem(idx)}><Copy className="h-3.5 w-3.5" /></Button>
+                      <Button variant="ghost" size="icon" onClick={() => removeItem(idx)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
                     </div>
-                  </td>
-                  <td className="px-3 py-2 text-right font-mono text-sm font-semibold">
-                    R$ {item.valor_total.toFixed(2)}
-                  </td>
-                  <td className="px-3 py-2">
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeItem(idx)}>
-                      <Trash2 className="w-3.5 h-3.5 text-destructive" />
-                    </Button>
+                    {lowStock ? <span className="inline-flex mt-1 items-center gap-1 text-[11px] text-warning"><AlertTriangle className="h-3.5 w-3.5" />Estoque baixo</span> : <span className="inline-flex mt-1 items-center gap-1 text-[11px] text-success"><CheckCircle2 className="h-3.5 w-3.5" />OK</span>}
                   </td>
                 </tr>
-              ))
-            )}
+              );
+            })}
           </tbody>
         </table>
       </div>
+
+      <ViewDrawerV2 open={!!detailProductId} onClose={() => setDetailProductId(null)} title={activeDetailProduct?.nome || "Detalhes do Produto"}>
+        {activeDetailProduct ? (
+          <div className="space-y-2 text-sm">
+            <p><strong>Código:</strong> {activeDetailProduct.sku || activeDetailProduct.codigo_interno || "—"}</p>
+            <p><strong>Estoque atual:</strong> {activeDetailProduct.estoque_atual ?? 0}</p>
+            <p><strong>Preço sugerido:</strong> {formatCurrency(activeDetailProduct.preco_venda || 0)}</p>
+            <p><strong>Descrição:</strong> {activeDetailProduct.descricao || "Sem descrição"}</p>
+          </div>
+        ) : null}
+      </ViewDrawerV2>
+
+      <Dialog open={importOpen} onOpenChange={setImportOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Importação rápida de itens</DialogTitle></DialogHeader>
+          <p className="text-xs text-muted-foreground">Cole uma linha por item no formato: Código;Descrição;Quantidade;Unitário</p>
+          <Textarea value={importText} onChange={(e) => setImportText(e.target.value)} className="min-h-40" />
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setImportOpen(false)}>Cancelar</Button>
+            <Button onClick={importFromText}>Importar</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

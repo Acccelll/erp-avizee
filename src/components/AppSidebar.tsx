@@ -27,10 +27,22 @@ export function AppSidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMo
   const currentRoute = `${location.pathname}${location.search}`;
   const { isAdmin } = useIsAdmin();
   const alerts = useSidebarAlerts();
+  const secondsSinceSync = alerts.lastUpdatedAt
+    ? Math.max(0, Math.floor((Date.now() - new Date(alerts.lastUpdatedAt).getTime()) / 1000))
+    : null;
 
   const badgeMap: Record<string, number> = useMemo(() => ({
-    financeiro: alerts.financeiroVencidos,
+    financeiro: alerts.financeiroVencidos + alerts.financeiroVencer,
     estoque: alerts.estoqueBaixo,
+    comercial: alerts.orcamentosPendentes,
+  }), [alerts]);
+
+  const itemBadges: Record<string, { count: number; tone: "danger" | "warning" | "info" }> = useMemo(() => ({
+    "/cotacoes": { count: alerts.orcamentosPendentes, tone: "warning" },
+    "/financeiro": { count: alerts.financeiroVencer, tone: "info" },
+    "/financeiro?tipo=receber": { count: alerts.financeiroVencer, tone: "info" },
+    "/financeiro?tipo=pagar": { count: alerts.financeiroVencidos, tone: "danger" },
+    "/estoque": { count: alerts.estoqueBaixo, tone: "danger" },
   }), [alerts]);
 
   // Filter out admin-only sections for non-admin users
@@ -46,6 +58,12 @@ export function AppSidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMo
   };
 
   const [manualSections, setManualSections] = useState<Record<string, boolean>>({});
+
+  const toneClass = {
+    danger: 'bg-destructive text-destructive-foreground',
+    warning: 'bg-warning text-warning-foreground',
+    info: 'bg-primary text-primary-foreground',
+  };
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const activeSectionKeys = useMemo(
@@ -75,6 +93,8 @@ export function AppSidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMo
     <>
       {mobileOpen && <div className="fixed inset-0 z-40 bg-black/40 md:hidden" onClick={onCloseMobile} />}
       <aside
+        role="complementary"
+        aria-label="Barra lateral principal"
         className={[
           'fixed inset-y-0 left-0 z-50 flex h-screen flex-col border-r border-border bg-card transition-all duration-200',
           containerClasses,
@@ -92,7 +112,14 @@ export function AppSidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMo
               </div>
             )}
           </div>
-          <Button variant="ghost" size="icon" className="hidden md:inline-flex" onClick={onToggleCollapsed}>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="hidden md:inline-flex"
+            onClick={onToggleCollapsed}
+            aria-label={collapsed ? "Expandir menu lateral" : "Recolher menu lateral"}
+            title={collapsed ? "Expandir menu lateral" : "Recolher menu lateral"}
+          >
             <ChevronRight className={`h-4 w-4 transition-transform ${collapsed ? '' : 'rotate-180'}`} />
           </Button>
         </div>
@@ -104,6 +131,7 @@ export function AppSidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMo
             onClick={onOpenSearch}
             className={`flex w-full items-center gap-2 rounded-lg border bg-background px-3 py-2 text-sm text-muted-foreground transition hover:border-primary/30 hover:text-foreground ${collapsed ? 'justify-center px-0' : ''}`}
             title="Buscar módulos (Ctrl/Cmd + K)"
+            aria-label="Abrir busca global"
           >
             <Search className="h-4 w-4" />
             {!collapsed && (
@@ -116,7 +144,7 @@ export function AppSidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMo
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto px-2 py-3">
+        <nav className="flex-1 overflow-y-auto px-2 py-3" role="navigation" aria-label="Módulos do sistema">
           {/* Dashboard */}
           <Link
             to={dashboardItem.path}
@@ -147,6 +175,7 @@ export function AppSidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMo
                         : 'text-foreground hover:bg-accent'
                     } ${collapsed ? 'justify-center px-0' : ''}`}
                     title={collapsed ? section.title : undefined}
+                    aria-label={collapsed ? `Abrir seção ${section.title}` : undefined}
                   >
                     <section.icon className="h-4.5 w-4.5 shrink-0" />
                     {!collapsed && (
@@ -183,13 +212,18 @@ export function AppSidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMo
                                 key={item.path}
                                 type="button"
                                 onClick={() => handleNavClick(item.path)}
-                                className={`block w-full text-left rounded-md px-3 py-1.5 text-[13px] transition ${
+                                className={`flex w-full items-center justify-between text-left rounded-md px-3 py-1.5 text-[13px] transition ${
                                   active
                                     ? 'bg-primary/10 font-medium text-primary'
                                     : 'text-muted-foreground hover:bg-accent hover:text-foreground'
                                 }`}
                               >
-                                {item.title}
+                                <span>{item.title}</span>
+                                {(itemBadges[item.path]?.count ?? 0) > 0 && (
+                                  <span className={`ml-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-semibold ${toneClass[itemBadges[item.path].tone]}`}>
+                                    {itemBadges[item.path].count}
+                                  </span>
+                                )}
                               </button>
                             );
                           })}
@@ -205,11 +239,17 @@ export function AppSidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMo
 
         {/* Footer */}
         <div className="border-t border-border p-2">
+          {!collapsed && secondsSinceSync !== null && (
+            <p className="mb-2 px-2 text-[10px] text-muted-foreground">
+              Última sincronização: há {secondsSinceSync}s
+            </p>
+          )}
           <button
             type="button"
             onClick={() => handleNavClick('/configuracoes')}
             className={`sidebar-item ${isPathActive(location.pathname, '/configuracoes') ? 'sidebar-item-active' : 'sidebar-item-inactive'} ${collapsed ? 'justify-center' : ''}`}
             title={collapsed ? 'Configurações' : undefined}
+            aria-label="Abrir configurações"
           >
             <Settings className="h-5 w-5 shrink-0" />
             {!collapsed && <span>Configurações</span>}
