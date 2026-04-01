@@ -7,6 +7,7 @@ import { MobileBottomNav } from './navigation/MobileBottomNav';
 import { MobileMenu } from './navigation/MobileMenu';
 import { MobileQuickActions } from './navigation/MobileQuickActions';
 import { RelationalDrawerStack } from './views/RelationalDrawerStack';
+import { SkipLink } from './SkipLink';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 interface AppLayoutProps {
@@ -31,6 +32,7 @@ export function AppLayout({ children }: AppLayoutProps) {
 
   return (
     <div className="min-h-screen bg-background">
+      <SkipLink />
       <div className="hidden md:block">
         <AppSidebar
           collapsed={collapsed}
@@ -43,7 +45,7 @@ export function AppLayout({ children }: AppLayoutProps) {
 
       <div className={`min-h-screen ${collapsedLoading ? '' : 'transition-all duration-200'} ${collapsed ? 'md:ml-[72px]' : 'md:ml-[240px]'}`}>
         <AppHeader onOpenMobileMenu={() => setMobileMenuOpen(true)} searchRequest={searchRequested} />
-        <main className="mx-auto max-w-[1600px] px-3 py-4 pb-28 md:px-6 md:py-6 md:pb-6">{children}</main>
+        <main id="main-content" className="mx-auto max-w-[1600px] px-3 py-4 pb-28 md:px-6 md:py-6 md:pb-6">{children}</main>
       </div>
 
       <MobileMenu

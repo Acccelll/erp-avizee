@@ -75,6 +75,7 @@ export function AppSidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMo
     <>
       {mobileOpen && <div className="fixed inset-0 z-40 bg-black/40 md:hidden" onClick={onCloseMobile} />}
       <aside
+        aria-label="Barra lateral de navegação"
         className={[
           'fixed inset-y-0 left-0 z-50 flex h-screen flex-col border-r border-border bg-card transition-all duration-200',
           containerClasses,
@@ -92,7 +93,7 @@ export function AppSidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMo
               </div>
             )}
           </div>
-          <Button variant="ghost" size="icon" className="hidden md:inline-flex" onClick={onToggleCollapsed}>
+          <Button variant="ghost" size="icon" className="hidden md:inline-flex" onClick={onToggleCollapsed} aria-label={collapsed ? 'Expandir menu lateral' : 'Recolher menu lateral'}>
             <ChevronRight className={`h-4 w-4 transition-transform ${collapsed ? '' : 'rotate-180'}`} />
           </Button>
         </div>
@@ -103,7 +104,7 @@ export function AppSidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMo
             type="button"
             onClick={onOpenSearch}
             className={`flex w-full items-center gap-2 rounded-lg border bg-background px-3 py-2 text-sm text-muted-foreground transition hover:border-primary/30 hover:text-foreground ${collapsed ? 'justify-center px-0' : ''}`}
-            title="Buscar módulos (Ctrl/Cmd + K)"
+            aria-label="Buscar módulos (Ctrl/Cmd + K)"
           >
             <Search className="h-4 w-4" />
             {!collapsed && (
@@ -116,11 +117,12 @@ export function AppSidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMo
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto px-2 py-3">
+        <nav aria-label="Navegação principal" className="flex-1 overflow-y-auto px-2 py-3">
           {/* Dashboard */}
           <Link
             to={dashboardItem.path}
             onClick={onCloseMobile}
+            aria-current={location.pathname === dashboardItem.path ? 'page' : undefined}
             className={`sidebar-item mb-3 ${location.pathname === dashboardItem.path ? 'sidebar-item-active' : 'sidebar-item-inactive'} ${collapsed ? 'justify-center' : ''}`}
             title={collapsed ? dashboardItem.title : undefined}
           >
@@ -141,6 +143,8 @@ export function AppSidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMo
                       if (collapsed) { onToggleCollapsed(); return; }
                       setManualSections((c) => ({ ...c, [section.key]: !isOpen }));
                     }}
+                    aria-expanded={!collapsed && isOpen}
+                    aria-controls={`sidebar-section-${section.key}`}
                     className={`relative flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-medium transition ${
                       sectionActive
                         ? 'text-primary'
@@ -168,7 +172,7 @@ export function AppSidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMo
                   </button>
 
                   {!collapsed && isOpen && (
-                    <div className="ml-3 space-y-0.5 border-l border-border pl-3 py-1">
+                    <div id={`sidebar-section-${section.key}`} className="ml-3 space-y-0.5 border-l border-border pl-3 py-1">
                       {section.items.map((group) => (
                         <Fragment key={group.title}>
                           {section.items.length > 1 && (
@@ -183,6 +187,7 @@ export function AppSidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMo
                                 key={item.path}
                                 type="button"
                                 onClick={() => handleNavClick(item.path)}
+                                aria-current={active ? 'page' : undefined}
                                 className={`block w-full text-left rounded-md px-3 py-1.5 text-[13px] transition ${
                                   active
                                     ? 'bg-primary/10 font-medium text-primary'

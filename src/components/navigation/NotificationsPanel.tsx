@@ -162,9 +162,14 @@ export function NotificationsPanel() {
   const unreadCount = useMemo(() => items.filter((item) => item.level === 'danger' || item.level === 'warning').length, [items]);
 
   const trigger = (
-    <Button variant="outline" size="icon" className="relative h-10 w-10 rounded-full">
+    <Button
+      variant="outline"
+      size="icon"
+      className="relative h-10 w-10 rounded-full"
+      aria-label={`Notificações: ${loading ? 'carregando' : `${unreadCount} alerta${unreadCount !== 1 ? 's' : ''}`}`}
+    >
       <Bell className="h-4 w-4" />
-      <span className="absolute -right-0.5 -top-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-semibold text-white">
+      <span className="absolute -right-0.5 -top-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-semibold text-white" aria-hidden="true">
         {loading ? '…' : unreadCount}
       </span>
     </Button>

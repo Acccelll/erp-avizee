@@ -88,7 +88,7 @@ export function AppHeader({ onOpenMobileMenu: _onOpenMobileMenu, searchRequest =
             <>
               <div className="flex min-w-0 flex-1 items-center gap-2">
                 {location.pathname !== '/' && (
-                  <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full" onClick={() => navigate(-1)}>
+                  <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full" onClick={() => navigate(-1)} aria-label="Voltar">
                     <ArrowLeft className="h-4 w-4" />
                   </Button>
                 )}
@@ -106,13 +106,13 @@ export function AppHeader({ onOpenMobileMenu: _onOpenMobileMenu, searchRequest =
               </div>
 
               <div className="flex items-center gap-2">
-                <Button variant="outline" size="icon" className="h-10 w-10 rounded-full" onClick={() => setSearchOpen(true)}>
+                <Button variant="outline" size="icon" className="h-10 w-10 rounded-full" onClick={() => setSearchOpen(true)} aria-label="Abrir busca">
                   <Search className="h-4 w-4" />
                 </Button>
                 <NotificationsPanel />
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="h-10 w-10 rounded-full p-0">
+                    <Button variant="ghost" className="h-10 w-10 rounded-full p-0" aria-label={`Menu do usuário: ${profile?.nome || 'Admin'}`}>
                       <Avatar className="h-9 w-9 border border-border">
                         <AvatarFallback className="bg-primary text-primary-foreground">{initials}</AvatarFallback>
                       </Avatar>
@@ -186,13 +186,14 @@ export function AppHeader({ onOpenMobileMenu: _onOpenMobileMenu, searchRequest =
                 size="icon"
                 className="rounded-full"
                 onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                aria-label={theme === 'dark' ? 'Mudar para tema claro' : 'Mudar para tema escuro'}
               >
                 {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
               </Button>
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="h-10 gap-2 rounded-full px-2">
+                  <Button variant="ghost" className="h-10 gap-2 rounded-full px-2" aria-label={`Menu do usuário: ${profile?.nome || 'Admin'}`}>
                     <Avatar className="h-9 w-9 border border-border">
                       <AvatarFallback className="bg-primary text-primary-foreground">{initials}</AvatarFallback>
                     </Avatar>

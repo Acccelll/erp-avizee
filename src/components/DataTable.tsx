@@ -122,7 +122,7 @@ export function DataTable<T extends Record<string, any>>({
     <div className="flex items-center gap-1 flex-nowrap">
       {onView && (
         <Tooltip><TooltipTrigger asChild>
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); onView(item); }}>
+          <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Visualizar registro" onClick={(e) => { e.stopPropagation(); onView(item); }}>
             <Eye className="h-4 w-4" />
           </Button>
         </TooltipTrigger><TooltipContent>Visualizar</TooltipContent></Tooltip>
@@ -170,10 +170,10 @@ export function DataTable<T extends Record<string, any>>({
           {currentPage * pageSize + 1}–{Math.min((currentPage + 1) * pageSize, sortedData.length)} de {sortedData.length}
         </span>
         <div className="flex gap-1">
-          <Button variant="ghost" size="icon" className="h-8 w-8" disabled={currentPage === 0} onClick={() => setCurrentPage((p) => p - 1)}>
+          <Button variant="ghost" size="icon" className="h-8 w-8" disabled={currentPage === 0} onClick={() => setCurrentPage((p) => p - 1)} aria-label="Página anterior">
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="icon" className="h-8 w-8" disabled={currentPage >= totalPages - 1} onClick={() => setCurrentPage((p) => p + 1)}>
+          <Button variant="ghost" size="icon" className="h-8 w-8" disabled={currentPage >= totalPages - 1} onClick={() => setCurrentPage((p) => p + 1)} aria-label="Próxima página">
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
@@ -275,12 +275,22 @@ export function DataTable<T extends Record<string, any>>({
                         <Checkbox
                           checked={pagedData.length > 0 && pagedData.every((item) => selectedIds.includes(item.id))}
                           onCheckedChange={toggleSelectAll}
+                          aria-label="Selecionar todos os registros da página"
                         />
                       </th>
                     )}
                     {visibleColumns.map((col) => (
                       <th
                         key={col.key}
+                        aria-sort={
+                          col.sortable !== false
+                            ? sortKey === col.key
+                              ? sortDir === 'asc'
+                                ? 'ascending'
+                                : 'descending'
+                              : 'none'
+                            : undefined
+                        }
                         className={cn(
                           "px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground",
                           col.sortable !== false && "cursor-pointer select-none hover:text-foreground transition-colors"
@@ -314,6 +324,7 @@ export function DataTable<T extends Record<string, any>>({
                             checked={selectedIds.includes(item.id)}
                             onCheckedChange={() => toggleSelect(item.id)}
                             onClick={(e) => e.stopPropagation()}
+                            aria-label="Selecionar registro"
                           />
                         </td>
                       )}
