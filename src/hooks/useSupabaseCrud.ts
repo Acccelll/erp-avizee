@@ -149,5 +149,5 @@ export function useSupabaseCrud<T extends Record<string, any>>({
     return create(copy);
   };
 
-  return { data, loading, fetchData, create, update, remove, duplicate, page, setPage, hasMore };
+  return { data, loading, fetchData, create, update, remove, duplicate, page, setPage, hasMore, totalCount, truncated };
 }
