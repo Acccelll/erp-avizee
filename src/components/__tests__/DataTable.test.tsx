@@ -4,7 +4,7 @@ import { DataTable } from "@/components/DataTable";
 
 describe("DataTable", () => {
   it("deve mostrar loading quando informado", () => {
-    render(
+    const { container } = render(
       <DataTable
         columns={[{ key: "nome", label: "Nome" }]}
         data={[]}
@@ -12,7 +12,7 @@ describe("DataTable", () => {
       />,
     );
 
-    expect(screen.getByText("Carregando...")).toBeInTheDocument();
+    expect(container.querySelector('.animate-pulse')).toBeInTheDocument();
   });
 
   it("deve mostrar estado vazio", () => {

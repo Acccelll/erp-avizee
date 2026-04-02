@@ -32,6 +32,7 @@ function createQueryResult() {
     eq: vi.fn(() => query),
     order: vi.fn(() => Promise.resolve({ data: [], error: null })),
     single: vi.fn(() => Promise.resolve({ data: null, error: null })),
+    maybeSingle: vi.fn(() => Promise.resolve({ data: null, error: null })),
   };
 
   return query;
