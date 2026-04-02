@@ -432,7 +432,7 @@ export default function OrcamentoForm() {
       .or(`chave.like.orcamento_template:${user.id}:%,chave.like.${TEAM_TEMPLATE_KEY}:%`)
       .then(({ data }) => {
         const list = (data || [])
-          .map((row) => row.valor as OrcamentoTemplate | null)
+          .map((row) => row.valor as unknown as OrcamentoTemplate | null)
           .filter((row): row is OrcamentoTemplate => !!row?.id && !!row?.nome && !!row?.payload);
         setTemplates(list);
       });

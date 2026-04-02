@@ -40,12 +40,11 @@ export default function Conciliacao() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    supabase
-      .from("contas_bancarias" as any)
-      .select("id, nome, banco")
+    (supabase.from as any)("contas_bancarias")
+      .select("id, descricao, saldo_atual, ativo")
       .eq("ativo", true)
-      .then(({ data }) => {
-        if (data) setContasBancarias(data as ContaBancaria[]);
+      .then(({ data }: any) => {
+        if (data) setContasBancarias(data.map((d: any) => ({ id: d.id, nome: d.descricao })) as ContaBancaria[]);
       });
   }, []);
 

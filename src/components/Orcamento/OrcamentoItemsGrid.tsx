@@ -90,8 +90,6 @@ export function OrcamentoItemsGrid({ items, onChange, produtos, precosEspeciais 
         if (precoEspecial) {
           if (precoEspecial.preco_especial && Number(precoEspecial.preco_especial) > 0) {
             item.valor_unitario = Number(precoEspecial.preco_especial);
-          } else if (precoEspecial.desconto_percentual && Number(precoEspecial.desconto_percentual) > 0) {
-            item.valor_unitario = precoBase * (1 - Number(precoEspecial.desconto_percentual) / 100);
           } else {
             item.valor_unitario = precoBase;
           }

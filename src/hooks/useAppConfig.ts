@@ -69,12 +69,13 @@ export function useAppConfig<T = Json>(chave: string, defaultValue?: T) {
       }
 
       const submit = async () => {
-        const { error } = await withTimeout(
+        const res = await withTimeout(
           supabase
             .from("app_configuracoes")
             .upsert({ chave, valor: newValue as unknown as Json, updated_at: new Date().toISOString() }, { onConflict: "chave" })
-            .then(res => res),
+            .then(r => r),
         );
+        const error = res?.error;
 
         if (error) {
           setCache(previous as T);
