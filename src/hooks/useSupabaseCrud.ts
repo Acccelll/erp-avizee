@@ -101,7 +101,7 @@ export function useSupabaseCrud<T extends Record<string, unknown>>({
         return { rows: [] as T[], totalCount: null as number | null, hasMore: false, truncated: false };
       }
 
-      let query = supabase.from(table).select(select, { count: "exact" }).order(orderBy, { ascending }) as unknown as QueryBuilder & PromiseLike<{ data: T[] | null; error: Error | null; count: number | null }>;
+      let query = (supabase.from as any)(table).select(select, { count: "exact" }).order(orderBy, { ascending }) as unknown as QueryBuilder & PromiseLike<{ data: T[] | null; error: Error | null; count: number | null }>;
 
       if (hasAtivo) {
         query = query.eq("ativo", true) as typeof query;
