@@ -74,7 +74,7 @@ const applyFilters = (query: QueryBuilder, filters: CrudFilter[]) => {
   return nextQuery;
 };
 
-export function useSupabaseCrud<T extends { [key: string]: unknown }>({
+export function useSupabaseCrud<T = Record<string, unknown>>({
   table,
   select = "*",
   orderBy = "created_at",

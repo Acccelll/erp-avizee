@@ -115,7 +115,7 @@ export function useUserPreference<T = Json>(userId: string | null | undefined, p
               updated_at: new Date().toISOString(),
             },
             { onConflict: 'chave' },
-          ),
+          ).then(res => res),
         );
 
         if (error) {
