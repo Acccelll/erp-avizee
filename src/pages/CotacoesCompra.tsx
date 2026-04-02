@@ -20,6 +20,7 @@ import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatCurrency, formatNumber } from "@/lib/format";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import {
   ShoppingCart, Edit, Trash2, Plus, CheckCircle2, Clock,
   FileSearch, Trophy, X, PackageSearch,
@@ -96,6 +97,7 @@ export default function CotacoesCompra() {
   const [form, setForm] = useState(emptyForm);
   const [localItems, setLocalItems] = useState<LocalItem[]>([]);
   const [saving, setSaving] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   // View drawer state
   const [viewItems, setViewItems] = useState<CotacaoItem[]>([]);
@@ -427,7 +429,7 @@ export default function CotacoesCompra() {
           selected ? (
             <>
               <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setDrawerOpen(false); openEdit(selected); }}><Edit className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Editar</TooltipContent></Tooltip>
-              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => { setDrawerOpen(false); remove(selected.id); }}><Trash2 className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Excluir</TooltipContent></Tooltip>
+              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setDeleteConfirmOpen(true)}><Trash2 className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Excluir</TooltipContent></Tooltip>
             </>
           ) : undefined
         }
@@ -605,6 +607,14 @@ export default function CotacoesCompra() {
           </div>
         )}
       </ViewDrawerV2>
+
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        onClose={() => setDeleteConfirmOpen(false)}
+        onConfirm={() => { if (selected) { setDrawerOpen(false); remove(selected.id); } setDeleteConfirmOpen(false); }}
+        title="Excluir cotação"
+        description={`Tem certeza que deseja excluir a cotação ${selected?.numero || ""}? Esta ação não pode ser desfeita.`}
+      />
     </AppLayout>
   );
 }

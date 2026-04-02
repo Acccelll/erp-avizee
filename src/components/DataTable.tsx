@@ -504,7 +504,7 @@ export function DataTable<T extends Record<string, any>>({
                 <tbody>
                   {pagedData.map((item, idx) => (
                     <>
-                      <tr key={item.id || idx} onClick={() => onRowClick?.(item)} className={cn('border-b transition-colors last:border-b-0 hover:bg-muted/30', selectable && selectedIds.includes(item.id) && 'bg-primary/5')}>
+                      <tr key={item.id || idx} onClick={() => onRowClick?.(item)} onDoubleClick={() => { if (onView) onView(item); else onRowClick?.(item); }} className={cn('border-b transition-colors last:border-b-0 hover:bg-muted/30', selectable && selectedIds.includes(item.id) && 'bg-primary/5')}>
                         {hasActions && <td className="w-12 px-2 py-3">{renderActions(item)}</td>}
                         {selectable && <td className="w-10 px-3 py-3"><Checkbox checked={selectedIds.includes(item.id)} onCheckedChange={() => toggleSelect(item.id)} onClick={(e) => e.stopPropagation()} /></td>}
                         {visibleColumns.map((col) => <td key={col.key} className="px-4 py-3 text-sm whitespace-nowrap">{col.render ? col.render(item) : item[col.key]}</td>)}
