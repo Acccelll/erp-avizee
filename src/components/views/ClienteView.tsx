@@ -37,7 +37,7 @@ export function ClienteView({ id }: Props) {
       setLoading(true);
       setFetchError(null);
       try {
-        const { data: c, error: cError } = await supabase.from("clientes").select("*, grupos_economicos(nome)").eq("id", id).maybeSingle();
+        const { data: c, error: cError } = await supabase.from("clientes").select("*, grupos_economicos!clientes_grupo_economico_id_fkey(nome)").eq("id", id).maybeSingle();
         if (cError) {
           console.error("[ClienteView] erro ao buscar cliente:", cError);
           setFetchError(`Erro ao carregar cliente: ${cError.message}`);
