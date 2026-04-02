@@ -90,11 +90,11 @@ export function OrcamentoView({ id }: Props) {
         </Tooltip>
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => { clearStack(); navigate(`/orcamentos/${id}`); }}>
+            <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => { clearStack(); navigate(`/orcamentos/${id}?preview=1`); }}>
               <FileText className="h-3.5 w-3.5" /> Visualizar PDF
             </Button>
           </TooltipTrigger>
-          <TooltipContent>Abrir página da cotação para visualizar PDF</TooltipContent>
+          <TooltipContent>Abrir visualização do PDF</TooltipContent>
         </Tooltip>
         <Tooltip>
           <TooltipTrigger asChild>
@@ -197,10 +197,12 @@ export function OrcamentoView({ id }: Props) {
         onClose={() => setDeleteConfirmOpen(false)}
         onConfirm={async () => {
           try {
-            await supabase.from("orcamentos").delete().eq("id", id);
+            const { error } = await supabase.from("orcamentos").delete().eq("id", id);
+            if (error) throw error;
             toast.success("Cotação excluída com sucesso.");
             clearStack();
-          } catch {
+          } catch (err) {
+            console.error("[OrcamentoView] erro ao excluir:", err);
             toast.error("Erro ao excluir cotação.");
           } finally {
             setDeleteConfirmOpen(false);
