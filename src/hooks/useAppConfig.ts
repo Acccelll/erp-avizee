@@ -31,7 +31,7 @@ export function useAppConfig<T = Json>(chave: string, defaultValue?: T) {
 
   const reloadFromSupabase = useCallback(async () => {
     if (!supabase) return;
-    const { data } = await supabase.from("app_configuracoes").select("valor").eq("chave", chave).single();
+    const { data } = await supabase.from("app_configuracoes").select("valor").eq("chave", chave).maybeSingle();
     if (data?.valor !== undefined) {
       setCache(data.valor as T);
     }

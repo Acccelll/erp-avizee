@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
+import { useUserPreference } from "@/hooks/useUserPreference";
 import { useNavigate } from "react-router-dom";
 import {
   Bar,
@@ -54,6 +55,7 @@ const DashboardContent = () => {
   const { user, profile } = useAuth();
 
   const { period: globalPeriod, setPeriod: setGlobalPeriod, customStart, customEnd, setCustomStart, setCustomEnd, range: globalRange } = useDashboardPeriod();
+  const { value: savedLayout, save: saveLayoutPref } = useUserPreference<string[]>(user?.id, "dashboard_layout", [...defaultLayout]);
   const [layout, setLayout] = useState<string[]>([...defaultLayout]);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [metricDrawer, setMetricDrawer] = useState<null | "receber" | "estoque" | "vendas">(null);
@@ -89,32 +91,15 @@ const DashboardContent = () => {
 
 
   useEffect(() => {
-    if (!user?.id) return;
-    supabase
-      .from("user_preferences" as any)
-      .select("dashboard_layout")
-      .eq("user_id", user.id)
-      .maybeSingle()
-      .then(({ data }: any) => {
-        const saved = data?.dashboard_layout;
-        if (Array.isArray(saved) && saved.length > 0) {
-          setLayout(saved.filter((item) => defaultLayout.includes(item)));
-        }
-      });
-  }, [user?.id]);
+    if (Array.isArray(savedLayout) && savedLayout.length > 0) {
+      setLayout(savedLayout.filter((item) => defaultLayout.includes(item)));
+    }
+  }, [savedLayout]);
 
-  const saveLayout = async (nextLayout: string[]) => {
+  const saveLayout = useCallback(async (nextLayout: string[]) => {
     setLayout(nextLayout);
-    if (!user?.id) return;
-    await supabase.from("user_preferences" as any).upsert(
-      {
-        user_id: user.id,
-        dashboard_layout: nextLayout,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "user_id" }
-    );
-  };
+    await saveLayoutPref(nextLayout);
+  }, [saveLayoutPref]);
 
   useEffect(() => {
     const load = async () => {
