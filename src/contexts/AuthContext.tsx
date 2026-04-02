@@ -36,6 +36,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const manualSignOut = useRef(false);
 
   useEffect(() => {
+    if (!supabase) {
+      setLoading(false);
+      return;
+    }
+
     // Safety timeout to prevent infinite loading if getSession hangs
     const safetyTimeout = setTimeout(() => {
       if (loading) {
@@ -99,7 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchRoles = async (userId: string) => {
     try {
-      const { data } = await supabase.from("user_roles" as any).select("role").eq("user_id", userId);
+      const { data } = await supabase.from("user_roles").select("role").eq("user_id", userId);
       if (data) setRoles((data as unknown as Array<{ role: string }>).map((r) => r.role as AppRole));
     } catch {
       setRoles([]);
@@ -109,6 +114,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const hasRole = (role: AppRole) => roles.includes(role);
 
   const signOut = async () => {
+    if (!supabase) return;
     manualSignOut.current = true;
     await supabase.auth.signOut();
     setUser(null);
