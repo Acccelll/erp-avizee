@@ -118,7 +118,6 @@ export function useUserPreference<T = Json>(userId: string | null | undefined, p
           ).then(r => r),
         );
         const error = res?.error;
-        );
 
         if (error) {
           setCache(previous);
