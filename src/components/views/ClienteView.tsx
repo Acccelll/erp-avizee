@@ -20,6 +20,7 @@ type ClienteWithGroup = Tables<"clientes"> & {
 export function ClienteView({ id }: Props) {
   const [selected, setSelected] = useState<ClienteWithGroup | null>(null);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [vendas, setVendas] = useState<any[]>([]);
   const [financeiro, setFinanceiro] = useState<any[]>([]);
   const [comunicacao, setComunicacao] = useState<any[]>([]);
@@ -27,10 +28,22 @@ export function ClienteView({ id }: Props) {
   const { pushView } = useRelationalNavigation();
 
   useEffect(() => {
+    if (!supabase) {
+      setFetchError("Serviço de banco de dados não disponível.");
+      setLoading(false);
+      return;
+    }
     const fetchData = async () => {
       setLoading(true);
+      setFetchError(null);
       try {
-        const { data: c } = await supabase.from("clientes").select("*, grupos_economicos(nome)").eq("id", id).maybeSingle();
+        const { data: c, error: cError } = await supabase.from("clientes").select("*, grupos_economicos(nome)").eq("id", id).maybeSingle();
+        if (cError) {
+          console.error("[ClienteView] erro ao buscar cliente:", cError);
+          setFetchError(`Erro ao carregar cliente: ${cError.message}`);
+          setSelected(null);
+          return;
+        }
         if (!c) {
           setSelected(null);
           return;
@@ -66,7 +79,8 @@ export function ClienteView({ id }: Props) {
         setComunicacao(commRes.data || []);
         setTransportadoras(transRes.data || []);
       } catch (error) {
-        console.error("Erro ao carregar dados do cliente:", error);
+        console.error("[ClienteView] erro inesperado:", error);
+        setFetchError(`Erro inesperado: ${error instanceof Error ? error.message : String(error)}`);
         setSelected(null);
       } finally {
         setLoading(false);
@@ -77,6 +91,7 @@ export function ClienteView({ id }: Props) {
   }, [id]);
 
   if (loading) return <div className="p-8 text-center animate-pulse">Carregando dados do cliente...</div>;
+  if (fetchError) return <div className="p-8 text-center text-destructive space-y-1"><p className="font-semibold">Erro ao carregar dados</p><p className="text-xs text-muted-foreground">{fetchError}</p></div>;
   if (!selected) return <div className="p-8 text-center text-destructive">Cliente não encontrado</div>;
 
   const totalAberto = financeiro.filter(f => f.status === 'aberto' || f.status === 'vencido').reduce((acc, curr) => acc + (curr.saldo_restante || curr.valor), 0);

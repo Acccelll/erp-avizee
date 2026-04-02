@@ -15,47 +15,70 @@ interface Props {
 export function FornecedorView({ id }: Props) {
   const [selected, setSelected] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [compras, setCompras] = useState<any[]>([]);
   const [financeiro, setFinanceiro] = useState<any[]>([]);
   const [produtos, setProdutos] = useState<any[]>([]);
   const { pushView } = useRelationalNavigation();
 
   useEffect(() => {
+    if (!supabase) {
+      setFetchError("Serviço de banco de dados não disponível.");
+      setLoading(false);
+      return;
+    }
     const fetchData = async () => {
       setLoading(true);
-      const { data: f } = await supabase.from("fornecedores").select("*").eq("id", id).single();
-      if (!f) return;
-      setSelected(f);
+      setFetchError(null);
+      try {
+        const { data: f, error: fError } = await supabase.from("fornecedores").select("*").eq("id", id).maybeSingle();
+        if (fError) {
+          console.error("[FornecedorView] erro ao buscar fornecedor:", fError);
+          setFetchError(`Erro ao carregar fornecedor: ${fError.message}`);
+          setLoading(false);
+          return;
+        }
+        if (!f) {
+          setLoading(false);
+          return;
+        }
+        setSelected(f);
 
-      const [cRes, fRes, pRes] = await Promise.all([
-        supabase
-        .from("pedidos_compra")
-        .select("id, numero, data_pedido, valor_total, status")
-        .eq("fornecedor_id", f.id)
-        .order("data_pedido", { ascending: false })
-        .limit(10),
-        supabase
-        .from("financeiro_lancamentos")
-        .select("*")
-        .eq("fornecedor_id", f.id)
-        .order("data_vencimento", { ascending: false })
-        .limit(10),
-        supabase
-        .from("produtos_fornecedores")
-        .select("*, produtos(id, nome, sku)")
-        .eq("fornecedor_id", f.id)
-      ]);
+        const [cRes, fRes, pRes] = await Promise.all([
+          supabase
+          .from("pedidos_compra")
+          .select("id, numero, data_pedido, valor_total, status")
+          .eq("fornecedor_id", f.id)
+          .order("data_pedido", { ascending: false })
+          .limit(10),
+          supabase
+          .from("financeiro_lancamentos")
+          .select("*")
+          .eq("fornecedor_id", f.id)
+          .order("data_vencimento", { ascending: false })
+          .limit(10),
+          supabase
+          .from("produtos_fornecedores")
+          .select("*, produtos(id, nome, sku)")
+          .eq("fornecedor_id", f.id)
+        ]);
 
-      setCompras(cRes.data || []);
-      setFinanceiro(fRes.data || []);
-      setProdutos(pRes.data || []);
-      setLoading(false);
+        setCompras(cRes.data || []);
+        setFinanceiro(fRes.data || []);
+        setProdutos(pRes.data || []);
+      } catch (error) {
+        console.error("[FornecedorView] erro inesperado:", error);
+        setFetchError(`Erro inesperado: ${error instanceof Error ? error.message : String(error)}`);
+      } finally {
+        setLoading(false);
+      }
     };
 
     fetchData();
   }, [id]);
 
   if (loading) return <div className="p-8 text-center animate-pulse">Carregando dados do fornecedor...</div>;
+  if (fetchError) return <div className="p-8 text-center text-destructive space-y-1"><p className="font-semibold">Erro ao carregar dados</p><p className="text-xs text-muted-foreground">{fetchError}</p></div>;
   if (!selected) return <div className="p-8 text-center text-destructive">Fornecedor não encontrado</div>;
 
   const ultCompra = compras.length > 0 ? compras[0].data_pedido : null;

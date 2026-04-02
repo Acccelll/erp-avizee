@@ -104,32 +104,46 @@ export default function OrcamentoForm() {
   const pesoTotal = items.reduce((sum, i) => sum + (i.peso_total || 0), 0);
 
   useEffect(() => {
+    if (!supabase) {
+      toast.error("Serviço de banco de dados não disponível. Verifique a configuração.");
+      return;
+    }
     const loadData = async () => {
-      const [clientesRes, produtosRes] = await Promise.all([
-        supabase.from("clientes").select("*").eq("ativo", true).order("nome_razao_social"),
-        supabase.from("produtos").select("*, produtos_fornecedores(*, fornecedores(nome_razao_social))").eq("ativo", true).order("nome"),
-      ]);
-      setClientes(clientesRes.data || []);
-      setProdutos(produtosRes.data || []);
+      try {
+        const [clientesRes, produtosRes] = await Promise.all([
+          supabase.from("clientes").select("*").eq("ativo", true).order("nome_razao_social"),
+          supabase.from("produtos").select("*, produtos_fornecedores(*, fornecedores(nome_razao_social))").eq("ativo", true).order("nome"),
+        ]);
+        setClientes(clientesRes.data || []);
+        setProdutos(produtosRes.data || []);
 
-      if (isEdit) {
-        const { data: orc } = await supabase.from("orcamentos").select("*").eq("id", id).single();
-        if (orc) {
-          setNumero(orc.numero); setDataOrcamento(orc.data_orcamento); setStatus(orc.status);
-          setClienteId(orc.cliente_id || ""); setObservacoes(orc.observacoes || "");
-          setValidade(orc.validade || ""); setDesconto(orc.desconto || 0);
-          setImpostoSt(orc.imposto_st || 0); setImpostoIpi(orc.imposto_ipi || 0);
-          setFreteValor(orc.frete_valor || 0); setOutrasDespesas(orc.outras_despesas || 0);
-          setPagamento(orc.pagamento || ""); setPrazoPagamento(orc.prazo_pagamento || "");
-          setPrazoEntrega(orc.prazo_entrega || ""); setFreteTipo(orc.frete_tipo || "");
-          setModalidade(orc.modalidade || "");
-          if (orc.cliente_snapshot) setClienteSnapshot(orc.cliente_snapshot as any);
-          const { data: itensData } = await supabase.from("orcamentos_itens").select("*").eq("orcamento_id", id);
-          if (itensData) setItems(itensData);
+        if (isEdit) {
+          const { data: orc, error: orcError } = await supabase.from("orcamentos").select("*").eq("id", id).maybeSingle();
+          if (orcError) {
+            console.error("[OrcamentoForm] erro ao carregar cotação:", orcError);
+            toast.error("Erro ao carregar cotação.", { description: orcError.message });
+          } else if (orc) {
+            setNumero(orc.numero); setDataOrcamento(orc.data_orcamento); setStatus(orc.status);
+            setClienteId(orc.cliente_id || ""); setObservacoes(orc.observacoes || "");
+            setValidade(orc.validade || ""); setDesconto(orc.desconto || 0);
+            setImpostoSt(orc.imposto_st || 0); setImpostoIpi(orc.imposto_ipi || 0);
+            setFreteValor(orc.frete_valor || 0); setOutrasDespesas(orc.outras_despesas || 0);
+            setPagamento(orc.pagamento || ""); setPrazoPagamento(orc.prazo_pagamento || "");
+            setPrazoEntrega(orc.prazo_entrega || ""); setFreteTipo(orc.frete_tipo || "");
+            setModalidade(orc.modalidade || "");
+            if (orc.cliente_snapshot) setClienteSnapshot(orc.cliente_snapshot as any);
+            const { data: itensData } = await supabase.from("orcamentos_itens").select("*").eq("orcamento_id", id);
+            if (itensData) setItems(itensData);
+          } else {
+            toast.error("Cotação não encontrada.", { description: `Nenhuma cotação com ID ${id}.` });
+          }
+        } else {
+          const { count } = await supabase.from("orcamentos").select("*", { count: "exact", head: true });
+          setNumero(`COT${String((count || 0) + 1).padStart(6, "0")}`);
         }
-      } else {
-        const { count } = await supabase.from("orcamentos").select("*", { count: "exact", head: true });
-        setNumero(`COT${String((count || 0) + 1).padStart(6, "0")}`);
+      } catch (err) {
+        console.error("[OrcamentoForm] erro ao carregar dados:", err);
+        toast.error("Erro ao carregar dados da cotação.", { description: "Verifique a conexão e tente novamente." });
       }
     };
     loadData();

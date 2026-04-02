@@ -18,6 +18,7 @@ interface Props {
 export function ProdutoView({ id }: Props) {
   const [selected, setSelected] = useState<Tables<"produtos"> | null>(null);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [historico, setHistorico] = useState<any[]>([]);
   const [composicao, setComposicao] = useState<any[]>([]);
   const [movimentos, setMovimentos] = useState<any[]>([]);
@@ -25,42 +26,64 @@ export function ProdutoView({ id }: Props) {
   const { pushView } = useRelationalNavigation();
 
   useEffect(() => {
+    if (!supabase) {
+      setFetchError("Serviço de banco de dados não disponível.");
+      setLoading(false);
+      return;
+    }
     const fetchData = async () => {
       setLoading(true);
-      const { data: p } = await supabase.from("produtos").select("*").eq("id", id).single();
-      if (!p) return;
-      setSelected(p);
+      setFetchError(null);
+      try {
+        const { data: p, error: pError } = await supabase.from("produtos").select("*").eq("id", id).maybeSingle();
+        if (pError) {
+          console.error("[ProdutoView] erro ao buscar produto:", pError);
+          setFetchError(`Erro ao carregar produto: ${pError.message}`);
+          setLoading(false);
+          return;
+        }
+        if (!p) {
+          setLoading(false);
+          return;
+        }
+        setSelected(p);
 
-      const [nfRes, compRes, movRes, fornRes] = await Promise.all([
-        supabase.from("notas_fiscais_itens").
-          select("quantidade, valor_unitario, notas_fiscais(id, numero, tipo, data_emissao, fornecedores(id, nome_razao_social))").
-          eq("produto_id", p.id).limit(20),
-        p.eh_composto ? supabase.from("produto_composicoes").
-          select("quantidade, ordem, produtos:produto_filho_id(id, nome, sku, preco_custo)").
-          eq("produto_pai_id", p.id).order("ordem") : Promise.resolve({ data: [] }),
-        supabase.from("estoque_movimentos").
-          select("tipo, quantidade, motivo, created_at, saldo_anterior, saldo_atual").
-          eq("produto_id", p.id).order("created_at", { ascending: false }).limit(20),
-        supabase.from("produtos_fornecedores").
-          select("preco_compra, lead_time_dias, referencia_fornecedor, eh_principal, unidade_fornecedor, fornecedores:fornecedor_id(id, nome_razao_social)").
-          eq("produto_id", p.id)
-      ]);
+        const [nfRes, compRes, movRes, fornRes] = await Promise.all([
+          supabase.from("notas_fiscais_itens").
+            select("quantidade, valor_unitario, notas_fiscais(id, numero, tipo, data_emissao, fornecedores(id, nome_razao_social))").
+            eq("produto_id", p.id).limit(20),
+          p.eh_composto ? supabase.from("produto_composicoes").
+            select("quantidade, ordem, produtos:produto_filho_id(id, nome, sku, preco_custo)").
+            eq("produto_pai_id", p.id).order("ordem") : Promise.resolve({ data: [] }),
+          supabase.from("estoque_movimentos").
+            select("tipo, quantidade, motivo, created_at, saldo_anterior, saldo_atual").
+            eq("produto_id", p.id).order("created_at", { ascending: false }).limit(20),
+          supabase.from("produtos_fornecedores").
+            select("preco_compra, lead_time_dias, referencia_fornecedor, eh_principal, unidade_fornecedor, fornecedores:fornecedor_id(id, nome_razao_social)").
+            eq("produto_id", p.id)
+        ]);
 
-      setHistorico(nfRes.data || []);
-      setComposicao((compRes.data || []).map((c: any) => ({
-        id: c.produtos?.id,
-        nome: c.produtos?.nome, sku: c.produtos?.sku, preco_custo: c.produtos?.preco_custo,
-        quantidade: c.quantidade, ordem: c.ordem,
-      })));
-      setMovimentos(movRes.data || []);
-      setFornecedoresProd(fornRes.data || []);
-      setLoading(false);
+        setHistorico(nfRes.data || []);
+        setComposicao((compRes.data || []).map((c: any) => ({
+          id: c.produtos?.id,
+          nome: c.produtos?.nome, sku: c.produtos?.sku, preco_custo: c.produtos?.preco_custo,
+          quantidade: c.quantidade, ordem: c.ordem,
+        })));
+        setMovimentos(movRes.data || []);
+        setFornecedoresProd(fornRes.data || []);
+      } catch (error) {
+        console.error("[ProdutoView] erro inesperado:", error);
+        setFetchError(`Erro inesperado: ${error instanceof Error ? error.message : String(error)}`);
+      } finally {
+        setLoading(false);
+      }
     };
 
     fetchData();
   }, [id]);
 
   if (loading) return <div className="p-8 text-center animate-pulse">Carregando dados do produto...</div>;
+  if (fetchError) return <div className="p-8 text-center text-destructive space-y-1"><p className="font-semibold">Erro ao carregar dados</p><p className="text-xs text-muted-foreground">{fetchError}</p></div>;
   if (!selected) return <div className="p-8 text-center text-destructive">Produto não encontrado</div>;
 
   const selectedMargem = (selected.preco_custo || 0) > 0 ? (selected.preco_venda / (selected.preco_custo || 1) - 1) * 100 : 0;
