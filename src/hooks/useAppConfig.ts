@@ -70,10 +70,12 @@ export function useAppConfig<T = Json>(chave: string, defaultValue?: T) {
 
       const submit = async () => {
         const res = await withTimeout(
-          supabase
-            .from("app_configuracoes")
-            .upsert({ chave, valor: newValue as unknown as Json, updated_at: new Date().toISOString() }, { onConflict: "chave" })
-            .then(r => r),
+          new Promise<{ error: any }>((resolve) => {
+            supabase
+              .from("app_configuracoes")
+              .upsert({ chave, valor: newValue as unknown as Json, updated_at: new Date().toISOString() }, { onConflict: "chave" })
+              .then(r => resolve(r));
+          }),
         );
         const error = res?.error;
 

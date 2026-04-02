@@ -532,7 +532,7 @@ const DashboardContent = () => {
                   content: (
                     <div className="h-64">
                       <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={openMetric.top}>
+                        <BarChart data={[...openMetric.top]}>
                           <CartesianGrid strokeDasharray="3 3" />
                           <XAxis dataKey="nome" />
                           <YAxis />

@@ -108,14 +108,16 @@ export function useUserPreference<T = Json>(userId: string | null | undefined, p
 
       const submit = async (): Promise<boolean> => {
         const res = await withTimeout(
-          supabase.from('app_configuracoes').upsert(
-            {
-              chave: buildDbKey(userId, preferenceKey),
-              valor: nextValue as unknown as Json,
-              updated_at: new Date().toISOString(),
-            },
-            { onConflict: 'chave' },
-          ).then(r => r),
+          new Promise<{ error: any }>((resolve) => {
+            supabase.from('app_configuracoes').upsert(
+              {
+                chave: buildDbKey(userId, preferenceKey),
+                valor: nextValue as unknown as Json,
+                updated_at: new Date().toISOString(),
+              },
+              { onConflict: 'chave' },
+            ).then(r => resolve(r));
+          }),
         );
         const error = res?.error;
 
