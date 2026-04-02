@@ -268,7 +268,7 @@ export default function OrcamentoForm() {
       payload,
     };
 
-    await supabase.from("app_configuracoes").upsert(
+    await (supabase.from("app_configuracoes") as any).upsert(
       { chave: key, valor: templateRecord, updated_at: new Date().toISOString() },
       { onConflict: "chave" },
     );
