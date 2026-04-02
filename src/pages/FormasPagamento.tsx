@@ -1,12 +1,16 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AppLayout } from "@/components/AppLayout";
 import { ModulePage } from "@/components/ModulePage";
 import { DataTable } from "@/components/DataTable";
 import { StatusBadge } from "@/components/StatusBadge";
 import { FormModal } from "@/components/FormModal";
-import { ViewDrawer } from "@/components/ViewDrawer";
+import { ViewDrawerV2, ViewField, ViewSection } from "@/components/ViewDrawerV2";
+import { RelationalLink } from "@/components/ui/RelationalLink";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Edit, Trash2, Plus, X } from "lucide-react";
+import {
+  Edit, Trash2, Plus, X, FileText, Banknote, CreditCard, QrCode, CheckSquare,
+  Building2, Wallet, AlertTriangle, Users, TrendingUp,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,6 +18,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 
@@ -30,7 +35,26 @@ interface FormaPagamento {
   created_at: string;
 }
 
-const tipoLabel: Record<string, string> = { dinheiro: "Dinheiro", boleto: "Boleto", cartao: "Cartão", pix: "PIX", cheque: "Cheque", deposito: "Depósito" };
+interface ClienteVinculado {
+  id: string;
+  nome_razao_social: string;
+  prazo_preferencial: number | null;
+}
+
+interface UsoResumo {
+  lancamentos: number;
+  caixa: number;
+}
+
+const tipoLabel: Record<string, string> = {
+  dinheiro: "Dinheiro", boleto: "Boleto", cartao: "Cartão",
+  pix: "PIX", cheque: "Cheque", deposito: "Depósito",
+};
+
+const tipoIcon: Record<string, React.ElementType> = {
+  dinheiro: Banknote, boleto: FileText, cartao: CreditCard,
+  pix: QrCode, cheque: CheckSquare, deposito: Building2,
+};
 
 const emptyForm: Record<string, any> = {
   descricao: "", prazo_dias: 0, parcelas: 1, intervalos_dias: [], gera_financeiro: true, tipo: "boleto", observacoes: "",
@@ -48,6 +72,49 @@ export default function FormasPagamento() {
 
   // Dynamic intervals
   const [newIntervalo, setNewIntervalo] = useState<number>(30);
+
+  // Related data for drawer
+  const [clientesVinculados, setClientesVinculados] = useState<ClienteVinculado[]>([]);
+  const [usoResumo, setUsoResumo] = useState<UsoResumo>({ lancamentos: 0, caixa: 0 });
+  const [loadingRelated, setLoadingRelated] = useState(false);
+
+  // Fetch related data whenever drawer opens with a selected item
+  useEffect(() => {
+    if (!selected || !drawerOpen || !supabase) {
+      setClientesVinculados([]);
+      setUsoResumo({ lancamentos: 0, caixa: 0 });
+      return;
+    }
+    let cancelled = false;
+    setLoadingRelated(true);
+    (async () => {
+      const [clientesRes, lancamentosRes, caixaRes] = await Promise.all([
+        (supabase as any)
+          .from("clientes")
+          .select("id, nome_razao_social, prazo_preferencial")
+          .eq("forma_pagamento_padrao", selected.descricao)
+          .eq("ativo", true)
+          .limit(50),
+        (supabase as any)
+          .from("financeiro_lancamentos")
+          .select("id", { count: "exact", head: true })
+          .eq("forma_pagamento", selected.tipo),
+        (supabase as any)
+          .from("caixa_movimentos")
+          .select("id", { count: "exact", head: true })
+          .eq("forma_pagamento", selected.tipo),
+      ]);
+      if (!cancelled) {
+        setClientesVinculados(clientesRes.data || []);
+        setUsoResumo({
+          lancamentos: lancamentosRes.count ?? 0,
+          caixa: caixaRes.count ?? 0,
+        });
+        setLoadingRelated(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [selected?.id, drawerOpen]);
 
   const openCreate = () => { setMode("create"); setForm({ ...emptyForm }); setSelected(null); setModalOpen(true); };
   const openEdit = (f: FormaPagamento) => {
@@ -169,73 +236,236 @@ export default function FormasPagamento() {
         </form>
       </FormModal>
 
-      <ViewDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} title="Detalhes da Forma de Pagamento"
-        actions={selected ? <>
-          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setDrawerOpen(false); openEdit(selected); }}><Edit className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Editar</TooltipContent></Tooltip>
-          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setDeleteConfirmOpen(true)}><Trash2 className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Excluir</TooltipContent></Tooltip>
-        </> : undefined}
-      >
-        {selected && (
-          <div className="space-y-5">
-            <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="font-semibold text-lg truncate">{selected.descricao}</h3>
-                <StatusBadge status={selected.ativo ? "Ativo" : "Inativo"} />
-              </div>
-              <p className="text-xs text-muted-foreground mt-0.5">{tipoLabel[selected.tipo] || selected.tipo}</p>
-            </div>
-
-            <div className="grid grid-cols-3 gap-3">
-              <div className="rounded-lg border bg-card p-4 text-center space-y-1">
-                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Prazo</p>
-                <p className="font-mono font-bold text-base text-foreground">{selected.prazo_dias === 0 ? "À vista" : `${selected.prazo_dias}d`}</p>
-              </div>
-              <div className="rounded-lg border bg-card p-4 text-center space-y-1">
-                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Parcelas</p>
-                <p className="font-mono font-bold text-base text-foreground">
-                  {Array.isArray(selected.intervalos_dias) && selected.intervalos_dias.length > 0 ? selected.intervalos_dias.length : selected.parcelas}x
-                </p>
-              </div>
-              <div className="rounded-lg border bg-card p-4 text-center space-y-1">
-                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Gera Financeiro</p>
-                <p className={`font-bold text-base ${selected.gera_financeiro ? "text-success" : "text-muted-foreground"}`}>{selected.gera_financeiro ? "Sim" : "Não"}</p>
-              </div>
-            </div>
-
-            {/* Installment Schedule Preview */}
-            {Array.isArray(selected.intervalos_dias) && selected.intervalos_dias.length > 0 && (
-              <div className="border-t pt-3">
-                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-2">Tabela de Parcelas</p>
-                <div className="rounded-lg border overflow-hidden">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="bg-muted/50">
-                        <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground">Parcela</th>
-                        <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground">Dias</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {selected.intervalos_dias.map((d: number, idx: number) => (
-                        <tr key={idx} className={idx % 2 === 0 ? "bg-muted/20" : ""}>
-                          <td className="px-3 py-1.5 text-xs">{idx + 1}ª parcela</td>
-                          <td className="px-3 py-1.5 text-xs font-mono text-right">{d} dias</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-
-            {selected.observacoes && (
-              <div className="border-t pt-3">
-                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-0.5">Observações</p>
-                <p className="text-sm text-muted-foreground">{selected.observacoes}</p>
-              </div>
+      <ViewDrawerV2
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        title={selected?.descricao ?? "Detalhes da Forma de Pagamento"}
+        badge={selected ? (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <StatusBadge status={selected.ativo ? "Ativo" : "Inativo"} />
+            {selected.tipo && (
+              <Badge variant="outline" className="text-xs gap-1 font-medium">
+                {(() => { const Icon = tipoIcon[selected.tipo]; return Icon ? <Icon className="w-3 h-3" /> : null; })()}
+                {tipoLabel[selected.tipo] || selected.tipo}
+              </Badge>
             )}
           </div>
-        )}
-      </ViewDrawer>
+        ) : undefined}
+        actions={selected ? (
+          <>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setDrawerOpen(false); openEdit(selected); }}>
+                  <Edit className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Editar</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setDeleteConfirmOpen(true)}>
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Excluir</TooltipContent>
+            </Tooltip>
+          </>
+        ) : undefined}
+        summary={selected ? (
+          <div className="grid grid-cols-4 gap-2">
+            <div className="rounded-lg border bg-card px-3 py-2.5 text-center space-y-0.5">
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Prazo</p>
+              <p className="font-mono font-bold text-sm text-foreground">
+                {selected.prazo_dias === 0 ? "À vista" : `${selected.prazo_dias}d`}
+              </p>
+            </div>
+            <div className="rounded-lg border bg-card px-3 py-2.5 text-center space-y-0.5">
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Parcelas</p>
+              <p className="font-mono font-bold text-sm text-foreground">
+                {Array.isArray(selected.intervalos_dias) && selected.intervalos_dias.length > 0
+                  ? selected.intervalos_dias.length
+                  : selected.parcelas}x
+              </p>
+            </div>
+            <div className="rounded-lg border bg-card px-3 py-2.5 text-center space-y-0.5">
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Clientes</p>
+              <p className="font-mono font-bold text-sm text-foreground">
+                {loadingRelated ? "—" : clientesVinculados.length}
+              </p>
+            </div>
+            <div className={`rounded-lg border px-3 py-2.5 text-center space-y-0.5 ${selected.gera_financeiro ? "bg-success/5 border-success/30" : "bg-card"}`}>
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Fin.</p>
+              <p className={`font-bold text-sm ${selected.gera_financeiro ? "text-success" : "text-muted-foreground"}`}>
+                {selected.gera_financeiro ? "Sim" : "Não"}
+              </p>
+            </div>
+          </div>
+        ) : undefined}
+        tabs={selected ? [
+          {
+            value: "resumo",
+            label: "Resumo",
+            content: (
+              <div className="space-y-4">
+                <ViewSection title="Regra">
+                  <div className="grid grid-cols-2 gap-4">
+                    <ViewField label="Prazo padrão">
+                      <span className="font-mono font-semibold">
+                        {selected.prazo_dias === 0 ? "À vista" : `${selected.prazo_dias} dias`}
+                      </span>
+                    </ViewField>
+                    <ViewField label="Parcelas">
+                      <span className="font-mono font-semibold">
+                        {Array.isArray(selected.intervalos_dias) && selected.intervalos_dias.length > 0
+                          ? `${selected.intervalos_dias.length}x`
+                          : `${selected.parcelas}x`}
+                      </span>
+                    </ViewField>
+                  </div>
+                  <ViewField label="Gera Financeiro">
+                    <Badge
+                      variant={selected.gera_financeiro ? "default" : "secondary"}
+                      className={selected.gera_financeiro
+                        ? "bg-success/10 text-success border border-success/30 gap-1"
+                        : "gap-1"}
+                    >
+                      <Wallet className="w-3 h-3" />
+                      {selected.gera_financeiro ? "Sim — gera lançamento financeiro" : "Não gera lançamento financeiro"}
+                    </Badge>
+                  </ViewField>
+                  <ViewField label="Status"><StatusBadge status={selected.ativo ? "Ativo" : "Inativo"} /></ViewField>
+                </ViewSection>
+
+                {Array.isArray(selected.intervalos_dias) && selected.intervalos_dias.length > 0 && (
+                  <ViewSection title="Tabela de parcelas">
+                    <div className="rounded-lg border overflow-hidden">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="bg-muted/50">
+                            <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground">Parcela</th>
+                            <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground">Vencimento</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {selected.intervalos_dias.map((d: number, idx: number) => (
+                            <tr key={idx} className={idx % 2 === 0 ? "bg-muted/20" : ""}>
+                              <td className="px-3 py-1.5 text-xs">{idx + 1}ª parcela</td>
+                              <td className="px-3 py-1.5 text-xs font-mono text-right">{d} dias</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </ViewSection>
+                )}
+
+                <ViewSection title="Contexto">
+                  <ViewField label="Tipo de pagamento">
+                    <div className="flex items-center gap-1.5">
+                      {(() => { const Icon = tipoIcon[selected.tipo]; return Icon ? <Icon className="w-3.5 h-3.5 text-muted-foreground" /> : null; })()}
+                      <span>{tipoLabel[selected.tipo] || selected.tipo}</span>
+                    </div>
+                  </ViewField>
+                </ViewSection>
+              </div>
+            ),
+          },
+          {
+            value: "clientes",
+            label: `Clientes${clientesVinculados.length > 0 ? ` (${clientesVinculados.length})` : ""}`,
+            content: (
+              <div className="space-y-4">
+                {loadingRelated ? (
+                  <p className="text-sm text-muted-foreground py-4 text-center">Carregando...</p>
+                ) : clientesVinculados.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-8 gap-2 text-center">
+                    <Users className="h-8 w-8 text-muted-foreground/40" />
+                    <p className="text-sm text-muted-foreground">Nenhum cliente usa esta forma como padrão.</p>
+                  </div>
+                ) : (
+                  <div className="rounded-lg border overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-muted/50">
+                          <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground">Cliente</th>
+                          <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground">Prazo pref.</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {clientesVinculados.map((c, idx) => (
+                          <tr key={c.id} className={idx % 2 === 0 ? "bg-muted/20" : ""}>
+                            <td className="px-3 py-2 text-xs">
+                              <RelationalLink type="cliente" id={c.id}>{c.nome_razao_social}</RelationalLink>
+                            </td>
+                            <td className="px-3 py-2 text-xs font-mono text-right text-muted-foreground">
+                              {c.prazo_preferencial ? `${c.prazo_preferencial}d` : "—"}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            ),
+          },
+          {
+            value: "uso",
+            label: "Uso no sistema",
+            content: (
+              <div className="space-y-4">
+                {loadingRelated ? (
+                  <p className="text-sm text-muted-foreground py-4 text-center">Carregando...</p>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="rounded-lg border bg-card p-4 space-y-1">
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <TrendingUp className="h-4 w-4" />
+                          <p className="text-xs font-semibold uppercase tracking-wider">Lançamentos</p>
+                        </div>
+                        <p className="font-mono font-bold text-xl text-foreground">{usoResumo.lancamentos}</p>
+                        <p className="text-[11px] text-muted-foreground">registros no financeiro com tipo {tipoLabel[selected.tipo] || selected.tipo}</p>
+                      </div>
+                      <div className="rounded-lg border bg-card p-4 space-y-1">
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <Wallet className="h-4 w-4" />
+                          <p className="text-xs font-semibold uppercase tracking-wider">Caixa</p>
+                        </div>
+                        <p className="font-mono font-bold text-xl text-foreground">{usoResumo.caixa}</p>
+                        <p className="text-[11px] text-muted-foreground">movimentações com tipo {tipoLabel[selected.tipo] || selected.tipo}</p>
+                      </div>
+                    </div>
+                    {usoResumo.lancamentos === 0 && usoResumo.caixa === 0 ? (
+                      <p className="text-sm text-muted-foreground text-center py-2">
+                        Esta forma ainda não foi utilizada em lançamentos ou movimentações.
+                      </p>
+                    ) : (
+                      <div className="rounded-lg border bg-muted/30 p-3 flex items-start gap-2">
+                        <TrendingUp className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+                        <p className="text-xs text-muted-foreground">
+                          Esta forma de pagamento está sendo usada ativamente no sistema.
+                          {usoResumo.lancamentos > 0 && ` Há ${usoResumo.lancamentos} lançamento(s) financeiro(s) vinculado(s).`}
+                          {usoResumo.caixa > 0 && ` Há ${usoResumo.caixa} movimentação(ões) de caixa.`}
+                        </p>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            ),
+          },
+          ...(selected.observacoes ? [{
+            value: "observacoes",
+            label: "Observações",
+            content: (
+              <div className="space-y-3">
+                <p className="text-sm text-foreground whitespace-pre-wrap">{selected.observacoes}</p>
+              </div>
+            ),
+          }] : []),
+        ] : []}
+      />
 
       <ConfirmDialog
         open={deleteConfirmOpen}
@@ -243,7 +473,43 @@ export default function FormasPagamento() {
         onConfirm={() => { if (selected) { setDrawerOpen(false); remove(selected.id); } setDeleteConfirmOpen(false); }}
         title="Excluir forma de pagamento"
         description={`Tem certeza que deseja excluir "${selected?.descricao || ""}"? Esta ação não pode ser desfeita.`}
-      />
+      >
+        {selected && (
+          <div className="space-y-3 rounded-lg border bg-muted/30 p-3 text-sm">
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div>
+                <span className="text-muted-foreground">Prazo padrão: </span>
+                <span className="font-semibold font-mono">
+                  {selected.prazo_dias === 0 ? "À vista" : `${selected.prazo_dias} dias`}
+                </span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Gera financeiro: </span>
+                <span className={`font-semibold ${selected.gera_financeiro ? "text-success" : ""}`}>
+                  {selected.gera_financeiro ? "Sim" : "Não"}
+                </span>
+              </div>
+            </div>
+            {(clientesVinculados.length > 0 || usoResumo.lancamentos > 0 || usoResumo.caixa > 0) && (
+              <div className="flex items-start gap-2 rounded border border-warning/40 bg-warning/5 p-2">
+                <AlertTriangle className="h-4 w-4 text-warning mt-0.5 shrink-0" />
+                <div className="text-xs space-y-0.5">
+                  {clientesVinculados.length > 0 && (
+                    <p><span className="font-semibold">{clientesVinculados.length}</span> cliente(s) usa(m) esta forma como padrão.</p>
+                  )}
+                  {usoResumo.lancamentos > 0 && (
+                    <p><span className="font-semibold">{usoResumo.lancamentos}</span> lançamento(s) financeiro(s) vinculado(s).</p>
+                  )}
+                  {usoResumo.caixa > 0 && (
+                    <p><span className="font-semibold">{usoResumo.caixa}</span> movimentação(ões) de caixa vinculada(s).</p>
+                  )}
+                  <p className="text-muted-foreground mt-1">Considere <strong>inativar</strong> em vez de excluir para preservar o histórico.</p>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </ConfirmDialog>
     </AppLayout>
   );
 }
