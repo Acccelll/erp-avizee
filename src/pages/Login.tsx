@@ -38,6 +38,11 @@ export default function Login() {
     e.preventDefault();
     if (!validate()) return;
 
+    if (!supabase) {
+      toast.error("Serviço de autenticação não disponível. Contate o administrador do sistema.");
+      return;
+    }
+
     setLoading(true);
     try {
       const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
