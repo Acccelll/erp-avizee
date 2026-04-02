@@ -137,7 +137,13 @@ export function RelationalNavigationProvider({ children }: { children: ReactNode
     return () => window.removeEventListener("keydown", handleKeyDown, true);
   }, []);
 
-  const pushView = useCallback((type: EntityType, id: string) => dispatch({ type: "request_push", payload: { type, id } }), []);
+  const pushView = useCallback((type: EntityType, id: string) => {
+    if (!id || id === "undefined") {
+      console.warn(`[RelationalNavigation] pushView("${type}") called with invalid id: ${JSON.stringify(id)}. Ignoring.`);
+      return;
+    }
+    dispatch({ type: "request_push", payload: { type, id } });
+  }, []);
   const popView = useCallback(() => dispatch({ type: "pop" }), []);
   const clearStack = useCallback(() => dispatch({ type: "clear" }), []);
   const confirmPendingPush = useCallback(() => dispatch({ type: "confirm_push" }), []);

@@ -5,7 +5,6 @@ import { ModulePage } from "@/components/ModulePage";
 import { DataTable } from "@/components/DataTable";
 import { StatusBadge } from "@/components/StatusBadge";
 import { SummaryCard } from "@/components/SummaryCard";
-import { ViewDrawer, ViewField, ViewSection } from "@/components/ViewDrawer";
 import { AdvancedFilterBar } from "@/components/AdvancedFilterBar";
 import type { FilterChip } from "@/components/AdvancedFilterBar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -41,9 +40,7 @@ const statusLabels: Record<string, string> = Object.fromEntries(
 const Orcamentos = () => {
   const navigate = useNavigate();
   const { pushView } = useRelationalNavigation();
-  const [drawerOpen, setDrawerOpen] = useState(false);
   const { data, loading, remove, fetchData } = useSupabaseCrud<Orcamento>({ table: "orcamentos", select: "*, clientes(nome_razao_social)" });
-  const [selected, setSelected] = useState<Orcamento | null>(null);
   const [convertingId, setConvertingId] = useState<string | null>(null);
   const [poNumberCliente, setPoNumberCliente] = useState("");
   const [dataPoCliente, setDataPoCliente] = useState("");
@@ -275,31 +272,9 @@ const Orcamentos = () => {
         </AdvancedFilterBar>
 
         <DataTable columns={columns} data={filteredData} loading={loading}
-          onView={(o) => {
-            setSelected(o);
-            setDrawerOpen(true);
-          }}
+          onView={(o) => pushView("orcamento", o.id)}
         />
       </ModulePage>
-
-      <ViewDrawer
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        title={`Cotação ${selected?.numero}`}
-        badge={selected ? <StatusBadge status={selected.status} label={statusLabels[selected.status]} /> : undefined}
-      >
-        {selected ? (
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <ViewField label="Número"><span className="font-mono">{selected.numero}</span></ViewField>
-              <ViewField label="Data">{formatDate(selected.data_orcamento)}</ViewField>
-              <ViewField label="Validade">{selected.validade ? formatDate(selected.validade) : "—"}</ViewField>
-              <ViewField label="Total"><span className="font-semibold font-mono">{formatCurrency(selected.valor_total)}</span></ViewField>
-            </div>
-            <ViewField label="Cliente">{selected.clientes?.nome_razao_social || "—"}</ViewField>
-          </div>
-        ) : null}
-      </ViewDrawer>
 
       <ConfirmDialog
         open={!!convertingId}
