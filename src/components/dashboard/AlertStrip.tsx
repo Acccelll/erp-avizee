@@ -34,7 +34,7 @@ const severityStyles = {
     dot: 'bg-destructive',
   },
   warning: {
-    badge: 'bg-warning/10 text-warning-foreground border-warning/20',
+    badge: 'bg-warning/10 text-warning border-warning/20',
     icon: 'text-warning',
     dot: 'bg-warning',
   },

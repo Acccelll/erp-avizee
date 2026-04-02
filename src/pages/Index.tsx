@@ -355,7 +355,6 @@ const DashboardContent = () => {
     <AppLayout>
       {/* ── Header ── */}
       <DashboardHeader
-        companyName={profile?.nome ? undefined : undefined}
         lastUpdated={loadedAt}
         onRefresh={loadData}
       />
