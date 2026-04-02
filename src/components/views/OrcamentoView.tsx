@@ -9,7 +9,7 @@ import { useRelationalNavigation } from "@/contexts/RelationalNavigationContext"
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { Edit, Trash2, ExternalLink, FileText } from "lucide-react";
+import { Edit, Trash2, FileText } from "lucide-react";
 import { toast } from "sonner";
 
 interface Props {
@@ -79,15 +79,7 @@ export function OrcamentoView({ id }: Props) {
   return (
     <div className="space-y-4">
       {/* Action bar */}
-      <div className="flex items-center gap-1 flex-wrap border-b pb-3">
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => { clearStack(); navigate(`/orcamentos/${id}`); }}>
-              <ExternalLink className="h-3.5 w-3.5" /> Abrir
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Abrir cotação</TooltipContent>
-        </Tooltip>
+      <div className="flex items-center justify-end gap-1 border-b pb-3">
         <Tooltip>
           <TooltipTrigger asChild>
             <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => { clearStack(); navigate(`/orcamentos/${id}?preview=1`); }}>

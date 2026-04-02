@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { AppLayout } from "@/components/AppLayout";
 import { DataTable } from "@/components/DataTable";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -46,6 +47,8 @@ const emptyProduto: Record<string, any> = {
 };
 
 const Produtos = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
   const { data, loading, create, update, remove, duplicate } = useSupabaseCrud<Produto>({ table: "produtos" });
   const { pushView } = useRelationalNavigation();
   const [modalOpen, setModalOpen] = useState(false);
@@ -68,6 +71,17 @@ const Produtos = () => {
       if (g) setGrupos(g);
     });
   }, []);
+
+  useEffect(() => {
+    const editId = (location.state as any)?.editId;
+    if (!editId) return;
+    navigate(location.pathname, { replace: true, state: {} });
+    supabase.from("produtos").select("*").eq("id", editId).maybeSingle().then(({ data: p }) => {
+      if (p) openEdit(p as Produto);
+    });
+  // openEdit is stable; navigate/pathname are stable refs
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state]);
 
   const produtosDisponiveis = data;
 

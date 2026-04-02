@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { AppLayout } from "@/components/AppLayout";
 import { DataTable } from "@/components/DataTable";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -37,6 +38,8 @@ const emptyForm: Record<string, any> = {
 };
 
 const Fornecedores = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
@@ -45,6 +48,17 @@ const Fornecedores = () => {
     const timer = setTimeout(() => setDebouncedSearch(searchTerm), 350);
     return () => clearTimeout(timer);
   }, [searchTerm]);
+
+  useEffect(() => {
+    const editId = (location.state as any)?.editId;
+    if (!editId) return;
+    navigate(location.pathname, { replace: true, state: {} });
+    supabase.from("fornecedores").select("*").eq("id", editId).maybeSingle().then(({ data: f }) => {
+      if (f) openEdit(f as Fornecedor);
+    });
+  // openEdit is stable; navigate/pathname are stable refs
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state]);
 
   const { data, loading, create, update, remove, duplicate } = useSupabaseCrud<Fornecedor>({
     table: "fornecedores",

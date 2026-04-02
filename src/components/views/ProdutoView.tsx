@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Tables } from "@/integrations/supabase/types";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Package, RefreshCw, AlertTriangle, Archive, FileText } from "lucide-react";
+import { Package, RefreshCw, AlertTriangle, Archive, FileText, Edit, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { toast } from "sonner";
 import { PrecosEspeciaisTab } from "@/components/precos/PrecosEspeciaisTab";
@@ -16,6 +19,7 @@ interface Props {
 }
 
 export function ProdutoView({ id }: Props) {
+  const navigate = useNavigate();
   const [selected, setSelected] = useState<Tables<"produtos"> | null>(null);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -23,7 +27,8 @@ export function ProdutoView({ id }: Props) {
   const [composicao, setComposicao] = useState<any[]>([]);
   const [movimentos, setMovimentos] = useState<any[]>([]);
   const [fornecedoresProd, setFornecedoresProd] = useState<any[]>([]);
-  const { pushView } = useRelationalNavigation();
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const { pushView, clearStack } = useRelationalNavigation();
 
   useEffect(() => {
     if (!supabase) {
@@ -92,6 +97,25 @@ export function ProdutoView({ id }: Props) {
 
   return (
     <div className="space-y-5">
+      {/* Action bar */}
+      <div className="flex items-center justify-end gap-1 border-b pb-3">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { clearStack(); navigate('/produtos', { state: { editId: id } }); }}>
+              <Edit className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Editar</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setDeleteConfirmOpen(true)}>
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Excluir</TooltipContent>
+        </Tooltip>
+      </div>
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         <div className="rounded-lg border bg-card p-4 text-center space-y-1">
           <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Venda</p>
@@ -247,6 +271,26 @@ export function ProdutoView({ id }: Props) {
           )}
         </TabsContent>
       </Tabs>
+
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        onClose={() => setDeleteConfirmOpen(false)}
+        onConfirm={async () => {
+          try {
+            const { error } = await supabase.from("produtos").delete().eq("id", id);
+            if (error) throw error;
+            toast.success("Produto excluído com sucesso.");
+            clearStack();
+          } catch (err) {
+            console.error("[ProdutoView] erro ao excluir:", err);
+            toast.error("Erro ao excluir produto.");
+          } finally {
+            setDeleteConfirmOpen(false);
+          }
+        }}
+        title="Excluir produto"
+        description={`Tem certeza que deseja excluir "${selected?.nome || ""}"? Esta ação não pode ser desfeita.`}
+      />
     </div>
   );
 }
