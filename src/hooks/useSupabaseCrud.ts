@@ -156,9 +156,9 @@ export function useSupabaseCrud<T extends Record<string, unknown>>({
   const updateMutation = useMutation({
     mutationFn: async ({ id, record }: { id: string; record: Partial<T> }) => {
       if (!supabase) throw new Error("Supabase não configurado");
-      const { data: result, error } = await supabase.from(table).update(record).eq("id", id).select().single();
+      const { data: result, error } = await (supabase.from as any)(table).update(record).eq("id", id).select().single();
       if (error) throw error;
-      return result as T;
+      return result as unknown as T;
     },
     onSuccess: () => {
       if (showToasts) toast.success("Registro atualizado com sucesso!");
