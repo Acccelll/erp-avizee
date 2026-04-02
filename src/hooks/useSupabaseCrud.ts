@@ -173,10 +173,10 @@ export function useSupabaseCrud<T extends Record<string, unknown>>({
     mutationFn: async ({ id, soft = true }: { id: string; soft?: boolean }) => {
       if (!supabase) throw new Error("Supabase não configurado");
       if (soft && hasAtivo) {
-        const { error } = await supabase.from(table).update({ ativo: false }).eq("id", id);
+        const { error } = await (supabase.from as any)(table).update({ ativo: false }).eq("id", id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from(table).delete().eq("id", id);
+        const { error } = await (supabase.from as any)(table).delete().eq("id", id);
         if (error) throw error;
       }
     },
