@@ -38,7 +38,7 @@ export function AppSidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMo
   }), [alerts]);
 
   const itemBadges: Record<string, { count: number; tone: "danger" | "warning" | "info" }> = useMemo(() => ({
-    "/cotacoes": { count: alerts.orcamentosPendentes, tone: "warning" },
+    "/orcamentos": { count: alerts.orcamentosPendentes, tone: "warning" },
     "/financeiro": { count: alerts.financeiroVencer, tone: "info" },
     "/financeiro?tipo=receber": { count: alerts.financeiroVencer, tone: "info" },
     "/financeiro?tipo=pagar": { count: alerts.financeiroVencidos, tone: "danger" },

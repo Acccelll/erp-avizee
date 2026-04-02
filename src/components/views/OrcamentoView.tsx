@@ -13,39 +13,59 @@ interface Props {
 export function OrcamentoView({ id }: Props) {
   const [selected, setSelected] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [items, setItems] = useState<any[]>([]);
   const { pushView } = useRelationalNavigation();
 
   useEffect(() => {
+    if (!supabase) {
+      setFetchError("Serviço de banco de dados não disponível.");
+      setLoading(false);
+      return;
+    }
     const fetchData = async () => {
       setLoading(true);
-      const { data: orc } = await supabase
-        .from("orcamentos")
-        .select("*, clientes(id, nome_razao_social)")
-        .eq("id", id)
-        .maybeSingle();
+      setFetchError(null);
+      try {
+        const { data: orc, error: orcError } = await supabase
+          .from("orcamentos")
+          .select("*, clientes(id, nome_razao_social)")
+          .eq("id", id)
+          .maybeSingle();
 
-      if (!orc) {
+        if (orcError) {
+          console.error("[OrcamentoView] erro ao buscar cotação:", orcError);
+          setFetchError(`Erro ao carregar cotação: ${orcError.message}`);
+          setSelected(null);
+          return;
+        }
+        if (!orc) {
+          setSelected(null);
+          setItems([]);
+          return;
+        }
+        setSelected(orc);
+
+        const { data: it } = await supabase
+          .from("orcamentos_itens")
+          .select("*, produtos(id, nome, sku)")
+          .eq("orcamento_id", orc.id);
+
+        setItems(it || []);
+      } catch (error) {
+        console.error("[OrcamentoView] erro inesperado:", error);
+        setFetchError(`Erro inesperado: ${error instanceof Error ? error.message : String(error)}`);
         setSelected(null);
-        setItems([]);
+      } finally {
         setLoading(false);
-        return;
       }
-      setSelected(orc);
-
-      const { data: it } = await supabase
-        .from("orcamentos_itens")
-        .select("*, produtos(id, nome, sku)")
-        .eq("orcamento_id", orc.id);
-
-      setItems(it || []);
-      setLoading(false);
     };
 
     fetchData();
   }, [id]);
 
   if (loading) return <div className="p-8 text-center animate-pulse">Carregando cotação...</div>;
+  if (fetchError) return <div className="p-8 text-center text-destructive space-y-1"><p className="font-semibold">Erro ao carregar dados</p><p className="text-xs text-muted-foreground">{fetchError}</p></div>;
   if (!selected) return <div className="p-8 text-center text-destructive">Cotação não encontrada</div>;
 
   return (
