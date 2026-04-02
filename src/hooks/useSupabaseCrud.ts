@@ -74,7 +74,7 @@ const applyFilters = (query: QueryBuilder, filters: CrudFilter[]) => {
   return nextQuery;
 };
 
-export function useSupabaseCrud<T extends Record<string, unknown>>({
+export function useSupabaseCrud<T = Record<string, unknown>>({
   table,
   select = "*",
   orderBy = "created_at",
@@ -101,7 +101,7 @@ export function useSupabaseCrud<T extends Record<string, unknown>>({
         return { rows: [] as T[], totalCount: null as number | null, hasMore: false, truncated: false };
       }
 
-      let query = supabase.from(table).select(select, { count: "exact" }).order(orderBy, { ascending }) as unknown as QueryBuilder & PromiseLike<{ data: T[] | null; error: Error | null; count: number | null }>;
+      let query = (supabase.from as any)(table).select(select, { count: "exact" }).order(orderBy, { ascending }) as unknown as QueryBuilder & PromiseLike<{ data: T[] | null; error: Error | null; count: number | null }>;
 
       if (hasAtivo) {
         query = query.eq("ativo", true) as typeof query;
@@ -140,9 +140,9 @@ export function useSupabaseCrud<T extends Record<string, unknown>>({
   const createMutation = useMutation({
     mutationFn: async (record: Partial<T>) => {
       if (!supabase) throw new Error("Supabase não configurado");
-      const { data: result, error } = await supabase.from(table).insert(record).select().single();
+      const { data: result, error } = await (supabase.from as any)(table).insert(record).select().single();
       if (error) throw error;
-      return result as T;
+      return result as unknown as T;
     },
     onSuccess: () => {
       if (showToasts) toast.success("Registro criado com sucesso!");
@@ -156,9 +156,9 @@ export function useSupabaseCrud<T extends Record<string, unknown>>({
   const updateMutation = useMutation({
     mutationFn: async ({ id, record }: { id: string; record: Partial<T> }) => {
       if (!supabase) throw new Error("Supabase não configurado");
-      const { data: result, error } = await supabase.from(table).update(record).eq("id", id).select().single();
+      const { data: result, error } = await (supabase.from as any)(table).update(record).eq("id", id).select().single();
       if (error) throw error;
-      return result as T;
+      return result as unknown as T;
     },
     onSuccess: () => {
       if (showToasts) toast.success("Registro atualizado com sucesso!");
@@ -173,10 +173,10 @@ export function useSupabaseCrud<T extends Record<string, unknown>>({
     mutationFn: async ({ id, soft = true }: { id: string; soft?: boolean }) => {
       if (!supabase) throw new Error("Supabase não configurado");
       if (soft && hasAtivo) {
-        const { error } = await supabase.from(table).update({ ativo: false }).eq("id", id);
+        const { error } = await (supabase.from as any)(table).update({ ativo: false }).eq("id", id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from(table).delete().eq("id", id);
+        const { error } = await (supabase.from as any)(table).delete().eq("id", id);
         if (error) throw error;
       }
     },

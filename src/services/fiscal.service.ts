@@ -188,7 +188,7 @@ export async function processarDevolucao(params: {
     await supabase.from("notas_fiscais_itens").insert({
       nota_fiscal_id: nfDev.id, produto_id: item.produto_id,
       quantidade: item.qtd_devolver, valor_unitario: item.valor_unitario,
-      cfop: calcularCfopDevolucao(item.cfop),
+      cfop: item.cfop ? item.cfop.replace(/^[0-9]/, (d: string) => String(Number(d) > 4 ? Number(d) - 2 : Number(d) + 2)) : item.cfop,
     });
     const { data: prod } = await supabase.from("produtos").select("estoque_atual").eq("id", item.produto_id).single();
     const saldoAnterior = Number(prod?.estoque_atual || 0);

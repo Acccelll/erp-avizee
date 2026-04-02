@@ -174,8 +174,6 @@ export default function OrcamentoForm() {
                 let newPrice: number;
                 if (rule.preco_especial && Number(rule.preco_especial) > 0) {
                   newPrice = Number(rule.preco_especial);
-                } else if (rule.desconto_percentual && Number(rule.desconto_percentual) > 0) {
-                  newPrice = item.valor_unitario * (1 - Number(rule.desconto_percentual) / 100);
                 } else {
                   return item;
                 }
@@ -270,7 +268,7 @@ export default function OrcamentoForm() {
       payload,
     };
 
-    await supabase.from("app_configuracoes").upsert(
+    await (supabase.from("app_configuracoes") as any).upsert(
       { chave: key, valor: templateRecord, updated_at: new Date().toISOString() },
       { onConflict: "chave" },
     );
@@ -434,7 +432,7 @@ export default function OrcamentoForm() {
       .or(`chave.like.orcamento_template:${user.id}:%,chave.like.${TEAM_TEMPLATE_KEY}:%`)
       .then(({ data }) => {
         const list = (data || [])
-          .map((row) => row.valor as OrcamentoTemplate | null)
+          .map((row) => row.valor as unknown as OrcamentoTemplate | null)
           .filter((row): row is OrcamentoTemplate => !!row?.id && !!row?.nome && !!row?.payload);
         setTemplates(list);
       });

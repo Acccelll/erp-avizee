@@ -50,7 +50,7 @@ export function useSidebarAlerts() {
             .from('orcamentos')
             .select('*', { count: 'exact', head: true })
             .eq('ativo', true)
-            .in('status', ['pendente', 'aguardando_aprovacao', 'em_analise']),
+            .in('status', ['pendente', 'aguardando_aprovacao', 'em_analise'] as any),
         ]);
 
         const baixoCount = (baixoData || []).filter((p: any) => (p.estoque_atual || 0) <= p.estoque_minimo).length;
