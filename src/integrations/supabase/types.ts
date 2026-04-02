@@ -2108,6 +2108,7 @@ export type Database = {
           ativo: boolean
           cliente_id: string
           created_at: string
+          desconto_percentual: number | null
           id: string
           observacao: string | null
           preco_especial: number
@@ -2120,6 +2121,7 @@ export type Database = {
           ativo?: boolean
           cliente_id: string
           created_at?: string
+          desconto_percentual?: number | null
           id?: string
           observacao?: string | null
           preco_especial?: number
@@ -2132,6 +2134,7 @@ export type Database = {
           ativo?: boolean
           cliente_id?: string
           created_at?: string
+          desconto_percentual?: number | null
           id?: string
           observacao?: string | null
           preco_especial?: number
@@ -2848,6 +2851,9 @@ export type Database = {
         | "faturado"
         | "aprovado"
         | "convertido"
+        | "pendente"
+        | "aguardando_aprovacao"
+        | "em_analise"
       tipo_caixa:
         | "abertura"
         | "suprimento"
@@ -2999,6 +3005,9 @@ export const Constants = {
         "faturado",
         "aprovado",
         "convertido",
+        "pendente",
+        "aguardando_aprovacao",
+        "em_analise",
       ],
       tipo_caixa: [
         "abertura",
