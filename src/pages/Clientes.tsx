@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { AppLayout } from "@/components/AppLayout";
 import { DataTable } from "@/components/DataTable";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -49,6 +50,8 @@ const relacaoOptions = [
 
 
 const Clientes = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
@@ -79,6 +82,17 @@ const Clientes = () => {
   useEffect(() => {
     supabase.from("grupos_economicos").select("id, nome").eq("ativo", true).order("nome").then(({ data: g }: any) => setGrupos(g || []));
   }, []);
+
+  useEffect(() => {
+    const editId = (location.state as any)?.editId;
+    if (!editId) return;
+    navigate(location.pathname, { replace: true, state: {} });
+    supabase.from("clientes").select("*").eq("id", editId).maybeSingle().then(({ data: c }) => {
+      if (c) openEdit(c as Cliente);
+    });
+  // openEdit is stable (no deps change); navigate/pathname are stable refs
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state]);
 
   const openCreate = () => {setMode("create");setForm({ ...emptyCliente });setSelected(null);setModalOpen(true);};
   const openEdit = (c: Cliente) => {

@@ -1,21 +1,29 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { RelationalLink } from "@/components/ui/RelationalLink";
 import { useRelationalNavigation } from "@/contexts/RelationalNavigationContext";
+import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { Edit, Trash2, FileText } from "lucide-react";
+import { toast } from "sonner";
 
 interface Props {
   id: string;
 }
 
 export function OrcamentoView({ id }: Props) {
+  const navigate = useNavigate();
   const [selected, setSelected] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [items, setItems] = useState<any[]>([]);
-  const { pushView } = useRelationalNavigation();
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const { pushView, clearStack } = useRelationalNavigation();
 
   useEffect(() => {
     if (!supabase) {
@@ -70,6 +78,33 @@ export function OrcamentoView({ id }: Props) {
 
   return (
     <div className="space-y-4">
+      {/* Action bar */}
+      <div className="flex items-center justify-end gap-1 border-b pb-3">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => { clearStack(); navigate(`/orcamentos/${id}?preview=1`); }}>
+              <FileText className="h-3.5 w-3.5" /> Visualizar PDF
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Abrir visualização do PDF</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { clearStack(); navigate(`/orcamentos/${id}`); }}>
+              <Edit className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Editar</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setDeleteConfirmOpen(true)}>
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Excluir</TooltipContent>
+        </Tooltip>
+      </div>
       <div className="bg-muted/30 rounded-lg p-4 text-sm">
         <div className="flex justify-between items-start mb-3">
           <div>
@@ -148,6 +183,26 @@ export function OrcamentoView({ id }: Props) {
           </div>
         </TabsContent>
       </Tabs>
+
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        onClose={() => setDeleteConfirmOpen(false)}
+        onConfirm={async () => {
+          try {
+            const { error } = await supabase.from("orcamentos").delete().eq("id", id);
+            if (error) throw error;
+            toast.success("Cotação excluída com sucesso.");
+            clearStack();
+          } catch (err) {
+            console.error("[OrcamentoView] erro ao excluir:", err);
+            toast.error("Erro ao excluir cotação.");
+          } finally {
+            setDeleteConfirmOpen(false);
+          }
+        }}
+        title="Excluir cotação"
+        description={`Tem certeza que deseja excluir a cotação ${selected?.numero || ""}? Esta ação não pode ser desfeita.`}
+      />
     </div>
   );
 }

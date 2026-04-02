@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -51,13 +51,14 @@ const emptyCliente: ClienteSnapshot = {
 export default function OrcamentoForm() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const pdfRef = useRef<HTMLDivElement>(null);
   const isEdit = !!id;
   const isMobile = useIsMobile();
   const { user } = useAuth();
 
   const [saving, setSaving] = useState(false);
-  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(searchParams.get("preview") === "1");
   const [clientes, setClientes] = useState<Tables<"clientes">[]>([]);
   const [produtos, setProdutos] = useState<ProductWithForn[]>([]);
   const [precosEspeciais, setPrecosEspeciais] = useState<Tables<"precos_especiais">[]>([]);

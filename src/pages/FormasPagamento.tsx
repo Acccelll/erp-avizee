@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
 import { toast } from "sonner";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 interface FormaPagamento {
   id: string;
@@ -43,6 +44,7 @@ export default function FormasPagamento() {
   const [mode, setMode] = useState<"create" | "edit">("create");
   const [form, setForm] = useState(emptyForm);
   const [searchTerm, setSearchTerm] = useState("");
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   // Dynamic intervals
   const [newIntervalo, setNewIntervalo] = useState<number>(30);
@@ -170,7 +172,7 @@ export default function FormasPagamento() {
       <ViewDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} title="Detalhes da Forma de Pagamento"
         actions={selected ? <>
           <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setDrawerOpen(false); openEdit(selected); }}><Edit className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Editar</TooltipContent></Tooltip>
-          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => { setDrawerOpen(false); remove(selected.id); }}><Trash2 className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Excluir</TooltipContent></Tooltip>
+          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setDeleteConfirmOpen(true)}><Trash2 className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Excluir</TooltipContent></Tooltip>
         </> : undefined}
       >
         {selected && (
@@ -234,6 +236,14 @@ export default function FormasPagamento() {
           </div>
         )}
       </ViewDrawer>
+
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        onClose={() => setDeleteConfirmOpen(false)}
+        onConfirm={() => { if (selected) { setDrawerOpen(false); remove(selected.id); } setDeleteConfirmOpen(false); }}
+        title="Excluir forma de pagamento"
+        description={`Tem certeza que deseja excluir "${selected?.descricao || ""}"? Esta ação não pode ser desfeita.`}
+      />
     </AppLayout>
   );
 }

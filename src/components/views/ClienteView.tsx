@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Tables } from "@/integrations/supabase/types";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -7,7 +8,11 @@ import { formatCurrency, formatDate } from "@/lib/format";
 import { RelationalLink } from "@/components/ui/RelationalLink";
 import { useRelationalNavigation } from "@/contexts/RelationalNavigationContext";
 import { PrecosEspeciaisTab } from "@/components/precos/PrecosEspeciaisTab";
-import { User, Mail, Phone, MapPin, FileText, CreditCard, MessageSquare, Truck, BarChart3 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { Edit, Trash2, User, Mail, Phone, MapPin, FileText, CreditCard, MessageSquare, Truck, BarChart3 } from "lucide-react";
+import { toast } from "sonner";
 
 interface Props {
   id: string;
@@ -18,6 +23,7 @@ type ClienteWithGroup = Tables<"clientes"> & {
 };
 
 export function ClienteView({ id }: Props) {
+  const navigate = useNavigate();
   const [selected, setSelected] = useState<ClienteWithGroup | null>(null);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -25,7 +31,8 @@ export function ClienteView({ id }: Props) {
   const [financeiro, setFinanceiro] = useState<any[]>([]);
   const [comunicacao, setComunicacao] = useState<any[]>([]);
   const [transportadoras, setTransportadoras] = useState<any[]>([]);
-  const { pushView } = useRelationalNavigation();
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const { pushView, clearStack } = useRelationalNavigation();
 
   useEffect(() => {
     if (!supabase) {
@@ -100,6 +107,25 @@ export function ClienteView({ id }: Props) {
 
   return (
     <div className="space-y-5">
+      {/* Action bar */}
+      <div className="flex items-center justify-end gap-1 border-b pb-3">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { clearStack(); navigate('/clientes', { state: { editId: id } }); }}>
+              <Edit className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Editar</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setDeleteConfirmOpen(true)}>
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Excluir</TooltipContent>
+        </Tooltip>
+      </div>
       <div className="flex items-center gap-4 bg-muted/30 p-4 rounded-lg">
         <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0">
           <User className="h-6 w-6" />
@@ -299,6 +325,26 @@ export function ClienteView({ id }: Props) {
           <PrecosEspeciaisTab clienteId={selected.id} />
         </TabsContent>
       </Tabs>
+
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        onClose={() => setDeleteConfirmOpen(false)}
+        onConfirm={async () => {
+          try {
+            const { error } = await supabase.from("clientes").delete().eq("id", id);
+            if (error) throw error;
+            toast.success("Cliente excluído com sucesso.");
+            clearStack();
+          } catch (err) {
+            console.error("[ClienteView] erro ao excluir:", err);
+            toast.error("Erro ao excluir cliente.");
+          } finally {
+            setDeleteConfirmOpen(false);
+          }
+        }}
+        title="Excluir cliente"
+        description={`Tem certeza que deseja excluir "${selected?.nome_razao_social || ""}"? Esta ação não pode ser desfeita.`}
+      />
     </div>
   );
 }
