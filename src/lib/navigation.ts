@@ -62,7 +62,7 @@ export const dashboardItem: NavLeafItem = {
 };
 
 export const quickActions: QuickAction[] = [
-  { id: 'nova-cotacao', title: 'Nova Cotação', description: 'Criar proposta comercial', path: '/cotacoes/novo', shortcut: '⌘N' },
+  { id: 'nova-cotacao', title: 'Nova Cotação', description: 'Criar proposta comercial', path: '/orcamentos/novo', shortcut: '⌘N' },
   { id: 'novo-cliente', title: 'Novo Cliente', description: 'Cadastrar cliente rapidamente', path: '/clientes' },
   { id: 'novo-produto', title: 'Novo Produto', description: 'Abrir cadastro de produto', path: '/produtos' },
   { id: 'abrir-financeiro', title: 'Contas a Receber', description: 'Ir para o financeiro filtrado', path: '/financeiro?tipo=receber' },
@@ -96,7 +96,7 @@ export const navSections: NavSection[] = [
       {
         title: 'Pipeline de vendas',
         items: [
-          { title: 'Cotações', path: '/cotacoes', keywords: ['orcamentos', 'propostas'] },
+          { title: 'Cotações', path: '/orcamentos', keywords: ['orcamentos', 'propostas'] },
           { title: 'Pedidos', path: '/pedidos', keywords: ['pipeline', 'pedidos comerciais'] },
           { title: 'Ordens de Venda', path: '/ordens-venda', keywords: ['ov', 'backlog'] },
         ],
@@ -201,7 +201,7 @@ export const navSections: NavSection[] = [
 
 export const mobileBottomTabs: MobileBottomTab[] = [
   { key: 'inicio', title: 'Início', icon: LayoutDashboard, path: '/' },
-  { key: 'comercial', title: 'Comercial', icon: FileText, path: '/cotacoes' },
+  { key: 'comercial', title: 'Comercial', icon: FileText, path: '/orcamentos' },
   { key: 'cadastros', title: 'Cadastros', icon: Users, path: '/clientes' },
   { key: 'financeiro', title: 'Financeiro', icon: DollarSign, path: '/financeiro?tipo=receber' },
 ];

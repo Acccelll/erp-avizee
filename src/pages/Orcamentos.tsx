@@ -51,6 +51,7 @@ const Orcamentos = () => {
   const { isAdmin } = useIsAdmin();
 
   useEffect(() => {
+    if (!supabase) return;
     supabase.from("clientes").select("id, nome_razao_social").eq("ativo", true).then(({ data }) => setClientesList(data || []));
   }, []);
 
