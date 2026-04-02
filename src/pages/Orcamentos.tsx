@@ -183,7 +183,15 @@ const Orcamentos = () => {
     { key: "status", label: "Status", sortable: true, render: (o: Orcamento) => <StatusBadge status={o.status} label={statusLabels[o.status]} /> },
     {
       key: "acoes_comercial", label: "Ações", sortable: false, render: (o: Orcamento) => (
-        <div className="flex gap-1">
+        <div className="flex items-center gap-1">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={(e) => { e.stopPropagation(); navigate(`/orcamentos/${o.id}`); }}>
+                <Edit className="w-3.5 h-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Editar cotação</TooltipContent>
+          </Tooltip>
           {o.status === "rascunho" && (
             <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={(e) => { e.stopPropagation(); handleSendForApproval(o); }}>
               <Send className="w-3 h-3" /> Enviar p/ Aprovação
