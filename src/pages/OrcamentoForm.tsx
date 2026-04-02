@@ -174,8 +174,6 @@ export default function OrcamentoForm() {
                 let newPrice: number;
                 if (rule.preco_especial && Number(rule.preco_especial) > 0) {
                   newPrice = Number(rule.preco_especial);
-                } else if (rule.desconto_percentual && Number(rule.desconto_percentual) > 0) {
-                  newPrice = item.valor_unitario * (1 - Number(rule.desconto_percentual) / 100);
                 } else {
                   return item;
                 }
