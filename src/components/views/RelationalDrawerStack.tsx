@@ -74,15 +74,15 @@ export function RelationalDrawerStack() {
                 borderLeftColor: `hsl(var(--primary) / ${Math.min(0.18 + index * 0.06, 0.45)})`,
               }}
             >
-              <SheetHeader className="sticky top-0 z-10 bg-card border-b px-6 py-4 flex flex-col gap-1.5 space-y-0">
-                <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <SheetHeader className="sticky top-0 z-10 bg-card border-b px-6 py-3 flex flex-col gap-1 space-y-0">
+                <div className="flex items-center justify-between text-xs text-muted-foreground leading-none">
                   <span>Drawers: {stack.length}/{MAX_DRAWER_DEPTH}</span>
-                  <Button variant="ghost" size="sm" onClick={clearStack}>Fechar todos</Button>
+                  <Button variant="ghost" size="sm" className="h-7 px-2.5 text-xs" onClick={clearStack}>Fechar todos</Button>
                 </div>
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3 min-w-0">
+                  <div className="flex items-center gap-2.5 min-w-0">
                     {index > 0 && (
-                      <Button variant="ghost" size="sm" className="h-8 shrink-0 gap-1" onClick={popView}>
+                      <Button variant="ghost" size="sm" className="h-7 shrink-0 gap-1 px-2.5" onClick={popView}>
                         <ArrowLeft className="h-4 w-4" />
                         <span className="text-xs">Voltar para {getTitle(stack[index - 1].type)}</span>
                       </Button>
@@ -94,14 +94,14 @@ export function RelationalDrawerStack() {
                     {isTop && atLimit && (
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <span className="flex items-center justify-center h-8 w-8 text-amber-500"><AlertTriangle className="h-4 w-4" /></span>
+                          <span className="flex items-center justify-center h-7 w-7 text-amber-500"><AlertTriangle className="h-4 w-4" /></span>
                         </TooltipTrigger>
                         <TooltipContent side="bottom">Limite de drawers atingido: novas aberturas pedem confirmação.</TooltipContent>
                       </Tooltip>
                     )}
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={clearStack}><X className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={clearStack}><X className="h-4 w-4" /></Button>
                       </TooltipTrigger>
                       <TooltipContent side="bottom">Fechar tudo <kbd className="ml-1 text-xs opacity-70">⇧ ESC</kbd></TooltipContent>
                     </Tooltip>
@@ -109,7 +109,7 @@ export function RelationalDrawerStack() {
                 </div>
               </SheetHeader>
 
-              <div className="flex-1 px-6 py-4">
+              <div className="flex-1 px-6 pt-3 pb-4">
                 <DrawerContent view={view} />
               </div>
             </SheetContent>
