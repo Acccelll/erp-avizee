@@ -39,10 +39,32 @@ interface FinanceiroLancamento {
 
 const tipoContratoLabel: Record<string, string> = { clt: "CLT", pj: "PJ", estagio: "Estágio", temporario: "Temporário" };
 
-const emptyForm: Record<string, any> = {
+/** Typed form for create/edit — avoids `Record<string, any>`. */
+interface FuncionarioForm {
+  nome: string; cpf: string; cargo: string; departamento: string;
+  data_admissao: string; salario_base: number; tipo_contrato: string; observacoes: string;
+}
+
+const emptyForm: FuncionarioForm = {
   nome: "", cpf: "", cargo: "", departamento: "", data_admissao: new Date().toISOString().split("T")[0],
   salario_base: 0, tipo_contrato: "clt", observacoes: "",
 };
+
+/**
+ * Local augmented type for financeiro_lancamentos rows that include
+ * `funcionario_id`.  The generated types don't carry this column yet;
+ * this local definition prevents scattered `as any` casts until the
+ * DB types are regenerated.
+ */
+interface FinanceiroLancamentoComFuncionario {
+  tipo: "pagar";
+  descricao: string;
+  valor: number;
+  data_vencimento: string;
+  status: string;
+  funcionario_id: string;
+  ativo: boolean;
+}
 
 export default function Funcionarios() {
   const { data, loading, create, update, remove } = useSupabaseCrud<Funcionario>({ table: "funcionarios" as any });
@@ -50,7 +72,7 @@ export default function Funcionarios() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selected, setSelected] = useState<Funcionario | null>(null);
   const [mode, setMode] = useState<"create" | "edit">("create");
-  const [form, setForm] = useState(emptyForm);
+  const [form, setForm] = useState<FuncionarioForm>(emptyForm);
   const [searchTerm, setSearchTerm] = useState("");
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
@@ -81,10 +103,11 @@ export default function Funcionarios() {
     setSelected(f); setDrawerOpen(true); setLoadingFolhas(true); setLoadingLancamentos(true);
     const [folhaResult, lancamentosResult] = await Promise.all([
       supabase.from("folha_pagamento" as any).select("*").eq("funcionario_id", f.id).order("competencia", { ascending: false }),
-      supabase.from("financeiro_lancamentos" as any).select("id,descricao,valor,data_vencimento,data_pagamento,status").eq("funcionario_id", f.id).order("data_vencimento", { ascending: false }),
+      // financeiro_lancamentos has funcionario_id not yet in the generated types — cast at row level
+      supabase.from("financeiro_lancamentos").select("id,descricao,valor,data_vencimento,data_pagamento,status").eq("funcionario_id" as any, f.id).order("data_vencimento", { ascending: false }),
     ]);
-    setFolhas((folhaResult.data as any[] || []) as FolhaPagamento[]);
-    setLancamentos((lancamentosResult.data as any[] || []) as FinanceiroLancamento[]);
+    setFolhas((folhaResult.data as unknown as FolhaPagamento[]) || []);
+    setLancamentos((lancamentosResult.data as unknown as FinanceiroLancamento[]) || []);
     setLoadingFolhas(false);
     setLoadingLancamentos(false);
   };
@@ -134,7 +157,7 @@ export default function Funcionarios() {
       .toISOString().slice(0, 10);
 
     // Lançamento do salário líquido
-    await supabase.from('financeiro_lancamentos').insert({
+    const salarioPayload: FinanceiroLancamentoComFuncionario = {
       tipo: 'pagar',
       descricao: `Salário ${mesRef} — ${selected?.nome}`,
       valor: folha.valor_liquido,
@@ -142,7 +165,8 @@ export default function Funcionarios() {
       status: 'aberto',
       funcionario_id: folha.funcionario_id,
       ativo: true,
-    } as any);
+    };
+    await supabase.from('financeiro_lancamentos').insert(salarioPayload as any);
 
     // Calcular e lançar FGTS (8% do salário base)
     const fgts = Number(folha.salario_base) * 0.08;

@@ -20,6 +20,7 @@ import { MultiSelect, type MultiSelectOption } from "@/components/ui/MultiSelect
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatCurrency, formatDate, daysSince, formatNumber } from "@/lib/format";
+import { calcularStatusFaturamentoOV } from "@/lib/fiscal";
 import { CheckCircle, Package, FileText, DollarSign, Clock, Truck } from "lucide-react";
 import { LogisticaRastreioSection } from "@/components/logistica/LogisticaRastreioSection";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
@@ -130,21 +131,26 @@ const OrdensVenda = () => {
         await supabase.from("notas_fiscais_itens").insert(nfItems);
       }
 
-      // Update OV faturamento status
-      const totalQtd = (ovItems || []).reduce((s: number, i: any) => s + Number(i.quantidade || 0), 0);
-      const totalFat = (ovItems || []).reduce((s: number, i: any) => s + Number(i.quantidade_faturada || 0), 0);
-      const newFatStatus = (totalFat + totalQtd >= totalQtd * 2) ? "total" : totalFat > 0 ? "parcial" : "total";
-      
-      await supabase.from("ordens_venda").update({ status_faturamento: "total" }).eq("id", ov.id);
-
-      // Update quantities faturadas
+      // Update quantities faturadas — add to existing quantidade_faturada
       if (ovItems) {
         for (const item of ovItems) {
+          const novaQtdFaturada = (item.quantidade_faturada || 0) + item.quantidade;
           await supabase.from("ordens_venda_itens").update({
-            quantidade_faturada: item.quantidade,
+            quantidade_faturada: novaQtdFaturada,
           }).eq("id", item.id);
         }
       }
+
+      // Re-read updated quantities and calculate billing status using the shared helper
+      const { data: updatedItems } = await supabase
+        .from("ordens_venda_itens")
+        .select("quantidade, quantidade_faturada")
+        .eq("ordem_venda_id", ov.id);
+      const totalQ = (updatedItems || []).reduce((s: number, i: any) => s + Number(i.quantidade), 0);
+      const totalF = (updatedItems || []).reduce((s: number, i: any) => s + Number(i.quantidade_faturada || 0), 0);
+      const newFatStatus = calcularStatusFaturamentoOV(totalQ, totalF);
+
+      await supabase.from("ordens_venda").update({ status_faturamento: newFatStatus }).eq("id", ov.id);
 
       toast.success(`NF ${nfNumero} gerada a partir da OV ${ov.numero}!`);
       fetchData();

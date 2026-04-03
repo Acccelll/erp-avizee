@@ -3,7 +3,11 @@ import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
-type AppRole = "admin" | "moderator" | "user" | "vendedor" | "financeiro" | "estoquista";
+/** Roles recognised by the application. Aligns with the `app_role` enum in the database. */
+export type AppRole = "admin" | "vendedor" | "financeiro" | "estoquista";
+
+/** Values that may exist in legacy rows but are no longer issued. */
+const LEGACY_ROLES = new Set(["moderator", "user"]);
 
 interface AuthContextType {
   user: User | null;
@@ -105,7 +109,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const fetchRoles = async (userId: string) => {
     try {
       const { data } = await supabase.from("user_roles").select("role").eq("user_id", userId);
-      if (data) setRoles((data as unknown as Array<{ role: string }>).map((r) => r.role as AppRole));
+      if (data) {
+        setRoles(
+          (data as unknown as Array<{ role: string }>)
+            .map((r) => r.role)
+            .filter((r): r is AppRole => !LEGACY_ROLES.has(r))
+        );
+      }
     } catch {
       setRoles([]);
     }
