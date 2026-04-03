@@ -33,6 +33,7 @@ interface Cliente {
 }
 
 interface GrupoEconomico {id: string;nome: string;}
+interface FormaPagamentoBasic {id: string;descricao: string;}
 
 const emptyCliente: Record<string, any> = {
   tipo_pessoa: "J", nome_razao_social: "", nome_fantasia: "", cpf_cnpj: "",
@@ -76,11 +77,13 @@ const Clientes = () => {
   const [form, setForm] = useState(emptyCliente);
   const [saving, setSaving] = useState(false);
   const [grupos, setGrupos] = useState<GrupoEconomico[]>([]);
+  const [formasPagamento, setFormasPagamento] = useState<FormaPagamentoBasic[]>([]);
   const [tipoFilters, setTipoFilters] = useState<string[]>([]);
   const [grupoFilters, setGrupoFilters] = useState<string[]>([]);
 
   useEffect(() => {
     supabase.from("grupos_economicos").select("id, nome").eq("ativo", true).order("nome").then(({ data: g }: any) => setGrupos(g || []));
+    supabase.from("formas_pagamento").select("id, descricao").eq("ativo", true).order("descricao").then(({ data: fp }) => setFormasPagamento((fp || []) as FormaPagamentoBasic[]));
   }, []);
 
   useEffect(() => {
@@ -274,6 +277,13 @@ const Clientes = () => {
             <div className="space-y-2"><Label>Contato</Label><Input value={form.contato} onChange={(e) => setForm({ ...form, contato: e.target.value })} /></div>
             <div className="space-y-2"><Label>Prazo (dias)</Label><Input type="number" value={form.prazo_padrao} onChange={(e) => setForm({ ...form, prazo_padrao: Number(e.target.value) })} /></div>
             <div className="space-y-2"><Label>Limite Crédito</Label><Input type="number" step="0.01" value={form.limite_credito} onChange={(e) => setForm({ ...form, limite_credito: Number(e.target.value) })} /></div>
+            <div className="space-y-2"><Label>Forma de Pagamento Padrão</Label>
+              <Select value={form.forma_pagamento_padrao || "nenhuma"} onValueChange={(v) => setForm({ ...form, forma_pagamento_padrao: v === "nenhuma" ? "" : v })}>
+                <SelectTrigger><SelectValue placeholder="Não definida" /></SelectTrigger>
+                <SelectContent><SelectItem value="nenhuma">Não definida</SelectItem>{formasPagamento.map((fp) => <SelectItem key={fp.id} value={fp.descricao}>{fp.descricao}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2"><Label>Prazo Preferencial (dias)</Label><Input type="number" value={form.prazo_preferencial} onChange={(e) => setForm({ ...form, prazo_preferencial: Number(e.target.value) })} /></div>
           </div>
           <h3 className="font-semibold text-sm pt-2 border-t flex items-center gap-2"><Building2 className="w-4 h-4" /> Grupo Econômico</h3>
           <div className="grid grid-cols-2 gap-4">

@@ -322,6 +322,7 @@ export function FornecedorView({ id }: Props) {
                     </button>
                     <p className="text-[10px] text-muted-foreground font-mono">{p.produtos?.sku}</p>
                     {p.referencia_fornecedor && <p className="text-[9px] text-primary mt-0.5">Ref: {p.referencia_fornecedor}</p>}
+                    {p.descricao_fornecedor && <p className="text-[9px] text-muted-foreground mt-0.5 italic">{p.descricao_fornecedor}{p.unidade_fornecedor ? ` · ${p.unidade_fornecedor}` : ""}</p>}
                   </div>
                   <div className="text-right space-y-0.5">
                     <p className="font-bold">{formatCurrency(p.preco_compra || 0)}</p>
