@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Tables } from "@/integrations/supabase/types";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/StatusBadge";
-import { Search, MapPin, Truck, ExternalLink, Package } from "lucide-react";
+import { Search, MapPin, Truck, ExternalLink, Package, AlertTriangle } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 
@@ -12,6 +12,25 @@ type Remessa = Tables<"remessas"> & {
 };
 
 type RemessaEvento = Tables<"remessa_eventos">;
+
+/** Shape of a single event returned by the Correios tracking Edge Function. */
+interface CorreiosEvento {
+  descricao?: string;
+  tipo?: string;
+  unidade?: { nome?: string; endereco?: { cidade?: string } };
+  dtHrCriado?: string;
+}
+
+/** Top-level response from the Correios tracking endpoint (including fallback mock). */
+interface CorreiosTrackingResponse {
+  error?: string;
+  /** Present when the response is a real Correios API payload. */
+  objetos?: Array<{ eventos?: CorreiosEvento[] }>;
+  /** "fallback_mock" when the Edge Function fell back to mock data. */
+  warning?: string;
+  /** Present in fallback mode — contains mock track data. */
+  data?: { eventos?: CorreiosEvento[] };
+}
 
 interface Props {
   pedidoCompraId?: string;
@@ -25,6 +44,7 @@ export function LogisticaRastreioSection({ pedidoCompraId, notaFiscalId, remessa
   const [eventos, setEventos] = useState<Record<string, RemessaEvento[]>>({});
   const [loading, setLoading] = useState(true);
   const [trackingLoading, setTrackingLoading] = useState<string | null>(null);
+  const [mockWarning, setMockWarning] = useState<string | null>(null);
 
   const fetchLogistica = async () => {
     setLoading(true);
@@ -60,10 +80,13 @@ export function LogisticaRastreioSection({ pedidoCompraId, notaFiscalId, remessa
 
   const handleRastrear = async (remessa: Remessa) => {
     if (!remessa.codigo_rastreio) return;
+    const codigoSanitizado = remessa.codigo_rastreio.trim().toUpperCase().replace(/\s+/g, "");
+    if (!codigoSanitizado) { toast.error("Código de rastreio inválido"); return; }
     setTrackingLoading(remessa.id);
+    setMockWarning(null);
     try {
       const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL as string || "").replace(/\/$/, "");
-      const url = `${supabaseUrl}/functions/v1/correios-api?action=rastrear&codigo=${encodeURIComponent(remessa.codigo_rastreio.trim())}`;
+      const url = `${supabaseUrl}/functions/v1/correios-api?action=rastrear&codigo=${encodeURIComponent(codigoSanitizado)}`;
       const { data: sessionData } = await supabase.auth.getSession();
       const token = sessionData.session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || "";
 
@@ -74,16 +97,64 @@ export function LogisticaRastreioSection({ pedidoCompraId, notaFiscalId, remessa
         },
       });
 
-      if (!res.ok) throw new Error("Erro na consulta aos Correios");
+      const tracking = await res.json() as CorreiosTrackingResponse;
 
-      toast.success("Rastreio atualizado!");
-      fetchLogistica(); // Refresh to show new events (assumes Edge Function saved them or we should save them here)
-      // Note: The logic in Remessas.tsx manually saves events. For simplicity and consistency,
-      // we might want a shared service, but following Prompt 4's "without duplicating structures"
-      // and "reusing existing", I'll stick to a simple refresh if the backend handles it,
-      // or implement the save logic if needed.
-    } catch (err: any) {
-      toast.error(err.message);
+      if (!res.ok || tracking.error) {
+        throw new Error(tracking.error || `Erro ao consultar rastreio (${res.status})`);
+      }
+
+      const isMock = tracking.warning === "fallback_mock";
+      if (isMock) setMockWarning(remessa.id);
+
+      // Normalise events from both real and mock response shapes
+      const rawEventos: CorreiosEvento[] = isMock
+        ? (tracking.data?.eventos || [])
+        : (tracking.objetos?.[0]?.eventos || []);
+
+      const eventosNormalizados = rawEventos.map((ev) => ({
+        remessa_id: remessa.id,
+        descricao: ev.descricao || ev.tipo || "Evento",
+        local: ev.unidade?.endereco?.cidade || ev.unidade?.nome || null,
+        data_hora: ev.dtHrCriado || new Date().toISOString(),
+      }));
+
+      if (!isMock && eventosNormalizados.length > 0) {
+        // Persist only genuinely new events (deduplicate)
+        const { data: existentes } = await supabase
+          .from("remessa_eventos")
+          .select("descricao, local, data_hora")
+          .eq("remessa_id", remessa.id);
+
+        const eventKey = (e: { descricao: string; local: string | null; data_hora: string }) =>
+          `${e.data_hora}::${e.descricao}::${e.local || ""}`;
+        const existentesSet = new Set((existentes || []).map(eventKey));
+        const novos = eventosNormalizados.filter((e) => !existentesSet.has(eventKey(e)));
+
+        if (novos.length > 0) {
+          await supabase.from("remessa_eventos").insert(novos);
+          toast.success(`${novos.length} novo(s) evento(s) incluído(s)`);
+        } else {
+          toast.success("Rastreio consultado — nenhum evento novo.");
+        }
+        // Refresh from DB to show persisted events
+        fetchLogistica();
+      } else if (isMock) {
+        // Mock data: show inline but don't persist
+        const mockEvs: RemessaEvento[] = eventosNormalizados.map((e, i) => ({
+          id: `mock-${i}`,
+          remessa_id: remessa.id,
+          descricao: e.descricao,
+          local: e.local,
+          data_hora: e.data_hora,
+          created_at: new Date().toISOString(),
+        }));
+        setEventos((prev) => ({ ...prev, [remessa.id]: mockEvs }));
+        toast.warning("Dados mockados — credenciais dos Correios não configuradas.");
+      } else {
+        toast.success("Rastreio consultado — nenhum evento encontrado.");
+      }
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Erro ao consultar rastreio");
     } finally {
       setTrackingLoading(null);
     }
@@ -148,6 +219,15 @@ export function LogisticaRastreioSection({ pedidoCompraId, notaFiscalId, remessa
               <p className="text-sm">{r.peso ? `${r.peso} kg` : "—"}</p>
             </div>
           </div>
+
+          {mockWarning === r.id && (
+            <div className="flex items-center gap-2 rounded-md border border-warning/40 bg-warning/5 px-3 py-2">
+              <AlertTriangle className="w-3.5 h-3.5 text-warning shrink-0" />
+              <p className="text-xs text-muted-foreground">
+                <strong>Dados simulados</strong> — credenciais dos Correios não configuradas. Os eventos exibidos são fictícios e não foram persistidos.
+              </p>
+            </div>
+          )}
 
           {eventos[r.id] && eventos[r.id].length > 0 ? (
             <div className="space-y-3 pt-2">

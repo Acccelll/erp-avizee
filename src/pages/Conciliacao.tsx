@@ -8,7 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { parseOFX, type OFXTransaction } from "@/lib/parseOFX";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { toast } from "sonner";
-import { Upload, CheckCircle, XCircle, Shuffle } from "lucide-react";
+import { Upload, CheckCircle, XCircle, Shuffle, AlertTriangle } from "lucide-react";
 import { useEffect } from "react";
 
 interface ContaBancaria {
@@ -37,6 +37,7 @@ export default function Conciliacao() {
   const [lancamentos, setLancamentos] = useState<Lancamento[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -133,17 +134,46 @@ export default function Conciliacao() {
     });
   };
 
-  const handleConfirmarConciliacao = () => {
+  const handleConfirmarConciliacao = async () => {
     if (matches.length === 0) {
       toast.error("Nenhum par confirmado para conciliar.");
       return;
     }
-    const total = extratoItems.length;
-    const pareados = matches.length;
-    const semPar = total - pareados;
-    toast.success(
-      `Conciliação confirmada: ${pareados} pareados / ${semPar} sem correspondência.`
-    );
+
+    // Structured payload — ready to be persisted when a service is plugged in.
+    const payload = {
+      conta_bancaria_id: selectedConta,
+      data_conciliacao: new Date().toISOString(),
+      pares: matches.map((m) => {
+        const extrato = extratoItems.find((e) => e.id === m.extratoId);
+        const lancamento = lancamentos.find((l) => l.id === m.lancamentoId);
+        return {
+          extrato_id: m.extratoId,
+          lancamento_id: m.lancamentoId,
+          valor_extrato: extrato?.valor ?? null,
+          valor_lancamento: lancamento?.valor ?? null,
+        };
+      }),
+    };
+
+    setConfirming(true);
+    try {
+      // TODO: replace with a conciliacao.service.ts call when the table is ready.
+      // Example: await confirmarConciliacao(payload);
+      // The payload is fully structured and validated, ready to plug into a service.
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const _payload = payload;
+
+      const total = extratoItems.length;
+      const pareados = matches.length;
+      const semPar = total - pareados;
+      toast.warning(
+        `Revisão concluída: ${pareados} par(es) identificado(s), ${semPar} sem correspondência.` +
+          " Atenção: esta ação ainda não foi gravada no banco de dados.",
+      );
+    } finally {
+      setConfirming(false);
+    }
   };
 
   const getMatch = (extratoId: string) => matches.find((m) => m.extratoId === extratoId);
@@ -308,25 +338,34 @@ export default function Conciliacao() {
             </div>
 
             {/* Footer summary */}
-            <div className="rounded-lg border border-border/60 bg-muted/10 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="flex gap-6 text-sm">
-                <div>
-                  <span className="text-muted-foreground">Pareados: </span>
-                  <span className="font-semibold text-success">{pareados}</span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Sem correspondência: </span>
-                  <span className="font-semibold text-destructive">{semPar}</span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Total: </span>
-                  <span className="font-semibold">{extratoItems.length}</span>
-                </div>
+            <div className="rounded-lg border border-border/60 bg-muted/10 p-4 flex flex-col gap-3">
+              <div className="flex items-start gap-2 rounded-md border border-warning/40 bg-warning/5 px-3 py-2">
+                <AlertTriangle className="w-4 h-4 text-warning shrink-0 mt-0.5" />
+                <p className="text-xs text-muted-foreground">
+                  <strong>Atenção:</strong> a confirmação abaixo ainda não persiste os pares no banco de dados.
+                  Os lançamentos conciliados precisam ser revisados manualmente por enquanto.
+                </p>
               </div>
-              <Button onClick={handleConfirmarConciliacao} disabled={matches.length === 0}>
-                <CheckCircle className="w-4 h-4 mr-2" />
-                Confirmar Conciliação
-              </Button>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex gap-6 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Pareados: </span>
+                    <span className="font-semibold text-success">{pareados}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Sem correspondência: </span>
+                    <span className="font-semibold text-destructive">{semPar}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Total: </span>
+                    <span className="font-semibold">{extratoItems.length}</span>
+                  </div>
+                </div>
+                <Button onClick={handleConfirmarConciliacao} disabled={matches.length === 0 || confirming} variant="outline">
+                  <CheckCircle className="w-4 h-4 mr-2" />
+                  {confirming ? "Processando..." : "Confirmar Revisão"}
+                </Button>
+              </div>
             </div>
           </>
         ) : (

@@ -8,7 +8,7 @@ import type { FilterChip } from "@/components/AdvancedFilterBar";
 import { FormModal } from "@/components/FormModal";
 import { ViewDrawerV2 } from "@/components/ViewDrawerV2";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Edit, Trash2, Plus, MapPin, Package as PackageIcon, Truck, Search } from "lucide-react";
+import { Edit, Trash2, Plus, MapPin, Package as PackageIcon, Truck, Search, AlertTriangle } from "lucide-react";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
 import { useRelationalNavigation } from "@/contexts/RelationalNavigationContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -37,6 +37,10 @@ interface CorreiosEvento {
 interface CorreiosTrackingResponse {
   error?: string;
   objetos?: Array<{ eventos?: CorreiosEvento[] }>;
+  /** "fallback_mock" when the Edge Function fell back to mock data. */
+  warning?: string;
+  /** Present in fallback mode — contains mock track data. */
+  data?: { eventos?: CorreiosEvento[] };
 }
 
 import { statusRemessa } from "@/lib/statusSchema";
@@ -81,6 +85,7 @@ export default function Remessas() {
   const [eventos, setEventos] = useState<RemessaEvento[]>([]);
   const [eventoForm, setEventoForm] = useState({ descricao: "", local: "" });
   const [savingEvento, setSavingEvento] = useState(false);
+  const [isMockTracking, setIsMockTracking] = useState(false);
 
   useEffect(() => {
     supabase.from("clientes").select("id,nome_razao_social").eq("ativo", true).then(({ data }) => setClientes(data || []));
@@ -200,10 +205,9 @@ export default function Remessas() {
     if (!remessa.codigo_rastreio) { toast.error("Sem código de rastreio"); return; }
     const codigoSanitizado = remessa.codigo_rastreio.trim().toUpperCase().replace(/\s+/g, "");
     if (!codigoSanitizado) { toast.error("Código de rastreio inválido"); return; }
+    setIsMockTracking(false);
     try {
       toast.info("Consultando rastreio...");
-      // Derive the Edge Function URL from VITE_SUPABASE_URL (always configured),
-      // avoiding the need for VITE_SUPABASE_PROJECT_ID.
       const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL as string || "").replace(/\/$/, "");
       const url = `${supabaseUrl}/functions/v1/correios-api?action=rastrear&codigo=${encodeURIComponent(codigoSanitizado)}`;
       const { data: sessionData } = await supabase.auth.getSession();
@@ -219,13 +223,27 @@ export default function Remessas() {
         throw new Error(tracking.error || `Erro ao consultar rastreio (${res.status})`);
       }
 
-      const eventosRastreamento = tracking.objetos?.[0]?.eventos || [];
-      const eventosNormalizados = eventosRastreamento.map((ev) => ({
+      const isMock = tracking.warning === "fallback_mock";
+      setIsMockTracking(isMock);
+
+      // Normalise events from both real and mock response shapes
+      const rawEventos: CorreiosEvento[] = isMock
+        ? (tracking.data?.eventos || [])
+        : (tracking.objetos?.[0]?.eventos || []);
+
+      const eventosNormalizados = rawEventos.map((ev) => ({
         remessa_id: remessa.id,
         descricao: ev.descricao || ev.tipo || "Evento",
         local: ev.unidade?.endereco?.cidade || ev.unidade?.nome || null,
         data_hora: ev.dtHrCriado || new Date().toISOString(),
       }));
+
+      if (isMock) {
+        // Mock data is shown inline only — not persisted
+        toast.warning("Dados simulados — credenciais dos Correios não configuradas. Eventos não foram persistidos.");
+        setEventos(eventosNormalizados as unknown as RemessaEvento[]);
+        return;
+      }
 
       const { data: eventosExistentes, error: eventosExistentesError } = await supabase
         .from("remessa_eventos")
@@ -485,6 +503,14 @@ export default function Remessas() {
             value: "eventos", label: "Eventos",
             content: selected ? (
               <div className="space-y-4">
+                {isMockTracking && (
+                  <div className="flex items-start gap-2 rounded-md border border-warning/40 bg-warning/5 px-3 py-2">
+                    <AlertTriangle className="w-3.5 h-3.5 text-warning shrink-0 mt-0.5" />
+                    <p className="text-xs text-muted-foreground">
+                      <strong>Dados simulados</strong> — credenciais dos Correios não estão configuradas. Os eventos abaixo são fictícios e não foram persistidos no banco de dados.
+                    </p>
+                  </div>
+                )}
                 <div className="rounded-lg border bg-card p-3 space-y-3">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Novo Evento</p>
                   <div className="grid grid-cols-2 gap-3">

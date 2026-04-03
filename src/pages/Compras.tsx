@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useSearchParams } from "react-router-dom";
 import { AppLayout } from "@/components/AppLayout";
 import { ModulePage } from "@/components/ModulePage";
@@ -11,7 +12,7 @@ import { FormModal } from "@/components/FormModal";
 import { ViewDrawerV2, ViewField, ViewSection } from "@/components/ViewDrawerV2";
 import { RelationalLink } from "@/components/ui/RelationalLink";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Edit, Trash2 } from "lucide-react";
+import { Edit, Trash2, Info, ArrowRight } from "lucide-react";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
 import { useRelationalNavigation } from "@/contexts/RelationalNavigationContext";
 import { AutocompleteSearch } from "@/components/ui/AutocompleteSearch";
@@ -50,6 +51,7 @@ const statusLabels: Record<string, string> = Object.fromEntries(
 );
 
 const Compras = () => {
+  const navigate = useNavigate();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const { data, loading, remove, fetchData } = useSupabaseCrud<Compra>({
     table: "compras", select: "*, fornecedores(nome_razao_social, cpf_cnpj)",
@@ -245,6 +247,25 @@ const Compras = () => {
           </Card>
         )}
 
+        {!isCotacoesView && (
+          <Card className="mb-4 border-info/30 bg-info/5">
+            <CardContent className="flex items-start gap-3 px-4 py-3">
+              <Info className="w-4 h-4 text-info shrink-0 mt-0.5" />
+              <p className="text-sm text-muted-foreground">
+                Receber uma compra <strong>não gera estoque nem lançamento financeiro automaticamente</strong>.
+                Após marcar como entregue, acesse{" "}
+                <button
+                  className="text-primary underline underline-offset-2 hover:no-underline"
+                  onClick={() => navigate("/fiscal?tipo=entrada")}
+                >
+                  Fiscal → Entradas
+                </button>{" "}
+                para emitir a nota de entrada e registrar os movimentos.
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
         <DataTable columns={columns} data={filteredData} loading={loading} onView={openView} onEdit={openEdit} />
       </ModulePage>
 
@@ -333,6 +354,17 @@ const Compras = () => {
                 <ViewField label="Frete"><span className="font-mono">{formatCurrency(Number(selected.frete_valor || 0))}</span></ViewField>
               </div>
               {selected.observacoes && <ViewField label="Observações">{selected.observacoes}</ViewField>}
+              {!isCotacoesView && selected.status === "entregue" && (
+                <div className="mt-3 flex items-center gap-2 rounded-lg border border-success/30 bg-success/5 px-4 py-3">
+                  <CheckCircle2 className="w-4 h-4 text-success shrink-0" />
+                  <p className="text-sm text-muted-foreground flex-1">
+                    Compra recebida. Para registrar estoque e financeiro, acesse a nota de entrada.
+                  </p>
+                  <Button size="sm" variant="outline" className="gap-1.5 shrink-0" onClick={() => { setDrawerOpen(false); navigate("/fiscal?tipo=entrada"); }}>
+                    Ir para Fiscal <ArrowRight className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+              )}
             </div>
           )},
           { value: "itens", label: `Itens (${viewItems.length})`, content: (

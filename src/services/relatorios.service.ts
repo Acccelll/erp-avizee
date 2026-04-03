@@ -2,6 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { downloadTextFile } from "@/lib/utils";
 import { formatCurrency, formatDate, formatNumber } from "@/lib/format";
 import { Tables } from "@/integrations/supabase/types";
+import { getEffectiveFiscalId } from "@/lib/fiscalUtils";
 
 export type TipoRelatorio = "estoque" | "movimentos_estoque" | "financeiro" | "fluxo_caixa" | "vendas" | "compras" | "aging" | "dre" | "curva_abc" | "margem_produtos" | "estoque_minimo" | "vendas_cliente" | "compras_fornecedor" | "divergencias" | "faturamento";
 
@@ -721,7 +722,7 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
         .eq("ativo", true);
 
       const nfIdsComFinanceiro = new Set(
-        (financeiro || []).map((f) => f.documento_fiscal_id || f.nota_fiscal_id).filter(Boolean)
+        (financeiro || []).map((f) => getEffectiveFiscalId(f)).filter(Boolean)
       );
 
       const nfsSemFinanceiro = (nfs || []).filter((nf) => !nfIdsComFinanceiro.has(nf.id));
