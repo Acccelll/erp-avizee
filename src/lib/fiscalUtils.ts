@@ -19,7 +19,7 @@ export interface FiscalIdRecord {
  *
  * Resolution order: nota_fiscal_id → documento_fiscal_id → null.
  */
-export function getEfectiveFiscalId(record: FiscalIdRecord): string | null {
+export function getEffectiveFiscalId(record: FiscalIdRecord): string | null {
   return record.nota_fiscal_id ?? record.documento_fiscal_id ?? null;
 }
 

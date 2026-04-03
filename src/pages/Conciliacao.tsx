@@ -160,7 +160,9 @@ export default function Conciliacao() {
     try {
       // TODO: replace with a conciliacao.service.ts call when the table is ready.
       // Example: await confirmarConciliacao(payload);
-      void payload; // payload is structured and validated — ready to persist.
+      // The payload is fully structured and validated, ready to plug into a service.
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const _payload = payload;
 
       const total = extratoItems.length;
       const pareados = matches.length;

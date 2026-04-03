@@ -103,7 +103,8 @@ export default function Funcionarios() {
     setSelected(f); setDrawerOpen(true); setLoadingFolhas(true); setLoadingLancamentos(true);
     const [folhaResult, lancamentosResult] = await Promise.all([
       supabase.from("folha_pagamento" as any).select("*").eq("funcionario_id", f.id).order("competencia", { ascending: false }),
-      // financeiro_lancamentos has funcionario_id not yet in the generated types — cast at row level
+      // `funcionario_id` exists in the DB but is absent from the generated Supabase types.
+      // The cast is intentional; remove once types are regenerated.
       supabase.from("financeiro_lancamentos").select("id,descricao,valor,data_vencimento,data_pagamento,status").eq("funcionario_id" as any, f.id).order("data_vencimento", { ascending: false }),
     ]);
     setFolhas((folhaResult.data as unknown as FolhaPagamento[]) || []);
@@ -166,6 +167,8 @@ export default function Funcionarios() {
       funcionario_id: folha.funcionario_id,
       ativo: true,
     };
+    // `FinanceiroLancamentoComFuncionario` is a local type (funcionario_id absent from
+    // generated Supabase types). Cast required until types are regenerated.
     await supabase.from('financeiro_lancamentos').insert(salarioPayload as any);
 
     // Calcular e lançar FGTS (8% do salário base)
