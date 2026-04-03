@@ -4,9 +4,10 @@ import { ModulePage } from "@/components/ModulePage";
 import { DataTable } from "@/components/DataTable";
 import { StatusBadge } from "@/components/StatusBadge";
 import { FormModal } from "@/components/FormModal";
-import { ViewDrawerV2, ViewField } from "@/components/ViewDrawerV2";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { ViewDrawerV2, ViewField, ViewSection } from "@/components/ViewDrawerV2";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Edit, Trash2, DollarSign, Users, UserCheck, UserX, CalendarDays } from "lucide-react";
+import { Edit, Trash2, DollarSign, Users, UserCheck, UserX, CalendarDays, FileText, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SummaryCard } from "@/components/SummaryCard";
+import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatCurrency, formatDate, formatNumber } from "@/lib/format";
@@ -28,6 +30,11 @@ interface FolhaPagamento {
   id: string; funcionario_id: string; competencia: string; salario_base: number;
   proventos: number; descontos: number; valor_liquido: number; observacoes: string;
   status: string; financeiro_gerado: boolean;
+}
+
+interface FinanceiroLancamento {
+  id: string; descricao: string; valor: number; data_vencimento: string;
+  data_pagamento: string | null; status: string;
 }
 
 const tipoContratoLabel: Record<string, string> = { clt: "CLT", pj: "PJ", estagio: "Estágio", temporario: "Temporário" };
@@ -45,12 +52,17 @@ export default function Funcionarios() {
   const [mode, setMode] = useState<"create" | "edit">("create");
   const [form, setForm] = useState(emptyForm);
   const [searchTerm, setSearchTerm] = useState("");
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
   // Folha states
   const [folhaModalOpen, setFolhaModalOpen] = useState(false);
   const [folhaForm, setFolhaForm] = useState({ competencia: "", proventos: 0, descontos: 0, observacoes: "" });
   const [folhas, setFolhas] = useState<FolhaPagamento[]>([]);
   const [loadingFolhas, setLoadingFolhas] = useState(false);
+
+  // Financeiro states
+  const [lancamentos, setLancamentos] = useState<FinanceiroLancamento[]>([]);
+  const [loadingLancamentos, setLoadingLancamentos] = useState(false);
 
   const kpis = useMemo(() => {
     const ativos = data.filter(f => f.ativo);
@@ -66,9 +78,15 @@ export default function Funcionarios() {
   };
 
   const openView = async (f: Funcionario) => {
-    setSelected(f); setDrawerOpen(true); setLoadingFolhas(true);
-    const { data: folhaData } = await supabase.from("folha_pagamento" as any).select("*").eq("funcionario_id", f.id).order("competencia", { ascending: false });
-    setFolhas((folhaData as any[] || []) as FolhaPagamento[]); setLoadingFolhas(false);
+    setSelected(f); setDrawerOpen(true); setLoadingFolhas(true); setLoadingLancamentos(true);
+    const [folhaResult, lancamentosResult] = await Promise.all([
+      supabase.from("folha_pagamento" as any).select("*").eq("funcionario_id", f.id).order("competencia", { ascending: false }),
+      supabase.from("financeiro_lancamentos" as any).select("id,descricao,valor,data_vencimento,data_pagamento,status").eq("funcionario_id", f.id).order("data_vencimento", { ascending: false }),
+    ]);
+    setFolhas((folhaResult.data as any[] || []) as FolhaPagamento[]);
+    setLancamentos((lancamentosResult.data as any[] || []) as FinanceiroLancamento[]);
+    setLoadingFolhas(false);
+    setLoadingLancamentos(false);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -213,108 +231,399 @@ export default function Funcionarios() {
       </FormModal>
 
       {/* View Drawer */}
-      <ViewDrawerV2 open={drawerOpen} onClose={() => setDrawerOpen(false)} title="Detalhes do Funcionário"
-        actions={selected ? <>
-          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setDrawerOpen(false); openEdit(selected); }}><Edit className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Editar</TooltipContent></Tooltip>
-          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => { setDrawerOpen(false); remove(selected.id); }}><Trash2 className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Excluir</TooltipContent></Tooltip>
-        </> : undefined}
-        badge={selected ? <StatusBadge status={selected.ativo ? "Ativo" : "Inativo"} /> : undefined}
-        tabs={selected ? [
-          { value: "dados", label: "Dados", content: (
-            <div className="space-y-4">
-              <ViewField label="Nome">{selected.nome}</ViewField>
+      {selected && (() => {
+        const ultimaFolha = folhas[0] ?? null;
+        const folhasPendentes = folhas.filter(f => !f.financeiro_gerado);
+        const lancamentosPendentes = lancamentos.filter(l => l.status === "aberto");
+
+        // Situação operacional
+        let situacao: { label: string; variant: "default" | "secondary" | "destructive" | "outline" } = { label: "Ativo", variant: "default" };
+        if (!selected.ativo) {
+          situacao = { label: "Desligado", variant: "secondary" };
+        } else if (folhas.length === 0) {
+          situacao = { label: "Sem folha registrada", variant: "outline" };
+        } else if (folhasPendentes.length > 0) {
+          situacao = { label: "Folha pendente", variant: "outline" };
+        } else if (lancamentosPendentes.length > 0) {
+          situacao = { label: "Financeiro pendente", variant: "outline" };
+        }
+
+        const drawerSummary = (
+          <div className="space-y-3">
+            {/* Sub-header: cargo · depto · tipo · situação */}
+            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              {selected.cargo && <span className="font-medium text-foreground">{selected.cargo}</span>}
+              {selected.cargo && selected.departamento && <span>·</span>}
+              {selected.departamento && <span>{selected.departamento}</span>}
+              {(selected.cargo || selected.departamento) && selected.tipo_contrato && <span>·</span>}
+              {selected.tipo_contrato && <Badge variant="secondary" className="text-xs font-normal">{tipoContratoLabel[selected.tipo_contrato] || selected.tipo_contrato}</Badge>}
+              {situacao.label !== "Ativo" && (
+                <Badge variant={situacao.variant} className="text-xs font-normal gap-1">
+                  {(situacao.label === "Folha pendente" || situacao.label === "Financeiro pendente") && <AlertTriangle className="w-3 h-3" />}
+                  {situacao.label}
+                </Badge>
+              )}
+            </div>
+            {/* KPI strip */}
+            <div className="grid grid-cols-2 gap-2">
+              <div className="rounded-md border bg-muted/30 px-3 py-2">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Salário Base</p>
+                <p className="font-mono font-bold text-sm mt-0.5">{formatCurrency(Number(selected.salario_base))}</p>
+              </div>
+              <div className="rounded-md border bg-muted/30 px-3 py-2">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Admissão</p>
+                <p className="font-mono font-bold text-sm mt-0.5">{formatDate(selected.data_admissao)}</p>
+              </div>
+              <div className={`rounded-md border px-3 py-2 ${!ultimaFolha ? "bg-muted/20 border-dashed" : "bg-muted/30"}`}>
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Última Competência</p>
+                <p className="font-mono font-bold text-sm mt-0.5">{ultimaFolha ? ultimaFolha.competencia : <span className="text-muted-foreground font-normal text-xs">Sem registro</span>}</p>
+              </div>
+              <div className={`rounded-md border px-3 py-2 ${!ultimaFolha ? "bg-muted/20 border-dashed" : "bg-muted/30"}`}>
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Líquido Recente</p>
+                <p className="font-mono font-bold text-sm mt-0.5">{ultimaFolha ? formatCurrency(Number(ultimaFolha.valor_liquido)) : <span className="text-muted-foreground font-normal text-xs">—</span>}</p>
+              </div>
+            </div>
+          </div>
+        );
+
+        const tabResumo = (
+          <div className="space-y-4">
+            <ViewSection title="Identificação">
+              <div className="grid grid-cols-2 gap-4">
+                <ViewField label="Nome">{selected.nome}</ViewField>
+                <ViewField label="Status"><StatusBadge status={selected.ativo ? "Ativo" : "Inativo"} /></ViewField>
+              </div>
               <div className="grid grid-cols-2 gap-4">
                 <ViewField label="CPF">{selected.cpf || "—"}</ViewField>
-                <ViewField label="Tipo">{tipoContratoLabel[selected.tipo_contrato] || selected.tipo_contrato}</ViewField>
+                <ViewField label="Tipo de Contrato">{tipoContratoLabel[selected.tipo_contrato] || selected.tipo_contrato}</ViewField>
               </div>
+            </ViewSection>
+
+            <ViewSection title="Estrutura">
               <div className="grid grid-cols-2 gap-4">
                 <ViewField label="Cargo">{selected.cargo || "—"}</ViewField>
                 <ViewField label="Departamento">{selected.departamento || "—"}</ViewField>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <ViewField label="Admissão">{formatDate(selected.data_admissao)}</ViewField>
-                <ViewField label="Desligamento">{selected.data_demissao ? formatDate(selected.data_demissao) : "—"}</ViewField>
-              </div>
-              <ViewField label="Salário Base"><span className="font-mono font-semibold text-lg">{formatCurrency(Number(selected.salario_base))}</span></ViewField>
-              {selected.observacoes && <ViewField label="Observações">{selected.observacoes}</ViewField>}
-            </div>
-          )},
-          { value: "folha", label: "Folha de Pagamento", content: (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h4 className="font-semibold text-sm">Lançamentos da Folha</h4>
-                <Button size="sm" variant="outline" className="gap-1" onClick={() => {
-                  setFolhaForm({ competencia: currentMonth, proventos: 0, descontos: 0, observacoes: "" });
-                  setFolhaModalOpen(true);
-                }}>
-                  <CalendarDays className="w-3 h-3" /> Registrar Folha
-                </Button>
-              </div>
+            </ViewSection>
 
-              {loadingFolhas ? (
-                <div className="flex justify-center py-4"><div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" /></div>
-              ) : folhas.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-4">Nenhum lançamento de folha</p>
-              ) : (
-                <div className="space-y-2">
-                  {folhas.map((f) => (
-                    <div key={f.id} className="rounded-lg border bg-accent/20 p-3 space-y-1">
-                      <div className="flex items-center justify-between">
-                        <span className="font-mono text-sm font-medium">{f.competencia}</span>
+            <ViewSection title="Vínculo">
+              <div className="grid grid-cols-2 gap-4">
+                <ViewField label="Data de Admissão">{formatDate(selected.data_admissao)}</ViewField>
+                <ViewField label="Data de Desligamento">{selected.data_demissao ? formatDate(selected.data_demissao) : "—"}</ViewField>
+              </div>
+            </ViewSection>
+
+            <ViewSection title="Remuneração">
+              <ViewField label="Salário Base">
+                <span className="font-mono font-semibold text-lg">{formatCurrency(Number(selected.salario_base))}</span>
+              </ViewField>
+            </ViewSection>
+
+            {selected.observacoes && (
+              <ViewSection title="Observações">
+                <p className="text-sm text-foreground break-words">{selected.observacoes}</p>
+              </ViewSection>
+            )}
+          </div>
+        );
+
+        const tabFolha = (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="font-semibold text-sm">Competências da Folha</h4>
+              <Button size="sm" variant="outline" className="gap-1" onClick={() => {
+                setFolhaForm({ competencia: currentMonth, proventos: 0, descontos: 0, observacoes: "" });
+                setFolhaModalOpen(true);
+              }}>
+                <CalendarDays className="w-3 h-3" /> Registrar Folha
+              </Button>
+            </div>
+
+            {loadingFolhas ? (
+              <div className="flex justify-center py-4"><div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" /></div>
+            ) : folhas.length === 0 ? (
+              <div className="rounded-lg border border-dashed p-6 text-center space-y-1">
+                <FileText className="w-6 h-6 mx-auto text-muted-foreground/50" />
+                <p className="text-sm text-muted-foreground">Nenhum lançamento de folha registrado</p>
+                <p className="text-xs text-muted-foreground">Clique em "Registrar Folha" para iniciar</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {folhas.map((f, idx) => {
+                  const isLatest = idx === 0;
+                  const statusMap: Record<string, { label: string; statusValue: string }> = {
+                    processada: { label: "Processada", statusValue: "aprovada" },
+                    pendente: { label: "Pendente", statusValue: "pendente" },
+                    pago: { label: "Paga", statusValue: "pago" },
+                    fechada: { label: "Fechada", statusValue: "fechada" },
+                  };
+                  const st = statusMap[f.status] ?? { label: f.status, statusValue: f.status };
+                  return (
+                    <div key={f.id} className={`rounded-lg border p-3 space-y-2 ${isLatest ? "border-primary/40 bg-primary/5" : "bg-accent/20"}`}>
+                      <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2">
-                          <StatusBadge status={f.status === "processada" ? "aprovada" : f.status} label={f.status === "processada" ? "Processada" : "Pendente"} />
-                          {!f.financeiro_gerado && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="gap-1 text-xs"
-                              onClick={() => handleFecharFolha(f)}
-                            >
-                              Gerar lançamentos financeiros
+                          {isLatest && <span className="text-[10px] font-semibold uppercase tracking-wider text-primary">Mais recente</span>}
+                          <span className="font-mono text-sm font-medium">{f.competencia}</span>
+                        </div>
+                        <div className="flex items-center gap-2 flex-wrap justify-end">
+                          <StatusBadge status={st.statusValue} label={st.label} />
+                          {f.financeiro_gerado ? (
+                            <span className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
+                              <CheckCircle2 className="w-3 h-3" /> Financeiro gerado
+                            </span>
+                          ) : (
+                            <Button size="sm" variant="outline" className="gap-1 text-xs h-6 px-2" onClick={() => handleFecharFolha(f)}>
+                              <DollarSign className="w-3 h-3" /> Gerar financeiro
                             </Button>
-                          )}
-                          {f.financeiro_gerado && (
-                            <span className="text-xs text-success">✓ Lançamentos gerados</span>
                           )}
                         </div>
                       </div>
                       <div className="grid grid-cols-4 gap-2 text-xs">
-                        <div><span className="text-muted-foreground">Base:</span> <span className="font-mono">{formatCurrency(Number(f.salario_base))}</span></div>
-                        <div><span className="text-muted-foreground">Proventos:</span> <span className="font-mono text-success">{formatCurrency(Number(f.proventos))}</span></div>
-                        <div><span className="text-muted-foreground">Descontos:</span> <span className="font-mono text-destructive">{formatCurrency(Number(f.descontos))}</span></div>
-                        <div><span className="text-muted-foreground">Líquido:</span> <span className="font-mono font-bold">{formatCurrency(Number(f.valor_liquido))}</span></div>
+                        <div><p className="text-muted-foreground">Base</p><p className="font-mono font-medium">{formatCurrency(Number(f.salario_base))}</p></div>
+                        <div><p className="text-muted-foreground">Proventos</p><p className="font-mono font-medium text-green-600 dark:text-green-400">{formatCurrency(Number(f.proventos))}</p></div>
+                        <div><p className="text-muted-foreground">Descontos</p><p className="font-mono font-medium text-destructive">{formatCurrency(Number(f.descontos))}</p></div>
+                        <div><p className="text-muted-foreground">Líquido</p><p className="font-mono font-bold">{formatCurrency(Number(f.valor_liquido))}</p></div>
                       </div>
+                      {f.observacoes && <p className="text-xs text-muted-foreground border-t pt-1">{f.observacoes}</p>}
                     </div>
-                  ))}
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+
+        const tabFinanceiro = (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="font-semibold text-sm">Lançamentos Financeiros</h4>
+              {lancamentos.length > 0 && (
+                <span className="text-xs text-muted-foreground">{lancamentos.length} registro{lancamentos.length !== 1 ? "s" : ""}</span>
+              )}
+            </div>
+
+            {loadingLancamentos ? (
+              <div className="flex justify-center py-4"><div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" /></div>
+            ) : lancamentos.length === 0 ? (
+              <div className="rounded-lg border border-dashed p-6 text-center space-y-1">
+                <DollarSign className="w-6 h-6 mx-auto text-muted-foreground/50" />
+                <p className="text-sm text-muted-foreground">Nenhum lançamento financeiro vinculado</p>
+                <p className="text-xs text-muted-foreground">Gere financeiro a partir de uma folha registrada</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {(() => {
+                  const hoje = new Date();
+                  return lancamentos.map((l) => {
+                    const isPago = l.status === "pago" || l.status === "baixado";
+                    const isVencido = !isPago && new Date(l.data_vencimento) < hoje;
+                    return (
+                      <div key={l.id} className={`rounded-lg border p-3 space-y-1 ${isVencido ? "border-destructive/40 bg-destructive/5" : isPago ? "bg-muted/20" : "bg-accent/20"}`}>
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm font-medium leading-tight">{l.descricao}</p>
+                          <StatusBadge status={l.status} />
+                        </div>
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <div className="flex items-center gap-3">
+                            <span>Venc.: <span className={`font-medium ${isVencido ? "text-destructive" : "text-foreground"}`}>{formatDate(l.data_vencimento)}</span></span>
+                            {l.data_pagamento && <span>Pago: <span className="font-medium text-foreground">{formatDate(l.data_pagamento)}</span></span>}
+                          </div>
+                          <span className={`font-mono font-bold ${isPago ? "" : "text-foreground"}`}>{formatCurrency(Number(l.valor))}</span>
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+            )}
+          </div>
+        );
+
+        const tabHistorico = (
+          <div className="space-y-2">
+            <h4 className="font-semibold text-sm mb-3">Linha do Tempo</h4>
+            <div className="relative pl-4 border-l-2 border-muted space-y-4">
+              {/* Admissão */}
+              <div className="relative">
+                <div className="absolute -left-[1.3rem] top-1 w-3 h-3 rounded-full bg-green-500 border-2 border-background" />
+                <div className="rounded-md border bg-green-500/5 border-green-500/20 p-2.5 space-y-0.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-green-700 dark:text-green-400">Admissão</span>
+                    <span className="text-xs text-muted-foreground font-mono">{formatDate(selected.data_admissao)}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">{selected.cargo || "Colaborador"} — {tipoContratoLabel[selected.tipo_contrato] || selected.tipo_contrato}</p>
+                </div>
+              </div>
+
+              {/* Competências de Folha */}
+              {folhas.length > 0 && folhas.slice().reverse().map((f) => {
+                const hasFin = f.financeiro_gerado;
+                return (
+                  <div key={f.id} className="relative">
+                    <div className={`absolute -left-[1.3rem] top-1 w-3 h-3 rounded-full border-2 border-background ${hasFin ? "bg-blue-500" : "bg-amber-400"}`} />
+                    <div className={`rounded-md border p-2.5 space-y-0.5 ${hasFin ? "bg-blue-500/5 border-blue-500/20" : "bg-amber-400/5 border-amber-400/20"}`}>
+                      <div className="flex items-center justify-between">
+                        <span className={`text-xs font-semibold ${hasFin ? "text-blue-700 dark:text-blue-400" : "text-amber-700 dark:text-amber-400"}`}>
+                          Folha {f.competencia}
+                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <StatusBadge status={f.status === "processada" ? "aprovada" : f.status} label={f.status === "processada" ? "Processada" : f.status === "pago" ? "Paga" : "Pendente"} />
+                        </div>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Líquido: <span className="font-mono font-medium text-foreground">{formatCurrency(Number(f.valor_liquido))}</span>
+                        {hasFin && <span className="ml-2 text-blue-600 dark:text-blue-400">· Financeiro gerado</span>}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Desligamento */}
+              {selected.data_demissao && (
+                <div className="relative">
+                  <div className="absolute -left-[1.3rem] top-1 w-3 h-3 rounded-full bg-destructive border-2 border-background" />
+                  <div className="rounded-md border bg-destructive/5 border-destructive/20 p-2.5 space-y-0.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-destructive">Desligamento</span>
+                      <span className="text-xs text-muted-foreground font-mono">{formatDate(selected.data_demissao)}</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">Colaborador desligado</p>
+                  </div>
+                </div>
+              )}
+
+              {folhas.length === 0 && !selected.data_demissao && (
+                <div className="relative">
+                  <div className="absolute -left-[1.3rem] top-1 w-3 h-3 rounded-full bg-muted border-2 border-background" />
+                  <p className="text-xs text-muted-foreground py-1 pl-1">Nenhuma competência de folha registrada</p>
                 </div>
               )}
             </div>
-          )},
-        ] : undefined}
-      />
+          </div>
+        );
+
+        return (
+          <ViewDrawerV2
+            open={drawerOpen}
+            onClose={() => setDrawerOpen(false)}
+            title={selected.nome}
+            badge={<StatusBadge status={selected.ativo ? "Ativo" : "Inativo"} />}
+            summary={drawerSummary}
+            actions={<>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setDrawerOpen(false); openEdit(selected); }}>
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Editar</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => setConfirmDeleteOpen(true)}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{selected.ativo && folhas.length > 0 ? "Inativar" : "Excluir"}</TooltipContent>
+              </Tooltip>
+            </>}
+            tabs={[
+              { value: "resumo", label: "Resumo", content: tabResumo },
+              { value: "folha", label: "Folha", content: tabFolha },
+              { value: "financeiro", label: "Financeiro", content: tabFinanceiro },
+              { value: "historico", label: "Histórico", content: tabHistorico },
+            ]}
+          />
+        );
+      })()}
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        open={confirmDeleteOpen}
+        onClose={() => setConfirmDeleteOpen(false)}
+        onConfirm={() => { setConfirmDeleteOpen(false); setDrawerOpen(false); remove(selected!.id); }}
+        title={selected && folhas.length > 0 ? "Inativar Funcionário" : "Confirmar exclusão"}
+        confirmLabel={selected && folhas.length > 0 ? "Inativar" : "Excluir"}
+      >
+        {selected && (
+          <div className="space-y-3 py-1">
+            <div className="rounded-md border bg-muted/30 p-3 space-y-1.5 text-sm">
+              <div className="flex justify-between"><span className="text-muted-foreground">Nome</span><span className="font-medium">{selected.nome}</span></div>
+              {selected.cpf && <div className="flex justify-between"><span className="text-muted-foreground">CPF</span><span className="font-mono">{selected.cpf}</span></div>}
+              {selected.cargo && <div className="flex justify-between"><span className="text-muted-foreground">Cargo</span><span>{selected.cargo}</span></div>}
+              {folhas.length > 0 && (
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Folhas registradas</span>
+                  <span className="font-medium text-amber-600 dark:text-amber-400">{folhas.length} competência{folhas.length !== 1 ? "s" : ""}</span>
+                </div>
+              )}
+              {lancamentos.length > 0 && (
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Lançamentos financeiros</span>
+                  <span className="font-medium text-amber-600 dark:text-amber-400">{lancamentos.length} lançamento{lancamentos.length !== 1 ? "s" : ""}</span>
+                </div>
+              )}
+            </div>
+            {folhas.length > 0 && (
+              <div className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md p-2.5">
+                <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                <span>Este funcionário possui histórico de folha. A ação irá apenas inativá-lo, preservando todos os registros.</span>
+              </div>
+            )}
+          </div>
+        )}
+      </ConfirmDialog>
 
       {/* Folha Registration Modal */}
       <FormModal open={folhaModalOpen} onClose={() => setFolhaModalOpen(false)} title={`Registrar Folha — ${selected?.nome || ""}`}>
         <div className="space-y-4">
-          <div className="space-y-2"><Label>Competência (AAAA-MM) *</Label><Input type="month" value={folhaForm.competencia} onChange={e => setFolhaForm({ ...folhaForm, competencia: e.target.value })} required /></div>
-          <div className="rounded-lg border bg-muted/30 p-3 text-center">
-            <span className="text-xs text-muted-foreground">Salário Base</span>
-            <p className="font-mono font-bold text-lg">{formatCurrency(Number(selected?.salario_base || 0))}</p>
+          <div className="space-y-2">
+            <Label>Competência (AAAA-MM) *</Label>
+            <Input type="month" value={folhaForm.competencia} onChange={e => setFolhaForm({ ...folhaForm, competencia: e.target.value })} required />
+          </div>
+          <div className="rounded-lg border bg-muted/30 p-3 flex items-center justify-between">
+            <div>
+              <p className="text-xs text-muted-foreground">Salário Base</p>
+              <p className="font-mono font-bold text-lg">{formatCurrency(Number(selected?.salario_base || 0))}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-xs text-muted-foreground">Funcionário</p>
+              <p className="text-sm font-medium">{selected?.nome}</p>
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2"><Label>Proventos Extras</Label><Input type="number" step="0.01" min={0} value={folhaForm.proventos || ""} onChange={e => setFolhaForm({ ...folhaForm, proventos: Number(e.target.value) })} placeholder="Horas extras, bônus..." /></div>
-            <div className="space-y-2"><Label>Descontos</Label><Input type="number" step="0.01" min={0} value={folhaForm.descontos || ""} onChange={e => setFolhaForm({ ...folhaForm, descontos: Number(e.target.value) })} placeholder="Faltas, adiantamentos..." /></div>
+            <div className="space-y-2">
+              <Label>Proventos Extras</Label>
+              <Input type="number" step="0.01" min={0} value={folhaForm.proventos || ""} onChange={e => setFolhaForm({ ...folhaForm, proventos: Number(e.target.value) })} placeholder="Horas extras, bônus..." />
+            </div>
+            <div className="space-y-2">
+              <Label>Descontos</Label>
+              <Input type="number" step="0.01" min={0} value={folhaForm.descontos || ""} onChange={e => setFolhaForm({ ...folhaForm, descontos: Number(e.target.value) })} placeholder="Faltas, adiantamentos..." />
+            </div>
           </div>
-          <div className="rounded-lg border bg-primary/5 p-3 text-center">
-            <span className="text-xs text-muted-foreground">Valor Líquido</span>
-            <p className="font-mono font-bold text-xl text-primary">
-              {formatCurrency(Number(selected?.salario_base || 0) + Number(folhaForm.proventos || 0) - Number(folhaForm.descontos || 0))}
-            </p>
+          <div className="rounded-lg border bg-primary/5 p-3 space-y-1">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>Base</span><span className="font-mono">{formatCurrency(Number(selected?.salario_base || 0))}</span>
+            </div>
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>+ Proventos extras</span><span className="font-mono text-green-600 dark:text-green-400">+{formatCurrency(Number(folhaForm.proventos || 0))}</span>
+            </div>
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>− Descontos</span><span className="font-mono text-destructive">-{formatCurrency(Number(folhaForm.descontos || 0))}</span>
+            </div>
+            <div className="flex items-center justify-between border-t pt-1 mt-1">
+              <span className="text-xs font-semibold">Valor Líquido</span>
+              <span className="font-mono font-bold text-lg text-primary">
+                {formatCurrency(Number(selected?.salario_base || 0) + Number(folhaForm.proventos || 0) - Number(folhaForm.descontos || 0))}
+              </span>
+            </div>
+            <p className="text-[10px] text-muted-foreground pt-0.5">Ao gerar o financeiro: salário no 5º dia e FGTS (8%) no 7º dia do mês seguinte</p>
           </div>
           <div className="space-y-2"><Label>Observações</Label><Textarea value={folhaForm.observacoes} onChange={e => setFolhaForm({ ...folhaForm, observacoes: e.target.value })} /></div>
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setFolhaModalOpen(false)}>Cancelar</Button>
-            <Button onClick={handleFolhaSubmit}>Registrar</Button>
+            <Button onClick={handleFolhaSubmit}>Registrar Folha</Button>
           </div>
         </div>
       </FormModal>
