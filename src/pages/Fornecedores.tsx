@@ -270,21 +270,19 @@ const Fornecedores = () => {
                       onClick={async () => {
                         const result = await buscarCnpj(form.cpf_cnpj);
                         if (result) {
-                          setForm(prev => ({
-                            ...prev,
-                            nome_razao_social: result.razao_social || prev.nome_razao_social,
-                            nome_fantasia: result.nome_fantasia || prev.nome_fantasia,
-                            email: result.email || prev.email,
-                            telefone: result.telefone || prev.telefone,
-                            logradouro: result.logradouro || prev.logradouro,
-                            numero: result.numero || prev.numero,
-                            complemento: result.complemento || prev.complemento,
-                            bairro: result.bairro || prev.bairro,
-                            cidade: result.municipio || prev.cidade,
-                            uf: result.uf || prev.uf,
-                            cep: result.cep || prev.cep,
-                          }));
-                          setIsDirty(true);
+                          updateForm({
+                            nome_razao_social: result.razao_social || form.nome_razao_social,
+                            nome_fantasia: result.nome_fantasia || form.nome_fantasia,
+                            email: result.email || form.email,
+                            telefone: result.telefone || form.telefone,
+                            logradouro: result.logradouro || form.logradouro,
+                            numero: result.numero || form.numero,
+                            complemento: result.complemento || form.complemento,
+                            bairro: result.bairro || form.bairro,
+                            cidade: result.municipio || form.cidade,
+                            uf: result.uf || form.uf,
+                            cep: result.cep || form.cep,
+                          });
                         }
                       }}
                     >
@@ -440,8 +438,7 @@ const Fornecedores = () => {
                   onBlur={async () => {
                     const result = await buscarCep(form.cep);
                     if (result) {
-                      setForm(prev => ({ ...prev, logradouro: result.logradouro, bairro: result.bairro, cidade: result.localidade, uf: result.uf }));
-                      setIsDirty(true);
+                      updateForm({ logradouro: result.logradouro, bairro: result.bairro, cidade: result.localidade, uf: result.uf });
                     }
                   }}
                   className={cepLoading ? "pr-8" : ""}
@@ -505,7 +502,7 @@ const Fornecedores = () => {
               onChange={(e) => updateForm({ observacoes: e.target.value })}
               placeholder="Informações relevantes: condições especiais negociadas, restrições de fornecimento, preferências logísticas, histórico de relacionamento..."
             />
-            <p className="text-xs text-muted-foreground mt-1 text-right">{(form.observacoes || "").length}/{MAX_OBSERVACOES_LENGTH}</p>
+            <p className="text-xs text-muted-foreground mt-1 text-right">{form.observacoes.length}/{MAX_OBSERVACOES_LENGTH}</p>
           </div>
 
           {/* ── RODAPÉ ────────────────────────────────────────── */}
