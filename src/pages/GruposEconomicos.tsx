@@ -105,7 +105,6 @@ const GruposEconomicos = () => {
     (form.empresa_matriz_id || "") !== (initialForm.empresa_matriz_id || "");
 
   const loadClientes = async () => {
-    if (clientesDisponiveis.length > 0) return;
     setLoadingClientes(true);
     try {
       const { data: c } = await supabase
@@ -664,7 +663,7 @@ const GruposEconomicos = () => {
                   </div>
                   <div className="rounded-lg border bg-card p-3 text-center space-y-1">
                     <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Saldo Aberto</p>
-                    <p className={`font-mono font-bold text-xs ${modalSaldo > 0 ? "text-yellow-600 dark:text-yellow-400" : "text-foreground"}`}>
+                    <p className={`font-mono font-bold text-lg ${modalSaldo > 0 ? "text-yellow-600 dark:text-yellow-400" : "text-foreground"}`}>
                       {formatCurrency(modalSaldo)}
                     </p>
                   </div>
