@@ -7,10 +7,12 @@ import { FormModal } from "@/components/FormModal";
 import { ViewDrawerV2, ViewField, ViewSection } from "@/components/ViewDrawerV2";
 import { RelationalLink } from "@/components/ui/RelationalLink";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Edit, Trash2, Search, Building2, MapPin, Package, Truck, Star, AlertTriangle } from "lucide-react";
+import { Edit, Trash2, Search, Building2, MapPin, Package, Truck, Star, AlertTriangle, Phone, FileText, Loader2 } from "lucide-react";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
 import { useRelationalNavigation } from "@/contexts/RelationalNavigationContext";
 import { useCnpjLookup } from "@/hooks/useCnpjLookup";
+import { useViaCep } from "@/hooks/useViaCep";
+import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -30,18 +32,25 @@ interface Transportadora {
   contato: string;
   telefone: string;
   email: string;
+  logradouro: string;
+  numero: string;
+  complemento: string;
+  bairro: string;
   cidade: string;
   uf: string;
+  cep: string;
   modalidade: string;
   prazo_medio: string;
   observacoes: string;
   ativo: boolean;
   created_at: string;
+  updated_at: string;
 }
 
 const emptyForm: Record<string, string> = {
   nome_razao_social: "", nome_fantasia: "", cpf_cnpj: "", contato: "",
-  telefone: "", email: "", cidade: "", uf: "", modalidade: "rodoviario",
+  telefone: "", email: "", logradouro: "", numero: "", complemento: "",
+  bairro: "", cidade: "", uf: "", cep: "", modalidade: "rodoviario",
   prazo_medio: "", observacoes: "",
 };
 
@@ -49,11 +58,13 @@ export default function Transportadoras() {
   const { data, loading, create, update, remove } = useSupabaseCrud<Transportadora>({ table: "transportadoras" });
   const { pushView } = useRelationalNavigation();
   const { buscarCnpj, loading: cnpjLoading } = useCnpjLookup();
+  const { buscarCep, loading: cepLoading } = useViaCep();
   const [modalOpen, setModalOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selected, setSelected] = useState<Transportadora | null>(null);
   const [mode, setMode] = useState<"create" | "edit">("create");
   const [form, setForm] = useState(emptyForm);
+  const [formAtivo, setFormAtivo] = useState(true);
   const [saving, setSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [clientesVinculados, setClientesVinculados] = useState<any[]>([]);
@@ -78,17 +89,20 @@ export default function Transportadoras() {
     }
   }, [selected, drawerOpen]);
 
-  const openCreate = () => { setMode("create"); setForm({...emptyForm}); setSelected(null); setModalOpen(true); };
+  const openCreate = () => { setMode("create"); setForm({...emptyForm}); setFormAtivo(true); setSelected(null); setModalOpen(true); };
   const openEdit = (t: Transportadora) => {
     setMode("edit"); setSelected(t);
     setForm({
       nome_razao_social: t.nome_razao_social, nome_fantasia: t.nome_fantasia || "",
       cpf_cnpj: t.cpf_cnpj || "", contato: t.contato || "",
       telefone: t.telefone || "", email: t.email || "",
-      cidade: t.cidade || "", uf: t.uf || "",
+      logradouro: t.logradouro || "", numero: t.numero || "",
+      complemento: t.complemento || "", bairro: t.bairro || "",
+      cidade: t.cidade || "", uf: t.uf || "", cep: t.cep || "",
       modalidade: t.modalidade || "rodoviario",
       prazo_medio: t.prazo_medio || "", observacoes: t.observacoes || "",
     });
+    setFormAtivo(t.ativo ?? true);
     setModalOpen(true);
   };
   const openView = (t: Transportadora) => {
@@ -101,8 +115,9 @@ export default function Transportadoras() {
     if (!form.nome_razao_social) { toast.error("Razão Social é obrigatória"); return; }
     setSaving(true);
     try {
-      if (mode === "create") await create(form);
-      else if (selected) await update(selected.id, form);
+      const submitData = { ...form, ativo: formAtivo };
+      if (mode === "create") await create(submitData);
+      else if (selected) await update(selected.id, submitData);
       setModalOpen(false);
     } catch (err: unknown) {
       console.error("[transportadoras] handleSubmit:", err);
@@ -111,6 +126,30 @@ export default function Transportadoras() {
   };
 
   const modalidadeLabel: Record<string, string> = { rodoviario: "Rodoviário", aereo: "Aéreo", maritimo: "Marítimo", ferroviario: "Ferroviário", multimodal: "Multimodal" };
+
+  const hasChanges = useMemo(() => {
+    if (mode === "create") return false;
+    if (!selected) return false;
+    const original: Record<string, string> = {
+      nome_razao_social: selected.nome_razao_social || "",
+      nome_fantasia: selected.nome_fantasia || "",
+      cpf_cnpj: selected.cpf_cnpj || "",
+      contato: selected.contato || "",
+      telefone: selected.telefone || "",
+      email: selected.email || "",
+      logradouro: selected.logradouro || "",
+      numero: selected.numero || "",
+      complemento: selected.complemento || "",
+      bairro: selected.bairro || "",
+      cidade: selected.cidade || "",
+      uf: selected.uf || "",
+      cep: selected.cep || "",
+      modalidade: selected.modalidade || "rodoviario",
+      prazo_medio: selected.prazo_medio || "",
+      observacoes: selected.observacoes || "",
+    };
+    return JSON.stringify(form) !== JSON.stringify(original) || formAtivo !== selected.ativo;
+  }, [form, formAtivo, mode, selected]);
 
   const remessaStatusMap: Record<string, { label: string; classes: string }> = {
     pendente:    { label: "Pendente",    classes: "bg-warning/10 text-warning border-warning/20" },
@@ -142,31 +181,107 @@ export default function Transportadoras() {
         <DataTable columns={columns} data={filteredData} loading={loading} onView={openView} onEdit={openEdit} />
       </ModulePage>
 
-      <FormModal open={modalOpen} onClose={() => setModalOpen(false)} title={mode === "create" ? "Nova Transportadora" : "Editar Transportadora"} size="lg">
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            <div className="col-span-2 space-y-2"><Label>Razão Social *</Label><Input value={form.nome_razao_social} onChange={(e) => setForm({ ...form, nome_razao_social: e.target.value })} required /></div>
-            <div className="space-y-2"><Label>Nome Fantasia</Label><Input value={form.nome_fantasia} onChange={(e) => setForm({ ...form, nome_fantasia: e.target.value })} /></div>
-            <div className="space-y-2"><Label>CNPJ</Label><div className="flex gap-1"><MaskedInput mask="cnpj" value={form.cpf_cnpj} onChange={(v) => setForm({ ...form, cpf_cnpj: v })} /><Button type="button" variant="outline" size="icon" className="shrink-0" disabled={cnpjLoading} onClick={async () => {
-              const result = await buscarCnpj(form.cpf_cnpj);
-              if (result) setForm(prev => ({
-                ...prev,
-                nome_razao_social: result.razao_social || prev.nome_razao_social,
-                nome_fantasia: result.nome_fantasia || prev.nome_fantasia,
-                email: result.email || prev.email,
-                telefone: result.telefone || prev.telefone,
-                cidade: result.municipio || prev.cidade,
-                uf: result.uf || prev.uf,
-              }));
-            }}><Search className="h-4 w-4" /></Button></div></div>
-            <div className="space-y-2"><Label>Contato</Label><Input value={form.contato} onChange={(e) => setForm({ ...form, contato: e.target.value })} /></div>
-            <div className="space-y-2"><Label>Telefone</Label><MaskedInput mask="telefone" value={form.telefone} onChange={(v) => setForm({ ...form, telefone: v })} /></div>
-            <div className="space-y-2"><Label>E-mail</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
-            <div className="space-y-2"><Label>Cidade</Label><Input value={form.cidade} onChange={(e) => setForm({ ...form, cidade: e.target.value })} /></div>
-            <div className="space-y-2"><Label>UF</Label><Input maxLength={2} value={form.uf} onChange={(e) => setForm({ ...form, uf: e.target.value.toUpperCase() })} /></div>
-            <div className="space-y-2"><Label>Modalidade</Label>
+      <FormModal open={modalOpen} onClose={() => setModalOpen(false)} title={mode === "create" ? "Nova Transportadora" : "Editar Transportadora"} size="xl">
+        <form onSubmit={handleSubmit} className="space-y-0">
+
+          {/* Context bar for edit mode */}
+          {mode === "edit" && selected && (
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 mb-5 text-xs text-muted-foreground rounded-md border bg-muted/30">
+              <StatusBadge status={selected.ativo ? "Ativo" : "Inativo"} />
+              <span>Cadastro: {new Date(selected.created_at).toLocaleDateString("pt-BR")}</span>
+              {selected.updated_at && <span>Atualizado: {new Date(selected.updated_at).toLocaleDateString("pt-BR")}</span>}
+              <span className="flex items-center gap-1"><Truck className="h-3 w-3" />{modalidadeLabel[selected.modalidade] || "—"}</span>
+              {selected.cidade && <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{selected.cidade}{selected.uf ? `/${selected.uf}` : ""}</span>}
+            </div>
+          )}
+
+          {/* ── BLOCO 1: IDENTIFICAÇÃO ── */}
+          <div className="flex items-center gap-2 pt-1 pb-3 border-b mb-4">
+            <Building2 className="w-4 h-4 text-primary/70" />
+            <h3 className="font-semibold text-sm">Identificação</h3>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6">
+            <div className="col-span-2 space-y-2">
+              <Label>CNPJ</Label>
+              <div className="flex gap-1">
+                <MaskedInput mask="cnpj" value={form.cpf_cnpj} onChange={(v) => setForm({ ...form, cpf_cnpj: v })} />
+                <Button type="button" variant="outline" size="icon" className="shrink-0" disabled={cnpjLoading}
+                  title="Buscar dados pelo CNPJ e preencher automaticamente"
+                  onClick={async () => {
+                    const result = await buscarCnpj(form.cpf_cnpj);
+                    if (result) setForm(prev => ({
+                      ...prev,
+                      nome_razao_social: result.razao_social || prev.nome_razao_social,
+                      nome_fantasia: result.nome_fantasia || prev.nome_fantasia,
+                      email: result.email || prev.email,
+                      telefone: result.telefone || prev.telefone,
+                      cidade: result.municipio || prev.cidade,
+                      uf: result.uf || prev.uf,
+                    }));
+                  }}>
+                  {cnpjLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground leading-tight">Informe o CNPJ e clique em buscar para preencher automaticamente.</p>
+            </div>
+            <div className="col-span-2 md:col-span-4 space-y-2">
+              <Label>Razão Social / Nome *</Label>
+              <Input value={form.nome_razao_social} onChange={(e) => setForm({ ...form, nome_razao_social: e.target.value })} required placeholder="Razão social ou nome da transportadora" />
+            </div>
+            <div className="col-span-2 md:col-span-3 space-y-2">
+              <Label>Nome Fantasia</Label>
+              <Input value={form.nome_fantasia} onChange={(e) => setForm({ ...form, nome_fantasia: e.target.value })} placeholder="Nome comercial (se diferente da razão social)" />
+            </div>
+            <div className="col-span-2 md:col-span-3 space-y-2">
+              <Label>Status</Label>
+              <div className="flex items-center gap-3 h-9 px-3 rounded-md border bg-background">
+                <Switch checked={formAtivo} onCheckedChange={setFormAtivo} />
+                <span className="text-sm text-muted-foreground">{formAtivo ? "Ativo" : "Inativo"}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* ── BLOCO 2: CONTATO ── */}
+          <div className="flex items-center gap-2 pt-4 pb-3 border-b border-t mb-4">
+            <Phone className="w-4 h-4 text-primary/70" />
+            <h3 className="font-semibold text-sm">Contato</h3>
+          </div>
+          <div className="mb-6 space-y-4">
+            <div>
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">Referência de atendimento</p>
+              <div className="space-y-2">
+                <Label>Contato Principal</Label>
+                <Input value={form.contato} onChange={(e) => setForm({ ...form, contato: e.target.value })} placeholder="Nome do responsável ou setor de atendimento" />
+              </div>
+            </div>
+            <div>
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">Canais de comunicação</p>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label>Telefone</Label>
+                  <MaskedInput mask="telefone" value={form.telefone} onChange={(v) => setForm({ ...form, telefone: v })} />
+                </div>
+                <div className="col-span-1 md:col-span-2 space-y-2">
+                  <Label>E-mail</Label>
+                  <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="email@transportadora.com.br" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* ── BLOCO 3: OPERAÇÃO LOGÍSTICA ── */}
+          <div className="flex items-center gap-2 pt-4 pb-3 border-b border-t mb-2">
+            <Truck className="w-4 h-4 text-primary/70" />
+            <h3 className="font-semibold text-sm">Operação Logística</h3>
+          </div>
+          <p className="text-xs text-muted-foreground mb-4">Define como a transportadora opera e o prazo médio de entrega. Esses dados são usados em pedidos, remessas e compras.</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <div className="space-y-2">
+              <Label className="font-semibold text-sm">Modalidade Principal</Label>
               <Select value={form.modalidade} onValueChange={(v) => setForm({ ...form, modalidade: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-10 font-medium">
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="rodoviario">Rodoviário</SelectItem>
                   <SelectItem value="aereo">Aéreo</SelectItem>
@@ -175,13 +290,100 @@ export default function Transportadoras() {
                   <SelectItem value="multimodal">Multimodal</SelectItem>
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground leading-tight">Forma predominante de transporte utilizada pela transportadora.</p>
             </div>
-            <div className="space-y-2"><Label>Prazo Médio</Label><Input value={form.prazo_medio} onChange={(e) => setForm({ ...form, prazo_medio: e.target.value })} placeholder="Ex: 3-5 dias úteis" /></div>
+            <div className="space-y-2">
+              <Label className="font-semibold text-sm">Prazo Médio de Entrega</Label>
+              <div className="relative">
+                <Input value={form.prazo_medio} onChange={(e) => setForm({ ...form, prazo_medio: e.target.value })} placeholder="Ex: 3-5" className="h-10 pr-24 font-mono" />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none select-none">dias úteis</span>
+              </div>
+              <p className="text-xs text-muted-foreground leading-tight">Prazo médio informado pela transportadora. Usado como referência em remessas.</p>
+            </div>
           </div>
-          <div className="space-y-2"><Label>Observações Logísticas</Label><Textarea value={form.observacoes} onChange={(e) => setForm({ ...form, observacoes: e.target.value })} placeholder="Restrições, particularidades..." /></div>
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={() => setModalOpen(false)}>Cancelar</Button>
-            <Button type="submit" disabled={saving}>{saving ? "Salvando..." : "Salvar"}</Button>
+
+          {/* ── BLOCO 4: ENDEREÇO ── */}
+          <div className="flex items-center gap-2 pt-4 pb-3 border-b border-t mb-2">
+            <MapPin className="w-4 h-4 text-primary/70" />
+            <h3 className="font-semibold text-sm">Endereço</h3>
+          </div>
+          <p className="text-xs text-muted-foreground mb-4">Informe o CEP para preenchimento automático do logradouro, bairro, cidade e UF.</p>
+          <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6">
+            <div className="col-span-2 space-y-2">
+              <Label>CEP</Label>
+              <div className="flex gap-1">
+                <MaskedInput mask="cep" value={form.cep} onChange={(v) => setForm({ ...form, cep: v })} />
+                <Button type="button" variant="outline" size="icon" className="shrink-0" disabled={cepLoading}
+                  title="Buscar endereço pelo CEP"
+                  onClick={async () => {
+                    const result = await buscarCep(form.cep);
+                    if (result) setForm(prev => ({
+                      ...prev,
+                      logradouro: result.logradouro || prev.logradouro,
+                      bairro: result.bairro || prev.bairro,
+                      cidade: result.localidade || prev.cidade,
+                      uf: result.uf || prev.uf,
+                    }));
+                  }}>
+                  {cepLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                </Button>
+              </div>
+            </div>
+            <div className="col-span-2 md:col-span-3 space-y-2">
+              <Label>Logradouro</Label>
+              <Input value={form.logradouro} onChange={(e) => setForm({ ...form, logradouro: e.target.value })} placeholder="Rua, Avenida, etc." />
+            </div>
+            <div className="col-span-1 space-y-2">
+              <Label>Número</Label>
+              <Input value={form.numero} onChange={(e) => setForm({ ...form, numero: e.target.value })} placeholder="Nº" />
+            </div>
+            <div className="col-span-2 md:col-span-3 space-y-2">
+              <Label>Complemento</Label>
+              <Input value={form.complemento} onChange={(e) => setForm({ ...form, complemento: e.target.value })} placeholder="Sala, Bloco, etc." />
+            </div>
+            <div className="col-span-2 md:col-span-3 space-y-2">
+              <Label>Bairro</Label>
+              <Input value={form.bairro} onChange={(e) => setForm({ ...form, bairro: e.target.value })} />
+            </div>
+            <div className="col-span-2 md:col-span-3 space-y-2">
+              <Label>Cidade</Label>
+              <Input value={form.cidade} onChange={(e) => setForm({ ...form, cidade: e.target.value })} />
+            </div>
+            <div className="col-span-1 space-y-2">
+              <Label>UF</Label>
+              <Input maxLength={2} value={form.uf} onChange={(e) => setForm({ ...form, uf: e.target.value.toUpperCase() })} className="uppercase" />
+            </div>
+          </div>
+
+          {/* ── BLOCO 5: OBSERVAÇÕES ── */}
+          <div className="flex items-center gap-2 pt-4 pb-3 border-b border-t mb-2">
+            <FileText className="w-4 h-4 text-primary/70" />
+            <h3 className="font-semibold text-sm">Observações</h3>
+          </div>
+          <p className="text-xs text-muted-foreground mb-4">Notas internas, operacionais e de atendimento sobre a transportadora.</p>
+          <div className="mb-6">
+            <Textarea
+              value={form.observacoes}
+              onChange={(e) => setForm({ ...form, observacoes: e.target.value })}
+              placeholder="Restrições de atendimento, particularidades operacionais, observações de logística..."
+              rows={4}
+              className="resize-none"
+            />
+          </div>
+
+          {/* Rodapé */}
+          <div className="flex items-center justify-between pt-3 border-t">
+            <span className="text-xs">
+              {hasChanges && (
+                <span className="text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                  <AlertTriangle className="h-3 w-3" />Há alterações não salvas
+                </span>
+              )}
+            </span>
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" onClick={() => setModalOpen(false)}>Cancelar</Button>
+              <Button type="submit" disabled={saving}>{saving ? "Salvando..." : "Salvar"}</Button>
+            </div>
           </div>
         </form>
       </FormModal>
