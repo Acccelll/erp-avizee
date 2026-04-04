@@ -54,6 +54,8 @@ const relacaoOptions = [
 { value: "filial", label: "Filial" },
 { value: "coligada", label: "Coligada" }];
 
+const MAX_PAYMENT_DAYS = 365;
+
 
 const Clientes = () => {
   const location = useLocation();
@@ -457,14 +459,14 @@ const Clientes = () => {
                     <Info className="h-3 w-3 text-muted-foreground cursor-help" />
                   </TooltipTrigger>
                   <TooltipContent className="max-w-[220px] text-xs">
-                    Prazo padrão em dias para pagamento. Pré-aplicado automaticamente em novas operações.
+                    Prazo padrão em dias para pagamento. Aplicado automaticamente em novas operações.
                   </TooltipContent>
                 </Tooltip>
               </div>
               <Input
                 type="number"
                 min={0}
-                max={365}
+                max={MAX_PAYMENT_DAYS}
                 value={form.prazo_padrao}
                 onChange={(e) => setForm({ ...form, prazo_padrao: Number(e.target.value) })}
                 className={formErrors.prazo_padrao ? "border-destructive" : ""}
@@ -486,7 +488,7 @@ const Clientes = () => {
               <Input
                 type="number"
                 min={0}
-                max={365}
+                max={MAX_PAYMENT_DAYS}
                 value={form.prazo_preferencial}
                 onChange={(e) => setForm({ ...form, prazo_preferencial: Number(e.target.value) })}
               />
