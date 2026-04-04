@@ -70,7 +70,6 @@ const Fornecedores = () => {
   const { buscarCep } = useViaCep();
   const { buscarCnpj, loading: cnpjLoading } = useCnpjLookup();
   const [modalOpen, setModalOpen] = useState(false);
-  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [selected, setSelected] = useState<Fornecedor | null>(null);
   const [mode, setMode] = useState<"create" | "edit">("create");
   const [form, setForm] = useState(emptyForm);
