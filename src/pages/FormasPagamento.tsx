@@ -9,7 +9,8 @@ import { RelationalLink } from "@/components/ui/RelationalLink";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   Edit, Trash2, Plus, X, FileText, Banknote, CreditCard, QrCode, CheckSquare,
-  Building2, Wallet, AlertTriangle, Users, TrendingUp,
+  Building2, Wallet, AlertTriangle, Users, TrendingUp, CalendarDays, StickyNote,
+  Info,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { Switch } from "@/components/ui/switch";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 interface FormaPagamento {
@@ -57,7 +59,7 @@ const tipoIcon: Record<string, React.ElementType> = {
 };
 
 const emptyForm: Record<string, any> = {
-  descricao: "", prazo_dias: 0, parcelas: 1, intervalos_dias: [], gera_financeiro: true, tipo: "boleto", observacoes: "",
+  descricao: "", prazo_dias: 0, parcelas: 1, intervalos_dias: [], gera_financeiro: true, tipo: "boleto", observacoes: "", ativo: true,
 };
 
 export default function FormasPagamento() {
@@ -120,7 +122,7 @@ export default function FormasPagamento() {
   const openEdit = (f: FormaPagamento) => {
     setMode("edit"); setSelected(f);
     const intervalos = Array.isArray(f.intervalos_dias) ? f.intervalos_dias : [];
-    setForm({ descricao: f.descricao, prazo_dias: f.prazo_dias, parcelas: f.parcelas, intervalos_dias: intervalos, gera_financeiro: f.gera_financeiro, tipo: f.tipo, observacoes: f.observacoes || "" });
+    setForm({ descricao: f.descricao, prazo_dias: f.prazo_dias, parcelas: f.parcelas, intervalos_dias: intervalos, gera_financeiro: f.gera_financeiro, tipo: f.tipo, observacoes: f.observacoes || "", ativo: f.ativo });
     setModalOpen(true);
   };
   const openView = (f: FormaPagamento) => { setSelected(f); setDrawerOpen(true); };
@@ -178,60 +180,189 @@ export default function FormasPagamento() {
         <DataTable columns={columns} data={filteredData} loading={loading} onView={openView} />
       </ModulePage>
 
-      <FormModal open={modalOpen} onClose={() => setModalOpen(false)} title={mode === "create" ? "Nova Forma de Pagamento" : "Editar Forma de Pagamento"}>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2"><Label>Descrição *</Label><Input value={form.descricao} onChange={(e) => setForm({ ...form, descricao: e.target.value })} required placeholder="Ex: 30/60/90 DDL" /></div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2"><Label>Tipo</Label>
-              <Select value={form.tipo} onValueChange={(v) => setForm({ ...form, tipo: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="dinheiro">Dinheiro</SelectItem>
-                  <SelectItem value="boleto">Boleto</SelectItem>
-                  <SelectItem value="cartao">Cartão</SelectItem>
-                  <SelectItem value="pix">PIX</SelectItem>
-                  <SelectItem value="cheque">Cheque</SelectItem>
-                  <SelectItem value="deposito">Depósito</SelectItem>
-                </SelectContent>
-              </Select>
+      <FormModal open={modalOpen} onClose={() => setModalOpen(false)} title={mode === "create" ? "Nova Forma de Pagamento" : "Editar Forma de Pagamento"} size="lg">
+        <form onSubmit={handleSubmit} className="space-y-6">
+
+          {/* ── BLOCO 1: IDENTIFICAÇÃO DA REGRA ───────────────────────── */}
+          <div>
+            <div className="flex items-center gap-2 pb-2 border-b mb-4">
+              <CreditCard className="w-4 h-4 text-primary/70" />
+              <h3 className="font-semibold text-sm">Identificação da Regra</h3>
             </div>
-            <div className="space-y-2 flex items-end">
-              <label className="flex items-center gap-2 text-sm cursor-pointer">
-                <input type="checkbox" checked={form.gera_financeiro} onChange={(e) => setForm({ ...form, gera_financeiro: e.target.checked })} className="rounded" />
-                Gera Financeiro
-              </label>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="fp-descricao">Descrição <span className="text-destructive" aria-hidden="true">*</span></Label>
+                <Input
+                  id="fp-descricao"
+                  value={form.descricao}
+                  onChange={(e) => setForm({ ...form, descricao: e.target.value })}
+                  required
+                  aria-required="true"
+                  placeholder="Ex: 30/60/90 DDL"
+                  className="text-base font-medium"
+                />
+                <p className="text-xs text-muted-foreground">Nome da forma de pagamento como aparecerá em clientes, orçamentos e pedidos.</p>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Tipo</Label>
+                  <Select value={form.tipo} onValueChange={(v) => setForm({ ...form, tipo: v })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="dinheiro">Dinheiro</SelectItem>
+                      <SelectItem value="boleto">Boleto</SelectItem>
+                      <SelectItem value="cartao">Cartão</SelectItem>
+                      <SelectItem value="pix">PIX</SelectItem>
+                      <SelectItem value="cheque">Cheque</SelectItem>
+                      <SelectItem value="deposito">Depósito</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {mode === "edit" && (
+                  <div className="space-y-2">
+                    <Label>Status</Label>
+                    <div className="flex items-center gap-2 h-10">
+                      <Switch
+                        checked={form.ativo}
+                        onCheckedChange={(v) => setForm({ ...form, ativo: v })}
+                      />
+                      <span className="text-sm text-muted-foreground">{form.ativo ? "Ativo" : "Inativo"}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
-          {/* Dynamic Installments */}
-          <div className="space-y-2">
-            <Label>Intervalos de Parcelas (dias)</Label>
-            <p className="text-xs text-muted-foreground">Defina os dias de vencimento de cada parcela a partir da data de emissão.</p>
-            <div className="flex flex-wrap gap-2 min-h-[32px]">
-              {(form.intervalos_dias as number[]).map((d: number, idx: number) => (
-                <Badge key={idx} variant="secondary" className="gap-1 text-sm font-mono">
-                  {d}d
-                  <button type="button" onClick={() => removeIntervalo(idx)} className="ml-1 hover:text-destructive">
-                    <X className="w-3 h-3" />
-                  </button>
-                </Badge>
-              ))}
+          {/* ── BLOCO 2: CONDIÇÃO DE PAGAMENTO ────────────────────────── */}
+          <div>
+            <div className="flex items-center gap-2 pb-2 border-b mb-4">
+              <CalendarDays className="w-4 h-4 text-primary/70" />
+              <h3 className="font-semibold text-sm">Condição de Pagamento</h3>
             </div>
-            <div className="flex gap-2">
-              <Input type="number" min={1} value={newIntervalo} onChange={(e) => setNewIntervalo(Number(e.target.value))} className="w-24 h-8 text-sm" placeholder="Dias" />
-              <Button type="button" size="sm" variant="outline" className="h-8 gap-1" onClick={addIntervalo}>
-                <Plus className="w-3 h-3" /> Adicionar
-              </Button>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>
+                  Prazo Padrão{" "}
+                  <span className="text-xs font-normal text-muted-foreground">(dias)</span>
+                </Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    min={0}
+                    value={form.prazo_dias}
+                    onChange={(e) => setForm({ ...form, prazo_dias: Number(e.target.value) })}
+                    className="w-28"
+                    placeholder="0"
+                  />
+                  <span className="text-sm text-muted-foreground">dias</span>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {form.prazo_dias === 0
+                    ? "Pagamento à vista (0 dias)."
+                    : `Vencimento padrão: ${form.prazo_dias} dias após a emissão.`}
+                  {" "}Aplicado como padrão em clientes, orçamentos e pedidos.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Intervalos de Parcelas <span className="text-xs font-normal text-muted-foreground">(dias por parcela)</span></Label>
+                <p className="text-xs text-muted-foreground">Defina os dias de vencimento de cada parcela a partir da data de emissão. Se preenchido, substitui o prazo padrão no cálculo das parcelas.</p>
+                <div className="flex flex-wrap gap-2 min-h-[36px] rounded-md border bg-muted/20 px-2 py-1.5">
+                  {(form.intervalos_dias as number[]).length === 0 ? (
+                    <span className="text-xs text-muted-foreground italic self-center">Nenhum intervalo adicionado — pagamento em parcela única.</span>
+                  ) : (
+                    (form.intervalos_dias as number[]).map((d: number, idx: number) => (
+                      <Badge key={idx} variant="secondary" className="gap-1 text-sm font-mono">
+                        {d}d
+                        <button type="button" onClick={() => removeIntervalo(idx)} className="ml-1 hover:text-destructive">
+                          <X className="w-3 h-3" />
+                        </button>
+                      </Badge>
+                    ))
+                  )}
+                </div>
+                <div className="flex gap-2 items-center">
+                  <Input type="number" min={1} value={newIntervalo} onChange={(e) => setNewIntervalo(Number(e.target.value))} className="w-24 h-8 text-sm" placeholder="Dias" />
+                  <Button type="button" size="sm" variant="outline" className="h-8 gap-1" onClick={addIntervalo}>
+                    <Plus className="w-3 h-3" /> Adicionar parcela
+                  </Button>
+                </div>
+                {(form.intervalos_dias as number[]).length > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    <span className="font-semibold text-foreground">{(form.intervalos_dias as number[]).length}</span> parcela(s):{" "}
+                    {(form.intervalos_dias as number[]).join(" / ")} dias.
+                  </p>
+                )}
+              </div>
             </div>
-            {(form.intervalos_dias as number[]).length === 0 && (
-              <p className="text-xs text-muted-foreground italic">Sem intervalos = pagamento à vista (1 parcela)</p>
-            )}
           </div>
 
-          <div className="space-y-2"><Label>Observações</Label><Textarea value={form.observacoes} onChange={(e) => setForm({ ...form, observacoes: e.target.value })} /></div>
-          <div className="flex justify-end gap-2">
+          {/* ── BLOCO 3: COMPORTAMENTO FINANCEIRO ─────────────────────── */}
+          <div>
+            <div className="flex items-center gap-2 pb-2 border-b mb-4">
+              <Wallet className="w-4 h-4 text-primary/70" />
+              <h3 className="font-semibold text-sm">Comportamento Financeiro</h3>
+            </div>
+            <div className="rounded-lg border bg-muted/30 p-4">
+              <div className="flex items-start justify-between gap-4">
+                <div className="space-y-1 flex-1">
+                  <p className="text-sm font-medium">Gera Financeiro</p>
+                  <p className="text-xs text-muted-foreground">
+                    Quando ativado, registra lançamentos automáticos no financeiro ao utilizar esta forma em pedidos e orçamentos.
+                  </p>
+                </div>
+                <Switch
+                  checked={form.gera_financeiro}
+                  onCheckedChange={(v) => setForm({ ...form, gera_financeiro: v })}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* ── BLOCO 4: USO / CONTEXTO ───────────────────────────────── */}
+          <div>
+            <div className="flex items-center gap-2 pb-2 border-b mb-4">
+              <Info className="w-4 h-4 text-primary/70" />
+              <h3 className="font-semibold text-sm">Uso / Contexto</h3>
+            </div>
+            <div className="rounded-lg border bg-muted/20 p-3 space-y-2 text-xs text-muted-foreground">
+              <div className="flex items-start gap-2">
+                <Users className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                <span><span className="font-medium text-foreground">Clientes:</span> pode ser definida como forma de pagamento padrão no cadastro do cliente.</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <FileText className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                <span><span className="font-medium text-foreground">Orçamentos e Pedidos:</span> aplicada automaticamente quando o cliente possui esta forma como padrão.</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <TrendingUp className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                <span><span className="font-medium text-foreground">Financeiro:</span> {form.gera_financeiro ? "gera lançamentos automáticos ao finalizar pedidos." : "não gera lançamentos automáticos — ative em Comportamento Financeiro se necessário."}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* ── BLOCO 5: OBSERVAÇÕES ──────────────────────────────────── */}
+          <div>
+            <div className="flex items-center gap-2 pb-2 border-b mb-4">
+              <StickyNote className="w-4 h-4 text-primary/70" />
+              <h3 className="font-semibold text-sm">Observações</h3>
+            </div>
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground">Notas internas sobre o uso desta forma de pagamento. Instruções, restrições ou acordos comerciais específicos.</p>
+              <Textarea
+                value={form.observacoes}
+                onChange={(e) => setForm({ ...form, observacoes: e.target.value })}
+                placeholder="Ex: Utilizada apenas para clientes com limite aprovado acima de R$ 5.000..."
+                rows={3}
+              />
+            </div>
+          </div>
+
+          {/* ── RODAPÉ ────────────────────────────────────────────────── */}
+          <div className="flex justify-end gap-2 pt-2 border-t">
             <Button type="button" variant="outline" onClick={() => setModalOpen(false)}>Cancelar</Button>
-            <Button type="submit">Salvar</Button>
+            <Button type="submit">{mode === "create" ? "Criar Forma de Pagamento" : "Salvar Alterações"}</Button>
           </div>
         </form>
       </FormModal>
