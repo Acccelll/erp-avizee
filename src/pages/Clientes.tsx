@@ -55,6 +55,7 @@ const relacaoOptions = [
 { value: "coligada", label: "Coligada" }];
 
 const MAX_PAYMENT_DAYS = 365;
+const MAX_OBSERVACOES_LENGTH = 2000;
 
 
 const Clientes = () => {
@@ -83,6 +84,7 @@ const Clientes = () => {
   const [mode, setMode] = useState<"create" | "edit">("create");
   const [form, setForm] = useState(emptyCliente);
   const [saving, setSaving] = useState(false);
+  const [isDirty, setIsDirty] = useState(false);
   const [grupos, setGrupos] = useState<GrupoEconomico[]>([]);
   const [formasPagamento, setFormasPagamento] = useState<FormaPagamentoBasic[]>([]);
   const [tipoFilters, setTipoFilters] = useState<string[]>([]);
@@ -104,7 +106,7 @@ const Clientes = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.state]);
 
-  const openCreate = () => {setMode("create");setForm({ ...emptyCliente });setSelected(null);setModalOpen(true);};
+  const openCreate = () => {setMode("create");setForm({ ...emptyCliente });setSelected(null);setIsDirty(false);setModalOpen(true);};
   const openEdit = (c: Cliente) => {
     setMode("edit");setSelected(c);
     setForm({
@@ -120,6 +122,7 @@ const Clientes = () => {
       grupo_economico_id: c.grupo_economico_id || "", tipo_relacao_grupo: c.tipo_relacao_grupo || "independente",
       caixa_postal: c.caixa_postal || ""
     });
+    setIsDirty(false);
     setModalOpen(true);
   };
 
@@ -142,6 +145,7 @@ const Clientes = () => {
     try {
       if (mode === "create") await create(payload);else
       if (selected) await update(selected.id, payload);
+      setIsDirty(false);
       setModalOpen(false);
     } catch (err) {
       console.error('[clientes] erro ao salvar:', err);
@@ -151,6 +155,7 @@ const Clientes = () => {
 
   const grupoNome = (id: string | null) => !id ? "—" : grupos.find((g) => g.id === id)?.nome || "—";
   const relacaoLabel: Record<string, string> = { matriz: "Matriz", filial: "Filial", coligada: "Coligada", independente: "Independente" };
+  const updateForm = (updates: Record<string, any>) => { setForm(prev => ({ ...prev, ...updates })); setIsDirty(true); };
 
   const filteredData = useMemo(() => {
     // Text search is now server-side; only apply local dropdown filters
@@ -248,8 +253,10 @@ const Clientes = () => {
         onView={openView} onEdit={openEdit} onDelete={(c) => remove(c.id)} />
       </ModulePage>
 
-      {/* Form Modal */}
-      <FormModal open={modalOpen} onClose={() => setModalOpen(false)} title={mode === "create" ? "Novo Cliente" : "Editar Cliente"} size="xl">
+      <FormModal open={modalOpen} onClose={() => {
+        if (isDirty && !window.confirm("Existem alterações não salvas. Deseja descartar as alterações?")) return;
+        setModalOpen(false);
+      }} title={mode === "create" ? "Novo Cliente" : "Editar Cliente"} size="xl">
         <form onSubmit={handleSubmit} className="space-y-0">
 
           {/* Edit-mode context bar */}
@@ -262,9 +269,22 @@ const Clientes = () => {
                   Cadastrado em {formatDate(selected.created_at)}
                 </span>
               )}
-              {selected.nome_fantasia && (
-                <span className="truncate max-w-[180px]">
-                  <span className="font-medium text-foreground">{selected.nome_fantasia}</span>
+              {form.forma_pagamento_padrao && (
+                <span className="flex items-center gap-1">
+                  <CreditCard className="h-3 w-3" />
+                  {form.forma_pagamento_padrao}
+                </span>
+              )}
+              {form.grupo_economico_id && (
+                <span className="flex items-center gap-1">
+                  <Building2 className="h-3 w-3" />
+                  {grupos.find(g => g.id === form.grupo_economico_id)?.nome}
+                </span>
+              )}
+              {isDirty && (
+                <span className="flex items-center gap-1 text-amber-600 ml-auto font-medium">
+                  <span className="h-1.5 w-1.5 rounded-full bg-amber-500 inline-block" />
+                  Alterações não salvas
                 </span>
               )}
             </div>
@@ -278,7 +298,7 @@ const Clientes = () => {
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
             <div className="space-y-1.5">
               <Label>Tipo de Pessoa</Label>
-              <Select value={form.tipo_pessoa} onValueChange={(v) => setForm({ ...form, tipo_pessoa: v })}>
+              <Select value={form.tipo_pessoa} onValueChange={(v) => updateForm({ tipo_pessoa: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="F">Pessoa Física</SelectItem>
@@ -301,7 +321,7 @@ const Clientes = () => {
                 )}
               </div>
               <div className="flex gap-1">
-                <MaskedInput mask="cpf_cnpj" value={form.cpf_cnpj} onChange={(v) => setForm({ ...form, cpf_cnpj: v })} />
+                <MaskedInput mask="cpf_cnpj" value={form.cpf_cnpj} onChange={(v) => updateForm({ cpf_cnpj: v })} />
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
@@ -312,20 +332,23 @@ const Clientes = () => {
                       disabled={cnpjLoading || form.tipo_pessoa !== "J"}
                       onClick={async () => {
                         const result = await buscarCnpj(form.cpf_cnpj);
-                        if (result) setForm(prev => ({
-                          ...prev,
-                          nome_razao_social: result.razao_social || prev.nome_razao_social,
-                          nome_fantasia: result.nome_fantasia || prev.nome_fantasia,
-                          email: result.email || prev.email,
-                          telefone: result.telefone || prev.telefone,
-                          logradouro: result.logradouro || prev.logradouro,
-                          numero: result.numero || prev.numero,
-                          complemento: result.complemento || prev.complemento,
-                          bairro: result.bairro || prev.bairro,
-                          cidade: result.municipio || prev.cidade,
-                          uf: result.uf || prev.uf,
-                          cep: result.cep || prev.cep,
-                        }));
+                        if (result) {
+                          setForm(prev => ({
+                            ...prev,
+                            nome_razao_social: result.razao_social || prev.nome_razao_social,
+                            nome_fantasia: result.nome_fantasia || prev.nome_fantasia,
+                            email: result.email || prev.email,
+                            telefone: result.telefone || prev.telefone,
+                            logradouro: result.logradouro || prev.logradouro,
+                            numero: result.numero || prev.numero,
+                            complemento: result.complemento || prev.complemento,
+                            bairro: result.bairro || prev.bairro,
+                            cidade: result.municipio || prev.cidade,
+                            uf: result.uf || prev.uf,
+                            cep: result.cep || prev.cep,
+                          }));
+                          setIsDirty(true);
+                        }
                       }}
                     >
                       {cnpjLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
@@ -350,13 +373,13 @@ const Clientes = () => {
                   </TooltipContent>
                 </Tooltip>
               </div>
-              <Input value={form.inscricao_estadual} onChange={(e) => setForm({ ...form, inscricao_estadual: e.target.value })} placeholder="Ex: 123.456.789.000 ou ISENTO" />
+              <Input value={form.inscricao_estadual} onChange={(e) => updateForm({ inscricao_estadual: e.target.value })} placeholder="Ex: 123.456.789.000 ou ISENTO" />
             </div>
             <div className="col-span-2 md:col-span-3 space-y-1.5">
               <Label>Nome / Razão Social <span className="text-destructive">*</span></Label>
               <Input
                 value={form.nome_razao_social}
-                onChange={(e) => setForm({ ...form, nome_razao_social: e.target.value })}
+                onChange={(e) => updateForm({ nome_razao_social: e.target.value })}
                 required
                 placeholder={form.tipo_pessoa === "J" ? "Razão social conforme CNPJ" : "Nome completo"}
                 className={formErrors.nome_razao_social ? "border-destructive" : ""}
@@ -375,7 +398,7 @@ const Clientes = () => {
                   </TooltipContent>
                 </Tooltip>
               </div>
-              <Input value={form.nome_fantasia} onChange={(e) => setForm({ ...form, nome_fantasia: e.target.value })} placeholder="Nome comercial (opcional)" />
+              <Input value={form.nome_fantasia} onChange={(e) => updateForm({ nome_fantasia: e.target.value })} placeholder="Nome comercial (opcional)" />
             </div>
           </div>
 
@@ -384,38 +407,46 @@ const Clientes = () => {
             <Phone className="w-4 h-4 text-primary/70" />
             <h3 className="font-semibold text-sm">Contato</h3>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
-            <div className="col-span-2 md:col-span-3 space-y-1.5">
-              <Label>Pessoa de Contato</Label>
-              <Input
-                value={form.contato}
-                onChange={(e) => setForm({ ...form, contato: e.target.value })}
-                placeholder="Nome do responsável pelo contato comercial"
-              />
-            </div>
-            <div className="col-span-2 md:col-span-3 space-y-1.5">
-              <div className="flex items-center gap-1">
-                <Mail className="h-3.5 w-3.5 text-muted-foreground" />
-                <Label>E-mail</Label>
+          <div className="mb-6 space-y-4">
+            <div>
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Referência de atendimento</p>
+              <div className="space-y-1.5">
+                <Label>Pessoa de Contato</Label>
+                <Input
+                  value={form.contato}
+                  onChange={(e) => updateForm({ contato: e.target.value })}
+                  placeholder="Nome do responsável pelo contato comercial"
+                />
               </div>
-              <Input
-                type="email"
-                value={form.email}
-                onChange={(e) => setForm({ ...form, email: e.target.value })}
-                placeholder="email@empresa.com.br"
-                className={formErrors.email ? "border-destructive" : ""}
-              />
-              {formErrors.email && <p className="text-xs text-destructive">{formErrors.email}</p>}
             </div>
-            <div className="space-y-1.5">
-              <Label>Telefone</Label>
-              <MaskedInput mask="telefone" value={form.telefone} onChange={(v) => setForm({ ...form, telefone: v })} />
-              {formErrors.telefone && <p className="text-xs text-destructive">{formErrors.telefone}</p>}
-            </div>
-            <div className="space-y-1.5">
-              <Label>Celular / WhatsApp</Label>
-              <MaskedInput mask="celular" value={form.celular} onChange={(v) => setForm({ ...form, celular: v })} />
-              {formErrors.celular && <p className="text-xs text-destructive">{formErrors.celular}</p>}
+            <div>
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Canais de comunicação</p>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <div className="col-span-2 md:col-span-3 space-y-1.5">
+                  <div className="flex items-center gap-1">
+                    <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+                    <Label>E-mail</Label>
+                  </div>
+                  <Input
+                    type="email"
+                    value={form.email}
+                    onChange={(e) => updateForm({ email: e.target.value })}
+                    placeholder="email@empresa.com.br"
+                    className={formErrors.email ? "border-destructive" : ""}
+                  />
+                  {formErrors.email && <p className="text-xs text-destructive">{formErrors.email}</p>}
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Telefone</Label>
+                  <MaskedInput mask="telefone" value={form.telefone} onChange={(v) => updateForm({ telefone: v })} />
+                  {formErrors.telefone && <p className="text-xs text-destructive">{formErrors.telefone}</p>}
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Celular / WhatsApp</Label>
+                  <MaskedInput mask="celular" value={form.celular} onChange={(v) => updateForm({ celular: v })} />
+                  {formErrors.celular && <p className="text-xs text-destructive">{formErrors.celular}</p>}
+                </div>
+              </div>
             </div>
           </div>
 
@@ -427,7 +458,7 @@ const Clientes = () => {
           <p className="text-xs text-muted-foreground mb-3">
             Condições aplicadas por padrão em cotações e pedidos. Podem ser sobrescritas individualmente por operação.
           </p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-3">
             <div className="col-span-2 space-y-1.5">
               <div className="flex items-center gap-1">
                 <Label>Forma de Pagamento Padrão</Label>
@@ -442,7 +473,7 @@ const Clientes = () => {
               </div>
               <Select
                 value={form.forma_pagamento_padrao || "nenhuma"}
-                onValueChange={(v) => setForm({ ...form, forma_pagamento_padrao: v === "nenhuma" ? "" : v })}
+                onValueChange={(v) => updateForm({ forma_pagamento_padrao: v === "nenhuma" ? "" : v })}
               >
                 <SelectTrigger><SelectValue placeholder="Não definida" /></SelectTrigger>
                 <SelectContent>
@@ -468,7 +499,7 @@ const Clientes = () => {
                 min={0}
                 max={MAX_PAYMENT_DAYS}
                 value={form.prazo_padrao}
-                onChange={(e) => setForm({ ...form, prazo_padrao: Number(e.target.value) })}
+                onChange={(e) => updateForm({ prazo_padrao: Number(e.target.value) })}
                 className={formErrors.prazo_padrao ? "border-destructive" : ""}
               />
               {formErrors.prazo_padrao && <p className="text-xs text-destructive">{formErrors.prazo_padrao}</p>}
@@ -490,10 +521,12 @@ const Clientes = () => {
                 min={0}
                 max={MAX_PAYMENT_DAYS}
                 value={form.prazo_preferencial}
-                onChange={(e) => setForm({ ...form, prazo_preferencial: Number(e.target.value) })}
+                onChange={(e) => updateForm({ prazo_preferencial: Number(e.target.value) })}
               />
             </div>
-            <div className="col-span-2 md:col-span-2 space-y-1.5">
+          </div>
+          <div className="mb-6">
+            <div className="rounded-md border bg-muted/20 px-4 py-3 space-y-1.5">
               <div className="flex items-center gap-1">
                 <Label>Limite de Crédito (R$)</Label>
                 <Tooltip>
@@ -511,8 +544,8 @@ const Clientes = () => {
                 min={0}
                 placeholder="0,00"
                 value={form.limite_credito}
-                onChange={(e) => setForm({ ...form, limite_credito: Number(e.target.value) })}
-                className={formErrors.limite_credito ? "border-destructive" : ""}
+                onChange={(e) => updateForm({ limite_credito: Number(e.target.value) })}
+                className={`max-w-xs ${formErrors.limite_credito ? "border-destructive" : ""}`}
               />
               {formErrors.limite_credito && <p className="text-xs text-destructive">{formErrors.limite_credito}</p>}
             </div>
@@ -526,12 +559,12 @@ const Clientes = () => {
           <p className="text-xs text-muted-foreground mb-3">
             Vincule o cliente a um grupo econômico para consolidar dados de vendas, crédito e relacionamento.
           </p>
-          <div className="grid grid-cols-2 gap-4 mb-6">
+          <div className="grid grid-cols-2 gap-4 mb-3">
             <div className="space-y-1.5">
               <Label>Grupo Econômico</Label>
               <Select
                 value={form.grupo_economico_id || "nenhum"}
-                onValueChange={(v) => setForm({ ...form, grupo_economico_id: v === "nenhum" ? "" : v })}
+                onValueChange={(v) => updateForm({ grupo_economico_id: v === "nenhum" ? "" : v })}
               >
                 <SelectTrigger><SelectValue placeholder="Nenhum" /></SelectTrigger>
                 <SelectContent>
@@ -557,7 +590,7 @@ const Clientes = () => {
               </div>
               <Select
                 value={form.tipo_relacao_grupo}
-                onValueChange={(v) => setForm({ ...form, tipo_relacao_grupo: v })}
+                onValueChange={(v) => updateForm({ tipo_relacao_grupo: v })}
               >
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -566,6 +599,15 @@ const Clientes = () => {
               </Select>
             </div>
           </div>
+          {form.grupo_economico_id ? (
+            <div className="mb-6 flex items-center gap-2 bg-muted/30 rounded-md px-3 py-2 text-xs text-muted-foreground border">
+              <Building2 className="h-3.5 w-3.5 shrink-0 text-primary/60" />
+              <span>
+                <strong className="text-foreground">{grupos.find(g => g.id === form.grupo_economico_id)?.nome}</strong>
+                {" — "}{relacaoLabel[form.tipo_relacao_grupo] || form.tipo_relacao_grupo}
+              </span>
+            </div>
+          ) : <div className="mb-6" />}
 
           {/* ── BLOCO 5: LOGÍSTICA ────────────────────────────── */}
           <div className="flex items-center gap-2 pt-4 pb-3 border-t mb-4">
@@ -596,10 +638,13 @@ const Clientes = () => {
                 <MaskedInput
                   mask="cep"
                   value={form.cep}
-                  onChange={(v) => setForm({ ...form, cep: v })}
+                  onChange={(v) => updateForm({ cep: v })}
                   onBlur={async () => {
                     const result = await buscarCep(form.cep);
-                    if (result) setForm(prev => ({ ...prev, logradouro: result.logradouro, bairro: result.bairro, cidade: result.localidade, uf: result.uf }));
+                    if (result) {
+                      setForm(prev => ({ ...prev, logradouro: result.logradouro, bairro: result.bairro, cidade: result.localidade, uf: result.uf }));
+                      setIsDirty(true);
+                    }
                   }}
                   className={cepLoading ? "pr-8" : ""}
                 />
@@ -611,23 +656,23 @@ const Clientes = () => {
             </div>
             <div className="col-span-2 space-y-1.5">
               <Label>Logradouro</Label>
-              <Input value={form.logradouro} onChange={(e) => setForm({ ...form, logradouro: e.target.value })} placeholder="Rua, Av., Travessa..." />
+              <Input value={form.logradouro} onChange={(e) => updateForm({ logradouro: e.target.value })} placeholder="Rua, Av., Travessa..." />
             </div>
             <div className="space-y-1.5">
               <Label>Número</Label>
-              <Input value={form.numero} onChange={(e) => setForm({ ...form, numero: e.target.value })} placeholder="Nº ou S/N" />
+              <Input value={form.numero} onChange={(e) => updateForm({ numero: e.target.value })} placeholder="Nº ou S/N" />
             </div>
-            <div className="col-span-2 space-y-1.5">
+            <div className="space-y-1.5">
               <Label>Complemento</Label>
-              <Input value={form.complemento} onChange={(e) => setForm({ ...form, complemento: e.target.value })} placeholder="Sala, bloco, andar..." />
+              <Input value={form.complemento} onChange={(e) => updateForm({ complemento: e.target.value })} placeholder="Sala, bloco, andar..." />
             </div>
             <div className="space-y-1.5">
               <Label>Bairro</Label>
-              <Input value={form.bairro} onChange={(e) => setForm({ ...form, bairro: e.target.value })} />
+              <Input value={form.bairro} onChange={(e) => updateForm({ bairro: e.target.value })} />
             </div>
             <div className="space-y-1.5">
               <Label>Cidade</Label>
-              <Input value={form.cidade} onChange={(e) => setForm({ ...form, cidade: e.target.value })} />
+              <Input value={form.cidade} onChange={(e) => updateForm({ cidade: e.target.value })} />
             </div>
             <div className="space-y-1.5">
               <Label>UF</Label>
@@ -635,14 +680,14 @@ const Clientes = () => {
                 maxLength={2}
                 placeholder="SP"
                 value={form.uf}
-                onChange={(e) => setForm({ ...form, uf: e.target.value.toUpperCase() })}
+                onChange={(e) => updateForm({ uf: e.target.value.toUpperCase() })}
                 className={formErrors.uf ? "border-destructive" : ""}
               />
               {formErrors.uf && <p className="text-xs text-destructive">{formErrors.uf}</p>}
             </div>
             <div className="space-y-1.5">
               <Label>País</Label>
-              <Input value={form.pais} onChange={(e) => setForm({ ...form, pais: e.target.value })} />
+              <Input value={form.pais} onChange={(e) => updateForm({ pais: e.target.value })} />
             </div>
             <div className="space-y-1.5">
               <div className="flex items-center gap-1">
@@ -656,7 +701,7 @@ const Clientes = () => {
                   </TooltipContent>
                 </Tooltip>
               </div>
-              <Input value={form.caixa_postal} onChange={(e) => setForm({ ...form, caixa_postal: e.target.value })} placeholder="Ex: CP 1234" />
+              <Input value={form.caixa_postal} onChange={(e) => updateForm({ caixa_postal: e.target.value })} placeholder="Ex: CP 1234" />
             </div>
           </div>
 
@@ -670,16 +715,27 @@ const Clientes = () => {
           </p>
           <div className="mb-6">
             <Textarea
-              rows={4}
+              rows={5}
+              maxLength={MAX_OBSERVACOES_LENGTH}
               value={form.observacoes}
-              onChange={(e) => setForm({ ...form, observacoes: e.target.value })}
+              onChange={(e) => updateForm({ observacoes: e.target.value })}
               placeholder="Informações relevantes sobre o cliente: preferências, restrições, histórico de relacionamento..."
             />
+            <p className="text-xs text-muted-foreground mt-1 text-right">{(form.observacoes || "").length}/{MAX_OBSERVACOES_LENGTH}</p>
           </div>
 
           {/* ── RODAPÉ ────────────────────────────────────────── */}
           <div className="flex justify-end gap-2 pt-4 border-t">
-            <Button type="button" variant="outline" onClick={() => setModalOpen(false)}>Cancelar</Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                if (isDirty && !window.confirm("Existem alterações não salvas. Deseja descartar as alterações?")) return;
+                setModalOpen(false);
+              }}
+            >
+              Cancelar
+            </Button>
             <Button type="submit" disabled={saving} className="min-w-[100px]">
               {saving ? (
                 <span className="flex items-center gap-1.5">
