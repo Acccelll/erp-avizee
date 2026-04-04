@@ -126,7 +126,7 @@ const Produtos = () => {
       id: p.id,
       nome: p.nome, sku: p.sku || "", codigo_interno: p.codigo_interno || "", descricao: p.descricao || "",
       unidade_medida: p.unidade_medida, preco_custo: p.preco_custo || 0, preco_venda: p.preco_venda,
-      estoque_minimo: p.estoque_minimo || 0, ncm: p.ncm || "", cst: p.cst || "", cfop_padrao: p.cfop_padrao || "",
+      estoque_minimo: p.estoque_minimo || 0, ncm: (p.ncm || "").replace(/\D/g, ''), cst: p.cst || "", cfop_padrao: p.cfop_padrao || "",
       peso: p.peso || 0, eh_composto: p.eh_composto || false,
       grupo_id: p.grupo_id || ""
     });
@@ -186,6 +186,7 @@ const Produtos = () => {
     if (form.eh_composto && editComposicao.length === 0) {toast.error("Produto composto precisa de ao menos um componente");return;}
     if (form.eh_composto && editComposicao.some((c) => !c.produto_filho_id)) {toast.error("Selecione o produto para todos os componentes");return;}
     const fornDups = editFornecedores.map(f => f.fornecedor_id).filter(Boolean);
+    if (editFornecedores.some(f => !f.fornecedor_id)) {toast.error("Selecione o fornecedor para todos os vínculos ou remova os vazios");return;}
     if (fornDups.length !== new Set(fornDups).size) {toast.error("Fornecedor duplicado: o mesmo fornecedor não pode ser vinculado duas vezes");return;}
     setSaving(true);
     try {
