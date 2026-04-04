@@ -9,7 +9,8 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { RelationalLink } from "@/components/ui/RelationalLink";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
-import { Edit, Trash2, AlertTriangle, CheckCircle2, ShieldAlert } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Edit, Trash2, AlertTriangle, CheckCircle2, ShieldAlert, Building2, Info, Star, FileText, TrendingUp } from "lucide-react";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,7 +39,12 @@ interface ClienteDoGrupo {
   uf: string | null;
 }
 
-const emptyForm: Record<string, any> = { nome: "", observacoes: "" };
+interface ClienteSimples {
+  id: string;
+  nome_razao_social: string;
+}
+
+const emptyForm: Record<string, any> = { nome: "", observacoes: "", empresa_matriz_id: "" };
 
 const relacaoLabel: Record<string, string> = {
   matriz: "Matriz",
@@ -75,6 +81,7 @@ const GruposEconomicos = () => {
   const [selected, setSelected] = useState<GrupoEconomico | null>(null);
   const [mode, setMode] = useState<"create" | "edit">("create");
   const [form, setForm] = useState(emptyForm);
+  const [initialForm, setInitialForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [empresas, setEmpresas] = useState<ClienteDoGrupo[]>([]);
   const [saldoConsolidado, setSaldoConsolidado] = useState(0);
@@ -84,12 +91,87 @@ const GruposEconomicos = () => {
   const [perEmpresaFinanceiro, setPerEmpresaFinanceiro] = useState<Record<string, { saldo: number; vencidos: number }>>({});
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  // modal-specific state for the improved edit form
+  const [clientesDisponiveis, setClientesDisponiveis] = useState<ClienteSimples[]>([]);
+  const [loadingClientes, setLoadingClientes] = useState(false);
+  const [modalEmpresas, setModalEmpresas] = useState<ClienteDoGrupo[]>([]);
+  const [modalSaldo, setModalSaldo] = useState(0);
+  const [modalVencidos, setModalVencidos] = useState(0);
+  const [loadingSummary, setLoadingSummary] = useState(false);
 
-  const openCreate = () => { setMode("create"); setForm({ ...emptyForm }); setSelected(null); setModalOpen(true); };
-  const openEdit = (g: GrupoEconomico) => {
-    setMode("edit"); setSelected(g);
-    setForm({ nome: g.nome, observacoes: g.observacoes || "" });
+  const isDirty =
+    form.nome !== initialForm.nome ||
+    (form.observacoes || "") !== (initialForm.observacoes || "") ||
+    (form.empresa_matriz_id || "") !== (initialForm.empresa_matriz_id || "");
+
+  const loadClientes = async () => {
+    if (clientesDisponiveis.length > 0) return;
+    setLoadingClientes(true);
+    try {
+      const { data: c } = await supabase
+        .from("clientes")
+        .select("id, nome_razao_social")
+        .eq("ativo", true)
+        .order("nome_razao_social");
+      setClientesDisponiveis((c as ClienteSimples[]) || []);
+    } finally {
+      setLoadingClientes(false);
+    }
+  };
+
+  const loadModalSummary = async (g: GrupoEconomico) => {
+    setLoadingSummary(true);
+    setModalEmpresas([]);
+    setModalSaldo(0);
+    setModalVencidos(0);
+    try {
+      const { data: clientes } = await supabase
+        .from("clientes")
+        .select("id, nome_razao_social, nome_fantasia, cpf_cnpj, tipo_relacao_grupo, cidade, uf")
+        .eq("grupo_economico_id", g.id)
+        .eq("ativo", true);
+      const clientesList: ClienteDoGrupo[] = (clientes as ClienteDoGrupo[]) || [];
+      setModalEmpresas(clientesList);
+      const clienteIds = clientesList.map((c) => c.id);
+      if (clienteIds.length > 0) {
+        const { data: titulos } = await supabase
+          .from("financeiro_lancamentos")
+          .select("valor, status")
+          .in("cliente_id", clienteIds)
+          .eq("tipo", "receber")
+          .eq("ativo", true)
+          .in("status", ["aberto", "vencido"]);
+        const tots = (titulos || []) as { valor: string | number; status: string }[];
+        setModalSaldo(tots.reduce((s, t) => s + Number(t.valor || 0), 0));
+        setModalVencidos(tots.filter((t) => t.status === "vencido").length);
+      }
+    } finally {
+      setLoadingSummary(false);
+    }
+  };
+
+  const openCreate = () => {
+    setMode("create");
+    const f = { ...emptyForm };
+    setForm(f);
+    setInitialForm(f);
+    setSelected(null);
+    setModalEmpresas([]);
+    setModalSaldo(0);
+    setModalVencidos(0);
     setModalOpen(true);
+    loadClientes();
+  };
+
+  const openEdit = (g: GrupoEconomico) => {
+    setMode("edit");
+    setSelected(g);
+    const f = { nome: g.nome, observacoes: g.observacoes || "", empresa_matriz_id: g.empresa_matriz_id || "" };
+    setForm(f);
+    setInitialForm(f);
+    setModalOpen(true);
+    loadClientes();
+    loadModalSummary(g);
   };
 
   const openView = async (g: GrupoEconomico) => {
@@ -153,11 +235,17 @@ const GruposEconomicos = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.nome) return;
+    const nome = form.nome.trim();
+    if (!nome || nome.length < 2) return;
     setSaving(true);
     try {
-      if (mode === "create") await create(form);
-      else if (selected) await update(selected.id, form);
+      const payload = {
+        nome,
+        observacoes: form.observacoes?.trim() || null,
+        empresa_matriz_id: form.empresa_matriz_id || null,
+      };
+      if (mode === "create") await create(payload);
+      else if (selected) await update(selected.id, payload);
       setModalOpen(false);
     } catch (err) {
       console.error("[grupos-economicos] erro ao salvar:", err);
@@ -427,19 +515,187 @@ const GruposEconomicos = () => {
         <DataTable columns={columns} data={data} loading={loading} onView={openView} />
       </ModulePage>
 
-      <FormModal open={modalOpen} onClose={() => setModalOpen(false)} title={mode === "create" ? "Novo Grupo Econômico" : "Editar Grupo Econômico"}>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label>Nome do Grupo *</Label>
-            <Input value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} required />
+      <FormModal open={modalOpen} onClose={() => setModalOpen(false)} title={mode === "create" ? "Novo Grupo Econômico" : "Editar Grupo Econômico"} size="lg">
+        {/* Edit mode context bar */}
+        {mode === "edit" && selected && (
+          <div className="flex flex-wrap items-center gap-3 bg-muted/40 rounded-lg px-3 py-2 mb-4 text-xs text-muted-foreground border">
+            <StatusBadge status={selected.ativo ? "Ativo" : "Inativo"} />
+            {isDirty && (
+              <span className="flex items-center gap-1 text-amber-600 ml-auto font-medium">
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-500 inline-block" />
+                Alterações não salvas
+              </span>
+            )}
           </div>
-          <div className="space-y-2">
-            <Label>Observações</Label>
-            <Textarea value={form.observacoes} onChange={(e) => setForm({ ...form, observacoes: e.target.value })} />
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-0">
+          {/* ── BLOCO 1: IDENTIFICAÇÃO DO GRUPO ── */}
+          <div className="flex items-center gap-2 pb-3 border-b mb-3">
+            <Building2 className="w-4 h-4 text-primary/70" />
+            <h3 className="font-semibold text-sm">Identificação do Grupo</h3>
           </div>
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={() => setModalOpen(false)}>Cancelar</Button>
-            <Button type="submit" disabled={saving}>{saving ? "Salvando..." : "Salvar"}</Button>
+          <p className="text-xs text-muted-foreground mb-3">
+            Defina como o grupo será identificado no sistema. O nome é usado para consolidar dados comerciais e financeiros das empresas vinculadas.
+          </p>
+          <div className="mb-6 space-y-1.5">
+            <div className="flex items-center gap-1">
+              <Label className="text-sm font-medium">Nome do Grupo *</Label>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent className="max-w-[240px] text-xs">
+                  Grupos econômicos servem para consolidar empresas relacionadas e permitir leitura comercial e financeira conjunta. O nome deve ser único e representar claramente a estrutura.
+                </TooltipContent>
+              </Tooltip>
+            </div>
+            <Input
+              value={form.nome}
+              onChange={(e) => setForm({ ...form, nome: e.target.value })}
+              placeholder="Ex: Grupo ABC, Holding XYZ..."
+              required
+              minLength={2}
+              className="font-medium"
+            />
+            {form.nome.trim().length > 0 && form.nome.trim().length < 2 && (
+              <p className="text-xs text-destructive mt-1">O nome deve ter ao menos 2 caracteres.</p>
+            )}
+          </div>
+
+          {/* ── BLOCO 2: EMPRESA MATRIZ ── */}
+          <div className="flex items-center gap-2 pt-2 pb-3 border-t border-b mb-3">
+            <Star className="w-4 h-4 text-primary/70" />
+            <h3 className="font-semibold text-sm">Empresa Matriz</h3>
+          </div>
+          <p className="text-xs text-muted-foreground mb-3">
+            A empresa matriz é a controladora principal do grupo. Sua definição facilita a consolidação de informações e aparece em destaque no painel do grupo.
+          </p>
+          <div className="mb-3 space-y-1.5">
+            <div className="flex items-center gap-1">
+              <Label>Empresa Matriz</Label>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent className="max-w-[240px] text-xs">
+                  Selecione o cliente cadastrado que representa a empresa controladora deste grupo. A composição completa do grupo é definida pelos clientes vinculados a ele.
+                </TooltipContent>
+              </Tooltip>
+            </div>
+            <Select
+              value={form.empresa_matriz_id || "nenhuma"}
+              onValueChange={(v) => setForm({ ...form, empresa_matriz_id: v === "nenhuma" ? "" : v })}
+              disabled={loadingClientes}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder={loadingClientes ? "Carregando clientes..." : "Selecionar empresa matriz..."} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="nenhuma">Nenhuma</SelectItem>
+                {clientesDisponiveis.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.nome_razao_social}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {form.empresa_matriz_id ? (
+            <div className="mb-5 flex items-center gap-2 bg-primary/5 rounded-md px-3 py-2 text-xs text-muted-foreground border border-primary/20">
+              <Star className="h-3.5 w-3.5 shrink-0 text-primary/60" />
+              <span>
+                <strong className="text-foreground">
+                  {clientesDisponiveis.find((c) => c.id === form.empresa_matriz_id)?.nome_razao_social ?? "—"}
+                </strong>
+                {" — definida como empresa controladora do grupo"}
+              </span>
+            </div>
+          ) : (
+            <div className="mb-5 text-xs text-muted-foreground bg-muted/30 rounded-md px-3 py-2 border">
+              Sem empresa matriz definida. O grupo pode ser estruturado apenas com as empresas vinculadas.
+            </div>
+          )}
+
+          {/* ── BLOCO 3: CONTEXTO / OBSERVAÇÕES ── */}
+          <div className="flex items-center gap-2 pt-2 pb-3 border-t border-b mb-3">
+            <FileText className="w-4 h-4 text-primary/70" />
+            <h3 className="font-semibold text-sm">Contexto / Observações</h3>
+          </div>
+          <p className="text-xs text-muted-foreground mb-3">
+            Observações comerciais, financeiras e estruturais sobre o grupo.
+          </p>
+          <div className="mb-5 space-y-1.5">
+            <div className="flex items-center gap-1">
+              <Label>Observações</Label>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent className="max-w-[240px] text-xs">
+                  Use este campo para registrar informações relevantes sobre o grupo: histórico, particularidades comerciais, condições especiais de relacionamento, etc.
+                </TooltipContent>
+              </Tooltip>
+            </div>
+            <Textarea
+              value={form.observacoes}
+              onChange={(e) => setForm({ ...form, observacoes: e.target.value })}
+              placeholder="Registre informações relevantes sobre o grupo econômico: histórico, particularidades comerciais, condições especiais..."
+              className="min-h-[96px] resize-y"
+              rows={4}
+            />
+          </div>
+
+          {/* ── BLOCO 4: RESUMO CONSOLIDADO (edit mode only) ── */}
+          {mode === "edit" && (
+            <>
+              <div className="flex items-center gap-2 pt-2 pb-3 border-t border-b mb-3">
+                <TrendingUp className="w-4 h-4 text-primary/70" />
+                <h3 className="font-semibold text-sm">Resumo Consolidado</h3>
+                <span className="ml-auto text-[10px] text-muted-foreground uppercase tracking-wider">apenas leitura</span>
+              </div>
+              {loadingSummary ? (
+                <div className="mb-5 h-[76px] rounded-lg bg-muted/30 animate-pulse" />
+              ) : (
+                <div className="mb-5 grid grid-cols-3 gap-3">
+                  <div className="rounded-lg border bg-card p-3 text-center space-y-1">
+                    <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Empresas</p>
+                    <p className="font-bold text-2xl text-foreground">{modalEmpresas.length}</p>
+                  </div>
+                  <div className="rounded-lg border bg-card p-3 text-center space-y-1">
+                    <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Saldo Aberto</p>
+                    <p className={`font-mono font-bold text-xs ${modalSaldo > 0 ? "text-yellow-600 dark:text-yellow-400" : "text-foreground"}`}>
+                      {formatCurrency(modalSaldo)}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border bg-card p-3 text-center space-y-1">
+                    <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Vencidos</p>
+                    <p className={`font-bold text-2xl ${modalVencidos > 0 ? "text-destructive" : "text-emerald-600 dark:text-emerald-400"}`}>
+                      {modalVencidos}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* ── FOOTER ── */}
+          <div className="flex items-center justify-between pt-4 border-t">
+            {isDirty ? (
+              <span className="text-xs text-amber-600 flex items-center gap-1">
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-500 inline-block" />
+                Alterações não salvas
+              </span>
+            ) : <span />}
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" onClick={() => setModalOpen(false)}>Cancelar</Button>
+              <Button
+                type="submit"
+                disabled={saving || !form.nome.trim() || form.nome.trim().length < 2}
+              >
+                {saving ? "Salvando..." : "Salvar"}
+              </Button>
+            </div>
           </div>
         </form>
       </FormModal>
