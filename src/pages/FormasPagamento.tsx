@@ -191,11 +191,13 @@ export default function FormasPagamento() {
             </div>
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label>Descrição <span className="text-destructive">*</span></Label>
+                <Label htmlFor="fp-descricao">Descrição <span className="text-destructive" aria-hidden="true">*</span></Label>
                 <Input
+                  id="fp-descricao"
                   value={form.descricao}
                   onChange={(e) => setForm({ ...form, descricao: e.target.value })}
                   required
+                  aria-required="true"
                   placeholder="Ex: 30/60/90 DDL"
                   className="text-base font-medium"
                 />
@@ -335,7 +337,7 @@ export default function FormasPagamento() {
               </div>
               <div className="flex items-start gap-2">
                 <TrendingUp className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                <span><span className="font-medium text-foreground">Financeiro:</span> {form.gera_financeiro ? "gera lançamentos automáticos ao finalizar pedidos." : "não gera lançamentos automáticos — configure se necessário."}</span>
+                <span><span className="font-medium text-foreground">Financeiro:</span> {form.gera_financeiro ? "gera lançamentos automáticos ao finalizar pedidos." : "não gera lançamentos automáticos — ative em Comportamento Financeiro se necessário."}</span>
               </div>
             </div>
           </div>
