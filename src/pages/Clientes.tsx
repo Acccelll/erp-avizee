@@ -18,9 +18,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { MultiSelect, type MultiSelectOption } from "@/components/ui/MultiSelect";
 import { Textarea } from "@/components/ui/textarea";
 import { MaskedInput } from "@/components/ui/MaskedInput";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { supabase } from "@/integrations/supabase/client";
+import { formatDate } from "@/lib/format";
 import { toast } from "sonner";
-import { Building2, Search } from "lucide-react";
+import {
+  Building2, Search, User2, Phone, CreditCard, MapPin, Truck, FileText,
+  Info, Loader2, Calendar, Mail,
+} from "lucide-react";
 import { clienteFornecedorSchema, validateForm } from "@/lib/validationSchemas";
 
 interface Cliente {
@@ -48,6 +53,8 @@ const relacaoOptions = [
 { value: "matriz", label: "Matriz" },
 { value: "filial", label: "Filial" },
 { value: "coligada", label: "Coligada" }];
+
+const MAX_PAYMENT_DAYS = 365;
 
 
 const Clientes = () => {
@@ -242,83 +249,445 @@ const Clientes = () => {
       </ModulePage>
 
       {/* Form Modal */}
-      <FormModal open={modalOpen} onClose={() => setModalOpen(false)} title={mode === "create" ? "Novo Cliente" : "Editar Cliente"} size="lg">
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            <div className="space-y-2"><Label>Tipo Pessoa</Label>
+      <FormModal open={modalOpen} onClose={() => setModalOpen(false)} title={mode === "create" ? "Novo Cliente" : "Editar Cliente"} size="xl">
+        <form onSubmit={handleSubmit} className="space-y-0">
+
+          {/* Edit-mode context bar */}
+          {mode === "edit" && selected && (
+            <div className="flex flex-wrap items-center gap-3 bg-muted/40 rounded-lg px-3 py-2 mb-4 text-xs text-muted-foreground border">
+              <StatusBadge status={selected.ativo ? "Ativo" : "Inativo"} />
+              {selected.created_at && (
+                <span className="flex items-center gap-1">
+                  <Calendar className="h-3 w-3" />
+                  Cadastrado em {formatDate(selected.created_at)}
+                </span>
+              )}
+              {selected.nome_fantasia && (
+                <span className="truncate max-w-[180px]">
+                  <span className="font-medium text-foreground">{selected.nome_fantasia}</span>
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* ── BLOCO 1: IDENTIFICAÇÃO ─────────────────────────── */}
+          <div className="flex items-center gap-2 pt-1 pb-3 border-b mb-4">
+            <User2 className="w-4 h-4 text-primary/70" />
+            <h3 className="font-semibold text-sm">Identificação</h3>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+            <div className="space-y-1.5">
+              <Label>Tipo de Pessoa</Label>
               <Select value={form.tipo_pessoa} onValueChange={(v) => setForm({ ...form, tipo_pessoa: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent><SelectItem value="F">Pessoa Física</SelectItem><SelectItem value="J">Pessoa Jurídica</SelectItem></SelectContent>
+                <SelectContent>
+                  <SelectItem value="F">Pessoa Física</SelectItem>
+                  <SelectItem value="J">Pessoa Jurídica</SelectItem>
+                </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2"><Label>CPF/CNPJ</Label><div className="flex gap-1"><MaskedInput mask="cpf_cnpj" value={form.cpf_cnpj} onChange={(v) => setForm({ ...form, cpf_cnpj: v })} /><Button type="button" variant="outline" size="icon" className="shrink-0" disabled={cnpjLoading || form.tipo_pessoa !== "J"} onClick={async () => {
-              const result = await buscarCnpj(form.cpf_cnpj);
-              if (result) setForm(prev => ({
-                ...prev,
-                nome_razao_social: result.razao_social || prev.nome_razao_social,
-                nome_fantasia: result.nome_fantasia || prev.nome_fantasia,
-                email: result.email || prev.email,
-                telefone: result.telefone || prev.telefone,
-                logradouro: result.logradouro || prev.logradouro,
-                numero: result.numero || prev.numero,
-                complemento: result.complemento || prev.complemento,
-                bairro: result.bairro || prev.bairro,
-                cidade: result.municipio || prev.cidade,
-                uf: result.uf || prev.uf,
-                cep: result.cep || prev.cep,
-              }));
-            }}><Search className="h-4 w-4" /></Button></div>{formErrors.cpf_cnpj && <p className="text-xs text-destructive">{formErrors.cpf_cnpj}</p>}</div>
-            <div className="space-y-2"><Label>I.E.</Label><Input value={form.inscricao_estadual} onChange={(e) => setForm({ ...form, inscricao_estadual: e.target.value })} /></div>
-            <div className="col-span-2 md:col-span-3 space-y-2"><Label>Nome / Razão Social *</Label><Input value={form.nome_razao_social} onChange={(e) => setForm({ ...form, nome_razao_social: e.target.value })} required className={formErrors.nome_razao_social ? "border-destructive" : ""} />{formErrors.nome_razao_social && <p className="text-xs text-destructive">{formErrors.nome_razao_social}</p>}</div>
-            <div className="col-span-2 md:col-span-3 space-y-2"><Label>Nome Fantasia</Label><Input value={form.nome_fantasia} onChange={(e) => setForm({ ...form, nome_fantasia: e.target.value })} /></div>
-            <div className="space-y-2"><Label>E-mail</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className={formErrors.email ? "border-destructive" : ""} />{formErrors.email && <p className="text-xs text-destructive">{formErrors.email}</p>}</div>
-            <div className="space-y-2"><Label>Telefone</Label><MaskedInput mask="telefone" value={form.telefone} onChange={(v) => setForm({ ...form, telefone: v })} /></div>
-            <div className="space-y-2"><Label>Celular</Label><MaskedInput mask="celular" value={form.celular} onChange={(v) => setForm({ ...form, celular: v })} /></div>
-            <div className="space-y-2"><Label>Contato</Label><Input value={form.contato} onChange={(e) => setForm({ ...form, contato: e.target.value })} /></div>
-            <div className="space-y-2"><Label>Prazo (dias)</Label><Input type="number" value={form.prazo_padrao} onChange={(e) => setForm({ ...form, prazo_padrao: Number(e.target.value) })} /></div>
-            <div className="space-y-2"><Label>Limite Crédito</Label><Input type="number" step="0.01" value={form.limite_credito} onChange={(e) => setForm({ ...form, limite_credito: Number(e.target.value) })} /></div>
-            <div className="space-y-2"><Label>Forma de Pagamento Padrão</Label>
-              <Select value={form.forma_pagamento_padrao || "nenhuma"} onValueChange={(v) => setForm({ ...form, forma_pagamento_padrao: v === "nenhuma" ? "" : v })}>
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-1">
+                <Label>CPF/CNPJ</Label>
+                {form.tipo_pessoa === "J" && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-[220px] text-xs">
+                      Informe o CNPJ e clique em <strong>Consultar</strong> para preencher automaticamente Razão Social, Nome Fantasia, e-mail, telefone e endereço.
+                    </TooltipContent>
+                  </Tooltip>
+                )}
+              </div>
+              <div className="flex gap-1">
+                <MaskedInput mask="cpf_cnpj" value={form.cpf_cnpj} onChange={(v) => setForm({ ...form, cpf_cnpj: v })} />
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="shrink-0"
+                      disabled={cnpjLoading || form.tipo_pessoa !== "J"}
+                      onClick={async () => {
+                        const result = await buscarCnpj(form.cpf_cnpj);
+                        if (result) setForm(prev => ({
+                          ...prev,
+                          nome_razao_social: result.razao_social || prev.nome_razao_social,
+                          nome_fantasia: result.nome_fantasia || prev.nome_fantasia,
+                          email: result.email || prev.email,
+                          telefone: result.telefone || prev.telefone,
+                          logradouro: result.logradouro || prev.logradouro,
+                          numero: result.numero || prev.numero,
+                          complemento: result.complemento || prev.complemento,
+                          bairro: result.bairro || prev.bairro,
+                          cidade: result.municipio || prev.cidade,
+                          uf: result.uf || prev.uf,
+                          cep: result.cep || prev.cep,
+                        }));
+                      }}
+                    >
+                      {cnpjLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent className="text-xs">
+                    {form.tipo_pessoa !== "J" ? "Disponível apenas para Pessoa Jurídica" : "Consultar CNPJ e preencher automaticamente"}
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              {formErrors.cpf_cnpj && <p className="text-xs text-destructive">{formErrors.cpf_cnpj}</p>}
+            </div>
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-1">
+                <Label>Inscrição Estadual</Label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-[200px] text-xs">
+                    Inscrição Estadual para emissão de notas fiscais. Informe "ISENTO" quando aplicável.
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              <Input value={form.inscricao_estadual} onChange={(e) => setForm({ ...form, inscricao_estadual: e.target.value })} placeholder="Ex: 123.456.789.000 ou ISENTO" />
+            </div>
+            <div className="col-span-2 md:col-span-3 space-y-1.5">
+              <Label>Nome / Razão Social <span className="text-destructive">*</span></Label>
+              <Input
+                value={form.nome_razao_social}
+                onChange={(e) => setForm({ ...form, nome_razao_social: e.target.value })}
+                required
+                placeholder={form.tipo_pessoa === "J" ? "Razão social conforme CNPJ" : "Nome completo"}
+                className={formErrors.nome_razao_social ? "border-destructive" : ""}
+              />
+              {formErrors.nome_razao_social && <p className="text-xs text-destructive">{formErrors.nome_razao_social}</p>}
+            </div>
+            <div className="col-span-2 md:col-span-3 space-y-1.5">
+              <div className="flex items-center gap-1">
+                <Label>Nome Fantasia</Label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-[200px] text-xs">
+                    Nome comercial pelo qual o cliente é conhecido. Aparece nas listagens e relatórios.
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              <Input value={form.nome_fantasia} onChange={(e) => setForm({ ...form, nome_fantasia: e.target.value })} placeholder="Nome comercial (opcional)" />
+            </div>
+          </div>
+
+          {/* ── BLOCO 2: CONTATO ──────────────────────────────── */}
+          <div className="flex items-center gap-2 pt-4 pb-3 border-t border-b mb-4">
+            <Phone className="w-4 h-4 text-primary/70" />
+            <h3 className="font-semibold text-sm">Contato</h3>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+            <div className="col-span-2 md:col-span-3 space-y-1.5">
+              <Label>Pessoa de Contato</Label>
+              <Input
+                value={form.contato}
+                onChange={(e) => setForm({ ...form, contato: e.target.value })}
+                placeholder="Nome do responsável pelo contato comercial"
+              />
+            </div>
+            <div className="col-span-2 md:col-span-3 space-y-1.5">
+              <div className="flex items-center gap-1">
+                <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+                <Label>E-mail</Label>
+              </div>
+              <Input
+                type="email"
+                value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
+                placeholder="email@empresa.com.br"
+                className={formErrors.email ? "border-destructive" : ""}
+              />
+              {formErrors.email && <p className="text-xs text-destructive">{formErrors.email}</p>}
+            </div>
+            <div className="space-y-1.5">
+              <Label>Telefone</Label>
+              <MaskedInput mask="telefone" value={form.telefone} onChange={(v) => setForm({ ...form, telefone: v })} />
+              {formErrors.telefone && <p className="text-xs text-destructive">{formErrors.telefone}</p>}
+            </div>
+            <div className="space-y-1.5">
+              <Label>Celular / WhatsApp</Label>
+              <MaskedInput mask="celular" value={form.celular} onChange={(v) => setForm({ ...form, celular: v })} />
+              {formErrors.celular && <p className="text-xs text-destructive">{formErrors.celular}</p>}
+            </div>
+          </div>
+
+          {/* ── BLOCO 3: CONDIÇÕES COMERCIAIS ─────────────────── */}
+          <div className="flex items-center gap-2 pt-4 pb-1 border-t">
+            <CreditCard className="w-4 h-4 text-primary/70" />
+            <h3 className="font-semibold text-sm">Condições Comerciais</h3>
+          </div>
+          <p className="text-xs text-muted-foreground mb-3">
+            Condições aplicadas por padrão em cotações e pedidos. Podem ser sobrescritas individualmente por operação.
+          </p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div className="col-span-2 space-y-1.5">
+              <div className="flex items-center gap-1">
+                <Label>Forma de Pagamento Padrão</Label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-[220px] text-xs">
+                    Forma de pagamento pré-selecionada ao criar pedidos para este cliente.
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              <Select
+                value={form.forma_pagamento_padrao || "nenhuma"}
+                onValueChange={(v) => setForm({ ...form, forma_pagamento_padrao: v === "nenhuma" ? "" : v })}
+              >
                 <SelectTrigger><SelectValue placeholder="Não definida" /></SelectTrigger>
-                <SelectContent><SelectItem value="nenhuma">Não definida</SelectItem>{formasPagamento.map((fp) => <SelectItem key={fp.id} value={fp.descricao}>{fp.descricao}</SelectItem>)}</SelectContent>
+                <SelectContent>
+                  <SelectItem value="nenhuma">Não definida</SelectItem>
+                  {formasPagamento.map((fp) => <SelectItem key={fp.id} value={fp.descricao}>{fp.descricao}</SelectItem>)}
+                </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2"><Label>Prazo Preferencial (dias)</Label><Input type="number" value={form.prazo_preferencial} onChange={(e) => setForm({ ...form, prazo_preferencial: Number(e.target.value) })} /></div>
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-1">
+                <Label>Prazo Padrão (dias)</Label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-[220px] text-xs">
+                    Prazo padrão em dias para pagamento. Aplicado automaticamente em novas operações.
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              <Input
+                type="number"
+                min={0}
+                max={MAX_PAYMENT_DAYS}
+                value={form.prazo_padrao}
+                onChange={(e) => setForm({ ...form, prazo_padrao: Number(e.target.value) })}
+                className={formErrors.prazo_padrao ? "border-destructive" : ""}
+              />
+              {formErrors.prazo_padrao && <p className="text-xs text-destructive">{formErrors.prazo_padrao}</p>}
+            </div>
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-1">
+                <Label>Prazo Preferencial (dias)</Label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-[220px] text-xs">
+                    Prazo alternativo negociado com o cliente. Diferente do prazo padrão — usado quando há condição especial acordada.
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              <Input
+                type="number"
+                min={0}
+                max={MAX_PAYMENT_DAYS}
+                value={form.prazo_preferencial}
+                onChange={(e) => setForm({ ...form, prazo_preferencial: Number(e.target.value) })}
+              />
+            </div>
+            <div className="col-span-2 md:col-span-2 space-y-1.5">
+              <div className="flex items-center gap-1">
+                <Label>Limite de Crédito (R$)</Label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-[220px] text-xs">
+                    Valor máximo de crédito disponível para este cliente. Impacta a análise de risco no financeiro.
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              <Input
+                type="number"
+                step="0.01"
+                min={0}
+                placeholder="0,00"
+                value={form.limite_credito}
+                onChange={(e) => setForm({ ...form, limite_credito: Number(e.target.value) })}
+                className={formErrors.limite_credito ? "border-destructive" : ""}
+              />
+              {formErrors.limite_credito && <p className="text-xs text-destructive">{formErrors.limite_credito}</p>}
+            </div>
           </div>
-          <h3 className="font-semibold text-sm pt-2 border-t flex items-center gap-2"><Building2 className="w-4 h-4" /> Grupo Econômico</h3>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2"><Label>Grupo</Label>
-              <Select value={form.grupo_economico_id || "nenhum"} onValueChange={(v) => setForm({ ...form, grupo_economico_id: v === "nenhum" ? "" : v })}>
+
+          {/* ── BLOCO 4: GRUPO ECONÔMICO ──────────────────────── */}
+          <div className="flex items-center gap-2 pt-4 pb-1 border-t">
+            <Building2 className="w-4 h-4 text-primary/70" />
+            <h3 className="font-semibold text-sm">Grupo Econômico</h3>
+          </div>
+          <p className="text-xs text-muted-foreground mb-3">
+            Vincule o cliente a um grupo econômico para consolidar dados de vendas, crédito e relacionamento.
+          </p>
+          <div className="grid grid-cols-2 gap-4 mb-6">
+            <div className="space-y-1.5">
+              <Label>Grupo Econômico</Label>
+              <Select
+                value={form.grupo_economico_id || "nenhum"}
+                onValueChange={(v) => setForm({ ...form, grupo_economico_id: v === "nenhum" ? "" : v })}
+              >
                 <SelectTrigger><SelectValue placeholder="Nenhum" /></SelectTrigger>
-                <SelectContent><SelectItem value="nenhum">Nenhum</SelectItem>{grupos.map((g) => <SelectItem key={g.id} value={g.id}>{g.nome}</SelectItem>)}</SelectContent>
+                <SelectContent>
+                  <SelectItem value="nenhum">Nenhum</SelectItem>
+                  {grupos.map((g) => <SelectItem key={g.id} value={g.id}>{g.nome}</SelectItem>)}
+                </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2"><Label>Tipo de Relação</Label>
-              <Select value={form.tipo_relacao_grupo} onValueChange={(v) => setForm({ ...form, tipo_relacao_grupo: v })}>
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-1">
+                <Label>Tipo de Relação</Label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-[240px] text-xs space-y-1">
+                    <p><strong>Matriz:</strong> empresa controladora do grupo.</p>
+                    <p><strong>Filial:</strong> empresa controlada pela matriz.</p>
+                    <p><strong>Coligada:</strong> empresa com participação societária no grupo.</p>
+                    <p><strong>Independente:</strong> sem vínculo hierárquico.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              <Select
+                value={form.tipo_relacao_grupo}
+                onValueChange={(v) => setForm({ ...form, tipo_relacao_grupo: v })}
+              >
                 <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{relacaoOptions.map((r) => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}</SelectContent>
+                <SelectContent>
+                  {relacaoOptions.map((r) => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}
+                </SelectContent>
               </Select>
             </div>
           </div>
-          <h3 className="font-semibold text-sm pt-2 border-t">Endereço</h3>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            <div className="space-y-2"><Label>CEP</Label><MaskedInput mask="cep" value={form.cep} onChange={(v) => setForm({ ...form, cep: v })} onBlur={async () => {
-              const result = await buscarCep(form.cep);
-              if (result) setForm(prev => ({ ...prev, logradouro: result.logradouro, bairro: result.bairro, cidade: result.localidade, uf: result.uf }));
-            }} /></div>
-            <div className="col-span-2 space-y-2"><Label>Logradouro</Label><Input value={form.logradouro} onChange={(e) => setForm({ ...form, logradouro: e.target.value })} /></div>
-            <div className="space-y-2"><Label>Número</Label><Input value={form.numero} onChange={(e) => setForm({ ...form, numero: e.target.value })} /></div>
-            <div className="space-y-2"><Label>Complemento</Label><Input value={form.complemento} onChange={(e) => setForm({ ...form, complemento: e.target.value })} /></div>
-            <div className="space-y-2"><Label>Bairro</Label><Input value={form.bairro} onChange={(e) => setForm({ ...form, bairro: e.target.value })} /></div>
-            <div className="space-y-2"><Label>Cidade</Label><Input value={form.cidade} onChange={(e) => setForm({ ...form, cidade: e.target.value })} /></div>
-            <div className="space-y-2"><Label>UF</Label><Input maxLength={2} value={form.uf} onChange={(e) => setForm({ ...form, uf: e.target.value.toUpperCase() })} /></div>
-            <div className="space-y-2"><Label>País</Label><Input value={form.pais} onChange={(e) => setForm({ ...form, pais: e.target.value })} /></div>
-            <div className="space-y-2"><Label>Caixa Postal</Label><Input value={form.caixa_postal} onChange={(e) => setForm({ ...form, caixa_postal: e.target.value })} placeholder="Ex: CP 1234" /></div>
+
+          {/* ── BLOCO 5: LOGÍSTICA ────────────────────────────── */}
+          <div className="flex items-center gap-2 pt-4 pb-3 border-t mb-4">
+            <Truck className="w-4 h-4 text-primary/70" />
+            <h3 className="font-semibold text-sm">Logística</h3>
           </div>
-          <div className="space-y-2"><Label>Observações</Label><Textarea value={form.observacoes} onChange={(e) => setForm({ ...form, observacoes: e.target.value })} /></div>
-          <div className="flex justify-end gap-2">
+          <div className="mb-6">
+            <div className="flex items-start gap-2 bg-muted/30 rounded-lg px-3 py-2.5 border border-dashed text-xs text-muted-foreground">
+              <Truck className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+              <span>
+                Transportadoras de preferência, modalidades de entrega e observações logísticas são gerenciadas na aba <strong className="text-foreground">Logística</strong> do cadastro do cliente. Após salvar, acesse o registro para configurar.
+              </span>
+            </div>
+          </div>
+
+          {/* ── BLOCO 6: ENDEREÇO ─────────────────────────────── */}
+          <div className="flex items-center gap-2 pt-4 pb-1 border-t">
+            <MapPin className="w-4 h-4 text-primary/70" />
+            <h3 className="font-semibold text-sm">Endereço</h3>
+          </div>
+          <p className="text-xs text-muted-foreground mb-3">
+            Informe o CEP para preenchimento automático do logradouro, bairro, cidade e UF.
+          </p>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+            <div className="space-y-1.5">
+              <Label>CEP</Label>
+              <div className="relative">
+                <MaskedInput
+                  mask="cep"
+                  value={form.cep}
+                  onChange={(v) => setForm({ ...form, cep: v })}
+                  onBlur={async () => {
+                    const result = await buscarCep(form.cep);
+                    if (result) setForm(prev => ({ ...prev, logradouro: result.logradouro, bairro: result.bairro, cidade: result.localidade, uf: result.uf }));
+                  }}
+                  className={cepLoading ? "pr-8" : ""}
+                />
+                {cepLoading && (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                )}
+              </div>
+              {formErrors.cep && <p className="text-xs text-destructive">{formErrors.cep}</p>}
+            </div>
+            <div className="col-span-2 space-y-1.5">
+              <Label>Logradouro</Label>
+              <Input value={form.logradouro} onChange={(e) => setForm({ ...form, logradouro: e.target.value })} placeholder="Rua, Av., Travessa..." />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Número</Label>
+              <Input value={form.numero} onChange={(e) => setForm({ ...form, numero: e.target.value })} placeholder="Nº ou S/N" />
+            </div>
+            <div className="col-span-2 space-y-1.5">
+              <Label>Complemento</Label>
+              <Input value={form.complemento} onChange={(e) => setForm({ ...form, complemento: e.target.value })} placeholder="Sala, bloco, andar..." />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Bairro</Label>
+              <Input value={form.bairro} onChange={(e) => setForm({ ...form, bairro: e.target.value })} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Cidade</Label>
+              <Input value={form.cidade} onChange={(e) => setForm({ ...form, cidade: e.target.value })} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>UF</Label>
+              <Input
+                maxLength={2}
+                placeholder="SP"
+                value={form.uf}
+                onChange={(e) => setForm({ ...form, uf: e.target.value.toUpperCase() })}
+                className={formErrors.uf ? "border-destructive" : ""}
+              />
+              {formErrors.uf && <p className="text-xs text-destructive">{formErrors.uf}</p>}
+            </div>
+            <div className="space-y-1.5">
+              <Label>País</Label>
+              <Input value={form.pais} onChange={(e) => setForm({ ...form, pais: e.target.value })} />
+            </div>
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-1">
+                <Label>Caixa Postal</Label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent className="text-xs">
+                    Caixa Postal para entrega de correspondências, quando diferente do endereço principal.
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              <Input value={form.caixa_postal} onChange={(e) => setForm({ ...form, caixa_postal: e.target.value })} placeholder="Ex: CP 1234" />
+            </div>
+          </div>
+
+          {/* ── BLOCO 7: OBSERVAÇÕES ──────────────────────────── */}
+          <div className="flex items-center gap-2 pt-4 pb-1 border-t">
+            <FileText className="w-4 h-4 text-primary/70" />
+            <h3 className="font-semibold text-sm">Observações</h3>
+          </div>
+          <p className="text-xs text-muted-foreground mb-3">
+            Notas internas e contexto adicional sobre o cliente. Visível apenas internamente.
+          </p>
+          <div className="mb-6">
+            <Textarea
+              rows={4}
+              value={form.observacoes}
+              onChange={(e) => setForm({ ...form, observacoes: e.target.value })}
+              placeholder="Informações relevantes sobre o cliente: preferências, restrições, histórico de relacionamento..."
+            />
+          </div>
+
+          {/* ── RODAPÉ ────────────────────────────────────────── */}
+          <div className="flex justify-end gap-2 pt-4 border-t">
             <Button type="button" variant="outline" onClick={() => setModalOpen(false)}>Cancelar</Button>
-            <Button type="submit" disabled={saving}>{saving ? "Salvando..." : "Salvar"}</Button>
+            <Button type="submit" disabled={saving} className="min-w-[100px]">
+              {saving ? (
+                <span className="flex items-center gap-1.5">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Salvando...
+                </span>
+              ) : "Salvar"}
+            </Button>
           </div>
         </form>
       </FormModal>
