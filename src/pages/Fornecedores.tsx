@@ -22,21 +22,22 @@ import { MaskedInput } from "@/components/ui/MaskedInput";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import {
-  Search, User2, Phone, ShoppingCart, MapPin, FileText,
-  Info, Loader2, Calendar, Mail,
+  Search, User2, Phone, ShoppingCart, MapPin,
+  Info, Loader2, Calendar, Mail, CheckCircle2, Handshake, BadgeCheck,
 } from "lucide-react";
 import { formatDate } from "@/lib/format";
 import { clienteFornecedorSchema, validateForm } from "@/lib/validationSchemas";
 
 const MAX_OBSERVACOES_LENGTH = 2000;
 const MAX_PRAZO_DAYS = 365;
+const MIN_NOME_RAZAO_SOCIAL_LENGTH = 2;
 
 interface Fornecedor {
   id: string;tipo_pessoa: string;nome_razao_social: string;nome_fantasia: string;
   cpf_cnpj: string;inscricao_estadual: string;email: string;telefone: string;celular: string;
   contato: string;prazo_padrao: number;logradouro: string;numero: string;complemento: string;
   bairro: string;cidade: string;uf: string;cep: string;pais: string;
-  observacoes: string;ativo: boolean;created_at: string;
+  observacoes: string;ativo: boolean;created_at: string;updated_at: string;
 }
 
 const emptyForm: Record<string, any> = {
@@ -212,6 +213,12 @@ const Fornecedores = () => {
                   Cadastrado em {formatDate(selected.created_at)}
                 </span>
               )}
+              {selected.updated_at && selected.updated_at !== selected.created_at && (
+                <span className="flex items-center gap-1">
+                  <BadgeCheck className="h-3 w-3" />
+                  Atualizado em {formatDate(selected.updated_at)}
+                </span>
+              )}
               {form.prazo_padrao ? (
                 <span className="flex items-center gap-1">
                   <ShoppingCart className="h-3 w-3" />
@@ -231,6 +238,12 @@ const Fornecedores = () => {
           <div className="flex items-center gap-2 pt-1 pb-3 border-b mb-4">
             <User2 className="w-4 h-4 text-primary/70" />
             <h3 className="font-semibold text-sm">Identificação</h3>
+            {form.cpf_cnpj && form.nome_razao_social.length >= MIN_NOME_RAZAO_SOCIAL_LENGTH && (
+              <span className="ml-auto flex items-center gap-1 text-xs text-emerald-600 font-medium">
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                Dados fiscais preenchidos
+              </span>
+            )}
           </div>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
             <div className="space-y-1.5">
@@ -259,42 +272,40 @@ const Fornecedores = () => {
               </div>
               <div className="flex gap-1">
                 <MaskedInput mask="cpf_cnpj" value={form.cpf_cnpj} onChange={(v) => updateForm({ cpf_cnpj: v })} />
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      className="shrink-0"
-                      disabled={cnpjLoading || form.tipo_pessoa !== "J"}
-                      onClick={async () => {
-                        const result = await buscarCnpj(form.cpf_cnpj);
-                        if (result) {
-                          updateForm({
-                            nome_razao_social: result.razao_social || form.nome_razao_social,
-                            nome_fantasia: result.nome_fantasia || form.nome_fantasia,
-                            email: result.email || form.email,
-                            telefone: result.telefone || form.telefone,
-                            logradouro: result.logradouro || form.logradouro,
-                            numero: result.numero || form.numero,
-                            complemento: result.complemento || form.complemento,
-                            bairro: result.bairro || form.bairro,
-                            cidade: result.municipio || form.cidade,
-                            uf: result.uf || form.uf,
-                            cep: result.cep || form.cep,
-                          });
-                        }
-                      }}
-                    >
-                      {cnpjLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent className="text-xs">
-                    {form.tipo_pessoa !== "J" ? "Disponível apenas para Pessoa Jurídica" : "Consultar CNPJ e preencher automaticamente"}
-                  </TooltipContent>
-                </Tooltip>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0 gap-1.5 px-3 text-xs"
+                  disabled={cnpjLoading || form.tipo_pessoa !== "J"}
+                  onClick={async () => {
+                    const result = await buscarCnpj(form.cpf_cnpj);
+                    if (result) {
+                      updateForm({
+                        nome_razao_social: result.razao_social || form.nome_razao_social,
+                        nome_fantasia: result.nome_fantasia || form.nome_fantasia,
+                        email: result.email || form.email,
+                        telefone: result.telefone || form.telefone,
+                        logradouro: result.logradouro || form.logradouro,
+                        numero: result.numero || form.numero,
+                        complemento: result.complemento || form.complemento,
+                        bairro: result.bairro || form.bairro,
+                        cidade: result.municipio || form.cidade,
+                        uf: result.uf || form.uf,
+                        cep: result.cep || form.cep,
+                      });
+                    }
+                  }}
+                >
+                  {cnpjLoading
+                    ? <><Loader2 className="h-3.5 w-3.5 animate-spin" />{" "}Consultando...</>
+                    : <><Search className="h-3.5 w-3.5" />{" "}Consultar CNPJ</>}
+                </Button>
               </div>
               {formErrors.cpf_cnpj && <p className="text-xs text-destructive">{formErrors.cpf_cnpj}</p>}
+              {form.tipo_pessoa === "J" && !formErrors.cpf_cnpj && (
+                <p className="text-xs text-muted-foreground">Consultar CNPJ preenche razão social, endereço e contato automaticamente.</p>
+              )}
             </div>
             <div className="space-y-1.5">
               <div className="flex items-center gap-1">
@@ -389,6 +400,9 @@ const Fornecedores = () => {
           <div className="flex items-center gap-2 pt-4 pb-1 border-t">
             <ShoppingCart className="w-4 h-4 text-primary/70" />
             <h3 className="font-semibold text-sm">Condições de Compra</h3>
+            <span className="ml-auto text-xs bg-blue-50 text-blue-600 border border-blue-200 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-800 rounded-full px-2 py-0.5 leading-none">
+              Aplica-se a compras e financeiro
+            </span>
           </div>
           <p className="text-xs text-muted-foreground mb-3">
             Condições comerciais padrão deste fornecedor. Aplicadas automaticamente em cotações e pedidos de compra. Podem ser sobrescritas por operação.
@@ -427,8 +441,9 @@ const Fornecedores = () => {
           <p className="text-xs text-muted-foreground mb-3">
             Informe o CEP para preenchimento automático do logradouro, bairro, cidade e UF.
           </p>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
-            <div className="space-y-1.5">
+          <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6">
+            {/* Busca por CEP */}
+            <div className="col-span-2 md:col-span-2 space-y-1.5">
               <Label>CEP</Label>
               <div className="relative">
                 <MaskedInput
@@ -449,27 +464,30 @@ const Fornecedores = () => {
               </div>
               {formErrors.cep && <p className="text-xs text-destructive">{formErrors.cep}</p>}
             </div>
-            <div className="col-span-2 space-y-1.5">
+            {/* Logradouro + Número na mesma linha */}
+            <div className="col-span-2 md:col-span-3 space-y-1.5">
               <Label>Logradouro</Label>
               <Input value={form.logradouro} onChange={(e) => updateForm({ logradouro: e.target.value })} placeholder="Rua, Av., Travessa..." />
             </div>
-            <div className="space-y-1.5">
+            <div className="col-span-2 md:col-span-1 space-y-1.5">
               <Label>Número</Label>
               <Input value={form.numero} onChange={(e) => updateForm({ numero: e.target.value })} placeholder="Nº ou S/N" />
             </div>
-            <div className="space-y-1.5">
+            {/* Complemento + Bairro */}
+            <div className="col-span-2 md:col-span-3 space-y-1.5">
               <Label>Complemento</Label>
               <Input value={form.complemento} onChange={(e) => updateForm({ complemento: e.target.value })} placeholder="Sala, bloco, galpão..." />
             </div>
-            <div className="space-y-1.5">
+            <div className="col-span-2 md:col-span-3 space-y-1.5">
               <Label>Bairro</Label>
               <Input value={form.bairro} onChange={(e) => updateForm({ bairro: e.target.value })} />
             </div>
-            <div className="space-y-1.5">
+            {/* Localização: Cidade + UF + País */}
+            <div className="col-span-2 md:col-span-3 space-y-1.5">
               <Label>Cidade</Label>
               <Input value={form.cidade} onChange={(e) => updateForm({ cidade: e.target.value })} />
             </div>
-            <div className="space-y-1.5">
+            <div className="col-span-1 md:col-span-1 space-y-1.5">
               <Label>UF</Label>
               <Input
                 maxLength={2}
@@ -480,19 +498,21 @@ const Fornecedores = () => {
               />
               {formErrors.uf && <p className="text-xs text-destructive">{formErrors.uf}</p>}
             </div>
-            <div className="space-y-1.5">
+            <div className="col-span-1 md:col-span-2 space-y-1.5">
               <Label>País</Label>
               <Input value={form.pais} onChange={(e) => updateForm({ pais: e.target.value })} />
             </div>
           </div>
 
-          {/* ── BLOCO 5: OBSERVAÇÕES ──────────────────────────── */}
+          {/* ── BLOCO 5: RELACIONAMENTO / OPERAÇÃO ────────────── */}
           <div className="flex items-center gap-2 pt-4 pb-1 border-t">
-            <FileText className="w-4 h-4 text-primary/70" />
-            <h3 className="font-semibold text-sm">Observações</h3>
+            <Handshake className="w-4 h-4 text-primary/70" />
+            <h3 className="font-semibold text-sm">Relacionamento / Operação</h3>
           </div>
           <p className="text-xs text-muted-foreground mb-3">
-            Notas internas, comerciais e operacionais sobre o fornecedor. Visível apenas internamente.
+            Observações internas, comerciais e operacionais sobre o fornecedor. Visível apenas internamente.
+            Use este campo para registrar condições especiais negociadas, restrições de fornecimento,
+            preferências logísticas e histórico de relacionamento.
           </p>
           <div className="mb-6">
             <Textarea
@@ -506,7 +526,13 @@ const Fornecedores = () => {
           </div>
 
           {/* ── RODAPÉ ────────────────────────────────────────── */}
-          <div className="flex justify-end gap-2 pt-4 border-t">
+          <div className="flex items-center justify-end gap-2 pt-4 border-t">
+            {isDirty && (
+              <span className="mr-auto text-xs text-amber-600 flex items-center gap-1">
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-500 inline-block" />
+                Há alterações não salvas
+              </span>
+            )}
             <Button
               type="button"
               variant="outline"
