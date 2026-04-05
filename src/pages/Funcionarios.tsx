@@ -7,7 +7,7 @@ import { FormModal } from "@/components/FormModal";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { ViewDrawerV2, ViewField, ViewSection } from "@/components/ViewDrawerV2";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Edit, Trash2, DollarSign, Users, UserCheck, UserX, CalendarDays, FileText, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { Edit, Trash2, DollarSign, Users, UserCheck, UserX, CalendarDays, FileText, AlertTriangle, CheckCircle2, HelpCircle, Loader2, Info } from "lucide-react";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,12 +42,13 @@ const tipoContratoLabel: Record<string, string> = { clt: "CLT", pj: "PJ", estagi
 /** Typed form for create/edit — avoids `Record<string, any>`. */
 interface FuncionarioForm {
   nome: string; cpf: string; cargo: string; departamento: string;
-  data_admissao: string; salario_base: number; tipo_contrato: string; observacoes: string;
+  data_admissao: string; data_demissao: string | null; salario_base: number;
+  tipo_contrato: string; observacoes: string; ativo: boolean;
 }
 
 const emptyForm: FuncionarioForm = {
   nome: "", cpf: "", cargo: "", departamento: "", data_admissao: new Date().toISOString().split("T")[0],
-  salario_base: 0, tipo_contrato: "clt", observacoes: "",
+  data_demissao: null, salario_base: 0, tipo_contrato: "clt", observacoes: "", ativo: true,
 };
 
 /**
@@ -75,6 +76,7 @@ export default function Funcionarios() {
   const [form, setForm] = useState<FuncionarioForm>(emptyForm);
   const [searchTerm, setSearchTerm] = useState("");
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   // Folha states
   const [folhaModalOpen, setFolhaModalOpen] = useState(false);
@@ -95,7 +97,7 @@ export default function Funcionarios() {
   const openCreate = () => { setMode("create"); setForm({ ...emptyForm }); setSelected(null); setModalOpen(true); };
   const openEdit = (f: Funcionario) => {
     setMode("edit"); setSelected(f);
-    setForm({ nome: f.nome, cpf: f.cpf || "", cargo: f.cargo || "", departamento: f.departamento || "", data_admissao: f.data_admissao, salario_base: f.salario_base, tipo_contrato: f.tipo_contrato, observacoes: f.observacoes || "" });
+    setForm({ nome: f.nome, cpf: f.cpf || "", cargo: f.cargo || "", departamento: f.departamento || "", data_admissao: f.data_admissao, data_demissao: f.data_demissao || null, salario_base: f.salario_base, tipo_contrato: f.tipo_contrato, observacoes: f.observacoes || "", ativo: f.ativo });
     setModalOpen(true);
   };
 
@@ -115,10 +117,23 @@ export default function Funcionarios() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.nome) { toast.error("Nome é obrigatório"); return; }
-    if (mode === "create") await create(form as any);
-    else if (selected) await update(selected.id, form as any);
-    setModalOpen(false);
+    if (!form.nome.trim()) { toast.error("Nome é obrigatório"); return; }
+    const cpfDigits = form.cpf.replace(/\D/g, "");
+    if (form.cpf && cpfDigits.length !== 11) { toast.error("CPF inválido. Informe os 11 dígitos."); return; }
+    setSubmitting(true);
+    try {
+      const payload = { ...form, data_demissao: form.data_demissao || null };
+      if (mode === "create") await create(payload as any);
+      else if (selected) {
+        await update(selected.id, payload as any);
+        if (selected.ativo && !form.ativo && folhas.length > 0) {
+          toast.info(`${selected.nome} foi inativado. O histórico de folha foi preservado.`);
+        }
+      }
+      setModalOpen(false);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleFolhaSubmit = async () => {
@@ -228,31 +243,185 @@ export default function Funcionarios() {
       </ModulePage>
 
       {/* Create/Edit Modal */}
-      <FormModal open={modalOpen} onClose={() => setModalOpen(false)} title={mode === "create" ? "Novo Funcionário" : "Editar Funcionário"}>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2"><Label>Nome *</Label><Input value={form.nome} onChange={e => setForm({ ...form, nome: e.target.value })} required /></div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2"><Label>CPF</Label><Input value={form.cpf} onChange={e => setForm({ ...form, cpf: e.target.value })} placeholder="000.000.000-00" /></div>
-            <div className="space-y-2"><Label>Tipo Contrato</Label>
+      <FormModal open={modalOpen} onClose={() => setModalOpen(false)} title={mode === "create" ? "Novo Funcionário" : "Editar Funcionário"} size="lg">
+        <form onSubmit={handleSubmit} className="space-y-6">
+
+          {/* BLOCO: IDENTIFICAÇÃO */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Identificação</span>
+              <div className="flex-1 h-px bg-border" />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="emp-nome" className="font-medium">Nome completo *</Label>
+              <Input id="emp-nome" value={form.nome} onChange={e => setForm({ ...form, nome: e.target.value })} placeholder="Nome do colaborador" required className="text-base" />
+            </div>
+            <div className={mode === "edit" ? "grid grid-cols-2 gap-4" : ""}>
+              <div className="space-y-1.5">
+                <Label htmlFor="emp-cpf">CPF <span className="text-muted-foreground text-xs font-normal">— identificador</span></Label>
+                <Input id="emp-cpf" value={form.cpf} onChange={e => setForm({ ...form, cpf: e.target.value })} placeholder="000.000.000-00" />
+              </div>
+              {mode === "edit" && (
+                <div className="space-y-1.5">
+                  <Label htmlFor="emp-status">Status do colaborador</Label>
+                  <Select value={form.ativo ? "ativo" : "inativo"} onValueChange={v => setForm({ ...form, ativo: v === "ativo" })}>
+                    <SelectTrigger id="emp-status"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ativo">Ativo</SelectItem>
+                      <SelectItem value="inativo">Inativo</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* BLOCO: VÍNCULO */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Vínculo</span>
+              <div className="flex-1 h-px bg-border" />
+            </div>
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-1.5">
+                <Label htmlFor="emp-tipo-contrato">Tipo de Contrato</Label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button type="button" className="inline-flex cursor-help"><HelpCircle className="w-3.5 h-3.5 text-muted-foreground" /></button>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-[230px] text-xs">
+                    CLT: vínculo com carteira assinada · PJ: prestação de serviços · Estágio: contrato de estágio · Temporário: prazo determinado
+                  </TooltipContent>
+                </Tooltip>
+              </div>
               <Select value={form.tipo_contrato} onValueChange={v => setForm({ ...form, tipo_contrato: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger id="emp-tipo-contrato"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="clt">CLT</SelectItem>
-                  <SelectItem value="pj">PJ</SelectItem>
+                  <SelectItem value="clt">CLT — Consolidação das Leis do Trabalho</SelectItem>
+                  <SelectItem value="pj">PJ — Pessoa Jurídica</SelectItem>
                   <SelectItem value="estagio">Estágio</SelectItem>
-                  <SelectItem value="temporario">Temporário</SelectItem>
+                  <SelectItem value="temporario">Temporário — prazo determinado</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2"><Label>Cargo</Label><Input value={form.cargo} onChange={e => setForm({ ...form, cargo: e.target.value })} /></div>
-            <div className="space-y-2"><Label>Departamento</Label><Input value={form.departamento} onChange={e => setForm({ ...form, departamento: e.target.value })} /></div>
-            <div className="space-y-2"><Label>Data Admissão *</Label><Input type="date" value={form.data_admissao} onChange={e => setForm({ ...form, data_admissao: e.target.value })} required /></div>
-            <div className="space-y-2"><Label>Salário Base *</Label><Input type="number" step="0.01" min={0} value={form.salario_base} onChange={e => setForm({ ...form, salario_base: Number(e.target.value) })} required /></div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="emp-admissao">Data de Admissão *</Label>
+                <Input id="emp-admissao" type="date" value={form.data_admissao} onChange={e => setForm({ ...form, data_admissao: e.target.value })} required />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="emp-demissao">Data de Desligamento</Label>
+                <Input id="emp-demissao" type="date" value={form.data_demissao ?? ""} onChange={e => setForm({ ...form, data_demissao: e.target.value || null })} />
+                {!form.data_demissao && <p className="text-[11px] text-muted-foreground">Preencher apenas se houver desligamento</p>}
+              </div>
+            </div>
           </div>
-          <div className="space-y-2"><Label>Observações</Label><Textarea value={form.observacoes} onChange={e => setForm({ ...form, observacoes: e.target.value })} /></div>
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={() => setModalOpen(false)}>Cancelar</Button>
-            <Button type="submit">Salvar</Button>
+
+          {/* BLOCO: ESTRUTURA INTERNA */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Estrutura Interna</span>
+              <div className="flex-1 h-px bg-border" />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="emp-cargo">Cargo</Label>
+                <Input id="emp-cargo" value={form.cargo} onChange={e => setForm({ ...form, cargo: e.target.value })} placeholder="Ex: Analista, Operador..." />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="emp-departamento">Departamento</Label>
+                <Input id="emp-departamento" value={form.departamento} onChange={e => setForm({ ...form, departamento: e.target.value })} placeholder="Ex: TI, RH, Produção..." />
+              </div>
+            </div>
+          </div>
+
+          {/* BLOCO: REMUNERAÇÃO */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Remuneração</span>
+              <div className="flex-1 h-px bg-border" />
+            </div>
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-1.5">
+                <Label htmlFor="emp-salario" className="font-medium">Salário Base *</Label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button type="button" className="inline-flex cursor-help"><HelpCircle className="w-3.5 h-3.5 text-muted-foreground" /></button>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-[240px] text-xs">
+                    Base para o cálculo da folha. Ao gerar financeiro: lançamento de salário (venc. dia 5) e FGTS 8% (venc. dia 7) do mês seguinte.
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              <Input id="emp-salario" type="number" step="0.01" min={0} value={form.salario_base} onChange={e => setForm({ ...form, salario_base: Number(e.target.value) })} required className="font-mono font-semibold text-base" />
+              <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+                <DollarSign className="w-3 h-3 shrink-0" />
+                Impacta o cálculo da folha e os lançamentos financeiros (salário + FGTS).
+              </p>
+            </div>
+          </div>
+
+          {/* BLOCO: FOLHA / CONTEXTO FINANCEIRO (apenas em edição, quando há dados) */}
+          {mode === "edit" && !loadingFolhas && (folhas.length > 0 || lancamentos.length > 0) && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Folha / Contexto Financeiro</span>
+                <div className="flex-1 h-px bg-border" />
+              </div>
+              <div className="rounded-lg border bg-muted/20 p-3 space-y-2.5">
+                <p className="text-xs text-muted-foreground flex items-start gap-1.5">
+                  <Info className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                  <span>
+                    {folhas.length > 0
+                      ? `${folhas.length} competência${folhas.length !== 1 ? "s" : ""} de folha registrada${folhas.length !== 1 ? "s" : ""}. Este colaborador gera lançamentos financeiros.`
+                      : "Este colaborador possui lançamentos financeiros vinculados."}
+                  </span>
+                </p>
+                <div className={`grid gap-2 ${folhas[0] ? "grid-cols-3" : "grid-cols-1"}`}>
+                  {folhas[0] && (
+                    <>
+                      <div className="rounded-md border bg-background px-2.5 py-2">
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Última Competência</p>
+                        <p className="font-mono text-sm font-medium mt-0.5">{folhas[0].competencia}</p>
+                      </div>
+                      <div className="rounded-md border bg-background px-2.5 py-2">
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Líquido Recente</p>
+                        <p className="font-mono text-sm font-medium mt-0.5">{formatCurrency(Number(folhas[0].valor_liquido))}</p>
+                      </div>
+                    </>
+                  )}
+                  <div className="rounded-md border bg-background px-2.5 py-2">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Financeiro Pendente</p>
+                    <p className={`font-mono text-sm font-medium mt-0.5 ${lancamentos.filter(l => l.status === "aberto").length > 0 ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground"}`}>
+                      {lancamentos.filter(l => l.status === "aberto").length > 0
+                        ? `${lancamentos.filter(l => l.status === "aberto").length} aberto${lancamentos.filter(l => l.status === "aberto").length !== 1 ? "s" : ""}`
+                        : "Em dia"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* BLOCO: OBSERVAÇÕES */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Observações</span>
+              <div className="flex-1 h-px bg-border" />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="emp-obs">Notas internas <span className="text-muted-foreground text-xs font-normal">— visível apenas internamente</span></Label>
+              <Textarea id="emp-obs" value={form.observacoes} onChange={e => setForm({ ...form, observacoes: e.target.value })} placeholder="Notas sobre o colaborador, histórico relevante, acordos específicos..." rows={3} />
+            </div>
+          </div>
+
+          {/* RODAPÉ */}
+          <div className="flex justify-end gap-2 pt-2 border-t">
+            <Button type="button" variant="outline" onClick={() => setModalOpen(false)} disabled={submitting}>Cancelar</Button>
+            <Button type="submit" disabled={submitting}>
+              {submitting && <Loader2 className="w-4 h-4 animate-spin mr-1.5" />}
+              {submitting ? "Salvando…" : "Salvar"}
+            </Button>
           </div>
         </form>
       </FormModal>
