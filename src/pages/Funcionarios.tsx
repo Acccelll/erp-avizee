@@ -94,7 +94,10 @@ export default function Funcionarios() {
     return { total: data.length, ativos: ativos.length, inativos: data.length - ativos.length, totalSalarios };
   }, [data]);
 
-  const openCreate = () => { setMode("create"); setForm({ ...emptyForm }); setSelected(null); setModalOpen(true); };
+  // Derived values used in the edit form context section
+  const lancamentosAbertos = lancamentos.filter(l => l.status === "aberto");
+
+  const openCreate = () => {  setMode("create"); setForm({ ...emptyForm }); setSelected(null); setModalOpen(true); };
   const openEdit = (f: Funcionario) => {
     setMode("edit"); setSelected(f);
     setForm({ nome: f.nome, cpf: f.cpf || "", cargo: f.cargo || "", departamento: f.departamento || "", data_admissao: f.data_admissao, data_demissao: f.data_demissao || null, salario_base: f.salario_base, tipo_contrato: f.tipo_contrato, observacoes: f.observacoes || "", ativo: f.ativo });
@@ -256,7 +259,7 @@ export default function Funcionarios() {
               <Label htmlFor="emp-nome" className="font-medium">Nome completo *</Label>
               <Input id="emp-nome" value={form.nome} onChange={e => setForm({ ...form, nome: e.target.value })} placeholder="Nome do colaborador" required className="text-base" />
             </div>
-            <div className={mode === "edit" ? "grid grid-cols-2 gap-4" : ""}>
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label htmlFor="emp-cpf">CPF <span className="text-muted-foreground text-xs font-normal">— identificador</span></Label>
                 <Input id="emp-cpf" value={form.cpf} onChange={e => setForm({ ...form, cpf: e.target.value })} placeholder="000.000.000-00" />
@@ -392,9 +395,9 @@ export default function Funcionarios() {
                   )}
                   <div className="rounded-md border bg-background px-2.5 py-2">
                     <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Financeiro Pendente</p>
-                    <p className={`font-mono text-sm font-medium mt-0.5 ${lancamentos.filter(l => l.status === "aberto").length > 0 ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground"}`}>
-                      {lancamentos.filter(l => l.status === "aberto").length > 0
-                        ? `${lancamentos.filter(l => l.status === "aberto").length} aberto${lancamentos.filter(l => l.status === "aberto").length !== 1 ? "s" : ""}`
+                    <p className={`font-mono text-sm font-medium mt-0.5 ${lancamentosAbertos.length > 0 ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground"}`}>
+                      {lancamentosAbertos.length > 0
+                        ? `${lancamentosAbertos.length} aberto${lancamentosAbertos.length !== 1 ? "s" : ""}`
                         : "Em dia"}
                     </p>
                   </div>
