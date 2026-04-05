@@ -95,7 +95,7 @@ const Fornecedores = () => {
   const loadFornContext = async (fornecedorId: string) => {
     setLoadingFornContext(true);
     try {
-      const [{ data: pf }, { data: compras }] = await Promise.all([
+      const [{ data: pf, error: pfErr }, { data: compras, error: comprasErr }] = await Promise.all([
         supabase
           .from("produtos_fornecedores")
           .select("id, lead_time_dias, preco_compra, eh_principal, produtos(nome)")
@@ -110,6 +110,8 @@ const Fornecedores = () => {
           .order("data_compra", { ascending: false })
           .limit(20),
       ]);
+      if (pfErr) throw pfErr;
+      if (comprasErr) throw comprasErr;
       setModalProdutosForn(((pf || []) as any[]).map((p) => ({
         id: p.id,
         produto_nome: (p.produtos as any)?.nome || "—",
@@ -123,6 +125,8 @@ const Fornecedores = () => {
         ultima: comprasList[0]?.data_compra || null,
         total: comprasList.reduce((s: number, c: any) => s + Number(c.valor_total || 0), 0),
       });
+    } catch (err) {
+      console.error("[fornecedores] erro ao carregar contexto:", err);
     } finally {
       setLoadingFornContext(false);
     }

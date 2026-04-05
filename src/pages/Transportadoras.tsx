@@ -77,12 +77,16 @@ export default function Transportadoras() {
   const loadModalContext = async (transportadoraId: string) => {
     setLoadingModalCtx(true);
     try {
-      const [{ count: cliCount }, { count: remCount }] = await Promise.all([
+      const [{ count: cliCount, error: cliErr }, { count: remCount, error: remErr }] = await Promise.all([
         supabase.from("cliente_transportadoras").select("id", { count: "exact", head: true }).eq("transportadora_id", transportadoraId).eq("ativo", true),
         supabase.from("remessas").select("id", { count: "exact", head: true }).eq("transportadora_id", transportadoraId),
       ]);
+      if (cliErr) throw cliErr;
+      if (remErr) throw remErr;
       setModalCliCount(cliCount ?? 0);
       setModalRemCount(remCount ?? 0);
+    } catch (err) {
+      console.error("[transportadoras] erro ao carregar contexto do modal:", err);
     } finally {
       setLoadingModalCtx(false);
     }

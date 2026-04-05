@@ -98,12 +98,13 @@ const Clientes = () => {
   const loadTransportadoras = async (clienteId: string) => {
     setLoadingTransportadoras(true);
     try {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("cliente_transportadoras")
         .select("id, transportadora_id, prioridade, modalidade, prazo_medio, transportadoras(nome_razao_social)")
         .eq("cliente_id", clienteId)
         .eq("ativo", true)
         .order("prioridade");
+      if (error) throw error;
       setModalTransportadoras(((data || []) as any[]).map((ct) => ({
         id: ct.id,
         transportadora_id: ct.transportadora_id,
@@ -112,6 +113,8 @@ const Clientes = () => {
         modalidade: ct.modalidade,
         prazo_medio: ct.prazo_medio,
       })));
+    } catch (err) {
+      console.error("[clientes] erro ao carregar transportadoras:", err);
     } finally {
       setLoadingTransportadoras(false);
     }
