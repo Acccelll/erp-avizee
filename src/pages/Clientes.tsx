@@ -24,7 +24,7 @@ import { formatDate } from "@/lib/format";
 import { toast } from "sonner";
 import {
   Building2, Search, User2, Phone, CreditCard, MapPin, Truck, FileText,
-  Info, Loader2, Calendar, Mail,
+  Info, Loader2, Calendar, Mail, Star,
 } from "lucide-react";
 import { clienteFornecedorSchema, validateForm } from "@/lib/validationSchemas";
 
@@ -89,6 +89,33 @@ const Clientes = () => {
   const [formasPagamento, setFormasPagamento] = useState<FormaPagamentoBasic[]>([]);
   const [tipoFilters, setTipoFilters] = useState<string[]>([]);
   const [grupoFilters, setGrupoFilters] = useState<string[]>([]);
+  const [modalTransportadoras, setModalTransportadoras] = useState<Array<{
+    id: string; transportadora_id: string; transportadora_nome: string;
+    prioridade: number | null; modalidade: string | null; prazo_medio: string | null;
+  }>>([]);
+  const [loadingTransportadoras, setLoadingTransportadoras] = useState(false);
+
+  const loadTransportadoras = async (clienteId: string) => {
+    setLoadingTransportadoras(true);
+    try {
+      const { data } = await supabase
+        .from("cliente_transportadoras")
+        .select("id, transportadora_id, prioridade, modalidade, prazo_medio, transportadoras(nome_razao_social)")
+        .eq("cliente_id", clienteId)
+        .eq("ativo", true)
+        .order("prioridade");
+      setModalTransportadoras(((data || []) as any[]).map((ct) => ({
+        id: ct.id,
+        transportadora_id: ct.transportadora_id,
+        transportadora_nome: ct.transportadoras?.nome_razao_social || "—",
+        prioridade: ct.prioridade,
+        modalidade: ct.modalidade,
+        prazo_medio: ct.prazo_medio,
+      })));
+    } finally {
+      setLoadingTransportadoras(false);
+    }
+  };
 
   useEffect(() => {
     supabase.from("grupos_economicos").select("id, nome").eq("ativo", true).order("nome").then(({ data: g }: any) => setGrupos(g || []));
@@ -106,7 +133,7 @@ const Clientes = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.state]);
 
-  const openCreate = () => {setMode("create");setForm({ ...emptyCliente });setSelected(null);setIsDirty(false);setModalOpen(true);};
+  const openCreate = () => {setMode("create");setForm({ ...emptyCliente });setSelected(null);setIsDirty(false);setModalTransportadoras([]);setModalOpen(true);};
   const openEdit = (c: Cliente) => {
     setMode("edit");setSelected(c);
     setForm({
@@ -123,6 +150,8 @@ const Clientes = () => {
       caixa_postal: c.caixa_postal || ""
     });
     setIsDirty(false);
+    setModalTransportadoras([]);
+    loadTransportadoras(c.id);
     setModalOpen(true);
   };
 
@@ -613,14 +642,48 @@ const Clientes = () => {
           <div className="flex items-center gap-2 pt-4 pb-3 border-t mb-4">
             <Truck className="w-4 h-4 text-primary/70" />
             <h3 className="font-semibold text-sm">Logística</h3>
+            {mode === "edit" && !loadingTransportadoras && modalTransportadoras.length > 0 && (
+              <span className="ml-auto text-[10px] text-muted-foreground uppercase tracking-wider">apenas leitura</span>
+            )}
           </div>
           <div className="mb-6">
-            <div className="flex items-start gap-2 bg-muted/30 rounded-lg px-3 py-2.5 border border-dashed text-xs text-muted-foreground">
-              <Truck className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-              <span>
-                Transportadoras de preferência, modalidades de entrega e observações logísticas são gerenciadas na aba <strong className="text-foreground">Logística</strong> do cadastro do cliente. Após salvar, acesse o registro para configurar.
-              </span>
-            </div>
+            {mode === "create" ? (
+              <div className="flex items-start gap-2 bg-muted/30 rounded-lg px-3 py-2.5 border border-dashed text-xs text-muted-foreground">
+                <Truck className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                <span>
+                  Transportadoras preferenciais, modalidades de entrega e observações logísticas são gerenciadas após o cadastro, na aba <strong className="text-foreground">Logística</strong> do registro do cliente.
+                </span>
+              </div>
+            ) : loadingTransportadoras ? (
+              <div className="h-[60px] rounded-lg bg-muted/30 animate-pulse" />
+            ) : modalTransportadoras.length === 0 ? (
+              <div className="flex items-start gap-2 bg-muted/30 rounded-lg px-3 py-2.5 border border-dashed text-xs text-muted-foreground">
+                <Truck className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                <span>
+                  Nenhuma transportadora vinculada ainda. Para definir transportadoras preferenciais, acesse a aba <strong className="text-foreground">Logística</strong> no painel do cliente.
+                </span>
+              </div>
+            ) : (
+              <div className="space-y-0.5">
+                {modalTransportadoras.slice(0, 4).map((ct) => (
+                  <div key={ct.id} className="flex items-center justify-between py-1.5 px-2 rounded-md hover:bg-muted/30 transition-colors border-b last:border-b-0">
+                    <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                      {ct.prioridade === 1 && <Star className="h-3 w-3 text-amber-500 shrink-0" />}
+                      <span className="text-xs font-medium text-foreground truncate">{ct.transportadora_nome}</span>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0 ml-2 text-xs text-muted-foreground">
+                      {ct.modalidade && <span className="capitalize">{ct.modalidade}</span>}
+                      {ct.prazo_medio && <span className="font-mono">{ct.prazo_medio} dias</span>}
+                    </div>
+                  </div>
+                ))}
+                {modalTransportadoras.length > 4 && (
+                  <p className="text-[10px] text-muted-foreground text-center pt-1">
+                    +{modalTransportadoras.length - 4} transportadora(s) vinculada(s)
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
           {/* ── BLOCO 6: ENDEREÇO ─────────────────────────────── */}

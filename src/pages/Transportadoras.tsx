@@ -7,7 +7,7 @@ import { FormModal } from "@/components/FormModal";
 import { ViewDrawerV2, ViewField, ViewSection } from "@/components/ViewDrawerV2";
 import { RelationalLink } from "@/components/ui/RelationalLink";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Edit, Trash2, Search, Building2, MapPin, Package, Truck, Star, AlertTriangle, Phone, FileText, Loader2 } from "lucide-react";
+import { Edit, Trash2, Search, Building2, MapPin, Package, Truck, Star, AlertTriangle, Phone, FileText, Loader2, Users } from "lucide-react";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
 import { useRelationalNavigation } from "@/contexts/RelationalNavigationContext";
 import { useCnpjLookup } from "@/hooks/useCnpjLookup";
@@ -70,6 +70,23 @@ export default function Transportadoras() {
   const [clientesVinculados, setClientesVinculados] = useState<any[]>([]);
   const [remessasVinculadas, setRemessasVinculadas] = useState<any[]>([]);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [modalCliCount, setModalCliCount] = useState(0);
+  const [modalRemCount, setModalRemCount] = useState(0);
+  const [loadingModalCtx, setLoadingModalCtx] = useState(false);
+
+  const loadModalContext = async (transportadoraId: string) => {
+    setLoadingModalCtx(true);
+    try {
+      const [{ count: cliCount }, { count: remCount }] = await Promise.all([
+        supabase.from("cliente_transportadoras").select("id", { count: "exact", head: true }).eq("transportadora_id", transportadoraId).eq("ativo", true),
+        supabase.from("remessas").select("id", { count: "exact", head: true }).eq("transportadora_id", transportadoraId),
+      ]);
+      setModalCliCount(cliCount ?? 0);
+      setModalRemCount(remCount ?? 0);
+    } finally {
+      setLoadingModalCtx(false);
+    }
+  };
 
   useEffect(() => {
     if (selected && drawerOpen) {
@@ -89,7 +106,7 @@ export default function Transportadoras() {
     }
   }, [selected, drawerOpen]);
 
-  const openCreate = () => { setMode("create"); setForm({...emptyForm}); setFormAtivo(true); setSelected(null); setModalOpen(true); };
+  const openCreate = () => { setMode("create"); setForm({...emptyForm}); setFormAtivo(true); setSelected(null); setModalCliCount(0); setModalRemCount(0); setModalOpen(true); };
   const openEdit = (t: Transportadora) => {
     setMode("edit"); setSelected(t);
     setForm({
@@ -103,6 +120,8 @@ export default function Transportadoras() {
       prazo_medio: t.prazo_medio || "", observacoes: t.observacoes || "",
     });
     setFormAtivo(t.ativo ?? true);
+    setModalCliCount(0); setModalRemCount(0);
+    loadModalContext(t.id);
     setModalOpen(true);
   };
   const openView = (t: Transportadora) => {
@@ -370,6 +389,42 @@ export default function Transportadoras() {
               className="resize-none"
             />
           </div>
+
+          {/* ── BLOCO 6: USO NO SISTEMA (edit mode only) ── */}
+          {mode === "edit" && (
+            <>
+              <div className="flex items-center gap-2 pt-4 pb-3 border-b border-t mb-2">
+                <Users className="w-4 h-4 text-primary/70" />
+                <h3 className="font-semibold text-sm">Uso no Sistema</h3>
+                <span className="ml-auto text-[10px] text-muted-foreground uppercase tracking-wider">apenas leitura</span>
+              </div>
+              {loadingModalCtx ? (
+                <div className="mb-6 h-[72px] rounded-lg bg-muted/30 animate-pulse" />
+              ) : (
+                <div className="mb-6">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded-lg border bg-card p-3 text-center space-y-1">
+                      <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Clientes Vinculados</p>
+                      <p className="font-bold text-2xl text-foreground">{modalCliCount}</p>
+                    </div>
+                    <div className="rounded-lg border bg-card p-3 text-center space-y-1">
+                      <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Remessas</p>
+                      <p className="font-bold text-2xl text-foreground">{modalRemCount}</p>
+                    </div>
+                  </div>
+                  {(modalCliCount > 0 || modalRemCount > 0) ? (
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Esta transportadora está em uso ativo. Considere inativar em vez de excluir caso necessário.
+                    </p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Nenhum vínculo ativo encontrado para esta transportadora.
+                    </p>
+                  )}
+                </div>
+              )}
+            </>
+          )}
 
           {/* Rodapé */}
           <div className="flex items-center justify-between pt-3 border-t">

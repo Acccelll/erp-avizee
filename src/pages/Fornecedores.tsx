@@ -23,9 +23,9 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { toast } from "sonner";
 import {
   Search, User2, Phone, ShoppingCart, MapPin,
-  Info, Loader2, Calendar, Mail, CheckCircle2, Handshake, BadgeCheck,
+  Info, Loader2, Calendar, Mail, CheckCircle2, Handshake, BadgeCheck, Package,
 } from "lucide-react";
-import { formatDate } from "@/lib/format";
+import { formatDate, formatCurrency } from "@/lib/format";
 import { clienteFornecedorSchema, validateForm } from "@/lib/validationSchemas";
 
 const MAX_OBSERVACOES_LENGTH = 2000;
@@ -85,13 +85,59 @@ const Fornecedores = () => {
   const [isDirty, setIsDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [tipoFilters, setTipoFilters] = useState<string[]>([]);
+  const [modalProdutosForn, setModalProdutosForn] = useState<Array<{
+    id: string; produto_nome: string; preco_compra: number | null;
+    lead_time_dias: number | null; eh_principal: boolean | null;
+  }>>([]);
+  const [modalComprasForn, setModalComprasForn] = useState<{ count: number; ultima: string | null; total: number }>({ count: 0, ultima: null, total: 0 });
+  const [loadingFornContext, setLoadingFornContext] = useState(false);
+
+  const loadFornContext = async (fornecedorId: string) => {
+    setLoadingFornContext(true);
+    try {
+      const [{ data: pf }, { data: compras }] = await Promise.all([
+        supabase
+          .from("produtos_fornecedores")
+          .select("id, lead_time_dias, preco_compra, eh_principal, produtos(nome)")
+          .eq("fornecedor_id", fornecedorId)
+          .order("eh_principal", { ascending: false })
+          .limit(5),
+        supabase
+          .from("compras")
+          .select("id, data_compra, valor_total")
+          .eq("fornecedor_id", fornecedorId)
+          .eq("ativo", true)
+          .order("data_compra", { ascending: false })
+          .limit(20),
+      ]);
+      setModalProdutosForn(((pf || []) as any[]).map((p) => ({
+        id: p.id,
+        produto_nome: (p.produtos as any)?.nome || "—",
+        preco_compra: p.preco_compra,
+        lead_time_dias: p.lead_time_dias,
+        eh_principal: p.eh_principal,
+      })));
+      const comprasList = (compras || []) as any[];
+      setModalComprasForn({
+        count: comprasList.length,
+        ultima: comprasList[0]?.data_compra || null,
+        total: comprasList.reduce((s: number, c: any) => s + Number(c.valor_total || 0), 0),
+      });
+    } finally {
+      setLoadingFornContext(false);
+    }
+  };
 
   const updateForm = (patch: Partial<typeof form>) => {
     setForm(prev => ({ ...prev, ...patch }));
     setIsDirty(true);
   };
 
-  const openCreate = () => {setMode("create");setForm({ ...emptyForm });setSelected(null);setIsDirty(false);setModalOpen(true);};
+  const openCreate = () => {
+    setMode("create"); setForm({ ...emptyForm }); setSelected(null); setIsDirty(false);
+    setModalProdutosForn([]); setModalComprasForn({ count: 0, ultima: null, total: 0 });
+    setModalOpen(true);
+  };
   const openEdit = (f: Fornecedor) => {
     setMode("edit");setSelected(f);
     setForm({
@@ -103,6 +149,8 @@ const Fornecedores = () => {
       uf: f.uf || "", cep: f.cep || "", pais: f.pais || "Brasil", observacoes: f.observacoes || ""
     });
     setIsDirty(false);
+    setModalProdutosForn([]); setModalComprasForn({ count: 0, ultima: null, total: 0 });
+    loadFornContext(f.id);
     setModalOpen(true);
   };
 
@@ -432,6 +480,51 @@ const Fornecedores = () => {
               {formErrors.prazo_padrao && <p className="text-xs text-destructive">{formErrors.prazo_padrao}</p>}
             </div>
           </div>
+
+          {/* Context block for edit mode — products and purchase history */}
+          {mode === "edit" && (
+            loadingFornContext ? (
+              <div className="h-[80px] rounded-lg bg-muted/30 animate-pulse mb-6" />
+            ) : (modalProdutosForn.length > 0 || modalComprasForn.count > 0) ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
+                {modalProdutosForn.length > 0 && (
+                  <div className="rounded-md border bg-muted/20 px-3 py-2.5 space-y-1.5">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <Package className="h-3.5 w-3.5 text-muted-foreground" />
+                      <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Produtos Fornecidos</p>
+                    </div>
+                    {modalProdutosForn.slice(0, 3).map((p) => (
+                      <div key={p.id} className="flex items-center justify-between gap-2">
+                        <span className="text-xs truncate text-foreground">{p.produto_nome}</span>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {p.preco_compra != null && <span className="text-[10px] font-mono text-muted-foreground">{formatCurrency(p.preco_compra)}</span>}
+                          {p.lead_time_dias != null && <span className="text-[10px] text-muted-foreground">{p.lead_time_dias}d</span>}
+                        </div>
+                      </div>
+                    ))}
+                    {modalProdutosForn.length > 3 && (
+                      <p className="text-[10px] text-muted-foreground">+{modalProdutosForn.length - 3} produto(s)</p>
+                    )}
+                  </div>
+                )}
+                {modalComprasForn.count > 0 && (
+                  <div className="rounded-md border bg-muted/20 px-3 py-2.5 space-y-1.5">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <ShoppingCart className="h-3.5 w-3.5 text-muted-foreground" />
+                      <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Histórico de Compras</p>
+                    </div>
+                    <p className="text-xs text-foreground">{modalComprasForn.count} compra{modalComprasForn.count !== 1 ? "s" : ""} registrada{modalComprasForn.count !== 1 ? "s" : ""}</p>
+                    {modalComprasForn.ultima && (
+                      <p className="text-[10px] text-muted-foreground">Última: {formatDate(modalComprasForn.ultima)}</p>
+                    )}
+                    {modalComprasForn.total > 0 && (
+                      <p className="text-[10px] text-muted-foreground font-mono">Total: {formatCurrency(modalComprasForn.total)}</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            ) : null
+          )}
 
           {/* ── BLOCO 4: ENDEREÇO ─────────────────────────────── */}
           <div className="flex items-center gap-2 pt-4 pb-1 border-t">

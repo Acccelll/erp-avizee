@@ -10,14 +10,14 @@ import { RelationalLink } from "@/components/ui/RelationalLink";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Edit, Trash2, AlertTriangle, CheckCircle2, ShieldAlert, Building2, Info, Star, FileText, TrendingUp, ExternalLink, Users } from "lucide-react";
+import { Edit, Trash2, AlertTriangle, CheckCircle2, ShieldAlert, Building2, Info, Star, FileText, TrendingUp, ExternalLink, Users, Calendar } from "lucide-react";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, formatDate } from "@/lib/format";
 import { toast } from "sonner";
 
 interface GrupoEconomico {
@@ -532,6 +532,24 @@ const GruposEconomicos = () => {
         {mode === "edit" && selected && (
           <div className="flex flex-wrap items-center gap-3 bg-muted/40 rounded-lg px-3 py-2 mb-4 text-xs text-muted-foreground border">
             <StatusBadge status={selected.ativo ? "Ativo" : "Inativo"} />
+            {selected.created_at && (
+              <span className="flex items-center gap-1">
+                <Calendar className="h-3 w-3" />
+                Cadastrado em {formatDate(selected.created_at)}
+              </span>
+            )}
+            {!loadingSummary && modalEmpresas.length > 0 && (
+              <span className="flex items-center gap-1">
+                <Users className="h-3 w-3" />
+                {modalEmpresas.length} empresa{modalEmpresas.length !== 1 ? "s" : ""}
+              </span>
+            )}
+            {!loadingSummary && (modalEmpresas.length > 0 || modalSaldo > 0 || modalVencidos > 0) && (
+              <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${modalRiskInfo.badgeClass}`}>
+                <ModalRiskIcon className="w-2.5 h-2.5 mr-1" />
+                {modalRiskInfo.label}
+              </Badge>
+            )}
             {isDirty && (
               <span className="flex items-center gap-1 text-amber-600 font-medium">
                 <span className="h-1.5 w-1.5 rounded-full bg-amber-500 inline-block" />
