@@ -10,7 +10,7 @@ import { RelationalLink } from "@/components/ui/RelationalLink";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Edit, Trash2, AlertTriangle, CheckCircle2, ShieldAlert, Building2, Info, Star, FileText, TrendingUp } from "lucide-react";
+import { Edit, Trash2, AlertTriangle, CheckCircle2, ShieldAlert, Building2, Info, Star, FileText, TrendingUp, ExternalLink, Users } from "lucide-react";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -103,6 +103,9 @@ const GruposEconomicos = () => {
     form.nome !== initialForm.nome ||
     (form.observacoes || "") !== (initialForm.observacoes || "") ||
     (form.empresa_matriz_id || "") !== (initialForm.empresa_matriz_id || "");
+
+  const modalRiskInfo = getRiskInfo(modalVencidos, modalSaldo);
+  const { Icon: ModalRiskIcon } = modalRiskInfo;
 
   const loadClientes = async () => {
     setLoadingClientes(true);
@@ -265,6 +268,16 @@ const GruposEconomicos = () => {
       toast.error("Erro ao excluir grupo econômico");
     }
     setDeleting(false);
+  };
+
+  const handleCancel = () => {
+    if (isDirty && !window.confirm("Há alterações não salvas. Deseja descartar e fechar?")) return;
+    setModalOpen(false);
+  };
+
+  const handleViewFromEdit = () => {
+    setModalOpen(false);
+    if (selected) openView(selected);
   };
 
   const columns = [
@@ -514,17 +527,32 @@ const GruposEconomicos = () => {
         <DataTable columns={columns} data={data} loading={loading} onView={openView} />
       </ModulePage>
 
-      <FormModal open={modalOpen} onClose={() => setModalOpen(false)} title={mode === "create" ? "Novo Grupo Econômico" : "Editar Grupo Econômico"} size="lg">
+      <FormModal open={modalOpen} onClose={handleCancel} title={mode === "create" ? "Novo Grupo Econômico" : "Editar Grupo Econômico"} size="lg">
         {/* Edit mode context bar */}
         {mode === "edit" && selected && (
           <div className="flex flex-wrap items-center gap-3 bg-muted/40 rounded-lg px-3 py-2 mb-4 text-xs text-muted-foreground border">
             <StatusBadge status={selected.ativo ? "Ativo" : "Inativo"} />
             {isDirty && (
-              <span className="flex items-center gap-1 text-amber-600 ml-auto font-medium">
+              <span className="flex items-center gap-1 text-amber-600 font-medium">
                 <span className="h-1.5 w-1.5 rounded-full bg-amber-500 inline-block" />
                 Alterações não salvas
               </span>
             )}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="ml-auto h-6 px-2 text-xs gap-1 text-muted-foreground hover:text-foreground"
+                  onClick={handleViewFromEdit}
+                >
+                  <ExternalLink className="h-3 w-3" />
+                  Ver painel
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent className="text-xs">Fechar edição e abrir o painel completo do grupo</TooltipContent>
+            </Tooltip>
           </div>
         )}
 
@@ -616,6 +644,53 @@ const GruposEconomicos = () => {
             </div>
           )}
 
+          {/* ── BLOCO: ESTRUTURA DO GRUPO ── */}
+          <div className="flex items-center gap-2 pt-2 pb-3 border-t border-b mb-3">
+            <Users className="w-4 h-4 text-primary/70" />
+            <h3 className="font-semibold text-sm">Estrutura do Grupo</h3>
+            {mode === "edit" && (
+              <span className="ml-auto text-[10px] text-muted-foreground uppercase tracking-wider">apenas leitura</span>
+            )}
+          </div>
+          {mode === "create" ? (
+            <div className="mb-5 flex items-start gap-2 bg-muted/30 rounded-md px-3 py-2.5 text-xs text-muted-foreground border">
+              <Info className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+              <span>
+                Após criar o grupo, vincule as empresas acessando o cadastro de{" "}
+                <strong className="text-foreground">Clientes</strong> e definindo o grupo econômico em cada uma. A composição completa (matriz, filiais, coligadas) é gerenciada pelos clientes vinculados.
+              </span>
+            </div>
+          ) : loadingSummary ? (
+            <div className="mb-5 h-[72px] rounded-lg bg-muted/30 animate-pulse" />
+          ) : modalEmpresas.length === 0 ? (
+            <div className="mb-5 flex items-start gap-2 bg-muted/30 rounded-md px-3 py-2.5 text-xs text-muted-foreground border">
+              <Info className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+              <span>
+                Nenhuma empresa vinculada ainda. Para vincular empresas, acesse o cadastro de{" "}
+                <strong className="text-foreground">Clientes</strong> e defina este grupo econômico em cada uma.
+              </span>
+            </div>
+          ) : (
+            <div className="mb-5 space-y-0.5">
+              {modalEmpresas.slice(0, 5).map((emp) => (
+                <div
+                  key={emp.id}
+                  className="flex items-center justify-between py-1.5 px-2 rounded-md hover:bg-muted/30 transition-colors border-b last:border-b-0"
+                >
+                  <span className="text-xs font-medium text-foreground truncate flex-1">{emp.nome_razao_social}</span>
+                  <span className="text-[10px] bg-muted text-muted-foreground px-2 py-0.5 rounded-full flex-shrink-0 ml-2">
+                    {relacaoLabel[emp.tipo_relacao_grupo ?? "independente"] ?? emp.tipo_relacao_grupo}
+                  </span>
+                </div>
+              ))}
+              {modalEmpresas.length > 5 && (
+                <p className="text-[10px] text-muted-foreground text-center pt-1.5">
+                  +{modalEmpresas.length - 5} empresa(s) vinculada(s)
+                </p>
+              )}
+            </div>
+          )}
+
           {/* ── BLOCO 3: CONTEXTO / OBSERVAÇÕES ── */}
           <div className="flex items-center gap-2 pt-2 pb-3 border-t border-b mb-3">
             <FileText className="w-4 h-4 text-primary/70" />
@@ -656,23 +731,36 @@ const GruposEconomicos = () => {
               {loadingSummary ? (
                 <div className="mb-5 h-[76px] rounded-lg bg-muted/30 animate-pulse" />
               ) : (
-                <div className="mb-5 grid grid-cols-3 gap-3">
-                  <div className="rounded-lg border bg-card p-3 text-center space-y-1">
-                    <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Empresas</p>
-                    <p className="font-bold text-2xl text-foreground">{modalEmpresas.length}</p>
+                <div className="mb-5 space-y-2">
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="rounded-lg border bg-card p-3 text-center space-y-1">
+                      <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Empresas</p>
+                      <p className="font-bold text-2xl text-foreground">{modalEmpresas.length}</p>
+                    </div>
+                    <div className="rounded-lg border bg-card p-3 text-center space-y-1">
+                      <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Saldo Aberto</p>
+                      <p className={`font-mono font-bold text-lg ${modalSaldo > 0 ? "text-yellow-600 dark:text-yellow-400" : "text-foreground"}`}>
+                        {formatCurrency(modalSaldo)}
+                      </p>
+                    </div>
+                    <div className="rounded-lg border bg-card p-3 text-center space-y-1">
+                      <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Vencidos</p>
+                      <p className={`font-bold text-2xl ${modalVencidos > 0 ? "text-destructive" : "text-emerald-600 dark:text-emerald-400"}`}>
+                        {modalVencidos}
+                      </p>
+                    </div>
                   </div>
-                  <div className="rounded-lg border bg-card p-3 text-center space-y-1">
-                    <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Saldo Aberto</p>
-                    <p className={`font-mono font-bold text-lg ${modalSaldo > 0 ? "text-yellow-600 dark:text-yellow-400" : "text-foreground"}`}>
-                      {formatCurrency(modalSaldo)}
-                    </p>
-                  </div>
-                  <div className="rounded-lg border bg-card p-3 text-center space-y-1">
-                    <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Vencidos</p>
-                    <p className={`font-bold text-2xl ${modalVencidos > 0 ? "text-destructive" : "text-emerald-600 dark:text-emerald-400"}`}>
-                      {modalVencidos}
-                    </p>
-                  </div>
+                  {(modalEmpresas.length > 0 || modalSaldo > 0 || modalVencidos > 0) && (
+                    <div className={`flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium ${modalRiskInfo.colorClass}`}>
+                      <ModalRiskIcon className="w-3.5 h-3.5 shrink-0" />
+                      <span>
+                        Grupo {modalRiskInfo.label}
+                        {modalRiskInfo.label === "Risco" && ` — ${modalVencidos} título(s) vencido(s)`}
+                        {modalRiskInfo.label === "Atenção" && ` — saldo aberto de ${formatCurrency(modalSaldo)}`}
+                        {modalRiskInfo.label === "Saudável" && " — sem títulos em aberto"}
+                      </span>
+                    </div>
+                  )}
                 </div>
               )}
             </>
@@ -687,7 +775,7 @@ const GruposEconomicos = () => {
               </span>
             ) : <span />}
             <div className="flex gap-2">
-              <Button type="button" variant="outline" onClick={() => setModalOpen(false)}>Cancelar</Button>
+              <Button type="button" variant="outline" onClick={handleCancel}>Cancelar</Button>
               <Button
                 type="submit"
                 disabled={saving || !form.nome.trim() || form.nome.trim().length < 2}
