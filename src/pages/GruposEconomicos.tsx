@@ -105,6 +105,7 @@ const GruposEconomicos = () => {
     (form.empresa_matriz_id || "") !== (initialForm.empresa_matriz_id || "");
 
   const modalRiskInfo = getRiskInfo(modalVencidos, modalSaldo);
+  const { Icon: ModalRiskIcon } = modalRiskInfo;
 
   const loadClientes = async () => {
     setLoadingClientes(true);
@@ -751,7 +752,7 @@ const GruposEconomicos = () => {
                   </div>
                   {(modalEmpresas.length > 0 || modalSaldo > 0 || modalVencidos > 0) && (
                     <div className={`flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium ${modalRiskInfo.colorClass}`}>
-                      <modalRiskInfo.Icon className="w-3.5 h-3.5 shrink-0" />
+                      <ModalRiskIcon className="w-3.5 h-3.5 shrink-0" />
                       <span>
                         Grupo {modalRiskInfo.label}
                         {modalRiskInfo.label === "Risco" && ` — ${modalVencidos} título(s) vencido(s)`}
