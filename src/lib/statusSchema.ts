@@ -63,7 +63,7 @@ export const statusCotacaoCompra: Record<string, { label: string; color: string 
   em_analise: { label: "Em Análise", color: "warning" },
   aguardando_aprovacao: { label: "Aguardando Aprovação", color: "warning" },
   aprovada: { label: "Aprovada", color: "success" },
-  finalizada: { label: "Aprovada", color: "success" },
+  finalizada: { label: "Concluída", color: "success" },
   convertida: { label: "Convertida em Pedido", color: "success" },
   rejeitada: { label: "Rejeitada", color: "destructive" },
   cancelada: { label: "Cancelada", color: "destructive" },

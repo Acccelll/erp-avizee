@@ -66,11 +66,16 @@ const statusLabels: Record<string, string> = {
   em_analise: "Em Análise",
   aguardando_aprovacao: "Aguardando Aprovação",
   aprovada: "Aprovada",
-  finalizada: "Aprovada",
+  finalizada: "Concluída",
   convertida: "Convertida em Pedido",
   rejeitada: "Rejeitada",
   cancelada: "Cancelada",
 };
+
+/** Maps legacy 'finalizada' status to 'aprovada' for flow/stepper logic */
+function normalizeStatus(status: string): string {
+  return status === "finalizada" ? "aprovada" : status;
+}
 
 const FLOW_STEPS = [
   { key: "aberta", label: "Em Cotação" },
@@ -80,10 +85,10 @@ const FLOW_STEPS = [
   { key: "convertida", label: "Convertida" },
 ];
 
-const FLOW_STEP_ORDER = ["aberta", "em_analise", "aguardando_aprovacao", "aprovada", "finalizada", "convertida"];
+const FLOW_STEP_ORDER = ["aberta", "em_analise", "aguardando_aprovacao", "aprovada", "convertida"];
 
 function getFlowStepIndex(status: string): number {
-  return FLOW_STEP_ORDER.indexOf(status);
+  return FLOW_STEP_ORDER.indexOf(normalizeStatus(status));
 }
 
 const emptyForm = {
@@ -340,26 +345,41 @@ export default function CotacoesCompra() {
 
   const handleSendForApproval = async () => {
     if (!selected) return;
-    await supabase.from("cotacoes_compra").update({ status: "aguardando_aprovacao" }).eq("id", selected.id);
-    setSelected({ ...selected, status: "aguardando_aprovacao" });
-    toast.success("Cotação enviada para aprovação!");
-    fetchData();
+    try {
+      const { error } = await supabase.from("cotacoes_compra").update({ status: "aguardando_aprovacao" }).eq("id", selected.id);
+      if (error) throw error;
+      setSelected({ ...selected, status: "aguardando_aprovacao" });
+      toast.success("Cotação enviada para aprovação!");
+      fetchData();
+    } catch {
+      toast.error("Erro ao enviar para aprovação.");
+    }
   };
 
   const handleApprove = async () => {
     if (!selected) return;
-    await supabase.from("cotacoes_compra").update({ status: "aprovada" }).eq("id", selected.id);
-    setSelected({ ...selected, status: "aprovada" });
-    toast.success("Cotação aprovada!");
-    fetchData();
+    try {
+      const { error } = await supabase.from("cotacoes_compra").update({ status: "aprovada" }).eq("id", selected.id);
+      if (error) throw error;
+      setSelected({ ...selected, status: "aprovada" });
+      toast.success("Cotação aprovada!");
+      fetchData();
+    } catch {
+      toast.error("Erro ao aprovar cotação.");
+    }
   };
 
   const handleReject = async () => {
     if (!selected) return;
-    await supabase.from("cotacoes_compra").update({ status: "rejeitada" }).eq("id", selected.id);
-    setSelected({ ...selected, status: "rejeitada" });
-    toast.error("Cotação rejeitada.");
-    fetchData();
+    try {
+      const { error } = await supabase.from("cotacoes_compra").update({ status: "rejeitada" }).eq("id", selected.id);
+      if (error) throw error;
+      setSelected({ ...selected, status: "rejeitada" });
+      toast.error("Cotação rejeitada.");
+      fetchData();
+    } catch {
+      toast.error("Erro ao rejeitar cotação.");
+    }
   };
 
   const gerarPedido = async () => {
@@ -634,7 +654,7 @@ export default function CotacoesCompra() {
                     {FLOW_STEPS.map((step, i) => {
                       const currentIdx = getFlowStepIndex(selected.status);
                       const stepIdx = getFlowStepIndex(step.key);
-                      const isActive = step.key === selected.status || (step.key === "aprovada" && selected.status === "finalizada");
+                      const isActive = normalizeStatus(selected.status) === step.key;
                       const isPast = currentIdx > stepIdx;
                       return (
                         <div key={step.key} className="flex items-center flex-1 min-w-0">
@@ -1146,7 +1166,8 @@ export default function CotacoesCompra() {
                       {drawerStats.selectedPropostas.length > 0 ? (
                         <div>
                           <p className="text-[10px] text-muted-foreground uppercase font-semibold mb-2 flex items-center gap-1">
-                            <Trophy className="h-3 w-3" /> Fornecedores Selecionados
+                            <Trophy className="h-3 w-3" />{" "}
+                            {drawerStats.selectedPropostas.length === 1 ? "Fornecedor Selecionado" : "Fornecedores Selecionados"}
                           </p>
                           <div className="rounded-lg border overflow-hidden">
                             <table className="w-full text-sm">
