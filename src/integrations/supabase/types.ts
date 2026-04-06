@@ -2001,11 +2001,14 @@ export type Database = {
       pedidos_compra: {
         Row: {
           ativo: boolean
+          condicao_pagamento: string | null
           cotacao_compra_id: string | null
           created_at: string
           data_entrega_prevista: string | null
+          data_entrega_real: string | null
           data_pedido: string
           fornecedor_id: string | null
+          frete_valor: number | null
           id: string
           numero: string
           observacoes: string | null
@@ -2016,11 +2019,14 @@ export type Database = {
         }
         Insert: {
           ativo?: boolean
+          condicao_pagamento?: string | null
           cotacao_compra_id?: string | null
           created_at?: string
           data_entrega_prevista?: string | null
+          data_entrega_real?: string | null
           data_pedido?: string
           fornecedor_id?: string | null
+          frete_valor?: number | null
           id?: string
           numero: string
           observacoes?: string | null
@@ -2031,11 +2037,14 @@ export type Database = {
         }
         Update: {
           ativo?: boolean
+          condicao_pagamento?: string | null
           cotacao_compra_id?: string | null
           created_at?: string
           data_entrega_prevista?: string | null
+          data_entrega_real?: string | null
           data_pedido?: string
           fornecedor_id?: string | null
+          frete_valor?: number | null
           id?: string
           numero?: string
           observacoes?: string | null
