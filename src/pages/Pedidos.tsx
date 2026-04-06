@@ -6,8 +6,6 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { SummaryCard } from "@/components/SummaryCard";
 import { AdvancedFilterBar } from "@/components/AdvancedFilterBar";
 import type { FilterChip } from "@/components/AdvancedFilterBar";
-import { ViewDrawerV2, ViewField } from "@/components/ViewDrawerV2";
-import { RelationalLink } from "@/components/ui/RelationalLink";
 import { FileOutput } from "lucide-react";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
 import { useRelationalNavigation } from "@/contexts/RelationalNavigationContext";
@@ -19,7 +17,6 @@ import { toast } from "sonner";
 import { formatCurrency, formatDate, daysSince, formatNumber } from "@/lib/format";
 import { calcularStatusFaturamentoOV } from "@/lib/fiscal";
 import { CheckCircle, FileText, DollarSign, Truck } from "lucide-react";
-import { LogisticaRastreioSection } from "@/components/logistica/LogisticaRastreioSection";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 interface Pedido {
@@ -56,12 +53,10 @@ const statusFaturamentoColors: Record<string, string> = {
 };
 
 const Pedidos = () => {
-  const { pushView: _pushView } = useRelationalNavigation();
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const { pushView } = useRelationalNavigation();
   const { data, loading, fetchData } = useSupabaseCrud<Pedido>({
     table: "ordens_venda", select: "*, clientes(nome_razao_social), orcamentos(numero)",
   });
-  const [selected, setSelected] = useState<Pedido | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilters, setStatusFilters] = useState<string[]>([]);
   const [faturamentoFilters, setFaturamentoFilters] = useState<string[]>([]);
@@ -82,8 +77,7 @@ const Pedidos = () => {
   }, [data]);
 
   const handleView = (pedido: Pedido) => {
-    setSelected(pedido);
-    setDrawerOpen(true);
+    pushView("ordem_venda", pedido.id);
   };
 
   const handleGenerateNF = async (pedido: Pedido) => {
@@ -266,46 +260,6 @@ const Pedidos = () => {
 
         <DataTable columns={columns} data={filteredData} loading={loading} onView={handleView} />
       </ModulePage>
-
-      <ViewDrawerV2
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        title={`Pedido ${selected?.numero}`}
-        badge={selected ? <StatusBadge status={selected.status} label={statusOperacionalLabels[selected.status]} /> : undefined}
-        tabs={selected ? [
-          {
-            value: "dados", label: "Dados", content: (
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <ViewField label="Número"><span className="font-mono">{selected.numero}</span></ViewField>
-                  <ViewField label="Emissão">{formatDate(selected.data_emissao)}</ViewField>
-                  <ViewField label="PO Cliente">{selected.po_number || "—"}</ViewField>
-                  <ViewField label="Total"><span className="font-semibold font-mono">{formatCurrency(selected.valor_total)}</span></ViewField>
-                </div>
-                <ViewField label="Cliente">
-                  {selected.clientes?.nome_razao_social ? (
-                    <RelationalLink type="cliente" id={selected.cliente_id}>{selected.clientes.nome_razao_social}</RelationalLink>
-                  ) : "—"}
-                </ViewField>
-                {selected.cotacao_id && (
-                  <ViewField label="Cotação de Origem">
-                    <RelationalLink type="orcamento" id={selected.cotacao_id}>
-                      {selected.orcamentos?.numero || "Ver cotação"}
-                    </RelationalLink>
-                  </ViewField>
-                )}
-              </div>
-            )
-          },
-          {
-            value: "logistica",
-            label: "Logística",
-            content: (
-              <LogisticaRastreioSection ordemVendaId={selected.id} />
-            )
-          }
-        ] : []}
-      />
 
       <ConfirmDialog
         open={!!generatingNfId}
