@@ -814,7 +814,7 @@ export default function OrcamentoForm() {
             <Button variant="outline" onClick={() => setPreviewOpen(true)} className="h-11 rounded-xl text-xs">Preview</Button>
             <Button variant="secondary" onClick={handleGeneratePdf} className="h-11 rounded-xl text-xs">PDF</Button>
             <Button onClick={handleSave} disabled={saving} className="h-11 rounded-xl text-xs">
-              {saving ? 'Salvando...' : isEdit && status !== "rascunho" ? 'Salvar' : 'Salvar'}
+              {saving ? 'Salvando...' : isEdit && status !== "rascunho" ? 'Salvar Alt.' : 'Salvar'}
             </Button>
           </div>
         </div>
