@@ -71,6 +71,7 @@ export default function OrcamentoForm() {
   const [clienteSnapshot, setClienteSnapshot] = useState<ClienteSnapshot>(emptyCliente);
   const [items, setItems] = useState<OrcamentoItem[]>([]);
   const [observacoes, setObservacoes] = useState("");
+  const [observacoesInternas, setObservacoesInternas] = useState("");
   const [validade, setValidade] = useState("");
 
   const [desconto, setDesconto] = useState(0);
@@ -127,6 +128,7 @@ export default function OrcamentoForm() {
           } else if (orc) {
             setNumero(orc.numero); setDataOrcamento(orc.data_orcamento); setStatus(orc.status);
             setClienteId(orc.cliente_id || ""); setObservacoes(orc.observacoes || "");
+            setObservacoesInternas(orc.observacoes_internas || "");
             setValidade(orc.validade || ""); setDesconto(orc.desconto || 0);
             setImpostoSt(orc.imposto_st || 0); setImpostoIpi(orc.imposto_ipi || 0);
             setFreteValor(orc.frete_valor || 0); setOutrasDespesas(orc.outras_despesas || 0);
@@ -221,11 +223,11 @@ export default function OrcamentoForm() {
 
 
   const buildDraftPayload = useCallback(() => ({
-    numero, dataOrcamento, status, clienteId, clienteSnapshot, items, observacoes, validade,
+    numero, dataOrcamento, status, clienteId, clienteSnapshot, items, observacoes, observacoesInternas, validade,
     desconto, impostoSt, impostoIpi, freteValor, outrasDespesas,
     pagamento, prazoPagamento, prazoEntrega, freteTipo, modalidade,
     savedAt: new Date().toISOString(),
-  }), [numero, dataOrcamento, status, clienteId, clienteSnapshot, items, observacoes, validade, desconto, impostoSt, impostoIpi, freteValor, outrasDespesas, pagamento, prazoPagamento, prazoEntrega, freteTipo, modalidade]);
+  }), [numero, dataOrcamento, status, clienteId, clienteSnapshot, items, observacoes, observacoesInternas, validade, desconto, impostoSt, impostoIpi, freteValor, outrasDespesas, pagamento, prazoPagamento, prazoEntrega, freteTipo, modalidade]);
 
   const applyDraft = (draft: any) => {
     setNumero(draft.numero || "");
@@ -235,6 +237,7 @@ export default function OrcamentoForm() {
     setClienteSnapshot(draft.clienteSnapshot || emptyCliente);
     setItems(draft.items || []);
     setObservacoes(draft.observacoes || "");
+    setObservacoesInternas(draft.observacoesInternas || "");
     setValidade(draft.validade || "");
     setDesconto(draft.desconto || 0);
     setImpostoSt(draft.impostoSt || 0);
@@ -259,6 +262,7 @@ export default function OrcamentoForm() {
       modalidade,
       freteTipo,
       observacoes,
+      observacoes_internas: observacoesInternas,
     };
 
     if (escopo === "equipe") {
@@ -300,6 +304,7 @@ export default function OrcamentoForm() {
     setModalidade(tpl.payload.modalidade || "");
     setFreteTipo(tpl.payload.freteTipo || "");
     setObservacoes(tpl.payload.observacoes || "");
+    setObservacoesInternas(tpl.payload.observacoes_internas || "");
     toast.success(`Template '${tpl.nome}' aplicado`);
   };
 
@@ -312,7 +317,8 @@ export default function OrcamentoForm() {
     try {
       const payload = {
         numero, data_orcamento: dataOrcamento, status, cliente_id: clienteId || null,
-        validade: validade || null, observacoes, desconto, imposto_st: impostoSt,
+        validade: validade || null, observacoes, observacoes_internas: observacoesInternas || null,
+        desconto, imposto_st: impostoSt,
         imposto_ipi: impostoIpi, frete_valor: freteValor, outras_despesas: outrasDespesas,
         valor_total: valorTotal, quantidade_total: quantidadeTotal, peso_total: pesoTotal,
         pagamento, prazo_pagamento: prazoPagamento, prazo_entrega: prazoEntrega,
@@ -359,7 +365,8 @@ export default function OrcamentoForm() {
       const newNumero = `COT${String((count || 0) + 1).padStart(6, "0")}`;
       const payload = {
         numero: newNumero, data_orcamento: new Date().toISOString().split("T")[0], status: "rascunho",
-        cliente_id: clienteId || null, validade: null, observacoes, desconto, imposto_st: impostoSt,
+        cliente_id: clienteId || null, validade: null, observacoes, observacoes_internas: observacoesInternas || null,
+        desconto, imposto_st: impostoSt,
         imposto_ipi: impostoIpi, frete_valor: freteValor, outras_despesas: outrasDespesas,
         valor_total: valorTotal, quantidade_total: quantidadeTotal, peso_total: pesoTotal,
         pagamento, prazo_pagamento: prazoPagamento, prazo_entrega: prazoEntrega,
@@ -629,17 +636,12 @@ export default function OrcamentoForm() {
               </div>
               {fieldErrors.clienteId && <p className="text-[11px] text-destructive">{fieldErrors.clienteId}</p>}
               {clienteId && (
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm bg-accent/20 rounded-lg p-4">
-                  <div className="md:col-span-2 space-y-1"><Label className="text-xs text-muted-foreground">Razão Social</Label><p className="font-medium">{clienteSnapshot.nome_razao_social}</p></div>
-                  <div className="space-y-1"><Label className="text-xs text-muted-foreground">Fantasia</Label><p>{clienteSnapshot.nome_fantasia || "—"}</p></div>
-                  <div className="space-y-1"><Label className="text-xs text-muted-foreground">CNPJ/CPF</Label><p className="font-mono text-xs">{clienteSnapshot.cpf_cnpj || "—"}</p></div>
-                  <div className="space-y-1"><Label className="text-xs text-muted-foreground">I.E.</Label><p>{clienteSnapshot.inscricao_estadual || "—"}</p></div>
-                  <div className="space-y-1"><Label className="text-xs text-muted-foreground">Email</Label><p>{clienteSnapshot.email || "—"}</p></div>
-                  <div className="md:col-span-2 space-y-1"><Label className="text-xs text-muted-foreground">Endereço</Label><p>{clienteSnapshot.logradouro}{clienteSnapshot.numero ? `, ${clienteSnapshot.numero}` : ""} - {clienteSnapshot.bairro}</p></div>
-                  <div className="space-y-1"><Label className="text-xs text-muted-foreground">Cidade/UF</Label><p>{clienteSnapshot.cidade}/{clienteSnapshot.uf} - {clienteSnapshot.cep}</p></div>
-                  <div className="space-y-1"><Label className="text-xs text-muted-foreground">Telefone</Label><p>{clienteSnapshot.telefone || "—"}</p></div>
-                  <div className="space-y-1"><Label className="text-xs text-muted-foreground">Celular</Label><p>{clienteSnapshot.celular || "—"}</p></div>
-                  <div className="space-y-1"><Label className="text-xs text-muted-foreground">Contato</Label><p>{clienteSnapshot.contato || "—"}</p></div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm bg-accent/20 rounded-lg p-3">
+                  <div className="md:col-span-2 space-y-0.5"><Label className="text-xs text-muted-foreground">Razão Social</Label><p className="font-medium text-sm leading-tight">{clienteSnapshot.nome_razao_social}</p></div>
+                  <div className="space-y-0.5"><Label className="text-xs text-muted-foreground">CNPJ/CPF</Label><p className="font-mono text-xs">{clienteSnapshot.cpf_cnpj || "—"}</p></div>
+                  <div className="space-y-0.5"><Label className="text-xs text-muted-foreground">Cidade/UF</Label><p className="text-sm">{clienteSnapshot.cidade ? `${clienteSnapshot.cidade}/${clienteSnapshot.uf}` : "—"}</p></div>
+                  {clienteSnapshot.email && <div className="space-y-0.5"><Label className="text-xs text-muted-foreground">Email</Label><p className="text-xs truncate">{clienteSnapshot.email}</p></div>}
+                  {clienteSnapshot.telefone && <div className="space-y-0.5"><Label className="text-xs text-muted-foreground">Telefone</Label><p className="text-xs">{clienteSnapshot.telefone}</p></div>}
                 </div>
               )}
             </div>
@@ -674,12 +676,21 @@ export default function OrcamentoForm() {
             onChange={handleCondicaoChange}
           />
 
-          <div className="bg-card rounded-xl border shadow-soft p-5">
-            <h3 className="font-semibold text-foreground mb-3">Observações</h3>
-            <Textarea value={observacoes} onChange={(e) => setObservacoes(e.target.value)}
-              placeholder="Texto livre para observações comerciais, instruções, validade, condições extras, etc."
-              className="min-h-[120px]" />
-            <p className="text-xs text-muted-foreground mt-2">Este texto aparecerá no PDF do orçamento.</p>
+          <div className="bg-card rounded-xl border shadow-soft p-5 space-y-4">
+            <div>
+              <h3 className="font-semibold text-foreground mb-3">Observações do Orçamento</h3>
+              <Textarea value={observacoes} onChange={(e) => setObservacoes(e.target.value)}
+                placeholder="Texto livre para observações comerciais, instruções, validade, condições extras, etc."
+                className="min-h-[100px]" />
+              <p className="text-xs text-muted-foreground mt-1.5">✓ Este texto <strong>aparecerá</strong> no PDF e no link enviado ao cliente.</p>
+            </div>
+            <div className="border-t pt-4">
+              <h3 className="font-semibold text-foreground mb-1">Observações Internas</h3>
+              <p className="text-xs text-muted-foreground mb-2">🔒 Uso exclusivo da equipe — <strong>não aparece</strong> para o cliente, no PDF nem no link público.</p>
+              <Textarea value={observacoesInternas} onChange={(e) => setObservacoesInternas(e.target.value)}
+                placeholder="Notas internas: margem, estratégia de negociação, alertas para a equipe, etc."
+                className="min-h-[80px] border-dashed" />
+            </div>
           </div>
         </div>
 

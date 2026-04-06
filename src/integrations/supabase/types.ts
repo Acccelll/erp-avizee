@@ -1706,6 +1706,7 @@ export type Database = {
           modalidade: string | null
           numero: string
           observacoes: string | null
+          observacoes_internas: string | null
           outras_despesas: number | null
           pagamento: string | null
           peso_total: number | null
@@ -1735,6 +1736,7 @@ export type Database = {
           modalidade?: string | null
           numero: string
           observacoes?: string | null
+          observacoes_internas?: string | null
           outras_despesas?: number | null
           pagamento?: string | null
           peso_total?: number | null
@@ -1764,6 +1766,7 @@ export type Database = {
           modalidade?: string | null
           numero?: string
           observacoes?: string | null
+          observacoes_internas?: string | null
           outras_despesas?: number | null
           pagamento?: string | null
           peso_total?: number | null

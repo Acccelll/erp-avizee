@@ -8,4 +8,5 @@ export interface TemplateConfig {
   modalidade: string;
   freteTipo: string;
   observacoes?: string;
+  observacoes_internas?: string;
 }

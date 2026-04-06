@@ -63,7 +63,15 @@ export function OrcamentoItemsGrid({ items, onChange, produtos, precosEspeciais 
   }));
 
   const removeItem = (idx: number) => onChange(items.filter((_, i) => i !== idx));
-  const duplicateItem = (idx: number) => onChange([...items.slice(0, idx + 1), { ...items[idx] }, ...items.slice(idx + 1)]);
+  const duplicateItem = (idx: number) => {
+    const source = items[idx];
+    if (source.produto_id && items.some((item, i) => i !== idx && item.produto_id === source.produto_id)) {
+      toast.warning("Item já incluso no orçamento. Edite a quantidade na linha existente.");
+      return;
+    }
+    const { id: _id, ...itemWithoutId } = source;
+    onChange([...items.slice(0, idx + 1), itemWithoutId, ...items.slice(idx + 1)]);
+  };
 
   const recalc = (item: OrcamentoItem) => {
     const qty = Number(item.quantidade || 0);
@@ -78,6 +86,11 @@ export function OrcamentoItemsGrid({ items, onChange, produtos, precosEspeciais 
     let item = { ...next[idx], [field]: value };
 
     if (field === "produto_id" && value) {
+      const alreadyExists = items.some((it, i) => i !== idx && it.produto_id === value);
+      if (alreadyExists) {
+        toast.warning("Item já incluso no orçamento. Edite a quantidade na linha existente.");
+        return;
+      }
       const prod = produtos.find((p: any) => p.id === value);
       if (prod) {
         item.codigo_snapshot = prod.sku || prod.codigo_interno || "";
@@ -139,8 +152,13 @@ export function OrcamentoItemsGrid({ items, onChange, produtos, precosEspeciais 
   const importFromText = async () => {
     const lines = importText.split("\n").map((l) => l.trim()).filter(Boolean);
     const parsed: OrcamentoItem[] = [];
+    let skipped = 0;
 
     for (let index = 0; index < lines.length; index += 1) {
+      if (index > 0 && index % 25 === 0) {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      }
+
       const line = lines[index];
       const [codigo = "", descricao = "", qtd = "1", unit = "0"] = line.split(/[;|,]/).map((p) => p.trim());
       const codigoKey = codigo.toLowerCase();
@@ -158,6 +176,15 @@ export function OrcamentoItemsGrid({ items, onChange, produtos, precosEspeciais 
         );
       }
 
+      if (prod?.id) {
+        const alreadyInList = items.some((it) => it.produto_id === prod!.id) ||
+          parsed.some((it) => it.produto_id === prod!.id);
+        if (alreadyInList) {
+          skipped += 1;
+          continue;
+        }
+      }
+
       parsed.push(recalc({
         ...emptyItem(),
         produto_id: prod?.id || "",
@@ -167,16 +194,18 @@ export function OrcamentoItemsGrid({ items, onChange, produtos, precosEspeciais 
         valor_unitario: Number(unit) || Number(prod?.preco_venda || 0),
         peso_unitario: Number(prod?.peso || 0),
       }));
-
-      if (index % 25 === 0) {
-        await new Promise((resolve) => setTimeout(resolve, 0));
-      }
     }
 
     onChange([...items, ...parsed]);
     setImportText("");
     setImportOpen(false);
-    toast.success(`${parsed.length} itens importados`);
+    if (skipped > 0) {
+      toast.success(`${parsed.length} itens importados`, {
+        description: `${skipped} item(ns) ignorado(s) por já estarem no orçamento.`,
+      });
+    } else {
+      toast.success(`${parsed.length} itens importados`);
+    }
   };
 
   return (
