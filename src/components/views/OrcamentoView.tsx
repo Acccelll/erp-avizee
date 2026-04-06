@@ -136,10 +136,12 @@ export function OrcamentoView({ id }: Props) {
   );
   if (!selected) return <div className="p-8 text-center text-destructive">Cotação não encontrada</div>;
 
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
   const isExpired =
     selected.validade &&
     selected.status !== "convertido" &&
-    new Date(selected.validade) < new Date(new Date().toDateString());
+    new Date(selected.validade) < today;
 
   const publicLink = selected.public_token
     ? `${window.location.origin}/orcamento-publico?token=${selected.public_token}`
@@ -210,6 +212,7 @@ export function OrcamentoView({ id }: Props) {
     }
   };
 
+  const itemsSubtotal = items.reduce((s, i) => s + Number(i.valor_total || 0), 0);
   const kpiItens = items.length;
   const kpiQtd = items.reduce((s, i) => s + Number(i.quantidade || 0), 0);
   const kpiPeso = Number(selected.peso_total || 0);
@@ -469,7 +472,7 @@ export function OrcamentoView({ id }: Props) {
         {/* --- TOTAIS --- */}
         <TabsContent value="totais" className="space-y-2 mt-3 text-sm">
           {[
-            { label: "Subtotal dos itens", value: items.reduce((s, i) => s + Number(i.valor_total || 0), 0), negative: false },
+            { label: "Subtotal dos itens", value: itemsSubtotal, negative: false },
             { label: "Desconto", value: Number(selected.desconto || 0), negative: true },
             { label: "Imposto IPI", value: Number(selected.imposto_ipi || 0), negative: false },
             { label: "Imposto ST", value: Number(selected.imposto_st || 0), negative: false },
