@@ -491,10 +491,10 @@ const Produtos = () => {
             </div>
           </div>
 
-          {/* ── Estoque e Logística ──────────────────────────── */}
+          {/* ── Suprimentos e Logística ──────────────────────────── */}
           <div className="space-y-3">
             <h3 className="font-semibold text-sm flex items-center gap-2 border-t pt-3">
-              <Archive className="w-4 h-4" /> Estoque e Logística
+              <Archive className="w-4 h-4" /> Suprimentos e Logística
             </h3>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">

@@ -1,6 +1,6 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Building2, Loader2, Mail, Receipt, Shield, Users, Wallet } from 'lucide-react';
+import { Building2, Check, Loader2, Mail, Receipt, Shield, Users, Wallet } from 'lucide-react';
 import { AppLayout } from '@/components/AppLayout';
 import { ModulePage } from '@/components/ModulePage';
 import { Button } from '@/components/ui/button';
@@ -10,11 +10,11 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import type { Database } from '@/integrations/supabase/types';
+import { ERP_RESOURCES } from '@/lib/permissions';
 
 type AppRole = Database['public']['Enums']['app_role'];
 const ALL_ROLES: AppRole[] = ['admin', 'vendedor', 'financeiro', 'estoquista'];
@@ -31,6 +31,17 @@ const ROLE_COLORS: Record<AppRole, string> = {
   vendedor: 'bg-primary/10 text-primary border-primary/30',
   financeiro: 'bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-700',
   estoquista: 'bg-emerald-100 text-emerald-700 border-emerald-300 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-700',
+};
+
+const ADMIN_UI_ACTIONS = ['visualizar', 'editar'] as const;
+
+type UiAction = (typeof ADMIN_UI_ACTIONS)[number];
+
+const roleCatalog: Record<AppRole, { label: string; defaultPermissions: string[] }> = {
+  admin: { label: 'Administrador', defaultPermissions: ERP_RESOURCES.flatMap((resource) => [`${resource}:visualizar`, `${resource}:editar`]) },
+  vendedor: { label: 'Vendedor', defaultPermissions: ['dashboard:visualizar', 'clientes:visualizar', 'clientes:editar', 'orcamentos:visualizar', 'orcamentos:editar', 'pedidos:visualizar', 'pedidos:editar', 'logistica:visualizar', 'relatorios:visualizar'] },
+  financeiro: { label: 'Financeiro', defaultPermissions: ['dashboard:visualizar', 'financeiro:visualizar', 'financeiro:editar', 'compras:visualizar', 'faturamento_fiscal:visualizar', 'relatorios:visualizar'] },
+  estoquista: { label: 'Estoquista', defaultPermissions: ['dashboard:visualizar', 'produtos:visualizar', 'estoque:visualizar', 'estoque:editar', 'compras:visualizar', 'logistica:visualizar', 'logistica:editar'] },
 };
 
 const defaultConfig = {
@@ -77,7 +88,7 @@ interface SideNavItem {
 
 const sideNavItems: SideNavItem[] = [
   { key: 'empresa', label: 'Empresa', icon: Building2 },
-  { key: 'usuarios', label: 'Usuários', icon: Users },
+  { key: 'usuarios', label: 'Usuários e Permissões', icon: Users },
   { key: 'email', label: 'E-mail', icon: Mail },
   { key: 'fiscal', label: 'Parâmetros Fiscais', icon: Receipt },
   { key: 'financeiro', label: 'Parâmetros Financeiros', icon: Wallet },
@@ -92,7 +103,8 @@ interface UserWithRoles {
   cargo: string | null;
   ativo: boolean;
   created_at: string;
-  roles: AppRole[];
+  role_padrao: AppRole;
+  extra_permissions: string[];
 }
 
 export default function Administracao() {
@@ -108,6 +120,11 @@ export default function Administracao() {
   const [users, setUsers] = useState<UserWithRoles[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
   const [roleUpdating, setRoleUpdating] = useState<string | null>(null);
+
+  const permissionOptions = useMemo(() =>
+    ERP_RESOURCES.flatMap((resource) => ADMIN_UI_ACTIONS.map((action) => ({ key: `${resource}:${action}`, label: `${resource.replaceAll('_', ' ')} · ${action}` }))),
+    [],
+  );
 
   useEffect(() => {
     const tab = searchParams.get('tab');
@@ -162,9 +179,10 @@ export default function Administracao() {
   const loadUsers = useCallback(async () => {
     setUsersLoading(true);
     try {
-      const [{ data: profiles }, { data: roles }] = await Promise.all([
-        supabase.from('profiles').select('id, nome, email, cargo, ativo, created_at'),
+      const [{ data: profiles }, { data: roles }, { data: userPermissions }] = await Promise.all([
+        supabase.from('profiles').select('id, nome, email, cargo, ativo, created_at, role_padrao'),
         supabase.from('user_roles').select('user_id, role'),
+        supabase.from('user_permissions' as any).select('user_id, permission_key, ativo').eq('ativo', true),
       ]);
       const roleMap = new Map<string, AppRole[]>();
       (roles || []).forEach((r: { user_id: string; role: string }) => {
@@ -172,9 +190,16 @@ export default function Administracao() {
         existing.push(r.role as AppRole);
         roleMap.set(r.user_id, existing);
       });
-      const merged: UserWithRoles[] = (profiles || []).map((p: { id: string; nome: string; email: string | null; cargo: string | null; ativo: boolean; created_at: string }) => ({
+      const permissionMap = new Map<string, string[]>();
+      ((userPermissions || []) as Array<{ user_id: string; permission_key: string }>).forEach((row) => {
+        const existing = permissionMap.get(row.user_id) || [];
+        existing.push(row.permission_key);
+        permissionMap.set(row.user_id, existing);
+      });
+      const merged: UserWithRoles[] = (profiles || []).map((p: { id: string; nome: string; email: string | null; cargo: string | null; ativo: boolean; created_at: string; role_padrao: AppRole | null }) => ({
         ...p,
-        roles: roleMap.get(p.id) || [],
+        role_padrao: p.role_padrao || (roleMap.get(p.id)?.[0] || 'vendedor'),
+        extra_permissions: permissionMap.get(p.id) || [],
       }));
       merged.sort((a, b) => a.nome.localeCompare(b.nome));
       setUsers(merged);
@@ -190,28 +215,47 @@ export default function Administracao() {
     if (activeSection === 'usuarios') loadUsers();
   }, [activeSection, loadUsers]);
 
-  // ── Toggle role ──
-  const toggleRole = async (userId: string, role: AppRole, currentlyHas: boolean) => {
-    setRoleUpdating(`${userId}-${role}`);
+  // ── Roles e permissões ──
+  const setDefaultRole = async (userId: string, role: AppRole) => {
+    setRoleUpdating(`${userId}-default`);
+    try {
+      await supabase.from('profiles').update({ role_padrao: role }).eq('id', userId);
+      await supabase.from('permission_audit' as any).insert({
+        user_id: (await supabase.auth.getUser()).data.user?.id,
+        target_user_id: userId,
+        role_padrao: role,
+        alteracao: { tipo: 'role_padrao', role },
+      });
+      setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, role_padrao: role } : u));
+      toast.success(`Role padrão atualizado para ${ROLE_LABELS[role]}.`);
+    } catch (err) {
+      console.error('[admin] Erro ao alterar role padrão:', err);
+      toast.error('Erro ao alterar role padrão.');
+    } finally {
+      setRoleUpdating(null);
+    }
+  };
+
+  const toggleExtraPermission = async (userId: string, permissionKey: string, currentlyHas: boolean) => {
+    setRoleUpdating(`${userId}-${permissionKey}`);
     try {
       if (currentlyHas) {
-        await supabase.from('user_roles').delete().eq('user_id', userId).eq('role', role);
+        await supabase.from('user_permissions' as any).upsert({ user_id: userId, permission_key: permissionKey, ativo: false, updated_by: (await supabase.auth.getUser()).data.user?.id }, { onConflict: 'user_id,permission_key' });
       } else {
-        await supabase.from('user_roles').insert({ user_id: userId, role });
+        await supabase.from('user_permissions' as any).upsert({ user_id: userId, permission_key: permissionKey, ativo: true, created_by: (await supabase.auth.getUser()).data.user?.id, updated_by: (await supabase.auth.getUser()).data.user?.id }, { onConflict: 'user_id,permission_key' });
       }
-      setUsers((prev) =>
-        prev.map((u) => {
-          if (u.id !== userId) return u;
-          return {
-            ...u,
-            roles: currentlyHas ? u.roles.filter((r) => r !== role) : [...u.roles, role],
-          };
-        })
-      );
-      toast.success(`Perfil "${ROLE_LABELS[role]}" ${currentlyHas ? 'removido' : 'atribuído'} com sucesso.`);
+      await supabase.from('permission_audit' as any).insert({
+        user_id: (await supabase.auth.getUser()).data.user?.id,
+        target_user_id: userId,
+        alteracao: { tipo: 'user_permission', permissionKey, ativo: !currentlyHas },
+      });
+      setUsers((prev) => prev.map((u) => u.id === userId ? {
+        ...u,
+        extra_permissions: currentlyHas ? u.extra_permissions.filter((p) => p !== permissionKey) : [...u.extra_permissions, permissionKey],
+      } : u));
     } catch (err) {
-      console.error('[admin] Erro ao alterar role:', err);
-      toast.error('Erro ao alterar perfil do usuário.');
+      console.error('[admin] Erro ao alterar permissão complementar:', err);
+      toast.error('Erro ao alterar permissão complementar.');
     } finally {
       setRoleUpdating(null);
     }
@@ -290,46 +334,66 @@ export default function Administracao() {
       <Card>
         <CardHeader>
           <CardTitle>Usuários cadastrados ({users.length})</CardTitle>
-          <CardDescription>Gerencie perfis de acesso de cada usuário. Clique nos badges para adicionar ou remover roles.</CardDescription>
+          <CardDescription>Cada usuário possui role padrão obrigatório e permissões complementares gerenciadas pelo administrador.</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {users.map((user) => (
-              <div key={user.id} className="flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="min-w-0 flex-1">
-                  <p className="font-medium truncate">{user.nome}</p>
-                  <p className="text-sm text-muted-foreground truncate">{user.email}</p>
-                  {user.cargo && <p className="text-xs text-muted-foreground">Cargo: {user.cargo}</p>}
-                  <p className="text-xs text-muted-foreground">
-                    Status: {user.ativo ? 'Ativo' : 'Inativo'}
-                  </p>
+            {users.map((user) => {
+              const defaultRolePermissions = roleCatalog[user.role_padrao]?.defaultPermissions || [];
+              return (
+              <div key={user.id} className="space-y-3 rounded-lg border p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium truncate">{user.nome}</p>
+                    <p className="text-sm text-muted-foreground truncate">{user.email}</p>
+                    {user.cargo && <p className="text-xs text-muted-foreground">Cargo: {user.cargo}</p>}
+                    <p className="text-xs text-muted-foreground">Status: {user.ativo ? 'Ativo' : 'Inativo'}</p>
+                  </div>
+                  <div className="w-full sm:w-64">
+                    <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">Role padrão</Label>
+                    <Select value={user.role_padrao} onValueChange={(value) => setDefaultRole(user.id, value as AppRole)}>
+                      <SelectTrigger className="h-9 mt-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ALL_ROLES.map((role) => <SelectItem key={role} value={role}>{ROLE_LABELS[role]}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  {ALL_ROLES.map((role) => {
-                    const has = user.roles.includes(role);
-                    const isUpdating = roleUpdating === `${user.id}-${role}`;
-                    return (
-                      <button
-                        key={role}
-                        type="button"
-                        disabled={isUpdating}
-                        onClick={() => toggleRole(user.id, role, has)}
-                        className={cn(
-                          'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-all',
-                          has ? ROLE_COLORS[role] : 'bg-muted/50 text-muted-foreground border-border opacity-60 hover:opacity-100',
-                          isUpdating && 'opacity-50 cursor-wait',
-                        )}
-                      >
-                        {isUpdating ? (
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                        ) : null}
-                        {ROLE_LABELS[role]}
-                      </button>
-                    );
-                  })}
+
+                <div className="rounded-md border bg-muted/30 p-3">
+                  <p className="text-xs font-semibold mb-2">Permissões do role padrão ({roleCatalog[user.role_padrao].label})</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {defaultRolePermissions.map((perm) => (
+                      <span key={perm} className="inline-flex rounded-full border px-2 py-0.5 text-[11px] text-muted-foreground">{perm}</span>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold">Permissões complementares por usuário</p>
+                  <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                    {permissionOptions.map((perm) => {
+                      const has = user.extra_permissions.includes(perm.key);
+                      const isUpdating = roleUpdating === `${user.id}-${perm.key}`;
+                      return (
+                        <button
+                          key={perm.key}
+                          type="button"
+                          onClick={() => toggleExtraPermission(user.id, perm.key, has)}
+                          disabled={isUpdating}
+                          className={cn('flex items-center justify-between rounded-md border px-2.5 py-2 text-left text-xs', has ? 'border-primary/40 bg-primary/5 text-primary' : 'text-muted-foreground')}
+                        >
+                          <span>{perm.label}</span>
+                          {has && <Check className="h-3.5 w-3.5" />}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
-            ))}
+            )})}
             {users.length === 0 && (
               <p className="text-center text-sm text-muted-foreground py-8">
                 Nenhum usuário encontrado.
