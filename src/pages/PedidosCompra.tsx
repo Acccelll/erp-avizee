@@ -9,7 +9,7 @@ import { ViewDrawerV2 } from "@/components/ViewDrawerV2";
 import { ViewField, ViewSection } from "@/components/ViewDrawer";
 import { RelationalLink } from "@/components/ui/RelationalLink";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Edit, Trash2, PackageCheck, SendHorizontal } from "lucide-react";
+import { Edit, Trash2, PackageCheck, SendHorizontal, AlertCircle, Calendar, Building2, FileText, Boxes, ArrowDownToLine, Receipt } from "lucide-react";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
 import { useRelationalNavigation } from "@/contexts/RelationalNavigationContext";
 import { AutocompleteSearch } from "@/components/ui/AutocompleteSearch";
@@ -21,7 +21,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { formatCurrency, formatNumber } from "@/lib/format";
+import { formatCurrency, formatNumber, formatDate } from "@/lib/format";
 import { ShoppingCart, Clock, CheckCircle2, Truck } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { LogisticaRastreioSection } from "@/components/logistica/LogisticaRastreioSection";
@@ -60,6 +60,9 @@ const PedidosCompra = () => {
   const [saving, setSaving] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [viewItems, setViewItems] = useState<any[]>([]);
+  const [viewEstoque, setViewEstoque] = useState<any[]>([]);
+  const [viewFinanceiro, setViewFinanceiro] = useState<any[]>([]);
+  const [viewCotacao, setViewCotacao] = useState<any | null>(null);
   const navigate = useNavigate();
 
   const valorProdutos = items.reduce((s, i) => s + (i.valor_total || 0), 0);
@@ -101,9 +104,30 @@ const PedidosCompra = () => {
 
   const openView = async (p: PedidoCompra) => {
     setSelected(p);
-    const { data: itens } = await supabase.from("pedidos_compra_itens" as any).select("*, produtos(nome, sku)").eq("pedido_compra_id", p.id);
-    setViewItems(itens || []);
+    setViewItems([]);
+    setViewEstoque([]);
+    setViewFinanceiro([]);
+    setViewCotacao(null);
     setDrawerOpen(true);
+
+    const [itensResult, estResult] = await Promise.all([
+      supabase.from("pedidos_compra_itens" as any).select("*, produtos(nome, sku)").eq("pedido_compra_id", p.id),
+      supabase.from("estoque_movimentos").select("*, produtos(nome, sku)").eq("documento_id", p.id).eq("documento_tipo", "pedido_compra"),
+    ]);
+    setViewItems(itensResult.data || []);
+    setViewEstoque((estResult.data as any[]) || []);
+
+    if (p.cotacao_compra_id) {
+      const { data: cot } = await supabase.from("cotacoes_compra" as any).select("id, numero, status, data_cotacao").eq("id", p.cotacao_compra_id).single();
+      setViewCotacao(cot || null);
+    }
+
+    const { data: finLanc } = await supabase
+      .from("financeiro_lancamentos")
+      .select("id, descricao, valor, status, data_vencimento, tipo")
+      .ilike("descricao", `PC ${p.numero}%`)
+      .eq("ativo", true);
+    setViewFinanceiro((finLanc as any[]) || []);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -293,18 +317,32 @@ const PedidosCompra = () => {
       </FormModal>
 
       {selected && (() => {
-        const tabDados = (
+        const isOverdue = !["recebido", "cancelado"].includes(selected.status)
+          && selected.data_entrega_prevista
+          && new Date(selected.data_entrega_prevista) < new Date();
+
+        const recebimentoStatus = (() => {
+          if (selected.status === "recebido") return { label: "Recebido", color: "success" };
+          if (selected.status === "parcialmente_recebido") return { label: "Parcial", color: "warning" };
+          if (selected.status === "aguardando_recebimento") return { label: "Aguardando", color: "warning" };
+          if (selected.status === "cancelado") return { label: "Cancelado", color: "destructive" };
+          return { label: "Pendente", color: "secondary" };
+        })();
+
+        const tabResumo = (
           <div className="space-y-5">
-            <ViewSection title="Informações">
+            {isOverdue && (
+              <div className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                Entrega prevista em {formatDate(selected.data_entrega_prevista)} — pedido em atraso.
+              </div>
+            )}
+            <ViewSection title="Pedido">
               <div className="grid grid-cols-2 gap-4">
                 <ViewField label="Número"><span className="font-mono font-medium">{selected.numero}</span></ViewField>
                 <ViewField label="Status"><StatusBadge status={selected.status} label={statusLabels[selected.status] || selected.status} /></ViewField>
-                <ViewField label="Data Pedido">{new Date(selected.data_pedido).toLocaleDateString("pt-BR")}</ViewField>
-                <ViewField label="Valor Total"><span className="font-semibold font-mono">{formatCurrency(Number(selected.valor_total || 0))}</span></ViewField>
-                {selected.data_entrega_prevista && <ViewField label="Entrega Prevista">{new Date(selected.data_entrega_prevista).toLocaleDateString("pt-BR")}</ViewField>}
-                {selected.data_entrega_real && <ViewField label="Entrega Real">{new Date(selected.data_entrega_real).toLocaleDateString("pt-BR")}</ViewField>}
-                {selected.frete_valor ? <ViewField label="Frete"><span className="font-mono">{formatCurrency(Number(selected.frete_valor))}</span></ViewField> : null}
-                {selected.condicao_pagamento && <ViewField label="Cond. Pagamento">{selected.condicao_pagamento}</ViewField>}
+                <ViewField label="Data Pedido">{formatDate(selected.data_pedido)}</ViewField>
+                <ViewField label="Valor Total"><span className="font-semibold font-mono text-primary">{formatCurrency(Number(selected.valor_total || 0))}</span></ViewField>
               </div>
             </ViewSection>
             <ViewSection title="Fornecedor">
@@ -313,19 +351,30 @@ const PedidosCompra = () => {
                   <RelationalLink type="fornecedor" id={selected.fornecedor_id}>
                     {selected.fornecedores?.nome_razao_social || "—"}
                   </RelationalLink>
-                ) : "—"}
+                ) : <span className="text-muted-foreground">Não informado</span>}
               </ViewField>
             </ViewSection>
             {selected.cotacao_compra_id && (
-              <ViewSection title="Origem">
-                <ViewField label="Cotação de Compra">
-                  <span className="font-mono text-xs text-primary">{selected.cotacao_compra_id}</span>
+              <ViewSection title="Cotação de Origem">
+                <ViewField label="Cotação">
+                  {viewCotacao ? (
+                    <RelationalLink to="/cotacoes-compra">
+                      {viewCotacao.numero}
+                    </RelationalLink>
+                  ) : (
+                    <span className="font-mono text-xs text-muted-foreground">{selected.cotacao_compra_id}</span>
+                  )}
                 </ViewField>
+                {viewCotacao?.status && (
+                  <ViewField label="Status da Cotação">
+                    <StatusBadge status={viewCotacao.status} />
+                  </ViewField>
+                )}
               </ViewSection>
             )}
             {selected.observacoes && (
               <ViewSection title="Observações">
-                <p className="text-sm text-muted-foreground">{selected.observacoes}</p>
+                <p className="text-sm text-muted-foreground italic">{selected.observacoes}</p>
               </ViewSection>
             )}
           </div>
@@ -334,31 +383,253 @@ const PedidosCompra = () => {
         const tabItens = (
           <div className="space-y-3">
             {viewItems.length > 0 ? (
-              <div className="rounded-lg border overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-muted/50 border-b">
-                      <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground">Produto</th>
-                      <th className="px-3 py-2 text-right text-xs font-semibold text-muted-foreground">Qtd</th>
-                      <th className="px-3 py-2 text-right text-xs font-semibold text-muted-foreground">Vlr. Unit.</th>
-                      <th className="px-3 py-2 text-right text-xs font-semibold text-muted-foreground">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {viewItems.map((i: any, idx: number) => (
-                      <tr key={idx} className="border-b last:border-b-0 hover:bg-muted/20">
-                        <td className="px-3 py-2">{i.produtos?.nome || "—"}</td>
-                        <td className="px-3 py-2 text-right font-mono">{i.quantidade}</td>
-                        <td className="px-3 py-2 text-right font-mono text-muted-foreground">{formatCurrency(Number(i.valor_unitario))}</td>
-                        <td className="px-3 py-2 text-right font-mono font-medium">{formatCurrency(Number(i.valor_total))}</td>
+              <>
+                <div className="rounded-lg border overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-muted/50 border-b">
+                        <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground">Produto</th>
+                        <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground hidden sm:table-cell">SKU</th>
+                        <th className="px-3 py-2 text-right text-xs font-semibold text-muted-foreground">Qtd</th>
+                        <th className="px-3 py-2 text-right text-xs font-semibold text-muted-foreground">Vlr. Unit.</th>
+                        <th className="px-3 py-2 text-right text-xs font-semibold text-muted-foreground">Total</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {viewItems.map((i: any, idx: number) => (
+                        <tr key={idx} className="border-b last:border-b-0 hover:bg-muted/20">
+                          <td className="px-3 py-2 font-medium">{i.produtos?.nome || "—"}</td>
+                          <td className="px-3 py-2 text-xs text-muted-foreground font-mono hidden sm:table-cell">{i.produtos?.sku || "—"}</td>
+                          <td className="px-3 py-2 text-right font-mono">{i.quantidade}</td>
+                          <td className="px-3 py-2 text-right font-mono text-muted-foreground text-xs">{formatCurrency(Number(i.valor_unitario))}</td>
+                          <td className="px-3 py-2 text-right font-mono font-medium">{formatCurrency(Number(i.valor_total))}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="bg-muted/30 border-t">
+                        <td colSpan={4} className="px-3 py-2 text-xs font-semibold text-muted-foreground text-right">Total dos Itens</td>
+                        <td className="px-3 py-2 text-right font-mono font-bold text-primary">
+                          {formatCurrency(viewItems.reduce((s: number, i: any) => s + Number(i.valor_total || 0), 0))}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+                {Number(selected.frete_valor) > 0 && (
+                  <div className="flex justify-between items-center rounded-lg bg-accent/20 px-3 py-2 text-sm">
+                    <span className="text-muted-foreground flex items-center gap-1.5"><Truck className="h-3.5 w-3.5" /> Frete</span>
+                    <span className="font-mono">{formatCurrency(Number(selected.frete_valor))}</span>
+                  </div>
+                )}
+              </>
             ) : (
-              <p className="text-sm text-muted-foreground text-center py-4">Nenhum item</p>
+              <p className="text-sm text-muted-foreground text-center py-4">Nenhum item cadastrado</p>
             )}
+          </div>
+        );
+
+        const tabRecebimento = (
+          <div className="space-y-5">
+            <div className="rounded-lg border p-4">
+              <p className="text-xs text-muted-foreground uppercase font-semibold mb-2">Situação de Recebimento</p>
+              <div className="flex items-center gap-3">
+                {selected.status === "recebido" && <CheckCircle2 className="h-5 w-5 text-success shrink-0" />}
+                {selected.status === "parcialmente_recebido" && <ArrowDownToLine className="h-5 w-5 text-warning shrink-0" />}
+                {["aguardando_recebimento", "enviado_ao_fornecedor", "aprovado"].includes(selected.status) && <Clock className="h-5 w-5 text-warning shrink-0" />}
+                {selected.status === "rascunho" && <FileText className="h-5 w-5 text-muted-foreground shrink-0" />}
+                {selected.status === "cancelado" && <AlertCircle className="h-5 w-5 text-destructive shrink-0" />}
+                <div>
+                  <p className="font-semibold text-sm">{recebimentoStatus.label}</p>
+                  <p className="text-xs text-muted-foreground">{statusLabels[selected.status] || selected.status}</p>
+                </div>
+              </div>
+            </div>
+
+            {(selected.data_entrega_prevista || selected.data_entrega_real) && (
+              <ViewSection title="Datas de Entrega">
+                <div className="grid grid-cols-2 gap-4">
+                  {selected.data_entrega_prevista && (
+                    <ViewField label="Entrega Prevista">
+                      <span className={`flex items-center gap-1 ${isOverdue ? "text-destructive font-medium" : ""}`}>
+                        <Calendar className="h-3.5 w-3.5" />
+                        {formatDate(selected.data_entrega_prevista)}
+                      </span>
+                    </ViewField>
+                  )}
+                  {selected.data_entrega_real && (
+                    <ViewField label="Entrega Real">
+                      <span className="flex items-center gap-1 text-success font-medium">
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        {formatDate(selected.data_entrega_real)}
+                      </span>
+                    </ViewField>
+                  )}
+                </div>
+              </ViewSection>
+            )}
+
+            {viewEstoque.length > 0 ? (
+              <ViewSection title="Movimentações de Estoque">
+                <div className="rounded-lg border overflow-hidden">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="bg-muted/50 border-b">
+                        <th className="px-3 py-2 text-left font-semibold text-muted-foreground">Produto</th>
+                        <th className="px-3 py-2 text-right font-semibold text-muted-foreground">Qtd</th>
+                        <th className="px-3 py-2 text-right font-semibold text-muted-foreground">Saldo Ant.</th>
+                        <th className="px-3 py-2 text-right font-semibold text-muted-foreground">Saldo Atu.</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {viewEstoque.map((m: any, idx: number) => (
+                        <tr key={idx} className="border-b last:border-b-0 hover:bg-muted/20">
+                          <td className="px-3 py-2 font-medium">{m.produtos?.nome || "—"}</td>
+                          <td className="px-3 py-2 text-right font-mono text-success font-semibold">+{m.quantidade}</td>
+                          <td className="px-3 py-2 text-right font-mono text-muted-foreground">{m.saldo_anterior}</td>
+                          <td className="px-3 py-2 text-right font-mono font-medium">{m.saldo_atual}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                  <CheckCircle2 className="h-3 w-3 text-success" />
+                  {viewEstoque.length} moviment{viewEstoque.length === 1 ? "ação registrada" : "ações registradas"}
+                </p>
+              </ViewSection>
+            ) : (
+              <div className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">
+                <Boxes className="h-8 w-8 mx-auto mb-2 opacity-30" />
+                {["recebido", "parcialmente_recebido"].includes(selected.status)
+                  ? "Movimentações de estoque não encontradas."
+                  : "Nenhum recebimento registrado ainda."}
+              </div>
+            )}
+
+            <ViewSection title="Logística / Rastreamento">
+              <LogisticaRastreioSection pedidoCompraId={selected.id} />
+            </ViewSection>
+          </div>
+        );
+
+        const tabCondicoes = (
+          <div className="space-y-5">
+            <ViewSection title="Pagamento">
+              <div className="grid grid-cols-2 gap-4">
+                <ViewField label="Cond. Pagamento">
+                  {selected.condicao_pagamento || <span className="text-muted-foreground">Não informado</span>}
+                </ViewField>
+                <ViewField label="Frete">
+                  <span className="font-mono">{selected.frete_valor ? formatCurrency(Number(selected.frete_valor)) : "—"}</span>
+                </ViewField>
+              </div>
+            </ViewSection>
+            <ViewSection title="Entregas">
+              <div className="grid grid-cols-2 gap-4">
+                <ViewField label="Data do Pedido">{formatDate(selected.data_pedido)}</ViewField>
+                {selected.data_entrega_prevista && (
+                  <ViewField label="Entrega Prevista">
+                    <span className={isOverdue ? "text-destructive font-medium" : ""}>
+                      {formatDate(selected.data_entrega_prevista)}
+                    </span>
+                  </ViewField>
+                )}
+                {selected.data_entrega_real && (
+                  <ViewField label="Entrega Real">
+                    <span className="text-success font-medium">{formatDate(selected.data_entrega_real)}</span>
+                  </ViewField>
+                )}
+              </div>
+            </ViewSection>
+            <ViewSection title="Totais">
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Produtos</span>
+                  <span className="font-mono">{formatCurrency(viewItems.reduce((s: number, i: any) => s + Number(i.valor_total || 0), 0))}</span>
+                </div>
+                {Number(selected.frete_valor) > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Frete</span>
+                    <span className="font-mono">{formatCurrency(Number(selected.frete_valor))}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-sm font-semibold border-t pt-2">
+                  <span>Total</span>
+                  <span className="font-mono text-primary">{formatCurrency(Number(selected.valor_total || 0))}</span>
+                </div>
+              </div>
+            </ViewSection>
+            {selected.observacoes && (
+              <ViewSection title="Observações">
+                <p className="text-sm text-muted-foreground italic">{selected.observacoes}</p>
+              </ViewSection>
+            )}
+          </div>
+        );
+
+        const tabVinculos = (
+          <div className="space-y-5">
+            <ViewSection title="Fornecedor">
+              <ViewField label="Fornecedor">
+                {selected.fornecedor_id ? (
+                  <RelationalLink type="fornecedor" id={selected.fornecedor_id}>
+                    <Building2 className="h-3.5 w-3.5" />
+                    {selected.fornecedores?.nome_razao_social || "—"}
+                  </RelationalLink>
+                ) : <span className="text-muted-foreground">Não vinculado</span>}
+              </ViewField>
+            </ViewSection>
+
+            <ViewSection title="Cotação de Origem">
+              {selected.cotacao_compra_id ? (
+                <ViewField label="Cotação">
+                  {viewCotacao ? (
+                    <RelationalLink to="/cotacoes-compra">
+                      <Receipt className="h-3.5 w-3.5" />
+                      {viewCotacao.numero}
+                    </RelationalLink>
+                  ) : (
+                    <span className="font-mono text-xs text-muted-foreground">{selected.cotacao_compra_id}</span>
+                  )}
+                </ViewField>
+              ) : (
+                <p className="text-sm text-muted-foreground">Pedido criado sem cotação de origem.</p>
+              )}
+            </ViewSection>
+
+            <ViewSection title="Financeiro">
+              {viewFinanceiro.length > 0 ? (
+                <div className="space-y-2">
+                  {viewFinanceiro.map((l: any, idx: number) => (
+                    <div key={idx} className="flex items-center justify-between rounded-md bg-accent/20 px-3 py-2 text-sm">
+                      <span className="truncate text-xs">{l.descricao}</span>
+                      <div className="flex items-center gap-2 shrink-0 ml-2">
+                        <StatusBadge status={l.status} />
+                        <span className="font-mono font-medium">{formatCurrency(Number(l.valor))}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  {["recebido", "parcialmente_recebido"].includes(selected.status)
+                    ? "Lançamento financeiro não encontrado para este pedido."
+                    : "Lançamento gerado automaticamente ao registrar o recebimento."}
+                </p>
+              )}
+            </ViewSection>
+
+            <ViewSection title="Estoque">
+              {viewEstoque.length > 0 ? (
+                <p className="text-sm text-success flex items-center gap-1.5">
+                  <CheckCircle2 className="h-4 w-4" />
+                  {viewEstoque.length} entrada{viewEstoque.length !== 1 ? "s" : ""} de estoque registrada{viewEstoque.length !== 1 ? "s" : ""}.
+                </p>
+              ) : (
+                <p className="text-sm text-muted-foreground">Nenhuma movimentação de estoque registrada.</p>
+              )}
+            </ViewSection>
           </div>
         );
 
@@ -391,32 +662,35 @@ const PedidosCompra = () => {
               <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={async () => { setDrawerOpen(false); await supabase.from("pedidos_compra" as any).update({ ativo: false } as any).eq("id", selected.id); fetchData(); toast.success("Removido!"); }}><Trash2 className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Excluir</TooltipContent></Tooltip>
             </>}
             summary={
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-4 gap-2">
                 <div className="bg-accent/30 rounded-lg p-3 text-center">
                   <p className="text-xs text-muted-foreground">Itens</p>
                   <p className="font-semibold text-sm font-mono">{viewItems.length}</p>
                 </div>
                 <div className="bg-accent/30 rounded-lg p-3 text-center">
-                  <p className="text-xs text-muted-foreground">Status</p>
-                  <p className="font-semibold text-sm capitalize">{statusLabels[selected.status] || selected.status}</p>
+                  <p className="text-xs text-muted-foreground">Recebimento</p>
+                  <p className={`font-semibold text-xs leading-tight mt-0.5 ${recebimentoStatus.color === "success" ? "text-success" : recebimentoStatus.color === "warning" ? "text-warning" : recebimentoStatus.color === "destructive" ? "text-destructive" : "text-muted-foreground"}`}>
+                    {recebimentoStatus.label}
+                  </p>
                 </div>
                 <div className="bg-accent/30 rounded-lg p-3 text-center">
                   <p className="text-xs text-muted-foreground">Total</p>
                   <p className="font-semibold text-sm font-mono">{formatCurrency(Number(selected.valor_total || 0))}</p>
                 </div>
+                <div className="bg-accent/30 rounded-lg p-3 text-center">
+                  <p className="text-xs text-muted-foreground">Cotação</p>
+                  <p className="font-semibold text-xs leading-tight mt-0.5 font-mono">
+                    {viewCotacao ? viewCotacao.numero : selected.cotacao_compra_id ? "—" : "Avulso"}
+                  </p>
+                </div>
               </div>
             }
             tabs={[
-              { value: "dados", label: "Dados", content: tabDados },
+              { value: "resumo", label: "Resumo", content: tabResumo },
               { value: "itens", label: `Itens (${viewItems.length})`, content: tabItens },
-              { value: "logistica", label: "Logística", content: (
-                <div className="space-y-4">
-                  <h4 className="text-sm font-semibold flex items-center gap-2 px-1">
-                    <Truck className="w-4 h-4" /> Rastreamento de Entrega
-                  </h4>
-                  <LogisticaRastreioSection pedidoCompraId={selected.id} />
-                </div>
-              )},
+              { value: "recebimento", label: "Recebimento", content: tabRecebimento },
+              { value: "condicoes", label: "Condições", content: tabCondicoes },
+              { value: "vinculos", label: "Vínculos", content: tabVinculos },
             ]}
             footer={drawerFooter}
           />
