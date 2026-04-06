@@ -13,16 +13,17 @@ import { OrcamentoCondicoesCard } from "@/components/Orcamento/OrcamentoCondicoe
 import { FreteCorreiosCard } from "@/components/Orcamento/FreteCorreiosCard";
 import { OrcamentoSidebarSummary } from "@/components/Orcamento/OrcamentoSidebarSummary";
 import { OrcamentoPdfTemplate } from "@/components/Orcamento/OrcamentoPdfTemplate";
+import { StatusBadge } from "@/components/StatusBadge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ArrowLeft, Save, Eye, FileText, Copy, Plus, Search, Wand2, RefreshCw, CheckCircle2, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Save, Eye, FileText, Copy, Plus, Search, Wand2, RefreshCw, CheckCircle2, AlertTriangle, CalendarDays, Clock } from "lucide-react";
 import { QuickAddClientModal } from "@/components/QuickAddClientModal";
 import { ClientSelector, type ProductWithForn } from "@/components/ui/DataSelector";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useAuth } from "@/contexts/AuthContext";
 import { Tables } from "@/integrations/supabase/types";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, formatDate } from "@/lib/format";
 import { TemplateConfig } from "@/types/orcamento";
 
 interface ClienteSnapshot {
@@ -339,7 +340,7 @@ export default function OrcamentoForm() {
       }
 
       localStorage.removeItem(draftKey);
-      toast.success("Orçamento criado com sucesso", {
+      toast.success(isEdit ? "Orçamento atualizado com sucesso" : "Orçamento criado com sucesso", {
         description: `Registro ${numero} salvo.`,
         action: { label: "Visualizar", onClick: () => navigate(orcId ? `/cotacoes/${orcId}` : "/cotacoes") },
       });
@@ -469,12 +470,19 @@ export default function OrcamentoForm() {
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <div className="min-w-0">
-            <h1 className="page-title text-xl md:text-2xl">{isEdit ? "Editar Cotação" : "Nova Cotação"}</h1>
-            <p className="text-muted-foreground text-sm mt-0.5">Criação e emissão de proposta comercial</p>
+            <h1 className="page-title text-xl md:text-2xl">
+              {isEdit ? `Editando Orçamento${numero ? ` — ${numero}` : ""}` : "Novo Orçamento"}
+            </h1>
+            <p className="text-muted-foreground text-sm mt-0.5">
+              {isEdit ? "Revisão e ajuste de proposta comercial" : "Criação e emissão de proposta comercial"}
+            </p>
           </div>
         </div>
         <div className="hidden items-center gap-2 md:ml-12 md:flex md:flex-wrap">
-          <Button onClick={handleSave} disabled={saving} className="gap-2"><Save className="w-4 h-4" />{saving ? "Salvando..." : "Salvar Rascunho"}</Button>
+          <Button onClick={handleSave} disabled={saving} className="gap-2">
+            <Save className="w-4 h-4" />
+            {saving ? "Salvando..." : isEdit && status !== "rascunho" ? "Salvar Alterações" : "Salvar Rascunho"}
+          </Button>
           <Button variant="outline" onClick={() => setPreviewOpen(true)} className="gap-2"><Eye className="w-4 h-4" />Visualizar</Button>
           <Button variant="secondary" onClick={handleGeneratePdf} className="gap-2"><FileText className="w-4 h-4" />Gerar PDF</Button>
           {isEdit && <Button variant="outline" onClick={handleDuplicate} className="gap-2"><Copy className="w-4 h-4" />Duplicar</Button>}
@@ -483,6 +491,35 @@ export default function OrcamentoForm() {
           <Button variant="outline" onClick={() => saveTemplate("usuario")} className="gap-2"><Wand2 className="w-4 h-4" />Salvar Meu</Button>
           <Button variant="outline" onClick={() => saveTemplate("equipe")} className="gap-2"><Wand2 className="w-4 h-4" />Compartilhar</Button>
         </div>
+
+        {/* Edit-mode context banner — desktop */}
+        {isEdit && (
+          <div className="hidden md:flex md:ml-12 items-center flex-wrap gap-x-6 gap-y-2 rounded-xl border bg-card/60 px-5 py-3 text-sm shadow-soft">
+            <div className="flex items-center gap-2">
+              <span className="text-xs uppercase tracking-wider text-muted-foreground font-medium">Orçamento</span>
+              <span className="font-mono font-bold text-primary">{numero || "—"}</span>
+            </div>
+            {clienteSnapshot.nome_razao_social && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs uppercase tracking-wider text-muted-foreground font-medium">Cliente</span>
+                <span className="font-medium truncate max-w-[200px]">{clienteSnapshot.nome_razao_social}</span>
+              </div>
+            )}
+            <StatusBadge status={status} />
+            <div className="flex items-center gap-1.5 text-muted-foreground">
+              <CalendarDays className="h-3.5 w-3.5" />
+              <span>Emissão: <span className="text-foreground font-medium">{formatDate(dataOrcamento)}</span></span>
+            </div>
+            {validade && (
+              <div className="flex items-center gap-1.5 text-muted-foreground">
+                <Clock className="h-3.5 w-3.5" />
+                <span>Validade: <span className={`font-medium ${new Date(validade) < new Date(new Date().toDateString()) ? "text-destructive" : "text-foreground"}`}>{formatDate(validade)}</span></span>
+              </div>
+            )}
+            <div className="ml-auto font-bold text-base text-primary font-mono">{formatCurrency(valorTotal)}</div>
+          </div>
+        )}
+
         {isMobile && (
           <div className="grid grid-cols-2 gap-3 rounded-2xl border bg-card p-4 shadow-sm">
             <div>
@@ -491,7 +528,7 @@ export default function OrcamentoForm() {
             </div>
             <div className="text-right">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Total</p>
-              <p className="mt-1 text-base font-semibold">{valorTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+              <p className="mt-1 text-base font-semibold">{formatCurrency(valorTotal)}</p>
             </div>
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Cliente</p>
@@ -501,18 +538,24 @@ export default function OrcamentoForm() {
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Itens</p>
               <p className="mt-1 text-sm">{items.filter(i => i.produto_id).length} item(ns)</p>
             </div>
+            {isEdit && (
+              <div className="col-span-2 flex items-center gap-2 pt-1 border-t">
+                <StatusBadge status={status} />
+                {validade && <span className="text-xs text-muted-foreground">Válido até {formatDate(validade)}</span>}
+              </div>
+            )}
           </div>
         )}
       </div>
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
         <div className="lg:col-span-8 space-y-5">
-          {/* Dados do Orçamento */}
+          {/* Identificação do Orçamento */}
           <div className="bg-card rounded-xl border shadow-soft p-5">
-            <h3 className="font-semibold text-foreground mb-4">Dados da Cotação</h3>
+            <h3 className="font-semibold text-foreground mb-4">Identificação do Orçamento</h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="space-y-1.5">
-                <Label className="text-xs">Nº Cotação</Label>
+                <Label className="text-xs">Nº Orçamento</Label>
                 <div className="relative">
                   <Input
                     value={numero}
@@ -524,20 +567,29 @@ export default function OrcamentoForm() {
                 </div>
                 {fieldErrors.numero && <p className="text-[11px] text-destructive">{fieldErrors.numero}</p>}
               </div>
-              <div className="space-y-1.5"><Label className="text-xs">Data</Label><Input type="date" value={dataOrcamento} onChange={(e) => setDataOrcamento(e.target.value)} /></div>
-              <div className="space-y-1.5"><Label className="text-xs">Status</Label>
+              <div className="space-y-1.5"><Label className="text-xs">Data de Emissão</Label><Input type="date" value={dataOrcamento} onChange={(e) => setDataOrcamento(e.target.value)} /></div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Status</Label>
                 <Select value={status} onValueChange={setStatus}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="rascunho">Rascunho</SelectItem>
-                    <SelectItem value="confirmado">Confirmada</SelectItem>
-                    <SelectItem value="aprovado">Aprovada</SelectItem>
-                    <SelectItem value="convertido">Convertida</SelectItem>
-                    <SelectItem value="cancelado">Cancelada</SelectItem>
+                    <SelectItem value="enviado">Enviado ao Cliente</SelectItem>
+                    <SelectItem value="confirmado">Aguardando Aprovação</SelectItem>
+                    <SelectItem value="aprovado">Aprovado</SelectItem>
+                    <SelectItem value="convertido">Convertido em Pedido</SelectItem>
+                    <SelectItem value="rejeitado">Rejeitado</SelectItem>
+                    <SelectItem value="expirado">Expirado</SelectItem>
+                    <SelectItem value="cancelado">Cancelado</SelectItem>
                   </SelectContent>
                 </Select>
+                <p className="text-[11px] text-muted-foreground">Fluxo: Rascunho → Enviado → Aprovado → Convertido</p>
               </div>
-              <div className="space-y-1.5"><Label className="text-xs">Validade</Label><Input type="date" value={validade} onChange={(e) => setValidade(e.target.value)} /></div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Validade</Label>
+                <Input type="date" value={validade} onChange={(e) => setValidade(e.target.value)} />
+                <p className="text-[11px] text-muted-foreground">Data limite para o cliente aceitar.</p>
+              </div>
             </div>
           </div>
 
@@ -602,6 +654,7 @@ export default function OrcamentoForm() {
 
           <OrcamentoTotaisCard
             totalProdutos={totalProdutos}
+            pesoTotal={pesoTotal}
             form={{ valor_total: valorTotal, desconto, imposto_st: impostoSt, imposto_ipi: impostoIpi, frete_valor: freteValor, outras_despesas: outrasDespesas }}
             onChange={handleTotalChange}
           />
@@ -635,6 +688,7 @@ export default function OrcamentoForm() {
             status={status} numero={numero} clienteNome={clienteSnapshot.nome_razao_social}
             qtdItens={items.filter(i => i.produto_id).length} totalProdutos={totalProdutos}
             freteValor={freteValor} valorTotal={valorTotal}
+            pesoTotal={pesoTotal} validade={validade} isEdit={isEdit}
             onSave={handleSave} onPreview={() => setPreviewOpen(true)}
             onGeneratePdf={handleGeneratePdf} saving={saving}
           />
@@ -657,18 +711,19 @@ export default function OrcamentoForm() {
               <p>Total simulado: <strong>{formatCurrency(valorSimulado)}</strong></p>
             </div>
           </div>
-          <div className="mt-4 rounded-xl border bg-card p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <h4 className="font-semibold">Histórico de Interações</h4>
-              <Button variant="outline" size="sm" onClick={() => setMailModalOpen(true)}>Reenviar por e-mail</Button>
+          {isEdit && (
+            <div className="mt-4 rounded-xl border bg-card p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="font-semibold">Ações Comerciais</h4>
+                <Button variant="outline" size="sm" onClick={() => setMailModalOpen(true)}>Reenviar por e-mail</Button>
+              </div>
+              <div className="space-y-1.5 text-sm text-muted-foreground">
+                <p>• Criado em: <span className="text-foreground font-medium">{formatDate(dataOrcamento)}</span></p>
+                {validade && <p>• Validade: <span className={`font-medium ${new Date(validade) < new Date(new Date().toDateString()) ? "text-destructive" : "text-foreground"}`}>{formatDate(validade)}</span></p>}
+                <p className="text-xs mt-2">Use "Reenviar por e-mail" para notificar o cliente sobre este orçamento.</p>
+              </div>
             </div>
-            <div className="space-y-2 text-sm">
-              <p>• {dataOrcamento}: Orçamento criado</p>
-              <p>• {new Date().toISOString().slice(0, 10)}: Alterações de itens</p>
-              <p>• {new Date().toISOString().slice(0, 10)}: E-mail enviado ao cliente</p>
-              <p className="text-warning">• Aguardando confirmação de visualização do cliente</p>
-            </div>
-          </div>
+          )}
         </div>
       </div>
 
@@ -759,7 +814,7 @@ export default function OrcamentoForm() {
             <Button variant="outline" onClick={() => setPreviewOpen(true)} className="h-11 rounded-xl text-xs">Preview</Button>
             <Button variant="secondary" onClick={handleGeneratePdf} className="h-11 rounded-xl text-xs">PDF</Button>
             <Button onClick={handleSave} disabled={saving} className="h-11 rounded-xl text-xs">
-              {saving ? 'Salvando...' : 'Salvar'}
+              {saving ? 'Salvando...' : isEdit && status !== "rascunho" ? 'Salvar Alt.' : 'Salvar'}
             </Button>
           </div>
         </div>

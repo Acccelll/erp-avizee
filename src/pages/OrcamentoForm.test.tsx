@@ -53,7 +53,7 @@ describe("OrcamentoForm", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText(/nova cotação/i)).toBeInTheDocument();
+      expect(screen.getByText(/novo orçamento/i)).toBeInTheDocument();
     });
   });
 });
