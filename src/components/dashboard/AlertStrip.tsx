@@ -86,7 +86,7 @@ export function AlertStrip({
       count: comprasAguardando,
       icon: ClipboardList,
       severity: 'warning',
-      href: '/compras',
+      href: '/pedidos-compra',
     },
     {
       id: 'notas',

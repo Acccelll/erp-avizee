@@ -110,9 +110,8 @@ export const navSections: NavSection[] = [
       {
         title: 'Gestão de compras',
         items: [
-          { title: 'Cotações de Compra', path: '/cotacoes-compra', keywords: ['comparacao', 'fornecedores'] },
-          { title: 'Pedidos de Compra', path: '/pedidos-compra', keywords: ['pre-nota', 'pedido fornecedor'] },
-          { title: 'Compras (Recebidas)', path: '/compras', keywords: ['compras', 'fornecedores'] },
+          { title: 'Cotações de Compra', path: '/cotacoes-compra', keywords: ['comparacao', 'fornecedores', 'cotacao'] },
+          { title: 'Pedidos de Compra', path: '/pedidos-compra', keywords: ['pre-nota', 'pedido fornecedor', 'recebimento'] },
         ],
       },
     ],

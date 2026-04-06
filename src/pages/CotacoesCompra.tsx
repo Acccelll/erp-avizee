@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { AppLayout } from "@/components/AppLayout";
 import { ModulePage } from "@/components/ModulePage";
 import { DataTable } from "@/components/DataTable";
@@ -23,7 +24,7 @@ import { formatCurrency, formatNumber } from "@/lib/format";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import {
   ShoppingCart, Edit, Trash2, Plus, CheckCircle2, Clock,
-  FileSearch, Trophy, X, PackageSearch,
+  FileSearch, Trophy, X, PackageSearch, ClipboardList,
 } from "lucide-react";
 
 interface CotacaoCompra {
@@ -62,6 +63,7 @@ const statusLabels: Record<string, string> = {
   aberta: "Aberta",
   em_analise: "Em Análise",
   finalizada: "Finalizada",
+  convertida: "Convertida em Pedido",
   cancelada: "Cancelada",
 };
 
@@ -82,6 +84,7 @@ interface LocalItem {
 }
 
 export default function CotacoesCompra() {
+  const navigate = useNavigate();
   const { data, loading, fetchData, remove } = useSupabaseCrud<CotacaoCompra>({
     table: "cotacoes_compra",
     orderBy: "created_at",
@@ -111,7 +114,7 @@ export default function CotacoesCompra() {
   const kpis = useMemo(() => {
     const abertas = data.filter((c) => c.status === "aberta").length;
     const emAnalise = data.filter((c) => c.status === "em_analise").length;
-    const finalizadas = data.filter((c) => c.status === "finalizada").length;
+    const finalizadas = data.filter((c) => c.status === "finalizada" || c.status === "convertida").length;
     return { total: data.length, abertas, emAnalise, finalizadas };
   }, [data]);
 
@@ -289,6 +292,81 @@ export default function CotacoesCompra() {
     toast.success("Cotação finalizada!");
     setDrawerOpen(false);
     fetchData();
+  };
+
+  const gerarPedido = async () => {
+    if (!selected) return;
+
+    // Gather selected proposals
+    const propostasSelecionadas = viewPropostas.filter((p) => p.selecionado);
+    if (propostasSelecionadas.length === 0) {
+      toast.error("Selecione ao menos uma proposta antes de gerar o pedido.");
+      return;
+    }
+
+    // Determine winning supplier (most frequent among selected proposals)
+    const fornecedorCount: Record<string, number> = {};
+    for (const p of propostasSelecionadas) {
+      fornecedorCount[p.fornecedor_id] = (fornecedorCount[p.fornecedor_id] || 0) + 1;
+    }
+    const fornecedorVencedorId = Object.entries(fornecedorCount).sort((a, b) => b[1] - a[1])[0][0];
+
+    // Build items from selected proposals for winning supplier
+    const itensParaPedido = viewItems
+      .map((item) => {
+        const proposta = propostasSelecionadas.find(
+          (p) => p.item_id === item.id && p.fornecedor_id === fornecedorVencedorId
+        ) || propostasSelecionadas.find((p) => p.item_id === item.id);
+        if (!proposta) return null;
+        return {
+          produto_id: item.produto_id,
+          quantidade: item.quantidade,
+          valor_unitario: Number(proposta.preco_unitario || 0),
+          valor_total: item.quantidade * Number(proposta.preco_unitario || 0),
+        };
+      })
+      .filter(Boolean);
+
+    if (itensParaPedido.length === 0) {
+      toast.error("Nenhum item com proposta válida para gerar pedido.");
+      return;
+    }
+
+    const valorTotal = itensParaPedido.reduce((s, i) => s + (i?.valor_total || 0), 0);
+    const numeroPedido = `PC-${String(Date.now()).slice(-6)}`;
+
+    try {
+      const { data: novoPedido, error } = await supabase
+        .from("pedidos_compra" as any)
+        .insert({
+          numero: numeroPedido,
+          fornecedor_id: fornecedorVencedorId,
+          cotacao_compra_id: selected.id,
+          data_pedido: new Date().toISOString().split("T")[0],
+          valor_total: valorTotal,
+          status: "aprovado",
+          observacoes: `Gerado a partir da cotação ${selected.numero}`,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      const pedidoId = (novoPedido as any).id;
+      const itemsPayload = itensParaPedido.map((i) => ({ pedido_compra_id: pedidoId, ...i }));
+      await supabase.from("pedidos_compra_itens" as any).insert(itemsPayload);
+
+      // Mark quotation as converted
+      await supabase.from("cotacoes_compra").update({ status: "convertida" }).eq("id", selected.id);
+
+      toast.success(`Pedido ${numeroPedido} gerado com sucesso!`);
+      setDrawerOpen(false);
+      fetchData();
+      navigate("/pedidos-compra");
+    } catch (err: any) {
+      console.error("[gerarPedido]", err);
+      toast.error("Erro ao gerar pedido de compra.");
+    }
   };
 
   const produtoOptions = produtosCrud.data.map((p: any) => ({
@@ -508,7 +586,7 @@ export default function CotacoesCompra() {
                                     <Badge variant="secondary" className="text-[10px]">{p.prazo_entrega_dias}d</Badge>
                                   )}
                                   <div className="flex gap-1">
-                                    {!p.selecionado && selected.status !== "finalizada" && (
+                                    {!p.selecionado && selected.status !== "finalizada" && selected.status !== "convertida" && (
                                       <Tooltip>
                                         <TooltipTrigger asChild>
                                           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleSelectProposal(p.id!, item.id)}>
@@ -518,7 +596,7 @@ export default function CotacoesCompra() {
                                         <TooltipContent>Selecionar</TooltipContent>
                                       </Tooltip>
                                     )}
-                                    {selected.status !== "finalizada" && (
+                                    {selected.status !== "finalizada" && selected.status !== "convertida" && (
                                       <Tooltip>
                                         <TooltipTrigger asChild>
                                           <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDeleteProposal(p.id!)}>
@@ -537,7 +615,7 @@ export default function CotacoesCompra() {
                       )}
 
                       {/* Add proposal inline */}
-                      {selected.status !== "finalizada" && selected.status !== "cancelada" && (
+                      {selected.status !== "finalizada" && selected.status !== "convertida" && selected.status !== "cancelada" && (
                         <>
                           {addingProposal === item.id ? (
                             <div className="rounded-lg border border-dashed p-3 space-y-3 bg-muted/30">
@@ -599,9 +677,22 @@ export default function CotacoesCompra() {
             </div>
 
             {/* Finalize button */}
-            {selected.status !== "finalizada" && selected.status !== "cancelada" && viewPropostas.some((p) => p.selecionado) && (
+            {selected.status !== "finalizada" && selected.status !== "convertida" && selected.status !== "cancelada" && viewPropostas.some((p) => p.selecionado) && (
               <Button className="w-full gap-2" onClick={handleFinalize}>
                 <CheckCircle2 className="h-4 w-4" /> Finalizar Cotação
+              </Button>
+            )}
+
+            {/* Generate Purchase Order button */}
+            {(selected.status === "finalizada" || selected.status === "convertida") && (
+              <Button
+                className="w-full gap-2"
+                variant={selected.status === "convertida" ? "outline" : "default"}
+                onClick={gerarPedido}
+                disabled={selected.status === "convertida"}
+              >
+                <ClipboardList className="h-4 w-4" />
+                {selected.status === "convertida" ? "Pedido já gerado" : "Gerar Pedido de Compra"}
               </Button>
             )}
           </div>

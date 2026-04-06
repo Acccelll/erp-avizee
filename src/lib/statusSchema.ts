@@ -62,7 +62,18 @@ export const statusCotacaoCompra: Record<string, { label: string; color: string 
   aberta: { label: "Aberta", color: "info" },
   em_analise: { label: "Em Análise", color: "warning" },
   finalizada: { label: "Finalizada", color: "success" },
+  convertida: { label: "Convertida em Pedido", color: "success" },
   cancelada: { label: "Cancelada", color: "destructive" },
+};
+
+export const statusPedidoCompra: Record<string, { label: string; color: string }> = {
+  rascunho: { label: "Rascunho", color: "secondary" },
+  aprovado: { label: "Aprovado", color: "info" },
+  enviado_ao_fornecedor: { label: "Enviado ao Fornecedor", color: "info" },
+  aguardando_recebimento: { label: "Aguardando Recebimento", color: "warning" },
+  parcialmente_recebido: { label: "Parcialmente Recebido", color: "warning" },
+  recebido: { label: "Recebido", color: "success" },
+  cancelado: { label: "Cancelado", color: "destructive" },
 };
 
 // Helper to get label from any status schema

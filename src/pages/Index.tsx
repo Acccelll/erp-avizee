@@ -104,7 +104,7 @@ const DashboardContent = () => {
       supabase.from("clientes").select("*", { count: "exact", head: true }).eq("ativo", true),
       supabase.from("fornecedores").select("*", { count: "exact", head: true }).eq("ativo", true),
       supabase.from("orcamentos").select("*", { count: "exact", head: true }).eq("ativo", true).gte("data_orcamento", dateFrom),
-      supabase.from("compras").select("*", { count: "exact", head: true }).eq("ativo", true).gte("data_compra", dateFrom),
+      supabase.from("pedidos_compra" as any).select("*", { count: "exact", head: true }).eq("ativo", true).gte("data_pedido", dateFrom),
       buildFinTotalQuery("receber"),
       buildFinTotalQuery("pagar"),
       supabase.from("financeiro_lancamentos").select("valor").eq("status", "vencido").eq("ativo", true),
@@ -124,10 +124,10 @@ const DashboardContent = () => {
         .order("data_emissao", { ascending: true })
         .limit(15),
       supabase
-        .from("compras")
-        .select("id, numero, valor_total, data_compra, data_entrega_prevista, fornecedores(nome_razao_social)")
+        .from("pedidos_compra" as any)
+        .select("id, numero, valor_total, data_pedido, data_entrega_prevista, fornecedores(nome_razao_social)")
         .eq("ativo", true)
-        .eq("status", "confirmado")
+        .in("status", ["aprovado", "enviado_ao_fornecedor", "aguardando_recebimento", "parcialmente_recebido"])
         .is("data_entrega_real", null)
         .order("data_entrega_prevista", { ascending: true })
         .limit(10),
