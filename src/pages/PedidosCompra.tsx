@@ -168,11 +168,13 @@ const PedidosCompra = () => {
       valor_total: valorTotal,
     };
 
-    console.log('[pedidos_compra] pre-submit diagnostic', {
-      fornecedor_id: payload.fornecedor_id,
-      fornecedor_id_type: typeof payload.fornecedor_id,
-      payload,
-    });
+    if (import.meta.env.DEV) {
+      console.log('[pedidos_compra] pre-submit diagnostic', {
+        fornecedor_id: payload.fornecedor_id,
+        fornecedor_id_type: typeof payload.fornecedor_id,
+        payload,
+      });
+    }
 
     let pedidoId = selected?.id;
     try {
