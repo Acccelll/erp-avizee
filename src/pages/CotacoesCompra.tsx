@@ -26,6 +26,7 @@ import {
   ShoppingCart, Edit, Trash2, Plus, CheckCircle2, Clock,
   FileSearch, Trophy, X, PackageSearch, ClipboardList,
   Users2, TrendingDown, AlertCircle, Info,
+  ThumbsUp, ThumbsDown, Send, BarChart3, Award, ChevronRight,
 } from "lucide-react";
 
 interface CotacaoCompra {
@@ -63,10 +64,32 @@ interface Proposta {
 const statusLabels: Record<string, string> = {
   aberta: "Aberta",
   em_analise: "Em Análise",
-  finalizada: "Finalizada",
+  aguardando_aprovacao: "Aguardando Aprovação",
+  aprovada: "Aprovada",
+  finalizada: "Concluída",
   convertida: "Convertida em Pedido",
+  rejeitada: "Rejeitada",
   cancelada: "Cancelada",
 };
+
+/** Maps legacy 'finalizada' status to 'aprovada' for flow/stepper logic */
+function normalizeStatus(status: string): string {
+  return status === "finalizada" ? "aprovada" : status;
+}
+
+const FLOW_STEPS = [
+  { key: "aberta", label: "Em Cotação" },
+  { key: "em_analise", label: "Em Análise" },
+  { key: "aguardando_aprovacao", label: "Aprovação" },
+  { key: "aprovada", label: "Aprovada" },
+  { key: "convertida", label: "Convertida" },
+];
+
+const FLOW_STEP_ORDER = ["aberta", "em_analise", "aguardando_aprovacao", "aprovada", "convertida"];
+
+function getFlowStepIndex(status: string): number {
+  return FLOW_STEP_ORDER.indexOf(normalizeStatus(status));
+}
 
 const emptyForm = {
   numero: "",
@@ -320,6 +343,45 @@ export default function CotacoesCompra() {
     fetchData();
   };
 
+  const handleSendForApproval = async () => {
+    if (!selected) return;
+    try {
+      const { error } = await supabase.from("cotacoes_compra").update({ status: "aguardando_aprovacao" }).eq("id", selected.id);
+      if (error) throw error;
+      setSelected({ ...selected, status: "aguardando_aprovacao" });
+      toast.success("Cotação enviada para aprovação!");
+      fetchData();
+    } catch {
+      toast.error("Erro ao enviar para aprovação.");
+    }
+  };
+
+  const handleApprove = async () => {
+    if (!selected) return;
+    try {
+      const { error } = await supabase.from("cotacoes_compra").update({ status: "aprovada" }).eq("id", selected.id);
+      if (error) throw error;
+      setSelected({ ...selected, status: "aprovada" });
+      toast.success("Cotação aprovada!");
+      fetchData();
+    } catch {
+      toast.error("Erro ao aprovar cotação.");
+    }
+  };
+
+  const handleReject = async () => {
+    if (!selected) return;
+    try {
+      const { error } = await supabase.from("cotacoes_compra").update({ status: "rejeitada" }).eq("id", selected.id);
+      if (error) throw error;
+      setSelected({ ...selected, status: "rejeitada" });
+      toast.error("Cotação rejeitada.");
+      fetchData();
+    } catch {
+      toast.error("Erro ao rejeitar cotação.");
+    }
+  };
+
   const gerarPedido = async () => {
     if (!selected) return;
 
@@ -436,6 +498,22 @@ export default function CotacoesCompra() {
       {/* Create/Edit Modal */}
       <FormModal open={modalOpen} onClose={() => setModalOpen(false)} title={mode === "create" ? "Nova Cotação de Compra" : "Editar Cotação de Compra"} size="xl">
         <form onSubmit={handleSubmit} className="space-y-5">
+          {/* Edit context banner */}
+          {mode === "edit" && selected && (
+            <div className="flex items-start gap-3 rounded-lg border bg-muted/30 px-4 py-3">
+              <Info className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium">
+                  Editando <span className="font-mono text-primary">{selected.numero}</span>
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {localItems.length} {localItems.length === 1 ? "item" : "itens"} •{" "}
+                  Criada em {formatDate(selected.data_cotacao)}
+                </p>
+              </div>
+              <StatusBadge status={selected.status} label={statusLabels[selected.status] || selected.status} />
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
             <div className="space-y-2">
               <Label>Número *</Label>
@@ -456,7 +534,9 @@ export default function CotacoesCompra() {
                 <SelectContent>
                   <SelectItem value="aberta">Aberta</SelectItem>
                   <SelectItem value="em_analise">Em Análise</SelectItem>
-                  <SelectItem value="finalizada">Finalizada</SelectItem>
+                  <SelectItem value="aguardando_aprovacao">Aguardando Aprovação</SelectItem>
+                  <SelectItem value="aprovada">Aprovada</SelectItem>
+                  <SelectItem value="rejeitada">Rejeitada</SelectItem>
                   <SelectItem value="cancelada">Cancelada</SelectItem>
                 </SelectContent>
               </Select>
@@ -544,30 +624,64 @@ export default function CotacoesCompra() {
         }
         summary={
           selected ? (
-            <div className="grid grid-cols-3 gap-2">
-              <div className="rounded-lg bg-muted/50 px-3 py-2 text-center">
-                <p className="text-[10px] text-muted-foreground uppercase font-semibold flex items-center justify-center gap-1">
-                  <PackageSearch className="h-3 w-3" /> Itens
-                </p>
-                <p className="text-xl font-bold font-mono mt-0.5">{viewItems.length}</p>
+            <div className="space-y-3">
+              <div className="grid grid-cols-3 gap-2">
+                <div className="rounded-lg bg-muted/50 px-3 py-2 text-center">
+                  <p className="text-[10px] text-muted-foreground uppercase font-semibold flex items-center justify-center gap-1">
+                    <PackageSearch className="h-3 w-3" /> Itens
+                  </p>
+                  <p className="text-xl font-bold font-mono mt-0.5">{viewItems.length}</p>
+                </div>
+                <div className="rounded-lg bg-muted/50 px-3 py-2 text-center">
+                  <p className="text-[10px] text-muted-foreground uppercase font-semibold flex items-center justify-center gap-1">
+                    <Users2 className="h-3 w-3" /> Fornecedores
+                  </p>
+                  <p className="text-xl font-bold font-mono mt-0.5">{drawerStats.uniqueSuppliers}</p>
+                </div>
+                <div className="rounded-lg bg-muted/50 px-3 py-2 text-center">
+                  <p className="text-[10px] text-muted-foreground uppercase font-semibold flex items-center justify-center gap-1">
+                    <TrendingDown className="h-3 w-3" /> Melhor Total
+                  </p>
+                  <p className="text-sm font-bold font-mono mt-0.5 text-emerald-600 dark:text-emerald-400 leading-tight">
+                    {drawerStats.bestTotal > 0 ? formatCurrency(drawerStats.bestTotal) : "—"}
+                  </p>
+                </div>
               </div>
-              <div className="rounded-lg bg-muted/50 px-3 py-2 text-center">
-                <p className="text-[10px] text-muted-foreground uppercase font-semibold flex items-center justify-center gap-1">
-                  <Users2 className="h-3 w-3" /> Fornecedores
-                </p>
-                <p className="text-xl font-bold font-mono mt-0.5">{drawerStats.uniqueSuppliers}</p>
-              </div>
-              <div className="rounded-lg bg-muted/50 px-3 py-2 text-center">
-                <p className="text-[10px] text-muted-foreground uppercase font-semibold flex items-center justify-center gap-1">
-                  <TrendingDown className="h-3 w-3" /> Melhor Total
-                </p>
-                <p className="text-sm font-bold font-mono mt-0.5 text-emerald-600 dark:text-emerald-400 leading-tight">
-                  {drawerStats.bestTotal > 0 ? formatCurrency(drawerStats.bestTotal) : "—"}
-                </p>
-              </div>
+              {/* Flow stepper */}
+              {selected.status !== "rejeitada" && selected.status !== "cancelada" ? (
+                <div className="rounded-lg bg-muted/30 border px-3 py-2">
+                  <div className="flex items-center">
+                    {FLOW_STEPS.map((step, i) => {
+                      const currentIdx = getFlowStepIndex(selected.status);
+                      const stepIdx = getFlowStepIndex(step.key);
+                      const isActive = normalizeStatus(selected.status) === step.key;
+                      const isPast = currentIdx > stepIdx;
+                      return (
+                        <div key={step.key} className="flex items-center flex-1 min-w-0">
+                          <div className="flex flex-col items-center gap-0.5 min-w-0">
+                            <div className={`h-2 w-2 rounded-full shrink-0 ${isActive ? "bg-primary" : isPast ? "bg-emerald-500" : "bg-muted-foreground/25"}`} />
+                            <span className={`text-[9px] font-medium truncate max-w-[48px] ${isActive ? "text-primary" : isPast ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground/50"}`}>
+                              {step.label}
+                            </span>
+                          </div>
+                          {i < FLOW_STEPS.length - 1 && (
+                            <div className={`flex-1 h-px mx-1 ${isPast || isActive ? "bg-emerald-500/40" : "bg-muted-foreground/15"}`} />
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                <div className={`rounded-lg border px-3 py-2 text-xs font-medium flex items-center gap-2 ${selected.status === "rejeitada" ? "border-destructive/30 bg-destructive/5 text-destructive" : "border-muted text-muted-foreground"}`}>
+                  <X className="h-3.5 w-3.5" />
+                  {selected.status === "rejeitada" ? "Cotação rejeitada — processo encerrado" : "Cotação cancelada"}
+                </div>
+              )}
             </div>
           ) : undefined
         }
+        defaultTab={viewPropostas.length > 0 ? "propostas" : "resumo"}
         tabs={
           selected
             ? [
@@ -686,7 +800,7 @@ export default function CotacoesCompra() {
                 /* ── TAB PROPOSTAS ───────────────────────── */
                 {
                   value: "propostas",
-                  label: `Propostas (${drawerStats.uniqueSuppliers})`,
+                  label: `Propostas (${drawerStats.uniqueSuppliers} forn.)`,
                   content: (
                     <div className="space-y-4">
                       {viewItems.length === 0 && (
@@ -694,6 +808,98 @@ export default function CotacoesCompra() {
                           Adicione itens à cotação antes de registrar propostas.
                         </div>
                       )}
+
+                      {/* Comparative table: items × suppliers */}
+                      {viewItems.length > 0 && drawerStats.uniqueSuppliers > 1 && (() => {
+                        const supplierIds = [...new Set(viewPropostas.map((p) => p.fornecedor_id))];
+                        const supplierNames = supplierIds.map(
+                          (id) => viewPropostas.find((p) => p.fornecedor_id === id)?.fornecedores?.nome_razao_social || id
+                        );
+                        const colTotals = supplierIds.map((sid) =>
+                          viewItems.reduce((sum, item) => {
+                            const p = viewPropostas.find((pp) => pp.item_id === item.id && pp.fornecedor_id === sid);
+                            return sum + (p ? Number(p.preco_unitario) * item.quantidade : 0);
+                          }, 0)
+                        );
+                        const bestColTotal = Math.min(...colTotals.filter((t) => t > 0));
+                        return (
+                          <div className="rounded-lg border overflow-hidden">
+                            <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 border-b">
+                              <BarChart3 className="h-3.5 w-3.5 text-muted-foreground" />
+                              <span className="text-[10px] font-semibold uppercase text-muted-foreground">
+                                Comparativo de Fornecedores
+                              </span>
+                            </div>
+                            <div className="overflow-x-auto">
+                              <table className="w-full text-xs">
+                                <thead>
+                                  <tr className="border-b bg-muted/20">
+                                    <th className="px-3 py-2 text-left font-semibold text-muted-foreground">Produto</th>
+                                    {supplierNames.map((name, si) => (
+                                      <th key={supplierIds[si]} className="px-3 py-2 text-right font-semibold text-muted-foreground min-w-[100px]">
+                                        <span className="truncate block max-w-[90px] ml-auto">{name}</span>
+                                      </th>
+                                    ))}
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {viewItems.map((item) => {
+                                    const rowPrices = supplierIds.map((sid) => {
+                                      const p = viewPropostas.find((pp) => pp.item_id === item.id && pp.fornecedor_id === sid);
+                                      return p ? Number(p.preco_unitario) : null;
+                                    });
+                                    const validPrices = rowPrices.filter((v): v is number => v !== null);
+                                    const bestRow = validPrices.length > 0 ? Math.min(...validPrices) : null;
+                                    return (
+                                      <tr key={item.id} className="border-b last:border-b-0 hover:bg-muted/10">
+                                        <td className="px-3 py-2 font-medium max-w-[110px]">
+                                          <span className="truncate block">{item.produtos?.nome || "—"}</span>
+                                          <span className="text-muted-foreground font-normal">
+                                            {item.quantidade} {item.unidade || "UN"}
+                                          </span>
+                                        </td>
+                                        {supplierIds.map((sid, si) => {
+                                          const p = viewPropostas.find((pp) => pp.item_id === item.id && pp.fornecedor_id === sid);
+                                          const isBestRow = p && Number(p.preco_unitario) === bestRow;
+                                          return (
+                                            <td key={sid} className={`px-3 py-2 text-right ${p?.selecionado ? "bg-primary/5 font-semibold" : isBestRow ? "text-emerald-600 dark:text-emerald-400" : ""}`}>
+                                              {p ? (
+                                                <div>
+                                                  <div className="flex items-center justify-end gap-1">
+                                                    {p.selecionado && <Trophy className="h-3 w-3 text-primary" />}
+                                                    {isBestRow && !p.selecionado && <Award className="h-3 w-3 text-emerald-500" />}
+                                                    <span className="font-mono">{formatCurrency(Number(p.preco_unitario))}</span>
+                                                  </div>
+                                                  {p.prazo_entrega_dias && (
+                                                    <span className="text-muted-foreground text-[10px]">{p.prazo_entrega_dias}d</span>
+                                                  )}
+                                                </div>
+                                              ) : (
+                                                <span className="text-muted-foreground/40">—</span>
+                                              )}
+                                            </td>
+                                          );
+                                        })}
+                                      </tr>
+                                    );
+                                  })}
+                                  <tr className="border-t bg-muted/30 font-semibold">
+                                    <td className="px-3 py-2 text-muted-foreground text-[10px] uppercase">Total</td>
+                                    {colTotals.map((total, si) => (
+                                      <td key={supplierIds[si]} className={`px-3 py-2 text-right font-mono ${total > 0 && total === bestColTotal ? "text-emerald-600 dark:text-emerald-400" : ""}`}>
+                                        {total > 0 ? formatCurrency(total) : "—"}
+                                        {total > 0 && total === bestColTotal && (
+                                          <div className="text-[9px] font-normal text-emerald-500 uppercase">menor</div>
+                                        )}
+                                      </td>
+                                    ))}
+                                  </tr>
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        );
+                      })()}
                       {viewItems.map((item) => {
                         const itemPropostas = viewPropostas.filter((p) => p.item_id === item.id);
                         const bestPrice =
@@ -916,11 +1122,52 @@ export default function CotacoesCompra() {
                   label: "Decisão",
                   content: (
                     <div className="space-y-4">
-                      {/* Selected supplier summary */}
+                      {/* Approval state banner */}
+                      {selected.status === "rejeitada" && (
+                        <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+                          <ThumbsDown className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                          <div>
+                            <p className="font-semibold">Cotação rejeitada</p>
+                            <p className="text-xs mt-0.5 opacity-80">Esta cotação foi reprovada e não pode ser convertida em pedido.</p>
+                          </div>
+                        </div>
+                      )}
+                      {selected.status === "aguardando_aprovacao" && (
+                        <div className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/5 px-4 py-3 text-sm text-warning">
+                          <Clock className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                          <div>
+                            <p className="font-semibold">Aguardando aprovação</p>
+                            <p className="text-xs mt-0.5 opacity-80">A cotação está em análise. Use os botões abaixo para aprovar ou reprovar.</p>
+                          </div>
+                        </div>
+                      )}
+                      {(selected.status === "aprovada" || selected.status === "finalizada") && (
+                        <div className="flex items-start gap-2 rounded-lg border border-emerald-500/30 bg-emerald-50/50 dark:bg-emerald-950/20 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-400">
+                          <ThumbsUp className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                          <div>
+                            <p className="font-semibold">Cotação aprovada</p>
+                            <p className="text-xs mt-0.5 opacity-80">Pronta para conversão em Pedido de Compra.</p>
+                          </div>
+                        </div>
+                      )}
+                      {selected.status === "convertida" && (
+                        <div className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm text-primary">
+                          <ClipboardList className="h-4 w-4 flex-shrink-0" />
+                          <div>
+                            <p className="font-semibold">Convertida em Pedido de Compra</p>
+                            <button className="text-xs underline font-semibold hover:opacity-70 mt-0.5" onClick={() => navigate("/pedidos-compra")}>
+                              Ver pedidos de compra →
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Selected proposals summary */}
                       {drawerStats.selectedPropostas.length > 0 ? (
                         <div>
-                          <p className="text-[10px] text-muted-foreground uppercase font-semibold mb-2">
-                            Fornecedores Selecionados
+                          <p className="text-[10px] text-muted-foreground uppercase font-semibold mb-2 flex items-center gap-1">
+                            <Trophy className="h-3 w-3" />{" "}
+                            {drawerStats.selectedPropostas.length === 1 ? "Fornecedor Selecionado" : "Fornecedores Selecionados"}
                           </p>
                           <div className="rounded-lg border overflow-hidden">
                             <table className="w-full text-sm">
@@ -943,13 +1190,21 @@ export default function CotacoesCompra() {
                                         <span className="truncate block">{p.fornecedores?.nome_razao_social || "—"}</span>
                                       </td>
                                       <td className="px-3 py-2 text-right font-mono text-xs font-semibold">
-                                        {item
-                                          ? formatCurrency(Number(p.preco_unitario) * item.quantidade)
-                                          : "—"}
+                                        {item ? formatCurrency(Number(p.preco_unitario) * item.quantidade) : "—"}
                                       </td>
                                     </tr>
                                   );
                                 })}
+                                {/* Grand total row */}
+                                <tr className="bg-muted/30 border-t">
+                                  <td colSpan={2} className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">Total aprovado</td>
+                                  <td className="px-3 py-2 text-right font-mono text-sm font-bold text-primary">
+                                    {formatCurrency(drawerStats.selectedPropostas.reduce((sum, p) => {
+                                      const item = viewItems.find((i) => i.id === p.item_id);
+                                      return sum + (item ? Number(p.preco_unitario) * item.quantidade : 0);
+                                    }, 0))}
+                                  </td>
+                                </tr>
                               </tbody>
                             </table>
                           </div>
@@ -961,52 +1216,41 @@ export default function CotacoesCompra() {
                         </div>
                       )}
 
-                      {/* Status do processo decisório */}
+                      {/* Process status */}
                       <div>
                         <p className="text-[10px] text-muted-foreground uppercase font-semibold mb-2">
-                          Status da Decisão
+                          Situação do Processo
                         </p>
                         <div className="space-y-2 text-sm">
                           <div className="flex items-center justify-between">
                             <span className="text-muted-foreground">Itens com proposta selecionada</span>
-                            <span className="font-mono font-semibold">
+                            <span className={`font-mono font-semibold ${drawerStats.allItemsHaveSelected ? "text-emerald-600 dark:text-emerald-400" : ""}`}>
                               {drawerStats.selectedPropostas.length} / {viewItems.length}
                             </span>
                           </div>
                           <div className="flex items-center justify-between">
-                            <span className="text-muted-foreground">Status da cotação</span>
-                            <StatusBadge
-                              status={selected.status}
-                              label={statusLabels[selected.status] || selected.status}
-                            />
+                            <span className="text-muted-foreground">Status atual</span>
+                            <StatusBadge status={selected.status} label={statusLabels[selected.status] || selected.status} />
                           </div>
+                          {drawerStats.selectedSupplierName && (
+                            <div className="flex items-center justify-between">
+                              <span className="text-muted-foreground">Fornecedor vencedor</span>
+                              <span className="font-medium text-xs text-right max-w-[160px] truncate">{drawerStats.selectedSupplierName}</span>
+                            </div>
+                          )}
                         </div>
                       </div>
 
-                      {/* Conversion info */}
-                      {selected.status === "convertida" && (
-                        <div className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-3 text-xs text-primary">
-                          <ClipboardList className="h-4 w-4 flex-shrink-0" />
-                          <span>
-                            Cotação convertida em Pedido de Compra.{" "}
-                            <button
-                              className="underline font-semibold hover:opacity-70"
-                              onClick={() => navigate("/pedidos-compra")}
-                            >
-                              Ver pedidos
-                            </button>
-                          </span>
-                        </div>
-                      )}
-
-                      {/* Guidance for finalizable state */}
+                      {/* Readiness guidance */}
                       {selected.status !== "finalizada" &&
+                        selected.status !== "aprovada" &&
                         selected.status !== "convertida" &&
+                        selected.status !== "rejeitada" &&
                         selected.status !== "cancelada" &&
                         drawerStats.allItemsHaveSelected && (
                           <div className="flex items-start gap-2 rounded-lg border border-emerald-500/30 bg-emerald-50/50 dark:bg-emerald-950/20 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-400">
                             <Info className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
-                            Todos os itens têm fornecedor selecionado. Pronto para finalizar.
+                            Todos os itens têm fornecedor selecionado. Envie para aprovação ou aprove diretamente.
                           </div>
                         )}
                     </div>
@@ -1017,24 +1261,42 @@ export default function CotacoesCompra() {
         }
         footer={
           selected ? (
-            <div className="flex gap-2">
-              {selected.status !== "finalizada" &&
-                selected.status !== "convertida" &&
-                selected.status !== "cancelada" &&
+            <div className="flex gap-2 flex-wrap">
+              {/* Active: send for approval when all items selected */}
+              {(selected.status === "aberta" || selected.status === "em_analise") &&
                 drawerStats.allItemsHaveSelected && (
-                  <Button className="flex-1 gap-2" onClick={handleFinalize}>
-                    <CheckCircle2 className="h-4 w-4" /> Finalizar Cotação
+                  <Button className="flex-1 gap-2" variant="outline" onClick={handleSendForApproval}>
+                    <Send className="h-4 w-4" /> Enviar para Aprovação
                   </Button>
                 )}
-              {(selected.status === "finalizada" || selected.status === "convertida") && (
-                <Button
-                  className="flex-1 gap-2"
-                  variant={selected.status === "convertida" ? "outline" : "default"}
-                  onClick={gerarPedido}
-                  disabled={selected.status === "convertida"}
-                >
-                  <ClipboardList className="h-4 w-4" />
-                  {selected.status === "convertida" ? "Pedido já gerado" : "Gerar Pedido de Compra"}
+              {/* Active: direct approve (shortcut) */}
+              {(selected.status === "aberta" || selected.status === "em_analise") &&
+                drawerStats.allItemsHaveSelected && (
+                  <Button className="flex-1 gap-2" onClick={handleApprove}>
+                    <ThumbsUp className="h-4 w-4" /> Aprovar
+                  </Button>
+                )}
+              {/* Waiting approval: approve or reject */}
+              {selected.status === "aguardando_aprovacao" && (
+                <>
+                  <Button className="flex-1 gap-2" variant="destructive" onClick={handleReject}>
+                    <ThumbsDown className="h-4 w-4" /> Reprovar
+                  </Button>
+                  <Button className="flex-1 gap-2" onClick={handleApprove}>
+                    <ThumbsUp className="h-4 w-4" /> Aprovar
+                  </Button>
+                </>
+              )}
+              {/* Approved or legacy finalizada: generate order */}
+              {(selected.status === "aprovada" || selected.status === "finalizada") && (
+                <Button className="flex-1 gap-2" onClick={gerarPedido}>
+                  <ClipboardList className="h-4 w-4" /> Gerar Pedido de Compra
+                </Button>
+              )}
+              {/* Already converted */}
+              {selected.status === "convertida" && (
+                <Button className="flex-1 gap-2" variant="outline" onClick={() => navigate("/pedidos-compra")}>
+                  <ChevronRight className="h-4 w-4" /> Ver Pedidos de Compra
                 </Button>
               )}
             </div>

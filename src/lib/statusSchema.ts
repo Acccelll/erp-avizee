@@ -61,8 +61,11 @@ export const statusRemessa: Record<string, { label: string; color: string }> = {
 export const statusCotacaoCompra: Record<string, { label: string; color: string }> = {
   aberta: { label: "Aberta", color: "info" },
   em_analise: { label: "Em Análise", color: "warning" },
-  finalizada: { label: "Finalizada", color: "success" },
+  aguardando_aprovacao: { label: "Aguardando Aprovação", color: "warning" },
+  aprovada: { label: "Aprovada", color: "success" },
+  finalizada: { label: "Concluída", color: "success" },
   convertida: { label: "Convertida em Pedido", color: "success" },
+  rejeitada: { label: "Rejeitada", color: "destructive" },
   cancelada: { label: "Cancelada", color: "destructive" },
 };
 
