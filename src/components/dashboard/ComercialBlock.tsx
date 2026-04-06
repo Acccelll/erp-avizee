@@ -126,10 +126,10 @@ export function ComercialBlock({
           variant="link"
           size="sm"
           className="h-auto p-0 text-xs"
-          onClick={() => navigate('/ordens-venda')}
+          onClick={() => navigate('/pedidos')}
         >
           <TrendingUp className="h-3 w-3 mr-1" />
-          Ver ordens de venda →
+          Ver pedidos →
         </Button>
       </div>
     </div>

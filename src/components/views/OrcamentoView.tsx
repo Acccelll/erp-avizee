@@ -15,7 +15,7 @@ import { useIsAdmin } from "@/hooks/useIsAdmin";
 import {
   sendForApproval,
   approveOrcamento,
-  convertToOV,
+  convertToPedido,
   ensurePublicToken,
 } from "@/services/orcamentos.service";
 import {
@@ -175,7 +175,7 @@ export function OrcamentoView({ id }: Props) {
   const handleConvertToOV = async () => {
     setActionLoading(true);
     try {
-      await convertToOV(selected, {
+      await convertToPedido(selected, {
         poNumber: poNumberCliente,
         dataPo: dataPoCliente,
       });
@@ -183,9 +183,9 @@ export function OrcamentoView({ id }: Props) {
       setDataPoCliente("");
       await fetchData();
       clearStack();
-      navigate(`/ordens-venda`);
+      navigate(`/pedidos`);
     } catch {
-      toast.error("Erro ao converter cotação em OV.");
+      toast.error("Erro ao converter cotação em pedido.");
     } finally {
       setActionLoading(false);
       setConvertConfirmOpen(false);
@@ -253,7 +253,7 @@ export function OrcamentoView({ id }: Props) {
               onClick={() => setConvertConfirmOpen(true)}
               disabled={actionLoading}
             >
-              <ArrowRightCircle className="h-3.5 w-3.5" /> Gerar OV
+              <ArrowRightCircle className="h-3.5 w-3.5" /> Gerar Pedido
             </Button>
           )}
           {selected.status === "convertido" && linkedOV && (
@@ -263,7 +263,7 @@ export function OrcamentoView({ id }: Props) {
               className="h-8 gap-1.5 text-xs"
               onClick={() => pushView("ordem_venda", linkedOV.id)}
             >
-              <ExternalLink className="h-3.5 w-3.5" /> Ver OV {linkedOV.numero}
+              <ExternalLink className="h-3.5 w-3.5" /> Ver Pedido {linkedOV.numero}
             </Button>
           )}
         </div>
@@ -403,7 +403,7 @@ export function OrcamentoView({ id }: Props) {
             </div>
             {selected.status === "convertido" && linkedOV && (
               <div className="flex justify-between items-center">
-                <span className="text-muted-foreground">Convertida em OV</span>
+                <span className="text-muted-foreground">Convertida em Pedido</span>
                 <RelationalLink onClick={() => pushView("ordem_venda", linkedOV.id)}>
                   {linkedOV.numero}
                 </RelationalLink>
@@ -541,13 +541,13 @@ export function OrcamentoView({ id }: Props) {
             </div>
 
             <div>
-              <p className="text-[10px] text-muted-foreground uppercase font-semibold mb-1">Ordem de Venda</p>
+              <p className="text-[10px] text-muted-foreground uppercase font-semibold mb-1">Pedido</p>
               {linkedOV ? (
                 <RelationalLink onClick={() => pushView("ordem_venda", linkedOV.id)}>
                   {linkedOV.numero}
                 </RelationalLink>
               ) : (
-                <p className="text-xs text-muted-foreground">Nenhuma OV vinculada</p>
+                <p className="text-xs text-muted-foreground">Nenhum pedido vinculado</p>
               )}
             </div>
 
@@ -597,7 +597,7 @@ export function OrcamentoView({ id }: Props) {
                 </div>
                 {selected.status === "convertido" && linkedOV && (
                   <div className="flex justify-between items-center text-muted-foreground">
-                    <span>Convertida em OV</span>
+                    <span>Convertida em Pedido</span>
                     <RelationalLink onClick={() => pushView("ordem_venda", linkedOV.id)}>
                       {linkedOV.numero}
                     </RelationalLink>
@@ -638,13 +638,13 @@ export function OrcamentoView({ id }: Props) {
         onClose={() => setApproveConfirmOpen(false)}
         onConfirm={handleApprove}
         title="Aprovar cotação?"
-        description="A cotação ficará disponível para gerar uma Ordem de Venda."
+        description="A cotação ficará disponível para gerar uma Pedido."
         confirmLabel="Aprovar"
         confirmVariant="default"
         loading={actionLoading}
       />
 
-      {/* Convert to OV confirm */}
+      {/* Gerar Pedido confirm */}
       <ConfirmDialog
         open={convertConfirmOpen}
         onClose={() => {
@@ -653,9 +653,9 @@ export function OrcamentoView({ id }: Props) {
           setDataPoCliente("");
         }}
         onConfirm={handleConvertToOV}
-        title="Gerar Ordem de Venda"
-        description={`Isso criará a OV e irá marcar a cotação ${selected?.numero} como convertida.`}
-        confirmLabel="Gerar OV"
+        title="Gerar Pedido"
+        description={`Isso criará o pedido e irá marcar a cotação ${selected?.numero} como convertida.`}
+        confirmLabel="Gerar Pedido"
         confirmVariant="default"
         loading={actionLoading}
       >

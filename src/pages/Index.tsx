@@ -370,7 +370,7 @@ const DashboardContent = () => {
                 vencimentosHoje.receber > 0 && vencimentosHoje.pagar > 0 ? " e " : ""
               }${vencimentosHoje.pagar > 0 ? `${vencimentosHoje.pagar} pagamento${vencimentosHoje.pagar > 1 ? "s" : ""}` : ""} vencendo hoje.`
             : "Sem vencimentos para hoje."}
-          {backlogOVs.length > 0 && ` · ${backlogOVs.length} OV${backlogOVs.length > 1 ? "s" : ""} aguardando faturamento.`}
+          {backlogOVs.length > 0 && ` · ${backlogOVs.length} pedido${backlogOVs.length > 1 ? "s" : ""} aguardando faturamento.`}
         </p>
       </div>
 

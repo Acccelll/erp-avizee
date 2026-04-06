@@ -119,7 +119,7 @@ export function NotaFiscalView({ id }: Props) {
         <TabsContent value="vinculos" className="space-y-4 mt-3 text-sm">
           {selected.ordens_venda && (
             <div>
-              <p className="text-[10px] text-muted-foreground uppercase font-semibold">Ordem de Venda</p>
+              <p className="text-[10px] text-muted-foreground uppercase font-semibold">Pedido</p>
               <RelationalLink onClick={() => pushView("ordem_venda", selected.ordens_venda?.id)} className="font-mono">
                 {selected.ordens_venda?.numero}
               </RelationalLink>

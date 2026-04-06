@@ -48,12 +48,12 @@ export function AlertCards({ backlogCount, backlogTotal, comprasCount, comprasTo
       <AlertCard
         title="Aguardando Faturamento"
         count={backlogCount}
-        subtitle={backlogCount > 0 ? `Total: ${formatCurrency(backlogTotal)}` : 'Nenhuma OV pendente'}
+        subtitle={backlogCount > 0 ? `Total: ${formatCurrency(backlogTotal)}` : 'Nenhum pedido pendente'}
         icon={ClipboardList}
         borderColor="border-l-warning"
         iconBg="bg-warning/10"
         iconColor="text-warning"
-        onClick={() => navigate('/ordens-venda')}
+        onClick={() => navigate('/pedidos')}
       />
       <AlertCard
         title="Compras Aguardando"

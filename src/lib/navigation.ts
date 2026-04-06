@@ -96,9 +96,8 @@ export const navSections: NavSection[] = [
       {
         title: 'Pipeline de vendas',
         items: [
-          { title: 'Cotações', path: '/orcamentos', keywords: ['orcamentos', 'propostas'] },
-          { title: 'Pedidos', path: '/pedidos', keywords: ['pipeline', 'pedidos comerciais'] },
-          { title: 'Ordens de Venda', path: '/ordens-venda', keywords: ['ov', 'backlog'] },
+          { title: 'Cotações', path: '/orcamentos', keywords: ['orcamentos', 'propostas', 'cotacoes'] },
+          { title: 'Pedidos', path: '/pedidos', keywords: ['pedidos', 'backlog', 'operacional', 'ordens', 'ov'] },
         ],
       },
     ],
@@ -248,7 +247,7 @@ const baseRouteLabels: Record<string, string> = {
   '/cotacoes': 'Cotações',
   '/orcamentos': 'Cotações',
   '/pedidos': 'Pedidos',
-  '/ordens-venda': 'Ordens de Venda',
+  '/ordens-venda': 'Pedidos',
   '/compras': 'Compras',
   '/cotacoes-compra': 'Cotações de Compra',
   '/pedidos-compra': 'Pedidos de Compra',

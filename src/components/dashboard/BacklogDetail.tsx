@@ -30,7 +30,7 @@ export function BacklogDetail({ items }: { items: any[] }) {
           <ClipboardList className="w-4 h-4 text-warning" />
           OVs Aguardando Faturamento
         </h3>
-        <button onClick={() => navigate('/ordens-venda')} className="text-xs text-primary hover:underline">Ver todas →</button>
+        <button onClick={() => navigate('/pedidos')} className="text-xs text-primary hover:underline">Ver todas →</button>
       </div>
       <div className="space-y-2 max-h-[260px] overflow-y-auto">
         {items.map((ov: any) => {
