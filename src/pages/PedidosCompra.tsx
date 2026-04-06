@@ -329,6 +329,13 @@ const PedidosCompra = () => {
           return { label: "Pendente", color: "secondary" };
         })();
 
+        const recebimentoColorClass: Record<string, string> = {
+          success: "text-success",
+          warning: "text-warning",
+          destructive: "text-destructive",
+          secondary: "text-muted-foreground",
+        };
+
         const tabResumo = (
           <div className="space-y-5">
             {isOverdue && (
@@ -669,7 +676,7 @@ const PedidosCompra = () => {
                 </div>
                 <div className="bg-accent/30 rounded-lg p-3 text-center">
                   <p className="text-xs text-muted-foreground">Recebimento</p>
-                  <p className={`font-semibold text-xs leading-tight mt-0.5 ${recebimentoStatus.color === "success" ? "text-success" : recebimentoStatus.color === "warning" ? "text-warning" : recebimentoStatus.color === "destructive" ? "text-destructive" : "text-muted-foreground"}`}>
+                  <p className={`font-semibold text-xs leading-tight mt-0.5 ${recebimentoColorClass[recebimentoStatus.color] ?? "text-muted-foreground"}`}>
                     {recebimentoStatus.label}
                   </p>
                 </div>
