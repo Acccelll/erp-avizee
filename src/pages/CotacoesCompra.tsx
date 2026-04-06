@@ -746,7 +746,7 @@ export default function CotacoesCompra() {
                                           <div className="text-right">
                                             <p className="font-mono font-semibold">
                                               {formatCurrency(Number(p.preco_unitario))}
-                                              <span className="text-muted-foreground text-[10px]">/un</span>
+                                              <span className="text-muted-foreground">/un</span>
                                             </p>
                                             <p className="text-[10px] text-muted-foreground font-mono">
                                               Total: {formatCurrency(totalProposta)}
