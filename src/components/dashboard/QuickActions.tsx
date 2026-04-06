@@ -35,10 +35,10 @@ const actions: QuickAction[] = [
     description: 'Cadastrar produto',
   },
   {
-    label: 'Nova Compra',
+    label: 'Novo Pedido',
     icon: ShoppingCart,
-    href: '/compras',
-    description: 'Lançar compra',
+    href: '/pedidos-compra',
+    description: 'Criar pedido de compra',
   },
   {
     label: 'Nova Nota',

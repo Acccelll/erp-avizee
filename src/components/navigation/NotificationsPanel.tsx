@@ -64,10 +64,10 @@ export function NotificationsPanel() {
             .eq('ativo', true)
             .gt('estoque_minimo', 0),
           supabase
-            .from('compras')
+            .from('pedidos_compra' as any)
             .select('id')
             .eq('ativo', true)
-            .eq('status', 'confirmado')
+            .in('status', ['aprovado', 'enviado_ao_fornecedor', 'aguardando_recebimento', 'parcialmente_recebido'])
             .is('data_entrega_real', null),
           supabase
             .from('ordens_venda')

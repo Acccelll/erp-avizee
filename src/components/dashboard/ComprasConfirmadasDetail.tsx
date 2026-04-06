@@ -33,7 +33,7 @@ export function ComprasConfirmadasDetail({ items }: { items: any[] }) {
             </span>
           )}
         </h3>
-        <button onClick={() => navigate('/compras')} className="text-xs text-primary hover:underline">Ver todas →</button>
+        <button onClick={() => navigate('/pedidos-compra')} className="text-xs text-primary hover:underline">Ver todas →</button>
       </div>
       <div className="space-y-2 max-h-[260px] overflow-y-auto">
         {items.map((c: any) => {
@@ -62,7 +62,7 @@ export function ComprasConfirmadasDetail({ items }: { items: any[] }) {
                       : `${diasEntrega}d p/ entrega`}
                   </p>
                 ) : (
-                  <p className="text-xs text-muted-foreground">{formatDate(c.data_compra)}</p>
+                  <p className="text-xs text-muted-foreground">{formatDate(c.data_pedido || c.data_compra)}</p>
                 )}
               </div>
             </div>

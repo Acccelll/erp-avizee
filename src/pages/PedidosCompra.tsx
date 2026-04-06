@@ -9,7 +9,7 @@ import { ViewDrawerV2 } from "@/components/ViewDrawerV2";
 import { ViewField, ViewSection } from "@/components/ViewDrawer";
 import { RelationalLink } from "@/components/ui/RelationalLink";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Edit, Trash2, FileInput } from "lucide-react";
+import { Edit, Trash2, PackageCheck, SendHorizontal } from "lucide-react";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
 import { useRelationalNavigation } from "@/contexts/RelationalNavigationContext";
 import { AutocompleteSearch } from "@/components/ui/AutocompleteSearch";
@@ -22,25 +22,27 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatCurrency, formatNumber } from "@/lib/format";
-import { ShoppingCart, Clock, CheckCircle2, FileText, Truck } from "lucide-react";
+import { ShoppingCart, Clock, CheckCircle2, Truck } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { LogisticaRastreioSection } from "@/components/logistica/LogisticaRastreioSection";
+import { statusPedidoCompra } from "@/lib/statusSchema";
 
 interface PedidoCompra {
   id: string; numero: string; fornecedor_id: string; data_pedido: string;
-  data_entrega_prevista: string; valor_total: number; status: string;
+  data_entrega_prevista: string; data_entrega_real: string; valor_total: number;
+  frete_valor: number; condicao_pagamento: string; status: string;
   observacoes: string; cotacao_compra_id: string; ativo: boolean; created_at: string;
   fornecedores?: { nome_razao_social: string; cpf_cnpj: string };
 }
 
-const statusLabels: Record<string, string> = {
-  pendente: "Pendente", aprovado: "Aprovado", parcial: "Receb. Parcial",
-  concluido: "Concluído", cancelado: "Cancelado",
-};
+const statusLabels: Record<string, string> = Object.fromEntries(
+  Object.entries(statusPedidoCompra).map(([k, v]) => [k, v.label])
+);
 
 const emptyForm: Record<string, any> = {
   numero: "", fornecedor_id: "", data_pedido: new Date().toISOString().split("T")[0],
-  data_entrega_prevista: "", status: "pendente", observacoes: "",
+  data_entrega_prevista: "", data_entrega_real: "", frete_valor: "",
+  condicao_pagamento: "", status: "rascunho", observacoes: "",
 };
 
 const PedidosCompra = () => {
@@ -60,13 +62,16 @@ const PedidosCompra = () => {
   const [viewItems, setViewItems] = useState<any[]>([]);
   const navigate = useNavigate();
 
-  const valorTotal = items.reduce((s, i) => s + (i.valor_total || 0), 0);
+  const valorProdutos = items.reduce((s, i) => s + (i.valor_total || 0), 0);
+  const valorTotal = valorProdutos + Number(form.frete_valor || 0);
 
   const kpis = useMemo(() => {
-    const pendentes = data.filter(p => p.status === "pendente" || p.status === "aprovado");
-    const concluidos = data.filter(p => p.status === "concluido");
+    const aguardando = data.filter(p =>
+      ["rascunho", "aprovado", "enviado_ao_fornecedor", "aguardando_recebimento"].includes(p.status)
+    );
+    const recebidos = data.filter(p => p.status === "recebido");
     const totalValue = data.reduce((s, p) => s + Number(p.valor_total || 0), 0);
-    return { total: data.length, totalValue, pending: pendentes.length, done: concluidos.length };
+    return { total: data.length, totalValue, aguardando: aguardando.length, recebidos: recebidos.length };
   }, [data]);
 
   const openCreate = () => {
@@ -79,8 +84,11 @@ const PedidosCompra = () => {
     setMode("edit"); setSelected(p);
     setForm({
       numero: p.numero, fornecedor_id: p.fornecedor_id || "", data_pedido: p.data_pedido,
-      data_entrega_prevista: p.data_entrega_prevista || "", status: p.status,
-      observacoes: p.observacoes || "",
+      data_entrega_prevista: p.data_entrega_prevista || "",
+      data_entrega_real: p.data_entrega_real || "",
+      frete_valor: p.frete_valor || "",
+      condicao_pagamento: p.condicao_pagamento || "",
+      status: p.status, observacoes: p.observacoes || "",
     });
     const { data: itens } = await supabase.from("pedidos_compra_itens" as any).select("*, produtos(nome, sku)").eq("pedido_compra_id", p.id);
     setItems((itens || []).map((i: any) => ({
@@ -91,8 +99,11 @@ const PedidosCompra = () => {
     setModalOpen(true);
   };
 
-  const openView = (p: PedidoCompra) => {
-    pushView("pedido_compra", p.id);
+  const openView = async (p: PedidoCompra) => {
+    setSelected(p);
+    const { data: itens } = await supabase.from("pedidos_compra_itens" as any).select("*, produtos(nome, sku)").eq("pedido_compra_id", p.id);
+    setViewItems(itens || []);
+    setDrawerOpen(true);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -100,7 +111,14 @@ const PedidosCompra = () => {
     if (!form.numero) { toast.error("Número é obrigatório"); return; }
     setSaving(true);
     try {
-      const payload = { ...form, fornecedor_id: form.fornecedor_id || null, valor_total: valorTotal };
+      const payload = {
+        ...form,
+        fornecedor_id: form.fornecedor_id || null,
+        frete_valor: Number(form.frete_valor || 0),
+        valor_total: valorTotal,
+        data_entrega_real: form.data_entrega_real || null,
+        condicao_pagamento: form.condicao_pagamento || null,
+      };
       let pedidoId = selected?.id;
       if (mode === "create") {
         const { data: newP, error } = await supabase.from("pedidos_compra" as any).insert(payload).select().single();
@@ -130,7 +148,7 @@ const PedidosCompra = () => {
     // 1. Load items for this purchase order
     const { data: itens } = await supabase.from("pedidos_compra_itens" as any).select("*, produtos(nome, sku, estoque_atual)").eq("pedido_compra_id", p.id);
     if (!itens || itens.length === 0) {
-      toast.error("Pedido sem itens para dar entrada.");
+      toast.error("Pedido sem itens para registrar recebimento.");
       return;
     }
 
@@ -154,32 +172,48 @@ const PedidosCompra = () => {
       }
 
       // 3. Generate financial entry (conta a pagar)
-      const valorTotal = Number(p.valor_total || 0);
-      if (valorTotal > 0) {
+      const vTotal = Number(p.valor_total || 0);
+      if (vTotal > 0) {
         await supabase.from("financeiro_lancamentos").insert({
           tipo: "pagar" as any,
           descricao: `PC ${p.numero} — ${p.fornecedores?.nome_razao_social || "Fornecedor"}`,
-          valor: valorTotal,
-          saldo_restante: valorTotal,
+          valor: vTotal,
+          saldo_restante: vTotal,
           data_vencimento: p.data_entrega_prevista || new Date().toISOString().split("T")[0],
           status: "aberto" as any,
           fornecedor_id: p.fornecedor_id || null,
         });
       }
 
-      // 4. Update purchase order status to "concluido"
-      await supabase.from("pedidos_compra" as any).update({ status: "concluido" } as any).eq("id", p.id);
+      // 4. Update purchase order status to "recebido" and record actual delivery date
+      const hoje = new Date().toISOString().split("T")[0];
+      await supabase.from("pedidos_compra" as any)
+        .update({ status: "recebido", data_entrega_real: hoje } as any)
+        .eq("id", p.id);
 
-      toast.success("Entrada realizada! Estoque atualizado e financeiro gerado.");
+      toast.success("Recebimento registrado! Estoque atualizado e financeiro gerado.");
       setDrawerOpen(false);
       fetchData();
     } catch (err: any) {
       console.error("[darEntrada]", err);
-      toast.error("Erro ao processar entrada.");
+      toast.error("Erro ao processar recebimento.");
     }
 
     // Also navigate to fiscal for NF registration
     navigate(`/fiscal?tipo=entrada&fornecedor_id=${p.fornecedor_id || ""}&pedido_compra=${p.numero}`);
+  };
+
+  const marcarEnviado = async (p: PedidoCompra) => {
+    try {
+      await supabase.from("pedidos_compra" as any)
+        .update({ status: "enviado_ao_fornecedor" } as any)
+        .eq("id", p.id);
+      toast.success("Pedido marcado como enviado ao fornecedor.");
+      fetchData();
+    } catch (err: any) {
+      console.error("[marcarEnviado]", err);
+      toast.error("Erro ao atualizar status.");
+    }
   };
 
   const fornecedorOptions = fornecedoresCrud.data.map((f: any) => ({ id: f.id, label: f.nome_razao_social, sublabel: f.cpf_cnpj || "" }));
@@ -194,12 +228,12 @@ const PedidosCompra = () => {
 
   return (
     <AppLayout>
-      <ModulePage title="Pedidos de Compra" subtitle="Gestão de pedidos de compra como pré-nota" addLabel="Novo Pedido" onAdd={openCreate} count={data.length}>
+      <ModulePage title="Pedidos de Compra" subtitle="Acompanhamento operacional de compras: envio, recebimento e integração com estoque/financeiro" addLabel="Novo Pedido" onAdd={openCreate} count={data.length}>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <SummaryCard title="Total" value={formatNumber(kpis.total)} icon={ShoppingCart} variationType="neutral" variation="pedidos" />
           <SummaryCard title="Valor Total" value={formatCurrency(kpis.totalValue)} icon={ShoppingCart} variationType="neutral" variation="acumulado" />
-          <SummaryCard title="Pendentes" value={formatNumber(kpis.pending)} icon={Clock} variationType={kpis.pending > 0 ? "negative" : "positive"} variant={kpis.pending > 0 ? "warning" : undefined} variation="aguardando" />
-          <SummaryCard title="Concluídos" value={formatNumber(kpis.done)} icon={CheckCircle2} variationType="positive" variation="recebidos" />
+          <SummaryCard title="Aguardando" value={formatNumber(kpis.aguardando)} icon={Clock} variationType={kpis.aguardando > 0 ? "negative" : "positive"} variant={kpis.aguardando > 0 ? "warning" : undefined} variation="em andamento" />
+          <SummaryCard title="Recebidos" value={formatNumber(kpis.recebidos)} icon={CheckCircle2} variationType="positive" variation="concluídos" />
         </div>
         <DataTable columns={columns} data={data} loading={loading} onView={openView} onEdit={openEdit} />
       </ModulePage>
@@ -214,10 +248,12 @@ const PedidosCompra = () => {
               <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="pendente">Pendente</SelectItem>
+                  <SelectItem value="rascunho">Rascunho</SelectItem>
                   <SelectItem value="aprovado">Aprovado</SelectItem>
-                  <SelectItem value="parcial">Receb. Parcial</SelectItem>
-                  <SelectItem value="concluido">Concluído</SelectItem>
+                  <SelectItem value="enviado_ao_fornecedor">Enviado ao Fornecedor</SelectItem>
+                  <SelectItem value="aguardando_recebimento">Aguardando Recebimento</SelectItem>
+                  <SelectItem value="parcialmente_recebido">Parcialmente Recebido</SelectItem>
+                  <SelectItem value="recebido">Recebido</SelectItem>
                   <SelectItem value="cancelado">Cancelado</SelectItem>
                 </SelectContent>
               </Select>
@@ -228,8 +264,24 @@ const PedidosCompra = () => {
             <AutocompleteSearch options={fornecedorOptions} value={form.fornecedor_id} onChange={(id) => setForm({ ...form, fornecedor_id: id })} placeholder="Buscar por nome ou CNPJ..." />
           </div>
           <ItemsGrid items={items} onChange={setItems} produtos={produtosCrud.data} title="Itens do Pedido" />
-          <div className="flex items-center justify-end rounded-lg bg-accent/50 p-4">
-            <span className="mr-2 text-sm text-muted-foreground">TOTAL:</span>
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
+            <div className="space-y-2">
+              <Label>Frete (R$)</Label>
+              <Input type="number" min="0" step="0.01" value={form.frete_valor} onChange={(e) => setForm({ ...form, frete_valor: e.target.value })} placeholder="0,00" />
+            </div>
+            <div className="space-y-2">
+              <Label>Condição de Pagamento</Label>
+              <Input value={form.condicao_pagamento} onChange={(e) => setForm({ ...form, condicao_pagamento: e.target.value })} placeholder="Ex: 30/60/90" />
+            </div>
+            <div className="space-y-2">
+              <Label>Data Entrega Real</Label>
+              <Input type="date" value={form.data_entrega_real} onChange={(e) => setForm({ ...form, data_entrega_real: e.target.value })} />
+            </div>
+          </div>
+          <div className="flex items-center justify-end rounded-lg bg-accent/50 p-4 gap-6">
+            <span className="text-sm text-muted-foreground">Produtos: <span className="font-mono font-medium">{formatCurrency(valorProdutos)}</span></span>
+            <span className="text-sm text-muted-foreground">Frete: <span className="font-mono font-medium">{formatCurrency(Number(form.frete_valor || 0))}</span></span>
+            <span className="ml-2 text-sm text-muted-foreground">TOTAL:</span>
             <span className="text-lg font-bold font-mono text-primary">{formatCurrency(valorTotal)}</span>
           </div>
           <div className="space-y-2"><Label>Observações</Label><Textarea value={form.observacoes} onChange={(e) => setForm({ ...form, observacoes: e.target.value })} /></div>
@@ -249,6 +301,10 @@ const PedidosCompra = () => {
                 <ViewField label="Status"><StatusBadge status={selected.status} label={statusLabels[selected.status] || selected.status} /></ViewField>
                 <ViewField label="Data Pedido">{new Date(selected.data_pedido).toLocaleDateString("pt-BR")}</ViewField>
                 <ViewField label="Valor Total"><span className="font-semibold font-mono">{formatCurrency(Number(selected.valor_total || 0))}</span></ViewField>
+                {selected.data_entrega_prevista && <ViewField label="Entrega Prevista">{new Date(selected.data_entrega_prevista).toLocaleDateString("pt-BR")}</ViewField>}
+                {selected.data_entrega_real && <ViewField label="Entrega Real">{new Date(selected.data_entrega_real).toLocaleDateString("pt-BR")}</ViewField>}
+                {selected.frete_valor ? <ViewField label="Frete"><span className="font-mono">{formatCurrency(Number(selected.frete_valor))}</span></ViewField> : null}
+                {selected.condicao_pagamento && <ViewField label="Cond. Pagamento">{selected.condicao_pagamento}</ViewField>}
               </div>
             </ViewSection>
             <ViewSection title="Fornecedor">
@@ -260,9 +316,11 @@ const PedidosCompra = () => {
                 ) : "—"}
               </ViewField>
             </ViewSection>
-            {selected.data_entrega_prevista && (
-              <ViewSection title="Entrega">
-                <ViewField label="Entrega Prevista">{new Date(selected.data_entrega_prevista).toLocaleDateString("pt-BR")}</ViewField>
+            {selected.cotacao_compra_id && (
+              <ViewSection title="Origem">
+                <ViewField label="Cotação de Compra">
+                  <span className="font-mono text-xs text-primary">{selected.cotacao_compra_id}</span>
+                </ViewField>
               </ViewSection>
             )}
             {selected.observacoes && (
@@ -304,10 +362,22 @@ const PedidosCompra = () => {
           </div>
         );
 
-        const drawerFooter = (selected.status === "aprovado" || selected.status === "pendente") ? (
-          <Button className="w-full" onClick={() => { setDrawerOpen(false); darEntrada(selected); }}>
-            <FileInput className="w-4 h-4 mr-2" /> Dar Entrada (NF)
-          </Button>
+        const canReceive = ["aprovado", "enviado_ao_fornecedor", "aguardando_recebimento", "parcialmente_recebido"].includes(selected.status);
+        const canSend = selected.status === "aprovado";
+
+        const drawerFooter = canReceive || canSend ? (
+          <div className="flex gap-2 w-full">
+            {canSend && (
+              <Button variant="outline" className="flex-1 gap-2" onClick={() => { marcarEnviado(selected); setSelected({ ...selected, status: "enviado_ao_fornecedor" }); }}>
+                <SendHorizontal className="w-4 h-4" /> Marcar como Enviado
+              </Button>
+            )}
+            {canReceive && (
+              <Button className="flex-1 gap-2" onClick={() => { setDrawerOpen(false); darEntrada(selected); }}>
+                <PackageCheck className="w-4 h-4" /> Registrar Recebimento
+              </Button>
+            )}
+          </div>
         ) : undefined;
 
         return (

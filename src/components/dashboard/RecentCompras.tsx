@@ -10,7 +10,7 @@ export function RecentCompras({ items, loading }: { items: any[]; loading: boole
     <div className="bg-card rounded-xl border p-5">
       <div className="flex items-center justify-between mb-4">
         <h3 className="font-semibold text-foreground">Últimas Compras</h3>
-        <button onClick={() => navigate('/compras')} className="text-xs text-primary hover:underline">Ver todas →</button>
+        <button onClick={() => navigate('/pedidos-compra')} className="text-xs text-primary hover:underline">Ver todas →</button>
       </div>
       {loading ? (
         <div className="flex items-center justify-center py-8">

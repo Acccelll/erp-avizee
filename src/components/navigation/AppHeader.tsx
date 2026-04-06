@@ -71,7 +71,7 @@ export function AppHeader({ onOpenMobileMenu: _onOpenMobileMenu, searchRequest =
         setShortcutsOpen(true);
       }
       if (mod && /^[1-9]$/.test(event.key)) {
-        const routes = ['/', '/cotacoes', '/pedidos', '/compras', '/estoque', '/financeiro', '/fiscal', '/relatorios', '/configuracoes'];
+        const routes = ['/', '/cotacoes', '/pedidos', '/pedidos-compra', '/estoque', '/financeiro', '/fiscal', '/relatorios', '/configuracoes'];
         const index = Number(event.key) - 1;
         if (routes[index]) {
           event.preventDefault();

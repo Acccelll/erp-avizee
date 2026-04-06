@@ -63,7 +63,7 @@ export function AlertCards({ backlogCount, backlogTotal, comprasCount, comprasTo
         borderColor="border-l-info"
         iconBg="bg-info/10"
         iconColor="text-info"
-        onClick={() => navigate('/compras')}
+        onClick={() => navigate('/pedidos-compra')}
       />
       <AlertCard
         title="Estoque Mínimo"
