@@ -330,19 +330,24 @@ export default function CotacoesCompra() {
       return;
     }
 
-    // Determine winning supplier (most frequent among selected proposals)
-    const fornecedorCount: Record<string, number> = {};
-    for (const p of propostasSelecionadas) {
-      fornecedorCount[p.fornecedor_id] = (fornecedorCount[p.fornecedor_id] || 0) + 1;
+    // Validate: all selected proposals must belong to the same supplier
+    const fornecedoresDistintos = [...new Set(propostasSelecionadas.map((p) => p.fornecedor_id))];
+    if (fornecedoresDistintos.length > 1) {
+      toast.error(
+        `As propostas selecionadas pertencem a fornecedores diferentes. Selecione propostas de apenas um fornecedor para gerar o pedido.`,
+        { duration: 6000 }
+      );
+      return;
     }
-    const fornecedorVencedorId = Object.entries(fornecedorCount).sort((a, b) => b[1] - a[1])[0][0];
 
-    // Build items from selected proposals for winning supplier
+    const fornecedorId = fornecedoresDistintos[0];
+
+    // Build items strictly from the selected proposals of the single supplier
     const itensParaPedido = viewItems
       .map((item) => {
         const proposta = propostasSelecionadas.find(
-          (p) => p.item_id === item.id && p.fornecedor_id === fornecedorVencedorId
-        ) || propostasSelecionadas.find((p) => p.item_id === item.id);
+          (p) => p.item_id === item.id && p.fornecedor_id === fornecedorId
+        );
         if (!proposta) return null;
         return {
           produto_id: item.produto_id,
@@ -361,12 +366,15 @@ export default function CotacoesCompra() {
     const valorTotal = itensParaPedido.reduce((s, i) => s + (i?.valor_total || 0), 0);
     const numeroPedido = `PC-${String(Date.now()).slice(-6)}`;
 
+    // pedidoId is declared outside try so it is accessible in the rollback block
+    // inside the catch, in case the item insert fails after the header is created.
+    let pedidoId: string | null = null;
     try {
-      const { data: novoPedido, error } = await supabase
+      const { data: novoPedido, error: erroCabecalho } = await supabase
         .from("pedidos_compra" as any)
         .insert({
           numero: numeroPedido,
-          fornecedor_id: fornecedorVencedorId,
+          fornecedor_id: fornecedorId,
           cotacao_compra_id: selected.id,
           data_pedido: new Date().toISOString().split("T")[0],
           valor_total: valorTotal,
@@ -376,11 +384,26 @@ export default function CotacoesCompra() {
         .select()
         .single();
 
-      if (error) throw error;
+      if (erroCabecalho) throw erroCabecalho;
 
-      const pedidoId = (novoPedido as any).id;
+      pedidoId = (novoPedido as any).id;
+
       const itemsPayload = itensParaPedido.map((i) => ({ pedido_compra_id: pedidoId, ...i }));
-      await supabase.from("pedidos_compra_itens" as any).insert(itemsPayload);
+      const { error: erroItens } = await supabase
+        .from("pedidos_compra_itens" as any)
+        .insert(itemsPayload);
+
+      if (erroItens) {
+        // Rollback: remove the orphan purchase order header
+        const { error: erroRollback } = await supabase
+          .from("pedidos_compra" as any)
+          .delete()
+          .eq("id", pedidoId);
+        if (erroRollback) {
+          console.error("[gerarPedido] rollback failed:", erroRollback?.message);
+        }
+        throw erroItens;
+      }
 
       // Mark quotation as converted
       await supabase.from("cotacoes_compra").update({ status: "convertida" }).eq("id", selected.id);
@@ -390,8 +413,12 @@ export default function CotacoesCompra() {
       fetchData();
       navigate("/pedidos-compra");
     } catch (err: any) {
-      console.error("[gerarPedido]", err);
-      toast.error("Erro ao gerar pedido de compra.");
+      console.error("[gerarPedido] message:", err?.message);
+      console.error("[gerarPedido] details:", err?.details);
+      console.error("[gerarPedido] hint:", err?.hint);
+      console.error("[gerarPedido] code:", err?.code);
+      const detalhe = err?.message ? ` (${err.message})` : "";
+      toast.error(`Erro ao gerar pedido de compra.${detalhe}`, { duration: 8000 });
     }
   };
 
