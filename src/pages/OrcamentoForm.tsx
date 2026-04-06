@@ -128,7 +128,7 @@ export default function OrcamentoForm() {
           } else if (orc) {
             setNumero(orc.numero); setDataOrcamento(orc.data_orcamento); setStatus(orc.status);
             setClienteId(orc.cliente_id || ""); setObservacoes(orc.observacoes || "");
-            setObservacoesInternas((orc as any).observacoes_internas || "");
+            setObservacoesInternas(orc.observacoes_internas || "");
             setValidade(orc.validade || ""); setDesconto(orc.desconto || 0);
             setImpostoSt(orc.imposto_st || 0); setImpostoIpi(orc.imposto_ipi || 0);
             setFreteValor(orc.frete_valor || 0); setOutrasDespesas(orc.outras_despesas || 0);
@@ -365,7 +365,7 @@ export default function OrcamentoForm() {
       const newNumero = `COT${String((count || 0) + 1).padStart(6, "0")}`;
       const payload = {
         numero: newNumero, data_orcamento: new Date().toISOString().split("T")[0], status: "rascunho",
-        cliente_id: clienteId || null, validade: null, observacoes, observacoes_internas: null,
+        cliente_id: clienteId || null, validade: null, observacoes, observacoes_internas: observacoesInternas || null,
         desconto, imposto_st: impostoSt,
         imposto_ipi: impostoIpi, frete_valor: freteValor, outras_despesas: outrasDespesas,
         valor_total: valorTotal, quantidade_total: quantidadeTotal, peso_total: pesoTotal,

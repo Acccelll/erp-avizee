@@ -69,7 +69,8 @@ export function OrcamentoItemsGrid({ items, onChange, produtos, precosEspeciais 
       toast.warning("Item já incluso no orçamento. Edite a quantidade na linha existente.");
       return;
     }
-    onChange([...items.slice(0, idx + 1), { ...source, id: undefined }, ...items.slice(idx + 1)]);
+    const { id: _id, ...itemWithoutId } = source;
+    onChange([...items.slice(0, idx + 1), itemWithoutId, ...items.slice(idx + 1)]);
   };
 
   const recalc = (item: OrcamentoItem) => {
@@ -154,6 +155,10 @@ export function OrcamentoItemsGrid({ items, onChange, produtos, precosEspeciais 
     let skipped = 0;
 
     for (let index = 0; index < lines.length; index += 1) {
+      if (index > 0 && index % 25 === 0) {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      }
+
       const line = lines[index];
       const [codigo = "", descricao = "", qtd = "1", unit = "0"] = line.split(/[;|,]/).map((p) => p.trim());
       const codigoKey = codigo.toLowerCase();
@@ -176,10 +181,6 @@ export function OrcamentoItemsGrid({ items, onChange, produtos, precosEspeciais 
           parsed.some((it) => it.produto_id === prod!.id);
         if (alreadyInList) {
           skipped += 1;
-
-          if (index % 25 === 0) {
-            await new Promise((resolve) => setTimeout(resolve, 0));
-          }
           continue;
         }
       }
@@ -193,10 +194,6 @@ export function OrcamentoItemsGrid({ items, onChange, produtos, precosEspeciais 
         valor_unitario: Number(unit) || Number(prod?.preco_venda || 0),
         peso_unitario: Number(prod?.peso || 0),
       }));
-
-      if (index % 25 === 0) {
-        await new Promise((resolve) => setTimeout(resolve, 0));
-      }
     }
 
     onChange([...items, ...parsed]);
