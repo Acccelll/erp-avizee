@@ -1,7 +1,7 @@
 import { Badge } from '@/components/ui/badge';
 import {
   FileEdit, Clock, CheckCircle, Cog, CheckCheck,
-  AlertTriangle, XCircle, AlarmClock, Ban, Send
+  AlertTriangle, XCircle, AlarmClock, Ban, Send, FileSearch,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -9,6 +9,10 @@ const statusConfig: Record<string, { classes: string; icon: typeof Clock; label:
   rascunho:        { classes: 'bg-muted text-muted-foreground border-muted', icon: FileEdit, label: 'Rascunho' },
   pendente:        { classes: 'bg-warning/10 text-warning border-warning/20', icon: Clock, label: 'Pendente' },
   aberto:          { classes: 'bg-warning/10 text-warning border-warning/20', icon: Clock, label: 'Aberto' },
+  aberta:          { classes: 'bg-warning/10 text-warning border-warning/20', icon: Clock, label: 'Aberta' },
+  em_analise:      { classes: 'bg-info/10 text-info border-info/20', icon: FileSearch, label: 'Em Análise' },
+  finalizada:      { classes: 'bg-success/10 text-success border-success/20', icon: CheckCheck, label: 'Finalizada' },
+  convertida:      { classes: 'bg-primary/10 text-primary border-primary/20', icon: CheckCircle, label: 'Convertida em Pedido' },
   enviado:         { classes: 'bg-info/10 text-info border-info/20', icon: Send, label: 'Enviado' },
   aprovado:        { classes: 'bg-info/10 text-info border-info/20', icon: CheckCircle, label: 'Aprovado' },
   aprovada:        { classes: 'bg-info/10 text-info border-info/20', icon: CheckCircle, label: 'Aprovada' },
