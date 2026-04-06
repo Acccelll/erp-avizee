@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { AppLayout } from "@/components/AppLayout";
 import { ModulePage } from "@/components/ModulePage";
 import { DataTable } from "@/components/DataTable";
@@ -27,42 +28,67 @@ import { useNavigate } from "react-router-dom";
 import { LogisticaRastreioSection } from "@/components/logistica/LogisticaRastreioSection";
 import { statusPedidoCompra } from "@/lib/statusSchema";
 
-// NOTE: fornecedor_id is a UUID string — pedidos_compra.fornecedor_id
-// is declared as `uuid REFERENCES public.fornecedores(id)` in the schema.
-// Supabase/PostgREST returns and expects UUID values as plain strings.
+// PedidoCompra reflects the current (legacy/manual) database schema:
+//   - IDs are bigint (returned by Supabase as number or numeric string)
+//   - `numero` column does NOT exist yet; display uses pedidoNumero()
+//   - `fornecedores` join uses `nome_razao` (not `nome_razao_social`)
 interface PedidoCompra {
-  id: string;
-  numero: string;
-  /** UUID string — matches pedidos_compra.fornecedor_id uuid column */
-  fornecedor_id: string;
+  id: string | number;
+  /** Not present in the current DB. Kept optional for future schema addition. */
+  numero?: string | null;
+  fornecedor_id: string | number | null;
   data_pedido: string;
-  data_entrega_prevista: string;
-  data_entrega_real: string;
-  valor_total: number;
-  frete_valor: number;
-  condicao_pagamento: string;
+  data_entrega_prevista: string | null;
+  data_entrega_real: string | null;
+  valor_total: number | null;
+  frete_valor: number | null;
+  condicao_pagamento: string | null;
   status: string;
-  observacoes: string;
-  cotacao_compra_id: string;
-  ativo: boolean;
-  created_at: string;
-  fornecedores?: { nome_razao_social: string; cpf_cnpj: string };
+  observacoes: string | null;
+  cotacao_compra_id: string | number | null;
+  ativo?: boolean;
+  created_at?: string;
+  /** Real DB uses `nome_razao`, not `nome_razao_social`. */
+  fornecedores?: { nome_razao: string; cpf_cnpj?: string | null };
 }
+
+/**
+ * Short-term display identifier.
+ * Returns `numero` if the column is ever added to the DB, otherwise `PC-{id}`.
+ * When the `numero` column is eventually added, this helper auto-upgrades.
+ */
+const pedidoNumero = (p: PedidoCompra) => p.numero || `PC-${p.id}`;
 
 const statusLabels: Record<string, string> = Object.fromEntries(
   Object.entries(statusPedidoCompra).map(([k, v]) => [k, v.label])
 );
 
 const emptyForm: Record<string, any> = {
-  numero: "", fornecedor_id: "", data_pedido: new Date().toISOString().split("T")[0],
+  fornecedor_id: "", data_pedido: new Date().toISOString().split("T")[0],
   data_entrega_prevista: "", data_entrega_real: "", frete_valor: "",
   condicao_pagamento: "", status: "rascunho", observacoes: "",
 };
 
 const PedidosCompra = () => {
-  const { data, loading, fetchData } = useSupabaseCrud<PedidoCompra>({
-    table: "pedidos_compra", select: "*, fornecedores(nome_razao_social, cpf_cnpj)",
+  // Explicit query — avoids the generic hook's implicit assumptions on
+  // `created_at` ordering, `ativo` filtering, and modern column names.
+  const { data: pedidosRaw, isLoading: loading, refetch: _refetchPedidos } = useQuery({
+    queryKey: ["pedidos_compra"],
+    queryFn: async () => {
+      const { data: rows, error } = await (supabase.from as any)("pedidos_compra")
+        .select("*, fornecedores(nome_razao, cpf_cnpj)")
+        .order("id", { ascending: false });
+      if (error) {
+        console.error("[pedidos_compra] fetch error", {
+          code: error.code, message: error.message, details: error.details,
+        });
+        throw error;
+      }
+      return (rows || []) as PedidoCompra[];
+    },
   });
+  const data = pedidosRaw || [];
+  const fetchData = () => { void _refetchPedidos(); };
   const { pushView } = useRelationalNavigation();
   const fornecedoresCrud = useSupabaseCrud<any>({ table: "fornecedores" });
   const produtosCrud = useSupabaseCrud<any>({ table: "produtos" });
@@ -93,14 +119,14 @@ const PedidosCompra = () => {
 
   const openCreate = () => {
     setMode("create");
-    setForm({ ...emptyForm, numero: `PC-${String(data.length + 1).padStart(4, "0")}` });
+    setForm({ ...emptyForm });
     setItems([]); setSelected(null); setModalOpen(true);
   };
 
   const openEdit = async (p: PedidoCompra) => {
     setMode("edit"); setSelected(p);
     setForm({
-      numero: p.numero, fornecedor_id: p.fornecedor_id || "", data_pedido: p.data_pedido,
+      fornecedor_id: p.fornecedor_id || "", data_pedido: p.data_pedido,
       data_entrega_prevista: p.data_entrega_prevista || "",
       data_entrega_real: p.data_entrega_real || "",
       frete_valor: p.frete_valor || "",
@@ -139,7 +165,7 @@ const PedidosCompra = () => {
     const { data: finLanc } = await supabase
       .from("financeiro_lancamentos")
       .select("id, descricao, valor, status, data_vencimento, tipo")
-      .ilike("descricao", `PC ${p.numero}%`)
+      .ilike("descricao", `${pedidoNumero(p)}%`)
       .eq("ativo", true);
     setViewFinanceiro((finLanc as any[]) || []);
   };
@@ -147,17 +173,12 @@ const PedidosCompra = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (saving) return;
-    if (!form.numero) { toast.error("Número é obrigatório"); return; }
     if (!form.fornecedor_id) { toast.error("Fornecedor é obrigatório"); return; }
     setSaving(true);
 
-    // Build an explicit payload — only the columns that exist in
-    // pedidos_compra.  Avoids accidental extra fields from form state.
-    // fornecedor_id is a UUID string (pedidos_compra.fornecedor_id is
-    // declared `uuid REFERENCES fornecedores(id)` in the DB schema).
+    // `numero` excluded — column does not exist in the current DB schema.
     const payload = {
-      numero: form.numero,
-      fornecedor_id: form.fornecedor_id,   // uuid string — see interface comment
+      fornecedor_id: form.fornecedor_id,
       data_pedido: form.data_pedido,
       data_entrega_prevista: form.data_entrega_prevista || null,
       data_entrega_real: form.data_entrega_real || null,
@@ -169,11 +190,7 @@ const PedidosCompra = () => {
     };
 
     if (import.meta.env.DEV) {
-      console.log('[pedidos_compra] pre-submit diagnostic', {
-        fornecedor_id: payload.fornecedor_id,
-        fornecedor_id_type: typeof payload.fornecedor_id,
-        payload,
-      });
+      console.log('[pedidos_compra] pre-submit diagnostic', { payload });
     }
 
     let pedidoId = selected?.id;
@@ -264,7 +281,7 @@ const PedidosCompra = () => {
           saldo_atual: saldoAnterior + qtd,
           documento_tipo: "pedido_compra",
           documento_id: p.id,
-          motivo: `Entrada via PC ${p.numero}`,
+          motivo: `Entrada via ${pedidoNumero(p)}`,
         });
         // Update product stock
         await supabase.from("produtos").update({ estoque_atual: saldoAnterior + qtd }).eq("id", item.produto_id);
@@ -275,7 +292,7 @@ const PedidosCompra = () => {
       if (vTotal > 0) {
         await supabase.from("financeiro_lancamentos").insert({
           tipo: "pagar" as any,
-          descricao: `PC ${p.numero} — ${p.fornecedores?.nome_razao_social || "Fornecedor"}`,
+          descricao: `${pedidoNumero(p)} — ${p.fornecedores?.nome_razao || "Fornecedor"}`,
           valor: vTotal,
           saldo_restante: vTotal,
           data_vencimento: p.data_entrega_prevista || new Date().toISOString().split("T")[0],
@@ -299,7 +316,7 @@ const PedidosCompra = () => {
     }
 
     // Also navigate to fiscal for NF registration
-    navigate(`/fiscal?tipo=entrada&fornecedor_id=${p.fornecedor_id || ""}&pedido_compra=${p.numero}`);
+    navigate(`/fiscal?tipo=entrada&fornecedor_id=${p.fornecedor_id || ""}&pedido_compra=${pedidoNumero(p)}`);
   };
 
   const marcarEnviado = async (p: PedidoCompra) => {
@@ -315,11 +332,12 @@ const PedidosCompra = () => {
     }
   };
 
-  const fornecedorOptions = fornecedoresCrud.data.map((f: any) => ({ id: f.id, label: f.nome_razao_social, sublabel: f.cpf_cnpj || "" }));
+  // Real DB uses `nome_razao` (not `nome_razao_social`) in the fornecedores table.
+  const fornecedorOptions = fornecedoresCrud.data.map((f: any) => ({ id: f.id, label: f.nome_razao || "", sublabel: f.cpf_cnpj || "" }));
 
   const columns = [
-    { key: "numero", label: "Nº", render: (p: PedidoCompra) => <span className="font-mono text-xs font-medium text-primary">{p.numero}</span> },
-    { key: "fornecedor", label: "Fornecedor", render: (p: PedidoCompra) => p.fornecedores?.nome_razao_social || "—" },
+    { key: "id", label: "Nº", render: (p: PedidoCompra) => <span className="font-mono text-xs font-medium text-primary">{pedidoNumero(p)}</span> },
+    { key: "fornecedor", label: "Fornecedor", render: (p: PedidoCompra) => p.fornecedores?.nome_razao || "—" },
     { key: "data_pedido", label: "Data", render: (p: PedidoCompra) => new Date(p.data_pedido).toLocaleDateString("pt-BR") },
     { key: "valor_total", label: "Total", render: (p: PedidoCompra) => <span className="font-semibold font-mono">{formatCurrency(Number(p.valor_total || 0))}</span> },
     { key: "status", label: "Status", render: (p: PedidoCompra) => <StatusBadge status={p.status} label={statusLabels[p.status] || p.status} /> },
@@ -339,8 +357,7 @@ const PedidosCompra = () => {
 
       <FormModal open={modalOpen} onClose={() => setModalOpen(false)} title={mode === "create" ? "Novo Pedido de Compra" : "Editar Pedido"} size="xl">
         <form onSubmit={handleSubmit} className="space-y-5">
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-            <div className="space-y-2"><Label>Número *</Label><Input value={form.numero} onChange={(e) => setForm({ ...form, numero: e.target.value })} required className="font-mono" /></div>
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
             <div className="space-y-2"><Label>Data</Label><Input type="date" value={form.data_pedido} onChange={(e) => setForm({ ...form, data_pedido: e.target.value })} /></div>
             <div className="space-y-2"><Label>Entrega Prevista</Label><Input type="date" value={form.data_entrega_prevista} onChange={(e) => setForm({ ...form, data_entrega_prevista: e.target.value })} /></div>
             <div className="space-y-2"><Label>Status</Label>
@@ -421,7 +438,7 @@ const PedidosCompra = () => {
             )}
             <ViewSection title="Pedido">
               <div className="grid grid-cols-2 gap-4">
-                <ViewField label="Número"><span className="font-mono font-medium">{selected.numero}</span></ViewField>
+                <ViewField label="Nº"><span className="font-mono font-medium">{pedidoNumero(selected)}</span></ViewField>
                 <ViewField label="Status"><StatusBadge status={selected.status} label={statusLabels[selected.status] || selected.status} /></ViewField>
                 <ViewField label="Data Pedido">{formatDate(selected.data_pedido)}</ViewField>
                 <ViewField label="Valor Total"><span className="font-semibold font-mono text-primary">{formatCurrency(Number(selected.valor_total || 0))}</span></ViewField>
@@ -431,7 +448,7 @@ const PedidosCompra = () => {
               <ViewField label="Fornecedor">
                 {selected.fornecedor_id ? (
                   <RelationalLink type="fornecedor" id={selected.fornecedor_id}>
-                    {selected.fornecedores?.nome_razao_social || "—"}
+                    {selected.fornecedores?.nome_razao || "—"}
                   </RelationalLink>
                 ) : <span className="text-muted-foreground">Não informado</span>}
               </ViewField>
@@ -657,7 +674,7 @@ const PedidosCompra = () => {
                 {selected.fornecedor_id ? (
                   <RelationalLink type="fornecedor" id={selected.fornecedor_id}>
                     <Building2 className="h-3.5 w-3.5" />
-                    {selected.fornecedores?.nome_razao_social || "—"}
+                    {selected.fornecedores?.nome_razao || "—"}
                   </RelationalLink>
                 ) : <span className="text-muted-foreground">Não vinculado</span>}
               </ViewField>
@@ -737,7 +754,7 @@ const PedidosCompra = () => {
           <ViewDrawerV2
             open={drawerOpen}
             onClose={() => setDrawerOpen(false)}
-            title={`PC ${selected.numero}`}
+            title={pedidoNumero(selected)}
             badge={<StatusBadge status={selected.status} label={statusLabels[selected.status] || selected.status} />}
             actions={<>
               <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setDrawerOpen(false); openEdit(selected); }}><Edit className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Editar</TooltipContent></Tooltip>
