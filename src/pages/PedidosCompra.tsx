@@ -132,24 +132,43 @@ const PedidosCompra = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (saving) return;
     if (!form.numero) { toast.error("Número é obrigatório"); return; }
+    if (!form.fornecedor_id) { toast.error("Fornecedor é obrigatório"); return; }
     setSaving(true);
+    const payload = {
+      ...form,
+      frete_valor: Number(form.frete_valor || 0),
+      valor_total: valorTotal,
+      data_entrega_prevista: form.data_entrega_prevista || null,
+      data_entrega_real: form.data_entrega_real || null,
+      condicao_pagamento: form.condicao_pagamento || null,
+    };
+    let pedidoId = selected?.id;
     try {
-      const payload = {
-        ...form,
-        fornecedor_id: form.fornecedor_id || null,
-        frete_valor: Number(form.frete_valor || 0),
-        valor_total: valorTotal,
-        data_entrega_real: form.data_entrega_real || null,
-        condicao_pagamento: form.condicao_pagamento || null,
-      };
-      let pedidoId = selected?.id;
       if (mode === "create") {
         const { data: newP, error } = await supabase.from("pedidos_compra" as any).insert(payload).select().single();
-        if (error) throw error;
+        if (error) {
+          console.error('[pedidos_compra] insert header error', {
+            code: error.code, message: error.message,
+            details: error.details, hint: error.hint, payload,
+          });
+          toast.error(`Erro ao criar pedido: ${error.message}`);
+          setSaving(false);
+          return;
+        }
         pedidoId = (newP as any).id;
       } else if (selected) {
-        await supabase.from("pedidos_compra" as any).update(payload).eq("id", selected.id);
+        const { error } = await supabase.from("pedidos_compra" as any).update(payload).eq("id", selected.id);
+        if (error) {
+          console.error('[pedidos_compra] update header error', {
+            code: error.code, message: error.message,
+            details: error.details, hint: error.hint, payload,
+          });
+          toast.error(`Erro ao atualizar pedido: ${error.message}`);
+          setSaving(false);
+          return;
+        }
         await supabase.from("pedidos_compra_itens" as any).delete().eq("pedido_compra_id", selected.id);
       }
       if (items.length > 0 && pedidoId) {
@@ -157,13 +176,37 @@ const PedidosCompra = () => {
           pedido_compra_id: pedidoId, produto_id: i.produto_id, quantidade: i.quantidade,
           valor_unitario: i.valor_unitario, valor_total: i.valor_total,
         }));
-        if (itemsPayload.length > 0) await supabase.from("pedidos_compra_itens" as any).insert(itemsPayload);
+        if (itemsPayload.length > 0) {
+          const { error: itemsError } = await supabase.from("pedidos_compra_itens" as any).insert(itemsPayload);
+          if (itemsError) {
+            console.error('[pedidos_compra] insert items error', {
+              code: itemsError.code, message: itemsError.message,
+              details: itemsError.details, hint: itemsError.hint, itemsPayload,
+            });
+            if (mode === "create" && pedidoId) {
+              const { error: rollbackError } = await supabase.from("pedidos_compra" as any).delete().eq("id", pedidoId);
+              if (rollbackError) {
+                console.error('[pedidos_compra] rollback delete error', {
+                  code: rollbackError.code, message: rollbackError.message,
+                  details: rollbackError.details, hint: rollbackError.hint, pedidoId,
+                });
+                toast.error(`Erro ao salvar itens: ${itemsError.message}. O pedido foi criado mas os itens não foram salvos — apague o pedido manualmente.`);
+                setSaving(false);
+                return;
+              }
+            }
+            toast.error(`Erro ao salvar itens: ${itemsError.message}`);
+            setSaving(false);
+            return;
+          }
+        }
       }
       toast.success("Pedido de compra salvo!");
-      setModalOpen(false); fetchData();
+      setModalOpen(false);
+      fetchData();
     } catch (err: any) {
-      console.error('[pedidos_compra]', err);
-      toast.error("Erro ao salvar. Tente novamente.");
+      console.error('[pedidos_compra] unexpected error', err);
+      toast.error("Erro inesperado ao salvar. Tente novamente.");
     }
     setSaving(false);
   };
