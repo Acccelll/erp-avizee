@@ -8,6 +8,7 @@ import { AppConfigProvider } from "@/contexts/AppConfigContext";
 import { RelationalNavigationProvider } from "@/contexts/RelationalNavigationContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AdminRoute } from "@/components/AdminRoute";
+import { SocialRoute } from "@/components/SocialRoute";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { OfflineBanner } from "@/components/OfflineBanner";
@@ -131,7 +132,7 @@ const App = () => (
             <Route path="/perfil" element={<ProtectedRoute><LazyPage><Perfil /></LazyPage></ProtectedRoute>} />
             <Route path="/contas-contabeis-plano" element={<ProtectedRoute><LazyPage><ContasContabeis /></LazyPage></ProtectedRoute>} />
             <Route path="/conciliacao" element={<ProtectedRoute><LazyPage><Conciliacao /></LazyPage></ProtectedRoute>} />
-            <Route path="/social" element={<ProtectedRoute><LazyPage><Social /></LazyPage></ProtectedRoute>} />
+            <Route path="/social" element={<SocialRoute><LazyPage><Social /></LazyPage></SocialRoute>} />
             <Route path="*" element={<LazyPage><NotFound /></LazyPage>} />
           </Routes>
           </ErrorBoundary>
