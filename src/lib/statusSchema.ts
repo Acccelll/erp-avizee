@@ -3,7 +3,10 @@
 export const statusOrcamento: Record<string, { label: string; color: string }> = {
   rascunho: { label: "Rascunho", color: "secondary" },
   enviado: { label: "Enviado", color: "info" },
-  confirmado: { label: "Confirmado", color: "success" },
+  confirmado: { label: "Confirmado", color: "info" },
+  aprovado: { label: "Aprovado", color: "success" },
+  convertido: { label: "Convertido", color: "success" },
+  rejeitado: { label: "Rejeitado", color: "destructive" },
   cancelado: { label: "Cancelado", color: "destructive" },
   expirado: { label: "Expirado", color: "warning" },
 };

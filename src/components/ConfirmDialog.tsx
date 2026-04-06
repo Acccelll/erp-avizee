@@ -8,6 +8,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { cn } from "@/lib/utils";
 
 interface ConfirmDialogProps {
   open: boolean;
@@ -16,6 +17,7 @@ interface ConfirmDialogProps {
   title?: string;
   description?: string;
   confirmLabel?: string;
+  confirmVariant?: "destructive" | "default";
   loading?: boolean;
   children?: React.ReactNode;
 }
@@ -27,6 +29,7 @@ export function ConfirmDialog({
   title = "Confirmar exclusão",
   description = "Tem certeza que deseja excluir este registro? Esta ação não pode ser desfeita.",
   confirmLabel = "Excluir",
+  confirmVariant = "destructive",
   loading,
   children,
 }: ConfirmDialogProps) {
@@ -40,8 +43,16 @@ export function ConfirmDialog({
         {children}
         <AlertDialogFooter>
           <AlertDialogCancel disabled={loading}>Cancelar</AlertDialogCancel>
-          <AlertDialogAction onClick={onConfirm} disabled={loading} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-            {loading ? "Excluindo..." : confirmLabel}
+          <AlertDialogAction
+            onClick={onConfirm}
+            disabled={loading}
+            className={cn(
+              confirmVariant === "destructive"
+                ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                : "bg-primary text-primary-foreground hover:bg-primary/90"
+            )}
+          >
+            {loading ? "Aguarde..." : confirmLabel}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

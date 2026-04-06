@@ -22,6 +22,7 @@ import { formatCurrency, formatDate } from "@/lib/format";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { Send } from "lucide-react";
+import { sendForApproval, approveOrcamento, convertToOV } from "@/services/orcamentos.service";
 
 interface Orcamento {
   id: string; numero: string; cliente_id: string; data_orcamento: string;
@@ -55,10 +56,8 @@ const Orcamentos = () => {
   }, []);
 
   const handleSendForApproval = useCallback(async (orc: Orcamento) => {
-    if (orc.status !== "rascunho") return;
     try {
-      await supabase.from("orcamentos").update({ status: "confirmado" }).eq("id", orc.id);
-      toast.success(`Cotação ${orc.numero} enviada para aprovação!`);
+      await sendForApproval(orc);
       fetchData();
     } catch {
       toast.error("Erro ao enviar cotação para aprovação.");
@@ -117,8 +116,7 @@ const Orcamentos = () => {
       return;
     }
     try {
-      await supabase.from("orcamentos").update({ status: "aprovado" }).eq("id", orc.id);
-      toast.success(`Cotação ${orc.numero} aprovada!`);
+      await approveOrcamento(orc);
       fetchData();
     } catch (err: any) {
       toast.error("Erro ao aprovar cotação.");
@@ -127,31 +125,7 @@ const Orcamentos = () => {
 
   const handleConvertToOV = async (orc: Orcamento) => {
     try {
-      const { data: items } = await supabase.from("orcamentos_itens").select("*").eq("orcamento_id", orc.id);
-      const { count } = await supabase.from("ordens_venda").select("*", { count: "exact", head: true });
-      const ovNumero = `OV${String((count || 0) + 1).padStart(6, "0")}`;
-      const { data: newOV, error } = await supabase.from("ordens_venda").insert({
-        numero: ovNumero, data_emissao: new Date().toISOString().split("T")[0],
-        cliente_id: orc.cliente_id, cotacao_id: orc.id,
-        status: "pendente", status_faturamento: "aguardando",
-        valor_total: orc.valor_total, observacoes: orc.observacoes,
-        po_number: poNumberCliente || null,
-        data_po_cliente: dataPoCliente || null,
-      }).select().single();
-      if (error) throw error;
-      if (items && items.length > 0 && newOV) {
-        const ovItems = items.map((i: any) => ({
-          ordem_venda_id: newOV.id, produto_id: i.produto_id,
-          codigo_snapshot: i.codigo_snapshot, descricao_snapshot: i.descricao_snapshot,
-          variacao: i.variacao, quantidade: i.quantidade, unidade: i.unidade,
-          valor_unitario: i.valor_unitario, valor_total: i.valor_total,
-          peso_unitario: i.peso_unitario, peso_total: i.peso_total,
-          quantidade_faturada: 0,
-        }));
-        await supabase.from("ordens_venda_itens").insert(ovItems);
-      }
-      await supabase.from("orcamentos").update({ status: "convertido" }).eq("id", orc.id);
-      toast.success(`Ordem de Venda ${ovNumero} criada!`);
+      await convertToOV(orc, { poNumber: poNumberCliente, dataPo: dataPoCliente });
       setPoNumberCliente("");
       setDataPoCliente("");
       fetchData();
@@ -284,8 +258,10 @@ const Orcamentos = () => {
           setDataPoCliente("");
         }}
         onConfirm={() => convertingOrc && handleConvertToOV(convertingOrc)}
-        title="Converter em Ordem de Venda"
-        description={`Deseja converter a cotação ${convertingOrc?.numero} em uma Ordem de Venda?`}
+        title="Gerar Ordem de Venda"
+        description={`Deseja converter a cotação ${convertingOrc?.numero} em uma Ordem de Venda? Isso irá marcar a cotação como convertida.`}
+        confirmLabel="Gerar OV"
+        confirmVariant="default"
       >
         <div className="grid grid-cols-2 gap-3 mt-3">
           <div className="space-y-2">
