@@ -407,7 +407,7 @@ export default function Remessas() {
           <h4 className="font-semibold text-sm pt-2 border-t">Vínculos Operacionais</h4>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label>Ordem de Venda</Label>
+              <Label>Pedido</Label>
               <Select value={form.ordem_venda_id} onValueChange={v => setForm({ ...form, ordem_venda_id: v === "none" ? "" : v })}>
                 <SelectTrigger><SelectValue placeholder="Opcional..." /></SelectTrigger>
                 <SelectContent>

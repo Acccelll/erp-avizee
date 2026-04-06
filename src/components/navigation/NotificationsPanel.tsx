@@ -126,11 +126,11 @@ export function NotificationsPanel() {
           {
             id: 'ovs-faturamento',
             level: (ovsAguardando || []).length > 0 ? 'warning' : 'success',
-            title: (ovsAguardando || []).length > 0 ? 'OVs aguardando faturamento' : 'Sem backlog de faturamento',
+            title: (ovsAguardando || []).length > 0 ? 'Pedidos aguardando faturamento' : 'Sem backlog de faturamento',
             description:
               (ovsAguardando || []).length > 0
-                ? `${(ovsAguardando || []).length} ordem(ns) de venda aguardam faturamento total ou parcial.`
-                : 'Nenhuma ordem de venda pendente de faturamento.',
+                ? `${(ovsAguardando || []).length} pedido(s) aguardam faturamento total ou parcial.`
+                : 'Nenhum pedido pendente de faturamento.',
             time: 'Agora',
           },
         ];

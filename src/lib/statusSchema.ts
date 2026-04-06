@@ -3,9 +3,9 @@
 export const statusOrcamento: Record<string, { label: string; color: string }> = {
   rascunho: { label: "Rascunho", color: "secondary" },
   enviado: { label: "Enviado", color: "info" },
-  confirmado: { label: "Confirmado", color: "info" },
+  confirmado: { label: "Aguardando Aprovação", color: "info" },
   aprovado: { label: "Aprovado", color: "success" },
-  convertido: { label: "Convertido", color: "success" },
+  convertido: { label: "Convertido em Pedido", color: "success" },
   rejeitado: { label: "Rejeitado", color: "destructive" },
   cancelado: { label: "Cancelado", color: "destructive" },
   expirado: { label: "Expirado", color: "warning" },
@@ -19,12 +19,20 @@ export const statusCompra: Record<string, { label: string; color: string }> = {
   cancelado: { label: "Cancelado", color: "destructive" },
 };
 
-export const statusOrdemVenda: Record<string, { label: string; color: string }> = {
-  rascunho: { label: "Rascunho", color: "secondary" },
-  confirmado: { label: "Confirmada", color: "info" },
-  faturado: { label: "Faturada", color: "success" },
-  cancelado: { label: "Cancelada", color: "destructive" },
+// Statuses for the Pedido entity (stored as ordens_venda in DB)
+export const statusPedido: Record<string, { label: string; color: string }> = {
+  pendente: { label: "Aguardando", color: "warning" },
+  aprovada: { label: "Aprovado", color: "success" },
+  em_separacao: { label: "Em Separação", color: "info" },
+  separado: { label: "Separado", color: "info" },
+  em_transporte: { label: "Em Transporte", color: "info" },
+  entregue: { label: "Entregue", color: "success" },
+  faturado: { label: "Faturado", color: "success" },
+  cancelada: { label: "Cancelado", color: "destructive" },
 };
+
+/** @deprecated Use statusPedido instead */
+export const statusOrdemVenda = statusPedido;
 
 export const statusNotaFiscal: Record<string, { label: string; color: string }> = {
   pendente: { label: "Pendente", color: "warning" },

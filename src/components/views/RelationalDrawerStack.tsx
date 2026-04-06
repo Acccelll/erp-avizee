@@ -36,7 +36,7 @@ const getTitle = (type: EntityType) => ({
   pedido_compra: "Pedido de Compra",
   nota_fiscal: "Nota Fiscal",
   remessa: "Remessa / Rastreio",
-  ordem_venda: "Ordem de Venda",
+  ordem_venda: "Pedido",
 }[type] || "Detalhes");
 
 export function RelationalDrawerStack() {

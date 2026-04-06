@@ -98,11 +98,11 @@ export function AlertStrip({
     },
     {
       id: 'ovs',
-      label: 'OVs a faturar',
+      label: 'Pedidos a faturar',
       count: ovsPendentes,
       icon: Users,
       severity: 'info',
-      href: '/ordens-venda',
+      href: '/pedidos',
     },
   ].filter((item) => item.count > 0);
 

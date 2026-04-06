@@ -305,7 +305,7 @@ const Fiscal = () => {
     { key: "modelo", label: "Modelo", render: (n: NotaFiscal) => <span className="text-xs font-mono font-medium">{modeloLabels[n.modelo_documento || '55'] || n.modelo_documento}</span> },
     { key: "numero", label: "Número", render: (n: NotaFiscal) => <span className="font-mono text-xs font-medium text-primary">{n.numero}</span> },
     { key: "parceiro", label: "Parceiro", render: (n: NotaFiscal) => n.tipo === "entrada" ? n.fornecedores?.nome_razao_social || "—" : n.clientes?.nome_razao_social || "—" },
-    { key: "ov", label: "OV", render: (n: NotaFiscal) => n.ordens_venda?.numero ? <span className="font-mono text-xs">{n.ordens_venda.numero}</span> : "—" },
+    { key: "ov", label: "Pedido", render: (n: NotaFiscal) => n.ordens_venda?.numero ? <span className="font-mono text-xs">{n.ordens_venda.numero}</span> : "—" },
     { key: "data_emissao", label: "Emissão", render: (n: NotaFiscal) => formatDate(n.data_emissao) },
     { key: "valor_total", label: "Total", render: (n: NotaFiscal) => <span className="font-semibold font-mono">{formatCurrency(Number(n.valor_total))}</span> },
     { key: "operacao", label: "Operação", render: (n: NotaFiscal) => {
@@ -372,8 +372,8 @@ const Fiscal = () => {
             )}
           </div>
           {form.tipo === "saida" && ordensVenda.length > 0 && (
-            <div className="space-y-2"><Label>Ordem de Venda (opcional)</Label>
-              <Select value={form.ordem_venda_id || "none"} onValueChange={(v) => setForm({ ...form, ordem_venda_id: v === "none" ? "" : v })}><SelectTrigger><SelectValue placeholder="Vincular a uma OV..." /></SelectTrigger><SelectContent><SelectItem value="none">Nenhuma</SelectItem>{ordensVenda.map((ov: any) => (<SelectItem key={ov.id} value={ov.id}>{ov.numero} — {ov.clientes?.nome_razao_social || ""}</SelectItem>))}</SelectContent></Select>
+            <div className="space-y-2"><Label>Pedido (opcional)</Label>
+              <Select value={form.ordem_venda_id || "none"} onValueChange={(v) => setForm({ ...form, ordem_venda_id: v === "none" ? "" : v })}><SelectTrigger><SelectValue placeholder="Vincular a um Pedido..." /></SelectTrigger><SelectContent><SelectItem value="none">Nenhum</SelectItem>{ordensVenda.map((ov: any) => (<SelectItem key={ov.id} value={ov.id}>{ov.numero} — {ov.clientes?.nome_razao_social || ""}</SelectItem>))}</SelectContent></Select>
             </div>
           )}
           <ItemsGrid items={items} onChange={setItems} produtos={produtosCrud.data} title="Itens da Nota" />
@@ -470,7 +470,7 @@ const Fiscal = () => {
                   </ViewSection>
                   <ViewSection title="Parceiro"><div className="grid grid-cols-2 gap-4">
                     <ViewField label={selected.tipo === "entrada" ? "Fornecedor" : "Cliente"}>{selected.tipo === "entrada" ? selected.fornecedores?.nome_razao_social || "—" : selected.clientes?.nome_razao_social || "—"}</ViewField>
-                    {selected.ordem_venda_id && selected.ordens_venda && <ViewField label="Ordem de Venda"><span className="font-mono font-medium">{selected.ordens_venda.numero}</span></ViewField>}
+                    {selected.ordem_venda_id && selected.ordens_venda && <ViewField label="Pedido"><span className="font-mono font-medium">{selected.ordens_venda.numero}</span></ViewField>}
                   </div></ViewSection>
                   <ViewSection title="Pagamento"><div className="grid grid-cols-2 gap-4">
                     <ViewField label="Condição">{condicaoLabel}</ViewField>
@@ -521,7 +521,7 @@ const Fiscal = () => {
               { value: "vinculos", label: "Vínculos", content: (
                 <div className="space-y-4">
                   <ViewSection title="Vínculos"><div className="grid grid-cols-2 gap-4">
-                    <ViewField label="Ordem de Venda">{selected.ordens_venda?.numero || "—"}</ViewField>
+                    <ViewField label="Pedido">{selected.ordens_venda?.numero || "—"}</ViewField>
                     <ViewField label={selected.tipo === "entrada" ? "Fornecedor" : "Cliente"}>{selected.tipo === "entrada" ? selected.fornecedores?.nome_razao_social || "—" : selected.clientes?.nome_razao_social || "—"}</ViewField>
                   </div></ViewSection>
                   {viewItems.some((i: any) => i.contas_contabeis) && (

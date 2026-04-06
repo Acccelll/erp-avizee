@@ -36,7 +36,10 @@ export interface ConvertToOVOptions {
   dataPo?: string;
 }
 
-export async function convertToOV(
+/** @deprecated Use convertToPedido instead */
+export const convertToOV = convertToPedido;
+
+export async function convertToPedido(
   orc: OrcamentoBase,
   options: ConvertToOVOptions = {}
 ): Promise<{ ovId: string; ovNumero: string }> {
@@ -49,7 +52,7 @@ export async function convertToOV(
     .from("ordens_venda")
     .select("*", { count: "exact", head: true });
 
-  const ovNumero = `OV${String((count || 0) + 1).padStart(6, "0")}`;
+  const ovNumero = `PED${String((count || 0) + 1).padStart(6, "0")}`;
 
   const { data: newOV, error } = await supabase
     .from("ordens_venda")
@@ -58,7 +61,7 @@ export async function convertToOV(
       data_emissao: new Date().toISOString().split("T")[0],
       cliente_id: orc.cliente_id,
       cotacao_id: orc.id,
-      status: "pendente",
+      status: "aprovada",
       status_faturamento: "aguardando",
       valor_total: orc.valor_total,
       observacoes: orc.observacoes,
@@ -95,7 +98,7 @@ export async function convertToOV(
 
   if (updateError) throw updateError;
 
-  toast.success(`Ordem de Venda ${ovNumero} criada!`);
+  toast.success(`Pedido ${ovNumero} criado com sucesso!`);
   return { ovId: newOV!.id, ovNumero };
 }
 

@@ -46,8 +46,8 @@ export function OrdemVendaView({ id }: Props) {
     fetchData();
   }, [id]);
 
-  if (loading) return <div className="p-8 text-center animate-pulse">Carregando ordem de venda...</div>;
-  if (!selected) return <div className="p-8 text-center text-destructive">Ordem de venda não encontrada</div>;
+  if (loading) return <div className="p-8 text-center animate-pulse">Carregando pedido...</div>;
+  if (!selected) return <div className="p-8 text-center text-destructive">Pedido não encontrado</div>;
 
   return (
     <div className="space-y-4">
@@ -84,7 +84,7 @@ export function OrdemVendaView({ id }: Props) {
             </div>
             {selected.cotacao_id && (
               <div>
-                <p className="text-[10px] text-muted-foreground uppercase font-semibold">Orçamento de Origem</p>
+                <p className="text-[10px] text-muted-foreground uppercase font-semibold">Cotação de Origem</p>
                 <RelationalLink type="orcamento" id={selected.cotacao_id}>
                   {selected.orcamentos?.numero ? `Cotação ${selected.orcamentos.numero}` : "Ver cotação"}
                 </RelationalLink>

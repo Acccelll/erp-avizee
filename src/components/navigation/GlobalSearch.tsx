@@ -125,7 +125,7 @@ export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
   const filteredActions = useMemo(() => {
     const enriched = [
       ...quickActions,
-      { id: 'nova-venda', title: 'Nova Venda', description: 'Abrir criação de ordem de venda', path: '/ordens-venda', shortcut: '⌃⇧N' },
+      { id: 'nova-venda', title: 'Novo Pedido', description: 'Ver pedidos e faturamento', path: '/pedidos', shortcut: '⌃⇧N' },
       { id: 'nova-nota', title: 'Nova Nota Fiscal', description: 'Abrir emissão fiscal', path: '/fiscal?tipo=saida', shortcut: '⌃⇧N' },
       { id: 'novo-produto-atalho', title: 'Novo Produto', description: 'Ir para cadastro de produto', path: '/produtos', shortcut: '⌃⇧P' },
     ];

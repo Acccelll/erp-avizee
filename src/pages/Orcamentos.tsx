@@ -22,7 +22,7 @@ import { formatCurrency, formatDate } from "@/lib/format";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { Send } from "lucide-react";
-import { sendForApproval, approveOrcamento, convertToOV } from "@/services/orcamentos.service";
+import { sendForApproval, approveOrcamento, convertToPedido } from "@/services/orcamentos.service";
 
 interface Orcamento {
   id: string; numero: string; cliente_id: string; data_orcamento: string;
@@ -123,15 +123,15 @@ const Orcamentos = () => {
     }
   };
 
-  const handleConvertToOV = async (orc: Orcamento) => {
+  const handleConvertToPedido = async (orc: Orcamento) => {
     try {
-      await convertToOV(orc, { poNumber: poNumberCliente, dataPo: dataPoCliente });
+      await convertToPedido(orc, { poNumber: poNumberCliente, dataPo: dataPoCliente });
       setPoNumberCliente("");
       setDataPoCliente("");
       fetchData();
-      navigate(`/ordens-venda`);
+      navigate(`/pedidos`);
     } catch (err: any) {
-      toast.error("Erro ao converter cotação.");
+      toast.error("Erro ao converter cotação em pedido.");
     } finally {
       setConvertingId(null);
     }
@@ -170,7 +170,7 @@ const Orcamentos = () => {
           )}
           {o.status === "aprovado" && (
             <Button size="sm" variant="default" className="h-7 text-xs gap-1" onClick={(e) => { e.stopPropagation(); setConvertingId(o.id); }}>
-              <ArrowRightCircle className="w-3 h-3" /> Gerar OV
+              <ArrowRightCircle className="w-3 h-3" /> Gerar Pedido
             </Button>
           )}
         </div>
@@ -216,8 +216,8 @@ const Orcamentos = () => {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <SummaryCard title="Total de Cotações" value={String(kpis.total)} icon={FileText} variationType="neutral" variation="registros" />
           <SummaryCard title="Valor Total" value={formatCurrency(kpis.totalValue)} icon={DollarSign} variationType="neutral" variation="acumulado" />
-          <SummaryCard title="Aprovadas" value={String(kpis.approved)} icon={Clock} variationType="positive" variation="aguardando OV" />
-          <SummaryCard title="Taxa de Conversão" value={`${kpis.conversionRate}%`} icon={BarChart3} variationType="positive" variation="cotações → OV" />
+          <SummaryCard title="Aprovadas" value={String(kpis.approved)} icon={Clock} variationType="positive" variation="aguardando geração de pedido" />
+          <SummaryCard title="Taxa de Conversão" value={`${kpis.conversionRate}%`} icon={BarChart3} variationType="positive" variation="cotações → Pedido" />
         </div>
 
         <AdvancedFilterBar
@@ -257,10 +257,10 @@ const Orcamentos = () => {
           setPoNumberCliente("");
           setDataPoCliente("");
         }}
-        onConfirm={() => convertingOrc && handleConvertToOV(convertingOrc)}
-        title="Gerar Ordem de Venda"
-        description={`Deseja converter a cotação ${convertingOrc?.numero} em uma Ordem de Venda? Isso irá marcar a cotação como convertida.`}
-        confirmLabel="Gerar OV"
+        onConfirm={() => convertingOrc && handleConvertToPedido(convertingOrc)}
+        title="Gerar Pedido"
+        description={`Deseja converter a cotação ${convertingOrc?.numero} em um Pedido? Isso irá marcar a cotação como convertida.`}
+        confirmLabel="Gerar Pedido"
         confirmVariant="default"
       >
         <div className="grid grid-cols-2 gap-3 mt-3">
