@@ -20,11 +20,12 @@ import { AutocompleteSearch } from "@/components/ui/AutocompleteSearch";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { formatCurrency, formatNumber } from "@/lib/format";
+import { formatCurrency, formatNumber, formatDate } from "@/lib/format";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import {
   ShoppingCart, Edit, Trash2, Plus, CheckCircle2, Clock,
   FileSearch, Trophy, X, PackageSearch, ClipboardList,
+  Users2, TrendingDown, AlertCircle, Info,
 } from "lucide-react";
 
 interface CotacaoCompra {
@@ -117,6 +118,31 @@ export default function CotacoesCompra() {
     const finalizadas = data.filter((c) => c.status === "finalizada" || c.status === "convertida").length;
     return { total: data.length, abertas, emAnalise, finalizadas };
   }, [data]);
+
+  // Drawer summary stats
+  const drawerStats = useMemo(() => {
+    const uniqueSuppliers = new Set(viewPropostas.map((p) => p.fornecedor_id)).size;
+    const bestTotal = viewItems.reduce((sum, item) => {
+      const itemPropostas = viewPropostas.filter((p) => p.item_id === item.id);
+      if (itemPropostas.length === 0) return sum;
+      const best = Math.min(...itemPropostas.map((p) => Number(p.preco_unitario)));
+      return sum + best * item.quantidade;
+    }, 0);
+    const selectedPropostas = viewPropostas.filter((p) => p.selecionado);
+    const selectedSupplierIds = [...new Set(selectedPropostas.map((p) => p.fornecedor_id))];
+    const selectedSupplierName =
+      selectedSupplierIds.length === 1
+        ? viewPropostas.find(
+            (p) => p.fornecedor_id === selectedSupplierIds[0] && p.selecionado
+          )?.fornecedores?.nome_razao_social ?? null
+        : selectedSupplierIds.length > 1
+        ? `${selectedSupplierIds.length} fornecedores`
+        : null;
+    const allItemsHaveSelected =
+      viewItems.length > 0 &&
+      viewItems.every((item) => viewPropostas.some((p) => p.item_id === item.id && p.selecionado));
+    return { uniqueSuppliers, bestTotal, selectedPropostas, selectedSupplierName, allItemsHaveSelected };
+  }, [viewItems, viewPropostas]);
 
   const openCreate = () => {
     setMode("create");
@@ -498,11 +524,16 @@ export default function CotacoesCompra() {
         </form>
       </FormModal>
 
-      {/* View Drawer with Comparison */}
+      {/* View Drawer — Decision Panel */}
       <ViewDrawerV2
         open={drawerOpen}
         onClose={() => { setDrawerOpen(false); setAddingProposal(null); }}
-        title="Cotação de Compra"
+        title={selected?.numero ?? "Cotação de Compra"}
+        badge={
+          selected ? (
+            <StatusBadge status={selected.status} label={statusLabels[selected.status] || selected.status} />
+          ) : undefined
+        }
         actions={
           selected ? (
             <>
@@ -511,193 +542,505 @@ export default function CotacoesCompra() {
             </>
           ) : undefined
         }
-      >
-        {selected && (
-          <div className="space-y-5">
-            {/* Header info */}
-            <div className="grid grid-cols-2 gap-4">
-              <div><span className="text-xs text-muted-foreground">Número</span><p className="font-medium font-mono">{selected.numero}</p></div>
-              <div><span className="text-xs text-muted-foreground">Status</span><div className="mt-0.5"><StatusBadge status={selected.status} label={statusLabels[selected.status] || selected.status} /></div></div>
-              <div><span className="text-xs text-muted-foreground">Data</span><p>{new Date(selected.data_cotacao).toLocaleDateString("pt-BR")}</p></div>
-              <div><span className="text-xs text-muted-foreground">Validade</span><p>{selected.data_validade ? new Date(selected.data_validade).toLocaleDateString("pt-BR") : "—"}</p></div>
+        summary={
+          selected ? (
+            <div className="grid grid-cols-3 gap-2">
+              <div className="rounded-lg bg-muted/50 px-3 py-2 text-center">
+                <p className="text-[10px] text-muted-foreground uppercase font-semibold flex items-center justify-center gap-1">
+                  <PackageSearch className="h-3 w-3" /> Itens
+                </p>
+                <p className="text-xl font-bold font-mono mt-0.5">{viewItems.length}</p>
+              </div>
+              <div className="rounded-lg bg-muted/50 px-3 py-2 text-center">
+                <p className="text-[10px] text-muted-foreground uppercase font-semibold flex items-center justify-center gap-1">
+                  <Users2 className="h-3 w-3" /> Fornecedores
+                </p>
+                <p className="text-xl font-bold font-mono mt-0.5">{drawerStats.uniqueSuppliers}</p>
+              </div>
+              <div className="rounded-lg bg-muted/50 px-3 py-2 text-center">
+                <p className="text-[10px] text-muted-foreground uppercase font-semibold flex items-center justify-center gap-1">
+                  <TrendingDown className="h-3 w-3" /> Melhor Total
+                </p>
+                <p className="text-sm font-bold font-mono mt-0.5 text-emerald-600 dark:text-emerald-400 leading-tight">
+                  {drawerStats.bestTotal > 0 ? formatCurrency(drawerStats.bestTotal) : "—"}
+                </p>
+              </div>
             </div>
+          ) : undefined
+        }
+        tabs={
+          selected
+            ? [
+                /* ── TAB RESUMO ──────────────────────────── */
+                {
+                  value: "resumo",
+                  label: "Resumo",
+                  content: (
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-[10px] text-muted-foreground uppercase font-semibold">Data da Cotação</p>
+                          <p className="text-sm mt-0.5">{formatDate(selected.data_cotacao)}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-muted-foreground uppercase font-semibold">Validade</p>
+                          <p className="text-sm mt-0.5">
+                            {selected.data_validade ? formatDate(selected.data_validade) : "—"}
+                          </p>
+                        </div>
+                      </div>
 
-            {selected.observacoes && (
-              <div><span className="text-xs text-muted-foreground">Observações</span><p className="text-sm">{selected.observacoes}</p></div>
-            )}
-
-            {/* Items + Proposals comparison */}
-            <div className="border-t pt-4 space-y-4">
-              <h4 className="text-sm font-semibold flex items-center gap-2">
-                <PackageSearch className="h-4 w-4" /> Itens e Propostas ({viewItems.length})
-              </h4>
-
-              {viewItems.map((item) => {
-                const itemPropostas = viewPropostas.filter((p) => p.item_id === item.id);
-                const bestPrice = itemPropostas.length > 0
-                  ? Math.min(...itemPropostas.map((p) => Number(p.preco_unitario)))
-                  : null;
-
-                return (
-                  <Card key={item.id} className="border">
-                    <CardHeader className="py-3 px-4">
-                      <CardTitle className="text-sm flex items-center justify-between">
-                        <span>
-                          {item.produtos?.nome || "—"}
-                          <span className="ml-2 text-xs text-muted-foreground font-mono">
-                            {item.produtos?.codigo_interno || item.produtos?.sku || ""}
-                          </span>
-                        </span>
-                        <Badge variant="outline" className="font-mono">
-                          {item.quantidade} {item.unidade || "UN"}
-                        </Badge>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="px-4 pb-3 space-y-2">
-                      {itemPropostas.length === 0 ? (
-                        <p className="text-xs text-muted-foreground italic">Nenhuma proposta cadastrada.</p>
-                      ) : (
-                        <div className="space-y-1.5">
-                          {itemPropostas.map((p) => {
-                            const isBest = Number(p.preco_unitario) === bestPrice;
-                            const totalProposta = Number(p.preco_unitario) * item.quantidade;
-                            return (
-                              <div
-                                key={p.id}
-                                className={`flex items-center justify-between rounded-lg border px-3 py-2 text-sm ${
-                                  p.selecionado
-                                    ? "border-primary bg-primary/5 ring-1 ring-primary/20"
-                                    : isBest
-                                    ? "border-emerald-500/30 bg-emerald-50/50 dark:bg-emerald-950/20"
-                                    : ""
-                                }`}
-                              >
-                                <div className="flex items-center gap-2 min-w-0">
-                                  {p.selecionado && <Trophy className="h-3.5 w-3.5 text-primary flex-shrink-0" />}
-                                  {isBest && !p.selecionado && <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">MENOR</span>}
-                                  <span className="truncate font-medium">{p.fornecedores?.nome_razao_social || "—"}</span>
-                                </div>
-                                <div className="flex items-center gap-3 flex-shrink-0">
-                                  <div className="text-right">
-                                    <p className="font-mono font-semibold">{formatCurrency(Number(p.preco_unitario))}<span className="text-muted-foreground">/un</span></p>
-                                    <p className="text-[10px] text-muted-foreground font-mono">Total: {formatCurrency(totalProposta)}</p>
-                                  </div>
-                                  {p.prazo_entrega_dias && (
-                                    <Badge variant="secondary" className="text-[10px]">{p.prazo_entrega_dias}d</Badge>
-                                  )}
-                                  <div className="flex gap-1">
-                                    {!p.selecionado && selected.status !== "finalizada" && selected.status !== "convertida" && (
-                                      <Tooltip>
-                                        <TooltipTrigger asChild>
-                                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleSelectProposal(p.id!, item.id)}>
-                                            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-                                          </Button>
-                                        </TooltipTrigger>
-                                        <TooltipContent>Selecionar</TooltipContent>
-                                      </Tooltip>
-                                    )}
-                                    {selected.status !== "finalizada" && selected.status !== "convertida" && (
-                                      <Tooltip>
-                                        <TooltipTrigger asChild>
-                                          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDeleteProposal(p.id!)}>
-                                            <Trash2 className="h-3.5 w-3.5" />
-                                          </Button>
-                                        </TooltipTrigger>
-                                        <TooltipContent>Remover</TooltipContent>
-                                      </Tooltip>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })}
+                      {selected.observacoes && (
+                        <div>
+                          <p className="text-[10px] text-muted-foreground uppercase font-semibold">Observações</p>
+                          <p className="text-sm text-muted-foreground mt-1 italic">{selected.observacoes}</p>
                         </div>
                       )}
 
-                      {/* Add proposal inline */}
-                      {selected.status !== "finalizada" && selected.status !== "convertida" && selected.status !== "cancelada" && (
-                        <>
-                          {addingProposal === item.id ? (
-                            <div className="rounded-lg border border-dashed p-3 space-y-3 bg-muted/30">
-                              <div className="space-y-2">
-                                <Label className="text-xs">Fornecedor</Label>
-                                <AutocompleteSearch
-                                  options={fornecedorOptions}
-                                  value={proposalForm.fornecedor_id}
-                                  onChange={(id) => setProposalForm({ ...proposalForm, fornecedor_id: id })}
-                                  placeholder="Selecionar fornecedor..."
-                                />
-                              </div>
-                              <div className="grid grid-cols-2 gap-2">
-                                <div className="space-y-1">
-                                  <Label className="text-xs">Preço Unitário</Label>
-                                  <Input
-                                    type="number"
-                                    step="0.01"
-                                    value={proposalForm.preco_unitario}
-                                    onChange={(e) => setProposalForm({ ...proposalForm, preco_unitario: Number(e.target.value) })}
-                                    className="h-8 font-mono"
-                                  />
-                                </div>
-                                <div className="space-y-1">
-                                  <Label className="text-xs">Prazo (dias)</Label>
-                                  <Input
-                                    type="number"
-                                    value={proposalForm.prazo_entrega_dias}
-                                    onChange={(e) => setProposalForm({ ...proposalForm, prazo_entrega_dias: e.target.value })}
-                                    className="h-8 font-mono"
-                                  />
-                                </div>
-                              </div>
-                              <div className="flex gap-2">
-                                <Button type="button" size="sm" onClick={() => handleAddProposal(item.id)} disabled={!proposalForm.fornecedor_id}>Salvar</Button>
-                                <Button type="button" size="sm" variant="ghost" onClick={() => setAddingProposal(null)}>Cancelar</Button>
-                              </div>
+                      {/* Contextual alerts */}
+                      <div className="space-y-2">
+                        {viewItems.length === 0 && (
+                          <div className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/5 px-3 py-2 text-xs text-warning">
+                            <AlertCircle className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
+                            Nenhum item cadastrado nesta cotação.
+                          </div>
+                        )}
+                        {viewItems.length > 0 && viewPropostas.length === 0 && (
+                          <div className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/5 px-3 py-2 text-xs text-warning">
+                            <AlertCircle className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
+                            Nenhuma proposta recebida. Acesse a aba Propostas para adicionar.
+                          </div>
+                        )}
+                        {viewItems.length > 0 &&
+                          viewPropostas.length > 0 &&
+                          !drawerStats.allItemsHaveSelected &&
+                          selected.status !== "finalizada" &&
+                          selected.status !== "convertida" &&
+                          selected.status !== "cancelada" && (
+                            <div className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/5 px-3 py-2 text-xs text-warning">
+                              <AlertCircle className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
+                              Aguardando seleção de fornecedor para todos os itens.
                             </div>
-                          ) : (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              className="w-full gap-1.5 text-xs"
-                              onClick={() => {
-                                setAddingProposal(item.id);
-                                setProposalForm({ fornecedor_id: "", preco_unitario: 0, prazo_entrega_dias: "", observacoes: "" });
-                              }}
-                            >
-                              <Plus className="h-3 w-3" /> Adicionar Proposta
-                            </Button>
                           )}
-                        </>
+                        {drawerStats.selectedSupplierName && (
+                          <div className="flex items-start gap-2 rounded-lg border border-emerald-500/30 bg-emerald-50/50 dark:bg-emerald-950/20 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-400">
+                            <Trophy className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
+                            Fornecedor selecionado: <strong className="ml-1">{drawerStats.selectedSupplierName}</strong>
+                          </div>
+                        )}
+                        {selected.status === "convertida" && (
+                          <div className="flex items-start gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-xs text-primary">
+                            <ClipboardList className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
+                            Esta cotação foi convertida em Pedido de Compra.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ),
+                },
+
+                /* ── TAB ITENS ───────────────────────────── */
+                {
+                  value: "itens",
+                  label: `Itens (${viewItems.length})`,
+                  content: (
+                    <div>
+                      {viewItems.length === 0 ? (
+                        <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
+                          Nenhum item cadastrado nesta cotação.
+                        </div>
+                      ) : (
+                        <div className="rounded-lg border overflow-hidden">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="bg-muted/50 border-b">
+                                <th className="px-3 py-2 text-left text-[10px] font-semibold text-muted-foreground uppercase">#</th>
+                                <th className="px-3 py-2 text-left text-[10px] font-semibold text-muted-foreground uppercase">Produto</th>
+                                <th className="px-3 py-2 text-left text-[10px] font-semibold text-muted-foreground uppercase">Cód.</th>
+                                <th className="px-3 py-2 text-right text-[10px] font-semibold text-muted-foreground uppercase">Qtd</th>
+                                <th className="px-3 py-2 text-center text-[10px] font-semibold text-muted-foreground uppercase">Un</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {viewItems.map((item, idx) => (
+                                <tr key={item.id} className="border-b last:border-b-0 hover:bg-muted/20">
+                                  <td className="px-3 py-2 text-xs text-muted-foreground font-mono">{idx + 1}</td>
+                                  <td className="px-3 py-2 font-medium max-w-[180px]">
+                                    <span className="truncate block">{item.produtos?.nome || "—"}</span>
+                                  </td>
+                                  <td className="px-3 py-2 text-xs font-mono text-muted-foreground">
+                                    {item.produtos?.codigo_interno || item.produtos?.sku || "—"}
+                                  </td>
+                                  <td className="px-3 py-2 text-right font-mono text-xs font-semibold">{item.quantidade}</td>
+                                  <td className="px-3 py-2 text-center text-xs text-muted-foreground">{item.unidade || "UN"}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
                       )}
-                    </CardContent>
-                  </Card>
-                );
-              })}
+                    </div>
+                  ),
+                },
+
+                /* ── TAB PROPOSTAS ───────────────────────── */
+                {
+                  value: "propostas",
+                  label: `Propostas (${drawerStats.uniqueSuppliers})`,
+                  content: (
+                    <div className="space-y-4">
+                      {viewItems.length === 0 && (
+                        <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
+                          Adicione itens à cotação antes de registrar propostas.
+                        </div>
+                      )}
+                      {viewItems.map((item) => {
+                        const itemPropostas = viewPropostas.filter((p) => p.item_id === item.id);
+                        const bestPrice =
+                          itemPropostas.length > 0
+                            ? Math.min(...itemPropostas.map((p) => Number(p.preco_unitario)))
+                            : null;
+
+                        return (
+                          <Card key={item.id} className="border">
+                            <CardHeader className="py-3 px-4">
+                              <CardTitle className="text-sm flex items-center justify-between">
+                                <span>
+                                  {item.produtos?.nome || "—"}
+                                  <span className="ml-2 text-xs text-muted-foreground font-mono">
+                                    {item.produtos?.codigo_interno || item.produtos?.sku || ""}
+                                  </span>
+                                </span>
+                                <Badge variant="outline" className="font-mono shrink-0">
+                                  {item.quantidade} {item.unidade || "UN"}
+                                </Badge>
+                              </CardTitle>
+                            </CardHeader>
+                            <CardContent className="px-4 pb-3 space-y-2">
+                              {itemPropostas.length === 0 ? (
+                                <p className="text-xs text-muted-foreground italic">Nenhuma proposta cadastrada.</p>
+                              ) : (
+                                <div className="space-y-1.5">
+                                  {itemPropostas.map((p) => {
+                                    const isBest = Number(p.preco_unitario) === bestPrice;
+                                    const totalProposta = Number(p.preco_unitario) * item.quantidade;
+                                    return (
+                                      <div
+                                        key={p.id}
+                                        className={`flex items-center justify-between rounded-lg border px-3 py-2 text-sm ${
+                                          p.selecionado
+                                            ? "border-primary bg-primary/5 ring-1 ring-primary/20"
+                                            : isBest
+                                            ? "border-emerald-500/30 bg-emerald-50/50 dark:bg-emerald-950/20"
+                                            : ""
+                                        }`}
+                                      >
+                                        <div className="flex items-center gap-2 min-w-0">
+                                          {p.selecionado && <Trophy className="h-3.5 w-3.5 text-primary flex-shrink-0" />}
+                                          {isBest && !p.selecionado && (
+                                            <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">MENOR</span>
+                                          )}
+                                          <span className="truncate font-medium">{p.fornecedores?.nome_razao_social || "—"}</span>
+                                        </div>
+                                        <div className="flex items-center gap-3 flex-shrink-0">
+                                          <div className="text-right">
+                                            <p className="font-mono font-semibold">
+                                              {formatCurrency(Number(p.preco_unitario))}
+                                              <span className="text-muted-foreground">/un</span>
+                                            </p>
+                                            <p className="text-[10px] text-muted-foreground font-mono">
+                                              Total: {formatCurrency(totalProposta)}
+                                            </p>
+                                          </div>
+                                          {p.prazo_entrega_dias && (
+                                            <Badge variant="secondary" className="text-[10px]">
+                                              {p.prazo_entrega_dias}d
+                                            </Badge>
+                                          )}
+                                          <div className="flex gap-1">
+                                            {!p.selecionado &&
+                                              selected.status !== "finalizada" &&
+                                              selected.status !== "convertida" && (
+                                                <Tooltip>
+                                                  <TooltipTrigger asChild>
+                                                    <Button
+                                                      variant="ghost"
+                                                      size="icon"
+                                                      className="h-7 w-7"
+                                                      onClick={() => handleSelectProposal(p.id!, item.id)}
+                                                    >
+                                                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                                                    </Button>
+                                                  </TooltipTrigger>
+                                                  <TooltipContent>Selecionar</TooltipContent>
+                                                </Tooltip>
+                                              )}
+                                            {selected.status !== "finalizada" &&
+                                              selected.status !== "convertida" && (
+                                                <Tooltip>
+                                                  <TooltipTrigger asChild>
+                                                    <Button
+                                                      variant="ghost"
+                                                      size="icon"
+                                                      className="h-7 w-7 text-destructive"
+                                                      onClick={() => handleDeleteProposal(p.id!)}
+                                                    >
+                                                      <Trash2 className="h-3.5 w-3.5" />
+                                                    </Button>
+                                                  </TooltipTrigger>
+                                                  <TooltipContent>Remover</TooltipContent>
+                                                </Tooltip>
+                                              )}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+
+                              {/* Inline add proposal form */}
+                              {selected.status !== "finalizada" &&
+                                selected.status !== "convertida" &&
+                                selected.status !== "cancelada" && (
+                                  <>
+                                    {addingProposal === item.id ? (
+                                      <div className="rounded-lg border border-dashed p-3 space-y-3 bg-muted/30">
+                                        <div className="space-y-2">
+                                          <Label className="text-xs">Fornecedor</Label>
+                                          <AutocompleteSearch
+                                            options={fornecedorOptions}
+                                            value={proposalForm.fornecedor_id}
+                                            onChange={(id) =>
+                                              setProposalForm({ ...proposalForm, fornecedor_id: id })
+                                            }
+                                            placeholder="Selecionar fornecedor..."
+                                          />
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-2">
+                                          <div className="space-y-1">
+                                            <Label className="text-xs">Preço Unitário</Label>
+                                            <Input
+                                              type="number"
+                                              step="0.01"
+                                              value={proposalForm.preco_unitario}
+                                              onChange={(e) =>
+                                                setProposalForm({
+                                                  ...proposalForm,
+                                                  preco_unitario: Number(e.target.value),
+                                                })
+                                              }
+                                              className="h-8 font-mono"
+                                            />
+                                          </div>
+                                          <div className="space-y-1">
+                                            <Label className="text-xs">Prazo (dias)</Label>
+                                            <Input
+                                              type="number"
+                                              value={proposalForm.prazo_entrega_dias}
+                                              onChange={(e) =>
+                                                setProposalForm({
+                                                  ...proposalForm,
+                                                  prazo_entrega_dias: e.target.value,
+                                                })
+                                              }
+                                              className="h-8 font-mono"
+                                            />
+                                          </div>
+                                        </div>
+                                        <div className="space-y-1">
+                                          <Label className="text-xs">Observações</Label>
+                                          <Input
+                                            value={proposalForm.observacoes}
+                                            onChange={(e) =>
+                                              setProposalForm({
+                                                ...proposalForm,
+                                                observacoes: e.target.value,
+                                              })
+                                            }
+                                            className="h-8 text-xs"
+                                            placeholder="Condições, validade da proposta..."
+                                          />
+                                        </div>
+                                        <div className="flex gap-2">
+                                          <Button
+                                            type="button"
+                                            size="sm"
+                                            onClick={() => handleAddProposal(item.id)}
+                                            disabled={!proposalForm.fornecedor_id}
+                                          >
+                                            Salvar
+                                          </Button>
+                                          <Button
+                                            type="button"
+                                            size="sm"
+                                            variant="ghost"
+                                            onClick={() => setAddingProposal(null)}
+                                          >
+                                            Cancelar
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        className="w-full gap-1.5 text-xs"
+                                        onClick={() => {
+                                          setAddingProposal(item.id);
+                                          setProposalForm({
+                                            fornecedor_id: "",
+                                            preco_unitario: 0,
+                                            prazo_entrega_dias: "",
+                                            observacoes: "",
+                                          });
+                                        }}
+                                      >
+                                        <Plus className="h-3 w-3" /> Adicionar Proposta
+                                      </Button>
+                                    )}
+                                  </>
+                                )}
+                            </CardContent>
+                          </Card>
+                        );
+                      })}
+                    </div>
+                  ),
+                },
+
+                /* ── TAB DECISÃO ─────────────────────────── */
+                {
+                  value: "decisao",
+                  label: "Decisão",
+                  content: (
+                    <div className="space-y-4">
+                      {/* Selected supplier summary */}
+                      {drawerStats.selectedPropostas.length > 0 ? (
+                        <div>
+                          <p className="text-[10px] text-muted-foreground uppercase font-semibold mb-2">
+                            Fornecedores Selecionados
+                          </p>
+                          <div className="rounded-lg border overflow-hidden">
+                            <table className="w-full text-sm">
+                              <thead>
+                                <tr className="bg-muted/50 border-b">
+                                  <th className="px-3 py-2 text-left text-[10px] font-semibold text-muted-foreground uppercase">Produto</th>
+                                  <th className="px-3 py-2 text-left text-[10px] font-semibold text-muted-foreground uppercase">Fornecedor</th>
+                                  <th className="px-3 py-2 text-right text-[10px] font-semibold text-muted-foreground uppercase">Total</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {drawerStats.selectedPropostas.map((p) => {
+                                  const item = viewItems.find((i) => i.id === p.item_id);
+                                  return (
+                                    <tr key={p.id} className="border-b last:border-b-0 hover:bg-muted/20">
+                                      <td className="px-3 py-2 text-xs max-w-[120px]">
+                                        <span className="truncate block">{item?.produtos?.nome || "—"}</span>
+                                      </td>
+                                      <td className="px-3 py-2 text-xs font-medium max-w-[130px]">
+                                        <span className="truncate block">{p.fornecedores?.nome_razao_social || "—"}</span>
+                                      </td>
+                                      <td className="px-3 py-2 text-right font-mono text-xs font-semibold">
+                                        {item
+                                          ? formatCurrency(Number(p.preco_unitario) * item.quantidade)
+                                          : "—"}
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/5 px-3 py-3 text-xs text-warning">
+                          <AlertCircle className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
+                          Nenhum fornecedor selecionado. Acesse a aba Propostas para selecionar as melhores condições.
+                        </div>
+                      )}
+
+                      {/* Status do processo decisório */}
+                      <div>
+                        <p className="text-[10px] text-muted-foreground uppercase font-semibold mb-2">
+                          Status da Decisão
+                        </p>
+                        <div className="space-y-2 text-sm">
+                          <div className="flex items-center justify-between">
+                            <span className="text-muted-foreground">Itens com proposta selecionada</span>
+                            <span className="font-mono font-semibold">
+                              {drawerStats.selectedPropostas.length} / {viewItems.length}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-muted-foreground">Status da cotação</span>
+                            <StatusBadge
+                              status={selected.status}
+                              label={statusLabels[selected.status] || selected.status}
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Conversion info */}
+                      {selected.status === "convertida" && (
+                        <div className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-3 text-xs text-primary">
+                          <ClipboardList className="h-4 w-4 flex-shrink-0" />
+                          <span>
+                            Cotação convertida em Pedido de Compra.{" "}
+                            <button
+                              className="underline font-semibold hover:opacity-70"
+                              onClick={() => navigate("/pedidos-compra")}
+                            >
+                              Ver pedidos
+                            </button>
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Guidance for finalizable state */}
+                      {selected.status !== "finalizada" &&
+                        selected.status !== "convertida" &&
+                        selected.status !== "cancelada" &&
+                        drawerStats.allItemsHaveSelected && (
+                          <div className="flex items-start gap-2 rounded-lg border border-emerald-500/30 bg-emerald-50/50 dark:bg-emerald-950/20 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-400">
+                            <Info className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
+                            Todos os itens têm fornecedor selecionado. Pronto para finalizar.
+                          </div>
+                        )}
+                    </div>
+                  ),
+                },
+              ]
+            : undefined
+        }
+        footer={
+          selected ? (
+            <div className="flex gap-2">
+              {selected.status !== "finalizada" &&
+                selected.status !== "convertida" &&
+                selected.status !== "cancelada" &&
+                drawerStats.allItemsHaveSelected && (
+                  <Button className="flex-1 gap-2" onClick={handleFinalize}>
+                    <CheckCircle2 className="h-4 w-4" /> Finalizar Cotação
+                  </Button>
+                )}
+              {(selected.status === "finalizada" || selected.status === "convertida") && (
+                <Button
+                  className="flex-1 gap-2"
+                  variant={selected.status === "convertida" ? "outline" : "default"}
+                  onClick={gerarPedido}
+                  disabled={selected.status === "convertida"}
+                >
+                  <ClipboardList className="h-4 w-4" />
+                  {selected.status === "convertida" ? "Pedido já gerado" : "Gerar Pedido de Compra"}
+                </Button>
+              )}
             </div>
-
-            {/* Finalize button */}
-            {selected.status !== "finalizada" && selected.status !== "convertida" && selected.status !== "cancelada" && viewPropostas.some((p) => p.selecionado) && (
-              <Button className="w-full gap-2" onClick={handleFinalize}>
-                <CheckCircle2 className="h-4 w-4" /> Finalizar Cotação
-              </Button>
-            )}
-
-            {/* Generate Purchase Order button */}
-            {(selected.status === "finalizada" || selected.status === "convertida") && (
-              <Button
-                className="w-full gap-2"
-                variant={selected.status === "convertida" ? "outline" : "default"}
-                onClick={gerarPedido}
-                disabled={selected.status === "convertida"}
-              >
-                <ClipboardList className="h-4 w-4" />
-                {selected.status === "convertida" ? "Pedido já gerado" : "Gerar Pedido de Compra"}
-              </Button>
-            )}
-          </div>
-        )}
-      </ViewDrawerV2>
+          ) : undefined
+        }
+      />
 
       <ConfirmDialog
         open={deleteConfirmOpen}
