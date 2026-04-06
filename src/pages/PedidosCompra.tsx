@@ -27,11 +27,25 @@ import { useNavigate } from "react-router-dom";
 import { LogisticaRastreioSection } from "@/components/logistica/LogisticaRastreioSection";
 import { statusPedidoCompra } from "@/lib/statusSchema";
 
+// NOTE: fornecedor_id is a UUID string — pedidos_compra.fornecedor_id
+// is declared as `uuid REFERENCES public.fornecedores(id)` in the schema.
+// Supabase/PostgREST returns and expects UUID values as plain strings.
 interface PedidoCompra {
-  id: string; numero: string; fornecedor_id: string; data_pedido: string;
-  data_entrega_prevista: string; data_entrega_real: string; valor_total: number;
-  frete_valor: number; condicao_pagamento: string; status: string;
-  observacoes: string; cotacao_compra_id: string; ativo: boolean; created_at: string;
+  id: string;
+  numero: string;
+  /** UUID string — matches pedidos_compra.fornecedor_id uuid column */
+  fornecedor_id: string;
+  data_pedido: string;
+  data_entrega_prevista: string;
+  data_entrega_real: string;
+  valor_total: number;
+  frete_valor: number;
+  condicao_pagamento: string;
+  status: string;
+  observacoes: string;
+  cotacao_compra_id: string;
+  ativo: boolean;
+  created_at: string;
   fornecedores?: { nome_razao_social: string; cpf_cnpj: string };
 }
 
@@ -136,14 +150,30 @@ const PedidosCompra = () => {
     if (!form.numero) { toast.error("Número é obrigatório"); return; }
     if (!form.fornecedor_id) { toast.error("Fornecedor é obrigatório"); return; }
     setSaving(true);
+
+    // Build an explicit payload — only the columns that exist in
+    // pedidos_compra.  Avoids accidental extra fields from form state.
+    // fornecedor_id is a UUID string (pedidos_compra.fornecedor_id is
+    // declared `uuid REFERENCES fornecedores(id)` in the DB schema).
     const payload = {
-      ...form,
-      frete_valor: Number(form.frete_valor || 0),
-      valor_total: valorTotal,
+      numero: form.numero,
+      fornecedor_id: form.fornecedor_id,   // uuid string — see interface comment
+      data_pedido: form.data_pedido,
       data_entrega_prevista: form.data_entrega_prevista || null,
       data_entrega_real: form.data_entrega_real || null,
+      frete_valor: Number(form.frete_valor || 0),
       condicao_pagamento: form.condicao_pagamento || null,
+      status: form.status,
+      observacoes: form.observacoes || null,
+      valor_total: valorTotal,
     };
+
+    console.log('[pedidos_compra] pre-submit diagnostic', {
+      fornecedor_id: payload.fornecedor_id,
+      fornecedor_id_type: typeof payload.fornecedor_id,
+      payload,
+    });
+
     let pedidoId = selected?.id;
     try {
       if (mode === "create") {
