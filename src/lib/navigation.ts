@@ -119,14 +119,14 @@ export const navSections: NavSection[] = [
   },
   {
     key: 'estoque',
-    title: 'Estoque & Logística',
+    title: 'Suprimentos e Logística',
     icon: Warehouse,
     items: [
       {
         title: 'Controle',
         items: [
           { title: 'Posição Atual', path: '/estoque', keywords: ['saldo', 'inventario'] },
-          { title: 'Remessas', path: '/remessas', keywords: ['rastreio', 'entrega', 'logistica', 'correios'] },
+          { title: 'Logística', path: '/logistica', keywords: ['rastreio', 'entrega', 'logistica', 'correios'] },
         ],
       },
     ],
@@ -140,7 +140,6 @@ export const navSections: NavSection[] = [
         title: 'Execução financeira',
         items: [
           { title: 'Contas a Pagar/Receber', path: '/financeiro', keywords: ['cp', 'cr', 'despesas', 'recebimentos'] },
-          { title: 'Caixa', path: '/caixa' },
           { title: 'Fluxo de Caixa', path: '/fluxo-caixa' },
           { title: 'Contas Bancárias', path: '/contas-bancarias', keywords: ['bancos'] },
           { title: 'Plano de Contas', path: '/contas-contabeis-plano', keywords: ['contabil'] },
@@ -235,6 +234,7 @@ export const headerIcons: Record<string, LucideIcon> = {
   '/pedidos-compra': ShoppingCart,
   '/produtos': Package,
   '/estoque': Warehouse,
+  '/logistica': Truck,
   '/remessas': Truck,
   '/clientes': Users,
   '/fornecedores': Truck,
@@ -269,7 +269,8 @@ const baseRouteLabels: Record<string, string> = {
   '/pedidos-compra': 'Pedidos de Compra',
   '/produtos': 'Produtos',
   '/estoque': 'Estoque',
-  '/remessas': 'Remessas',
+  '/logistica': 'Logística',
+  '/remessas': 'Remessas (Legado)',
   '/clientes': 'Clientes',
   '/fornecedores': 'Fornecedores',
   '/transportadoras': 'Transportadoras',

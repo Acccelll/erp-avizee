@@ -25,7 +25,6 @@ const OrdensVenda = lazy(() => import("./pages/OrdensVenda"));
 const Estoque = lazy(() => import("./pages/Estoque"));
 const Fiscal = lazy(() => import("./pages/Fiscal"));
 const Financeiro = lazy(() => import("./pages/Financeiro"));
-const Caixa = lazy(() => import("./pages/Caixa"));
 const ContasBancarias = lazy(() => import("./pages/ContasBancarias"));
 const FluxoCaixa = lazy(() => import("./pages/FluxoCaixa"));
 const ContasContabeis = lazy(() => import("./pages/ContasContabeis"));
@@ -46,6 +45,7 @@ const FormasPagamento = lazy(() => import("./pages/FormasPagamento"));
 const CotacoesCompra = lazy(() => import("./pages/CotacoesCompra"));
 const PedidosCompra = lazy(() => import("./pages/PedidosCompra"));
 const Remessas = lazy(() => import("./pages/Remessas"));
+const Logistica = lazy(() => import("./pages/Logistica"));
 const Funcionarios = lazy(() => import("./pages/Funcionarios"));
 const OrcamentoPublico = lazy(() => import("./pages/OrcamentoPublico"));
 const Conciliacao = lazy(() => import("./pages/Conciliacao"));
@@ -109,6 +109,7 @@ const App = () => (
             <Route path="/compras" element={<Navigate to="/pedidos-compra" replace />} />
             <Route path="/cotacoes-compra" element={<ProtectedRoute><LazyPage><CotacoesCompra /></LazyPage></ProtectedRoute>} />
             <Route path="/pedidos-compra" element={<ProtectedRoute><LazyPage><PedidosCompra /></LazyPage></ProtectedRoute>} />
+            <Route path="/logistica" element={<ProtectedRoute><LazyPage><Logistica /></LazyPage></ProtectedRoute>} />
             <Route path="/remessas" element={<ProtectedRoute><LazyPage><Remessas /></LazyPage></ProtectedRoute>} />
             <Route path="/cotacoes" element={<Navigate to="/orcamentos" replace />} />
             <Route path="/cotacoes/novo" element={<Navigate to="/orcamentos/novo" replace />} />
@@ -123,7 +124,7 @@ const App = () => (
             <Route path="/financeiro" element={<ProtectedRoute><LazyPage><Financeiro /></LazyPage></ProtectedRoute>} />
             <Route path="/contas-bancarias" element={<ProtectedRoute><LazyPage><ContasBancarias /></LazyPage></ProtectedRoute>} />
             <Route path="/fluxo-caixa" element={<ProtectedRoute><LazyPage><FluxoCaixa /></LazyPage></ProtectedRoute>} />
-            <Route path="/caixa" element={<ProtectedRoute><LazyPage><Caixa /></LazyPage></ProtectedRoute>} />
+            <Route path="/caixa" element={<Navigate to="/financeiro" replace />} />
             <Route path="/relatorios" element={<ProtectedRoute><LazyPage><Relatorios /></LazyPage></ProtectedRoute>} />
             <Route path="/configuracoes" element={<ProtectedRoute><LazyPage><Configuracoes /></LazyPage></ProtectedRoute>} />
             <Route path="/administracao" element={<AdminRoute><LazyPage><Administracao /></LazyPage></AdminRoute>} />
