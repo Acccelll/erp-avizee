@@ -28,7 +28,7 @@ export function AppSidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMo
   const navigate = useNavigate();
   const currentRoute = `${location.pathname}${location.search}`;
   const { isAdmin } = useIsAdmin();
-  const { roles } = useAuth();
+  const { roles, can } = useAuth();
   const socialPermissions = useMemo(() => getSocialPermissionFlags(roles), [roles]);
   const alerts = useSidebarAlerts();
   const secondsSinceSync = alerts.lastUpdatedAt
@@ -52,11 +52,26 @@ export function AppSidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMo
   // Filter out admin-only sections for non-admin users
   const visibleSections = useMemo(() => {
     const withoutAdmin = isAdmin ? navSections : navSections.filter((s) => s.key !== 'administracao');
-    if (!socialPermissions.canViewModule) {
-      return withoutAdmin.filter((s) => s.key !== 'social');
-    }
-    return withoutAdmin;
-  }, [isAdmin, socialPermissions.canViewModule]);
+    const sectionResourceMap: Record<string, string> = {
+      cadastros: 'produtos',
+      comercial: 'pedidos',
+      compras: 'compras',
+      estoque: 'estoque',
+      financeiro: 'financeiro',
+      fiscal: 'faturamento_fiscal',
+      relatorios: 'relatorios',
+      administracao: 'administracao',
+      social: 'dashboard',
+    };
+
+    return withoutAdmin
+      .filter((s) => socialPermissions.canViewModule || s.key !== 'social')
+      .filter((s) => {
+        const resource = sectionResourceMap[s.key] as any;
+        if (!resource) return true;
+        return can(resource, 'visualizar');
+      });
+  }, [isAdmin, socialPermissions.canViewModule, can]);
 
   const isItemActive = (targetPath: string) => {
     const [targetBase, targetQuery] = targetPath.split('?');

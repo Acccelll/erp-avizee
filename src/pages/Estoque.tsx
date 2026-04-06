@@ -33,6 +33,10 @@ interface ProdutoPosicao {
   id: string; nome: string; sku: string; codigo_interno: string;
   unidade_medida: string; estoque_atual: number; estoque_minimo: number;
   preco_venda: number;
+  estoque_reservado?: number;
+  estoque_ideal?: number;
+  ponto_reposicao?: number;
+  ativo?: boolean;
 }
 
 const Estoque = () => {
@@ -49,6 +53,8 @@ const Estoque = () => {
   const [dataInicio, setDataInicio] = useState("");
   const [dataFim, setDataFim] = useState("");
   const [searchPosicao, setSearchPosicao] = useState("");
+  const [somenteAbaixoMinimo, setSomenteAbaixoMinimo] = useState(false);
+  const [somenteSemSaldo, setSomenteSemSaldo] = useState(false);
 
   // Produtos abaixo do mínimo
   const abaixoMinimo = useMemo(() =>
@@ -71,13 +77,16 @@ const Estoque = () => {
 
   // Posição atual
   const posicaoAtual = useMemo(() => {
-    const items = produtosCrud.data.filter((p: any) => p.ativo) as ProdutoPosicao[];
-    if (!searchPosicao) return items;
     const q = searchPosicao.toLowerCase();
-    return items.filter(p =>
-      p.nome?.toLowerCase().includes(q) || p.sku?.toLowerCase().includes(q) || p.codigo_interno?.toLowerCase().includes(q)
-    );
-  }, [produtosCrud.data, searchPosicao]);
+    return (produtosCrud.data as ProdutoPosicao[])
+      .filter((p) => Number(p.estoque_atual || 0) !== 0 || Number(p.estoque_minimo || 0) > 0)
+      .filter((p) => {
+        if (!q) return true;
+        return p.nome?.toLowerCase().includes(q) || p.sku?.toLowerCase().includes(q) || p.codigo_interno?.toLowerCase().includes(q);
+      })
+      .filter((p) => !somenteAbaixoMinimo || (Number(p.estoque_minimo || 0) > 0 && Number(p.estoque_atual || 0) <= Number(p.estoque_minimo || 0)))
+      .filter((p) => !somenteSemSaldo || Number(p.estoque_atual || 0) === 0);
+  }, [produtosCrud.data, searchPosicao, somenteAbaixoMinimo, somenteSemSaldo]);
 
   const posicaoKpis = useMemo(() => {
     const items = produtosCrud.data.filter((p: any) => p.ativo);
@@ -90,6 +99,7 @@ const Estoque = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.produto_id || !form.quantidade) { toast.error("Produto e quantidade são obrigatórios"); return; }
+    if (form.tipo === "ajuste" && !form.motivo.trim()) { toast.error("Ajuste manual exige motivo obrigatório"); return; }
     setSaving(true);
     try {
       const produto = produtosCrud.data.find((p: any) => p.id === form.produto_id);
@@ -137,11 +147,17 @@ const Estoque = () => {
     { label: "Entrada", value: "entrada" },
     { label: "Saída", value: "saida" },
     { label: "Ajuste", value: "ajuste" },
+    { label: "Transferência", value: "transferencia" },
+    { label: "Reserva", value: "reserva" },
+    { label: "Liberação de reserva", value: "liberacao_reserva" },
+    { label: "Estorno", value: "estorno" },
+    { label: "Inventário", value: "inventario" },
+    { label: "Perda/Avaria", value: "perda_avaria" },
   ];
 
   const origemLabel = (m: Movimento) => {
     if (!m.documento_tipo) return "—";
-    const labels: Record<string, string> = { manual: "Manual", fiscal: "Fiscal", compra: "Compra", venda: "Venda", ajuste: "Ajuste", estorno_fiscal: "Estorno" };
+    const labels: Record<string, string> = { manual: "Manual", fiscal: "Fiscal", compra: "Compra", venda: "Venda", ajuste: "Ajuste", estorno_fiscal: "Estorno", pedido: "Pedido", pedido_compra: "Compra", nota_fiscal: "Nota Fiscal" };
     return labels[m.documento_tipo] || m.documento_tipo;
   };
 
@@ -166,18 +182,22 @@ const Estoque = () => {
       <div><span className="font-medium">{p.nome}</span>{p.sku && <><br/><span className="text-xs text-muted-foreground font-mono">{p.sku}</span></>}</div>
     )},
     { key: "unidade", label: "Unid.", render: (p: ProdutoPosicao) => p.unidade_medida || "UN" },
-    { key: "estoque_atual", label: "Saldo", render: (p: ProdutoPosicao) => {
-      const baixo = p.estoque_minimo > 0 && Number(p.estoque_atual || 0) <= p.estoque_minimo;
-      return <span className={`font-semibold font-mono ${baixo ? "text-destructive" : ""}`}>{formatNumber(Number(p.estoque_atual || 0))}</span>;
+    { key: "estoque_atual", label: "Estoque Atual", render: (p: ProdutoPosicao) => <span className="font-semibold font-mono">{formatNumber(Number(p.estoque_atual || 0))}</span> },
+    { key: "estoque_reservado", label: "Reservado", render: (p: ProdutoPosicao) => <span className="font-mono text-muted-foreground">{formatNumber(Number(p.estoque_reservado || 0))}</span> },
+    { key: "estoque_disponivel", label: "Disponível", render: (p: ProdutoPosicao) => <span className="font-mono font-semibold">{formatNumber(Number(p.estoque_atual || 0) - Number(p.estoque_reservado || 0))}</span> },
+    { key: "estoque_minimo", label: "Mínimo", render: (p: ProdutoPosicao) => <span className="font-mono text-muted-foreground">{p.estoque_minimo > 0 ? formatNumber(p.estoque_minimo) : "—"}</span> },
+    { key: "status", label: "Status", render: (p: ProdutoPosicao) => {
+      const atual = Number(p.estoque_atual || 0);
+      const minimo = Number(p.estoque_minimo || 0);
+      const status = atual <= 0 ? "Sem estoque" : minimo > 0 && atual <= minimo ? "Abaixo do mínimo" : minimo > 0 && atual <= minimo * 1.2 ? "Em atenção" : "Normal";
+      return <StatusBadge status={status === "Normal" ? "confirmado" : status === "Em atenção" ? "pendente" : "cancelado"} label={status} />;
     }},
-    { key: "estoque_minimo", label: "Mín.", render: (p: ProdutoPosicao) => <span className="font-mono text-muted-foreground">{p.estoque_minimo > 0 ? formatNumber(p.estoque_minimo) : "—"}</span> },
-    { key: "preco_venda", label: "Preço Unit.", render: (p: ProdutoPosicao) => <span className="font-mono">{formatCurrency(Number(p.preco_venda || 0))}</span> },
     { key: "valor_estoque", label: "Valor Est.", render: (p: ProdutoPosicao) => <span className="font-mono font-medium">{formatCurrency(Number(p.estoque_atual || 0) * Number(p.preco_venda || 0))}</span> },
   ];
 
   return (
     <AppLayout>
-      <ModulePage title="Estoque" subtitle="Posição atual e histórico de movimentações" addLabel="Nova Movimentação" onAdd={() => setModalOpen(true)} count={undefined}>
+      <ModulePage title="Estoque" subtitle="Posição Atual e extrato de movimentações com rastreabilidade" addLabel="Nova Movimentação" onAdd={() => setModalOpen(true)} count={undefined}>
 
         {/* KPI Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -220,6 +240,10 @@ const Estoque = () => {
                 placeholder="Buscar produto por nome, SKU ou código..."
                 className="sm:max-w-sm"
               />
+              <div className="flex items-center gap-3">
+                <label className="text-xs flex items-center gap-1.5"><input type="checkbox" checked={somenteAbaixoMinimo} onChange={(e) => setSomenteAbaixoMinimo(e.target.checked)} />Abaixo do mínimo</label>
+                <label className="text-xs flex items-center gap-1.5"><input type="checkbox" checked={somenteSemSaldo} onChange={(e) => setSomenteSemSaldo(e.target.checked)} />Sem saldo</label>
+              </div>
               <div className="flex items-center gap-4 text-sm text-muted-foreground">
                 <span>{posicaoKpis.totalItens} produtos</span>
                 <span className="font-mono font-medium">{formatNumber(posicaoKpis.totalEstoque)} unid.</span>
@@ -289,7 +313,7 @@ const Estoque = () => {
               <Input type="number" step="0.01" value={form.quantidade} onChange={(e) => setForm({ ...form, quantidade: Number(e.target.value) })} required />
             </div>
           </div>
-          <div className="space-y-2"><Label>Motivo</Label><Textarea value={form.motivo} onChange={(e) => setForm({ ...form, motivo: e.target.value })} placeholder="Motivo da movimentação..." /></div>
+          <div className="space-y-2"><Label>Motivo {form.tipo === "ajuste" ? "*" : ""}</Label><Textarea value={form.motivo} onChange={(e) => setForm({ ...form, motivo: e.target.value })} placeholder="Motivo da movimentação..." /></div>
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={() => setModalOpen(false)}>Cancelar</Button>
             <Button type="submit" disabled={saving}>{saving ? "Salvando..." : "Registrar"}</Button>
