@@ -578,6 +578,116 @@ VALUES
 ON CONFLICT (id) DO NOTHING;
 
 -- ============================================================
+-- FASE 8.1: PEDIDOS DE COMPRA (exemplos operacionais)
+-- ============================================================
+
+INSERT INTO public.pedidos_compra (
+  id, numero, fornecedor_id, data_pedido, data_entrega_prevista, data_entrega_real,
+  valor_total, status, observacoes, usuario_id, ativo, condicao_pagamento, frete_valor
+)
+VALUES
+  (
+    'b3b3b3b3-b003-b003-b003-b00300000001',
+    'PC-EX-0001',
+    'a5a5a5a5-0005-0005-0005-000000000001',
+    '2026-03-12',
+    '2026-03-20',
+    '2026-03-20',
+    3190.00,
+    'recebido',
+    'Pedido exemplo recebido integralmente.',
+    'ffffffff-ffff-ffff-ffff-ffffffffffff',
+    true,
+    '30 dias',
+    120.00
+  ),
+  (
+    'b3b3b3b3-b003-b003-b003-b00300000002',
+    'PC-EX-0002',
+    'a5a5a5a5-0005-0005-0005-000000000002',
+    '2026-03-28',
+    '2026-04-10',
+    null,
+    2880.00,
+    'aguardando_recebimento',
+    'Pedido exemplo em aberto, aguardando recebimento do fornecedor.',
+    'ffffffff-ffff-ffff-ffff-ffffffffffff',
+    true,
+    '45 dias',
+    85.00
+  ),
+  (
+    'b3b3b3b3-b003-b003-b003-b00300000003',
+    'PC-EX-0003',
+    'a5a5a5a5-0005-0005-0005-000000000003',
+    '2026-04-03',
+    '2026-04-18',
+    null,
+    1860.00,
+    'pedido_emitido',
+    'Pedido exemplo recém emitido para acompanhamento de logística de recebimento.',
+    'ffffffff-ffff-ffff-ffff-ffffffffffff',
+    true,
+    'a_vista',
+    60.00
+  )
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.pedidos_compra_itens (
+  id, pedido_compra_id, produto_id, quantidade, valor_unitario, valor_total
+)
+VALUES
+  (
+    'b4b4b4b4-b004-b004-b004-b00400000001',
+    'b3b3b3b3-b003-b003-b003-b00300000001',
+    'a6a6a6a6-0006-0006-0006-000000000004',
+    20,
+    49.00,
+    980.00
+  ),
+  (
+    'b4b4b4b4-b004-b004-b004-b00400000002',
+    'b3b3b3b3-b003-b003-b003-b00300000001',
+    'a6a6a6a6-0006-0006-0006-000000000006',
+    40,
+    52.25,
+    2090.00
+  ),
+  (
+    'b4b4b4b4-b004-b004-b004-b00400000003',
+    'b3b3b3b3-b003-b003-b003-b00300000002',
+    'a6a6a6a6-0006-0006-0006-000000000001',
+    500,
+    2.30,
+    1150.00
+  ),
+  (
+    'b4b4b4b4-b004-b004-b004-b00400000004',
+    'b3b3b3b3-b003-b003-b003-b00300000002',
+    'a6a6a6a6-0006-0006-0006-000000000002',
+    400,
+    3.00,
+    1200.00
+  ),
+  (
+    'b4b4b4b4-b004-b004-b004-b00400000005',
+    'b3b3b3b3-b003-b003-b003-b00300000002',
+    'a6a6a6a6-0006-0006-0006-000000000003',
+    150,
+    2.97,
+    445.00
+  ),
+  (
+    'b4b4b4b4-b004-b004-b004-b00400000006',
+    'b3b3b3b3-b003-b003-b003-b00300000003',
+    'a6a6a6a6-0006-0006-0006-000000000008',
+    30,
+    60.00,
+    1800.00
+  )
+ON CONFLICT (id) DO NOTHING;
+
+-- ============================================================
 -- FASE 9: ORÇAMENTOS (cotações de venda)
 -- ============================================================
 
