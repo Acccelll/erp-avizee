@@ -49,6 +49,7 @@ const Remessas = lazy(() => import("./pages/Remessas"));
 const Funcionarios = lazy(() => import("./pages/Funcionarios"));
 const OrcamentoPublico = lazy(() => import("./pages/OrcamentoPublico"));
 const Conciliacao = lazy(() => import("./pages/Conciliacao"));
+const Social = lazy(() => import("./pages/Social"));
 
 // Redirect component that properly maps :id param
 function CotacaoIdRedirect() {
@@ -131,6 +132,7 @@ const App = () => (
             <Route path="/perfil" element={<ProtectedRoute><LazyPage><Perfil /></LazyPage></ProtectedRoute>} />
             <Route path="/contas-contabeis-plano" element={<ProtectedRoute><LazyPage><ContasContabeis /></LazyPage></ProtectedRoute>} />
             <Route path="/conciliacao" element={<ProtectedRoute><LazyPage><Conciliacao /></LazyPage></ProtectedRoute>} />
+            <Route path="/social" element={<ProtectedRoute><LazyPage><Social /></LazyPage></ProtectedRoute>} />
             <Route path="*" element={<LazyPage><NotFound /></LazyPage>} />
           </Routes>
           </ErrorBoundary>

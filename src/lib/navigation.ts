@@ -20,6 +20,7 @@ import {
   Warehouse,
   FileSearch,
   UserCog,
+  Share2,
 } from 'lucide-react';
 
 export interface NavLeafItem {
@@ -164,6 +165,21 @@ export const navSections: NavSection[] = [
       },
     ],
   },
+
+  {
+    key: 'social',
+    title: 'Social',
+    icon: Share2,
+    items: [
+      {
+        title: 'Redes sociais',
+        items: [
+          { title: 'Dashboard Social', path: '/social', keywords: ['instagram', 'linkedin', 'engajamento', 'seguidores'] },
+        ],
+      },
+    ],
+  },
+
   {
     key: 'relatorios',
     title: 'Relatórios',
@@ -233,6 +249,7 @@ export const headerIcons: Record<string, LucideIcon> = {
   '/caixa': DollarSign,
   '/contas-contabeis-plano': FileSearch,
   '/conciliacao': DollarSign,
+  '/social': Share2,
   '/fiscal': Receipt,
   '/relatorios': BarChart3,
   '/configuracoes': Settings,
@@ -266,6 +283,7 @@ const baseRouteLabels: Record<string, string> = {
   '/caixa': 'Caixa',
   '/contas-contabeis-plano': 'Plano de Contas',
   '/conciliacao': 'Conciliação',
+  '/social': 'Social',
   '/fiscal': 'Fiscal',
   '/relatorios': 'Relatórios',
   '/configuracoes': 'Configurações',
