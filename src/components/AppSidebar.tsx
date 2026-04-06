@@ -12,6 +12,8 @@ import { Button } from '@/components/ui/button';
 import { navSections, dashboardItem, isPathActive } from '@/lib/navigation';
 import { useIsAdmin } from '@/hooks/useIsAdmin';
 import { useSidebarAlerts } from '@/hooks/useSidebarAlerts';
+import { useAuth } from '@/contexts/AuthContext';
+import { getSocialPermissionFlags } from '@/types/social';
 
 interface AppSidebarProps {
   collapsed: boolean;
@@ -26,6 +28,8 @@ export function AppSidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMo
   const navigate = useNavigate();
   const currentRoute = `${location.pathname}${location.search}`;
   const { isAdmin } = useIsAdmin();
+  const { roles } = useAuth();
+  const socialPermissions = useMemo(() => getSocialPermissionFlags(roles), [roles]);
   const alerts = useSidebarAlerts();
   const secondsSinceSync = alerts.lastUpdatedAt
     ? Math.max(0, Math.floor((Date.now() - new Date(alerts.lastUpdatedAt).getTime()) / 1000))
@@ -46,10 +50,13 @@ export function AppSidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMo
   }), [alerts]);
 
   // Filter out admin-only sections for non-admin users
-  const visibleSections = useMemo(
-    () => (isAdmin ? navSections : navSections.filter((s) => s.key !== 'administracao')),
-    [isAdmin],
-  );
+  const visibleSections = useMemo(() => {
+    const withoutAdmin = isAdmin ? navSections : navSections.filter((s) => s.key !== 'administracao');
+    if (!socialPermissions.canViewModule) {
+      return withoutAdmin.filter((s) => s.key !== 'social');
+    }
+    return withoutAdmin;
+  }, [isAdmin, socialPermissions.canViewModule]);
 
   const isItemActive = (targetPath: string) => {
     const [targetBase, targetQuery] = targetPath.split('?');
