@@ -194,13 +194,14 @@ export function OrdemVendaView({ id }: Props) {
       }
 
       if (pedidoItems) {
-        for (const item of pedidoItems) {
-          const novaQtdFaturada = (item.quantidade_faturada || 0) + item.quantidade;
-          await supabase
-            .from("ordens_venda_itens")
-            .update({ quantidade_faturada: novaQtdFaturada })
-            .eq("id", item.id);
-        }
+        await Promise.all(
+          pedidoItems.map((item: any) =>
+            supabase
+              .from("ordens_venda_itens")
+              .update({ quantidade_faturada: (item.quantidade_faturada || 0) + item.quantidade })
+              .eq("id", item.id)
+          )
+        );
       }
 
       const { data: updatedItems } = await supabase
@@ -406,61 +407,57 @@ export function OrdemVendaView({ id }: Props) {
           {items.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-6">Nenhum item encontrado.</p>
           ) : (
-            <div className="rounded-lg border overflow-hidden">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-muted/50 border-b">
-                    <th className="px-2 py-2 text-left text-[10px] font-semibold text-muted-foreground">Produto</th>
-                    <th className="px-2 py-2 text-left text-[10px] font-semibold text-muted-foreground hidden sm:table-cell">Un.</th>
-                    <th className="px-2 py-2 text-right text-[10px] font-semibold text-muted-foreground">Qtd</th>
-                    <th className="px-2 py-2 text-right text-[10px] font-semibold text-muted-foreground hidden sm:table-cell">Unit.</th>
-                    <th className="px-2 py-2 text-right text-[10px] font-semibold text-muted-foreground">Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {items.map((i: any, idx: number) => (
-                    <tr key={idx} className="border-b last:border-b-0 hover:bg-muted/20">
-                      <td className="px-2 py-2">
-                        <button
-                          onClick={() => i.produtos?.id && pushView("produto", i.produtos.id)}
-                          className="text-left hover:underline block"
-                        >
-                          <span className="truncate max-w-[110px] block text-xs font-medium">
-                            {i.produtos?.nome || i.descricao_snapshot || "—"}
-                          </span>
-                          {i.produtos?.sku && (
-                            <span className="text-[10px] text-muted-foreground font-mono">{i.produtos.sku}</span>
-                          )}
-                          {i.variacao && (
-                            <span className="text-[10px] text-muted-foreground"> · {i.variacao}</span>
-                          )}
-                        </button>
-                      </td>
-                      <td className="px-2 py-2 text-xs text-muted-foreground hidden sm:table-cell">
-                        {i.unidade || "—"}
-                      </td>
-                      <td className="px-2 py-2 text-right font-mono text-xs">{i.quantidade}</td>
-                      <td className="px-2 py-2 text-right font-mono text-xs hidden sm:table-cell">
-                        {formatCurrency(i.valor_unitario)}
-                      </td>
-                      <td className="px-2 py-2 text-right font-mono text-xs font-medium">
-                        {formatCurrency(i.valor_total)}
-                      </td>
+            <>
+              <div className="rounded-lg border overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-muted/50 border-b">
+                      <th className="px-2 py-2 text-left text-[10px] font-semibold text-muted-foreground">Produto</th>
+                      <th className="px-2 py-2 text-left text-[10px] font-semibold text-muted-foreground hidden sm:table-cell">Un.</th>
+                      <th className="px-2 py-2 text-right text-[10px] font-semibold text-muted-foreground">Qtd</th>
+                      <th className="px-2 py-2 text-right text-[10px] font-semibold text-muted-foreground hidden sm:table-cell">Unit.</th>
+                      <th className="px-2 py-2 text-right text-[10px] font-semibold text-muted-foreground">Total</th>
                     </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr className="bg-muted/30 border-t">
-                    <td colSpan={4} className="px-2 py-2 text-right text-[10px] font-semibold text-muted-foreground uppercase sm:table-cell">
-                      Total do Pedido
-                    </td>
-                    <td className="px-2 py-2 text-right font-mono text-sm font-bold text-primary">
-                      {formatCurrency(selected.valor_total || 0)}
-                    </td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {items.map((i: any, idx: number) => (
+                      <tr key={idx} className="border-b last:border-b-0 hover:bg-muted/20">
+                        <td className="px-2 py-2">
+                          <button
+                            onClick={() => i.produtos?.id && pushView("produto", i.produtos.id)}
+                            className="text-left hover:underline block"
+                          >
+                            <span className="truncate max-w-[110px] block text-xs font-medium">
+                              {i.produtos?.nome || i.descricao_snapshot || "—"}
+                            </span>
+                            {i.produtos?.sku && (
+                              <span className="text-[10px] text-muted-foreground font-mono">{i.produtos.sku}</span>
+                            )}
+                            {i.variacao && (
+                              <span className="text-[10px] text-muted-foreground"> · {i.variacao}</span>
+                            )}
+                          </button>
+                        </td>
+                        <td className="px-2 py-2 text-xs text-muted-foreground hidden sm:table-cell">
+                          {i.unidade || "—"}
+                        </td>
+                        <td className="px-2 py-2 text-right font-mono text-xs">{i.quantidade}</td>
+                        <td className="px-2 py-2 text-right font-mono text-xs hidden sm:table-cell">
+                          {formatCurrency(i.valor_unitario)}
+                        </td>
+                        <td className="px-2 py-2 text-right font-mono text-xs font-medium">
+                          {formatCurrency(i.valor_total)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="flex justify-between items-center rounded-lg border bg-muted/30 px-3 py-2">
+                <span className="text-[10px] font-semibold text-muted-foreground uppercase">Total do Pedido</span>
+                <span className="font-mono text-sm font-bold text-primary">{formatCurrency(selected.valor_total || 0)}</span>
+              </div>
+            </>
           )}
         </TabsContent>
 
