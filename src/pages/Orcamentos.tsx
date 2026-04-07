@@ -33,13 +33,14 @@ interface Orcamento {
 }
 
 const TERMINAL_STATUSES = ["convertido", "cancelado", "rejeitado"];
+const PROXIMA_VENCER_DIAS = 7;
 
 function getValidadeStatus(validade: string | null, status: string): "vencida" | "proxima" | "vigente" | "sem_validade" {
   if (!validade) return "sem_validade";
   if (TERMINAL_STATUSES.includes(status)) return "vigente";
   const daysLeft = calculateDaysBetween(new Date(), validade);
   if (daysLeft < 0) return "vencida";
-  if (daysLeft <= 7) return "proxima";
+  if (daysLeft <= PROXIMA_VENCER_DIAS) return "proxima";
   return "vigente";
 }
 
@@ -235,7 +236,10 @@ const Orcamentos = () => {
     },
     {
       key: "pagamento", label: "Pagamento", hidden: true,
-      render: (o: Orcamento) => <span className="text-xs text-muted-foreground">{o.pagamento || o.prazo_pagamento || "—"}</span>,
+      render: (o: Orcamento) => {
+        const parts = [o.pagamento, o.prazo_pagamento].filter(Boolean);
+        return <span className="text-xs text-muted-foreground">{parts.length > 0 ? parts.join(" · ") : "—"}</span>;
+      },
     },
     {
       key: "prazo_entrega", label: "Prazo Entrega", hidden: true,
@@ -273,7 +277,7 @@ const Orcamentos = () => {
 
   const validadeOptions: MultiSelectOption[] = [
     { label: "Vencidas", value: "vencida" },
-    { label: "Próximas a vencer (≤7d)", value: "proxima" },
+    { label: `Próximas a vencer (≤${PROXIMA_VENCER_DIAS}d)`, value: "proxima" },
     { label: "Vigentes", value: "vigente" },
   ];
 
