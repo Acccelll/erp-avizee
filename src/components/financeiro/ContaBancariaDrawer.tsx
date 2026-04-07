@@ -297,7 +297,7 @@ export function ContaBancariaDrawer({
       <>
         <ViewDrawerV2
           open={open}
-          onClose={() => { cancelEdit(); onClose(); }}
+          onClose={onClose}
           title={`Editando: ${selected.descricao}`}
           subtitle={
             <span className="flex items-center gap-1">
@@ -540,8 +540,8 @@ export function ContaBancariaDrawer({
               </AlertDialogCancel>
               <AlertDialogAction
                 onClick={async () => {
-                  setConfirmInactivate(false);
                   await persistSave();
+                  setConfirmInactivate(false);
                 }}
                 className="bg-amber-600 hover:bg-amber-700 text-white"
               >
