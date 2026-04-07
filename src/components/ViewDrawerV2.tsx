@@ -1,8 +1,6 @@
 import { ReactNode } from "react";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Separator } from "@/components/ui/separator";
-import { cn } from "@/lib/utils";
 
 interface ViewDrawerV2Props {
   open: boolean;
@@ -21,25 +19,29 @@ interface ViewDrawerV2Props {
 export function ViewDrawerV2({
   open, onClose, title, subtitle, children, badge, actions, summary, tabs, defaultTab, footer,
 }: ViewDrawerV2Props) {
+  const hasContextBlock = Boolean(subtitle) || Boolean(summary);
+
   return (
     <Sheet open={open} onOpenChange={onClose}>
       <SheetContent className="w-full sm:max-w-xl overflow-y-auto p-0 flex flex-col">
         <SheetHeader className="sticky top-0 z-10 bg-card border-b px-6 py-4">
           <div className="flex items-center justify-between gap-3">
-            <div className="flex flex-col min-w-0">
-              <div className="flex items-center gap-3 min-w-0">
-                <SheetTitle className="text-lg truncate leading-tight">{title}</SheetTitle>
-                <SheetDescription className="sr-only">Visualização detalhada de {title}</SheetDescription>
-                {badge}
-              </div>
-              {subtitle && <p className="text-xs text-muted-foreground truncate mt-0.5">{subtitle}</p>}
+            <div className="flex items-center gap-3 min-w-0">
+              <SheetTitle className="text-lg truncate leading-tight">{title}</SheetTitle>
+              <SheetDescription className="sr-only">Visualização detalhada de {title}</SheetDescription>
+              {badge}
             </div>
             {actions && <div className="flex items-center gap-1 shrink-0">{actions}</div>}
           </div>
         </SheetHeader>
 
-        {summary && (
-          <div className="px-6 pt-4 pb-2">{summary}</div>
+        {hasContextBlock && (
+          <div className="border-b px-6 py-3 space-y-3 bg-muted/20">
+            {subtitle && (
+              <p className="text-xs text-muted-foreground leading-relaxed">{subtitle}</p>
+            )}
+            {summary}
+          </div>
         )}
 
         <div className="flex-1 px-6 py-4">
