@@ -365,8 +365,16 @@ const Clientes = () => {
           />
         </AdvancedFilterBar>
 
-        <DataTable columns={columns} data={filteredData} loading={loading}
-        onView={openView} onEdit={openEdit} onDelete={(c) => remove(c.id)} />
+        <DataTable
+          columns={columns}
+          data={filteredData}
+          loading={loading}
+          moduleKey="clientes"
+          showColumnToggle={true}
+          onView={openView}
+          onEdit={openEdit}
+          onDelete={(c) => remove(c.id)}
+        />
       </ModulePage>
 
       <FormModal open={modalOpen} onClose={() => {
