@@ -26,7 +26,9 @@ import {
   Clock,
   CheckCircle2,
   Truck,
+  XCircle,
 } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 import { AutocompleteSearch } from "@/components/ui/AutocompleteSearch";
 import { ItemsGrid, type GridItem } from "@/components/ui/ItemsGrid";
 import { Button } from "@/components/ui/button";
@@ -571,6 +573,21 @@ const PedidosCompra = () => {
     }
   };
 
+  const cancelarPedido = async (p: PedidoCompra) => {
+    try {
+      await (supabase.from as any)("pedidos_compra")
+        .update({ status: "cancelado" })
+        .eq("id", p.id);
+
+      toast.success("Pedido de compra cancelado.");
+      setDrawerOpen(false);
+      await refreshAll();
+    } catch (err: any) {
+      console.error("[cancelarPedido]", err);
+      toast.error("Erro ao cancelar pedido.");
+    }
+  };
+
   const columns = [
     {
       key: "id",
@@ -817,6 +834,20 @@ const PedidosCompra = () => {
             secondary: "text-muted-foreground",
           };
 
+          // Per-item receipt progress (cross-reference items × stock movements)
+          const estoquePorProduto: Record<string, number> = viewEstoque.reduce(
+            (acc: Record<string, number>, m: any) => {
+              const key = String(m.produto_id);
+              acc[key] = (acc[key] || 0) + Number(m.quantidade || 0);
+              return acc;
+            },
+            {},
+          );
+          const totalOrdenado = viewItems.reduce((s: number, i: any) => s + Number(i.quantidade || 0), 0);
+          const totalRecebido = viewEstoque.reduce((s: number, m: any) => s + Number(m.quantidade || 0), 0);
+          const pctRecebimento =
+            totalOrdenado > 0 ? Math.min(100, Math.round((totalRecebido / totalOrdenado) * 100)) : 0;
+
           const tabResumo = (
             <div className="space-y-5">
               {isOverdue && (
@@ -897,24 +928,36 @@ const PedidosCompra = () => {
                             Vlr. Unit.
                           </th>
                           <th className="px-3 py-2 text-right text-xs font-semibold text-muted-foreground">Total</th>
+                          <th className="px-3 py-2 text-right text-xs font-semibold text-muted-foreground text-success">Rec.</th>
+                          <th className="px-3 py-2 text-right text-xs font-semibold text-muted-foreground text-warning">Pend.</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {viewItems.map((i: any, idx: number) => (
-                          <tr key={idx} className="border-b last:border-b-0 hover:bg-muted/20">
-                            <td className="px-3 py-2 font-medium">{i.produtos?.nome || "—"}</td>
-                            <td className="px-3 py-2 text-xs text-muted-foreground font-mono hidden sm:table-cell">
-                              {i.produtos?.codigo_interno || "—"}
-                            </td>
-                            <td className="px-3 py-2 text-right font-mono">{i.quantidade}</td>
-                            <td className="px-3 py-2 text-right font-mono text-muted-foreground text-xs">
-                              {formatCurrency(Number(i.valor_unitario))}
-                            </td>
-                            <td className="px-3 py-2 text-right font-mono font-medium">
-                              {formatCurrency(Number(i.valor_total))}
-                            </td>
-                          </tr>
-                        ))}
+                        {viewItems.map((i: any, idx: number) => {
+                          const qtdRec = estoquePorProduto[String(i.produto_id)] || 0;
+                          const qtdPend = Math.max(0, Number(i.quantidade) - qtdRec);
+                          return (
+                            <tr key={idx} className="border-b last:border-b-0 hover:bg-muted/20">
+                              <td className="px-3 py-2 font-medium">{i.produtos?.nome || "—"}</td>
+                              <td className="px-3 py-2 text-xs text-muted-foreground font-mono hidden sm:table-cell">
+                                {i.produtos?.codigo_interno || "—"}
+                              </td>
+                              <td className="px-3 py-2 text-right font-mono">{i.quantidade}</td>
+                              <td className="px-3 py-2 text-right font-mono text-muted-foreground text-xs">
+                                {formatCurrency(Number(i.valor_unitario))}
+                              </td>
+                              <td className="px-3 py-2 text-right font-mono font-medium">
+                                {formatCurrency(Number(i.valor_total))}
+                              </td>
+                              <td className="px-3 py-2 text-right font-mono text-xs text-success font-medium">
+                                {qtdRec > 0 ? qtdRec : "—"}
+                              </td>
+                              <td className="px-3 py-2 text-right font-mono text-xs text-warning font-medium">
+                                {qtdPend > 0 ? qtdPend : "—"}
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                       <tfoot>
                         <tr className="bg-muted/30 border-t">
@@ -926,6 +969,7 @@ const PedidosCompra = () => {
                               viewItems.reduce((s: number, i: any) => s + Number(i.valor_total || 0), 0),
                             )}
                           </td>
+                          <td colSpan={2} />
                         </tr>
                       </tfoot>
                     </table>
@@ -962,12 +1006,53 @@ const PedidosCompra = () => {
                   {selected.status === "cancelado" && (
                     <AlertCircle className="h-5 w-5 text-destructive shrink-0" />
                   )}
-                  <div>
+                  <div className="flex-1 min-w-0">
                     <p className="font-semibold text-sm">{recebimentoStatus.label}</p>
                     <p className="text-xs text-muted-foreground">{statusLabels[selected.status] || selected.status}</p>
                   </div>
+                  {pctRecebimento > 0 && (
+                    <span
+                      className={`text-sm font-bold font-mono shrink-0 ${pctRecebimento === 100 ? "text-success" : "text-warning"}`}
+                    >
+                      {pctRecebimento}%
+                    </span>
+                  )}
                 </div>
+                {pctRecebimento > 0 && (
+                  <Progress value={pctRecebimento} className="h-1.5 mt-3" />
+                )}
               </div>
+
+              {viewItems.length > 0 && (
+                <ViewSection title="Progresso por Item">
+                  <div className="space-y-3">
+                    {viewItems.map((i: any, idx: number) => {
+                      const qtdRec = estoquePorProduto[String(i.produto_id)] || 0;
+                      const qtdPend = Math.max(0, Number(i.quantidade) - qtdRec);
+                      const pct =
+                        Number(i.quantidade) > 0
+                          ? Math.min(100, Math.round((qtdRec / Number(i.quantidade)) * 100))
+                          : 0;
+                      return (
+                        <div key={idx} className="space-y-1">
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="font-medium truncate max-w-[200px]">{i.produtos?.nome || "—"}</span>
+                            <span className="font-mono text-muted-foreground shrink-0 ml-2 flex items-center gap-1">
+                              <span className="text-success font-medium">{qtdRec}</span>
+                              <span>/</span>
+                              <span>{i.quantidade}</span>
+                              {qtdPend > 0 && (
+                                <span className="text-warning ml-1">({qtdPend} pend.)</span>
+                              )}
+                            </span>
+                          </div>
+                          <Progress value={pct} className="h-1" />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </ViewSection>
+              )}
 
               {(selected.data_entrega_prevista || selected.data_entrega_real) && (
                 <ViewSection title="Datas de Entrega">
@@ -1177,34 +1262,46 @@ const PedidosCompra = () => {
 
           const canReceive = ["aprovado", "enviado_ao_fornecedor", "aguardando_recebimento", "parcialmente_recebido"].includes(selected.status);
           const canSend = selected.status === "aprovado";
+          const canCancel = ["rascunho", "aprovado", "enviado_ao_fornecedor", "aguardando_recebimento"].includes(selected.status);
 
           const drawerFooter =
-            canReceive || canSend ? (
+            canReceive || canSend || canCancel ? (
               <div className="flex gap-2 w-full">
-                {canSend && (
+                {canCancel && (
                   <Button
                     variant="outline"
-                    className="flex-1 gap-2"
-                    onClick={() => {
-                      marcarEnviado(selected);
-                      setSelected({ ...selected, status: "enviado_ao_fornecedor" });
-                    }}
+                    className="gap-2 text-destructive border-destructive/30 hover:bg-destructive/10"
+                    onClick={() => cancelarPedido(selected)}
                   >
-                    <SendHorizontal className="w-4 h-4" /> Marcar como Enviado
+                    <XCircle className="w-4 h-4" /> Cancelar
                   </Button>
                 )}
+                <div className="flex gap-2 flex-1 justify-end">
+                  {canSend && (
+                    <Button
+                      variant="outline"
+                      className="gap-2"
+                      onClick={() => {
+                        marcarEnviado(selected);
+                        setSelected({ ...selected, status: "enviado_ao_fornecedor" });
+                      }}
+                    >
+                      <SendHorizontal className="w-4 h-4" /> Marcar como Enviado
+                    </Button>
+                  )}
 
-                {canReceive && (
-                  <Button
-                    className="flex-1 gap-2"
-                    onClick={() => {
-                      setDrawerOpen(false);
-                      darEntrada(selected);
-                    }}
-                  >
-                    <PackageCheck className="w-4 h-4" /> Registrar Recebimento
-                  </Button>
-                )}
+                  {canReceive && (
+                    <Button
+                      className="gap-2"
+                      onClick={() => {
+                        setDrawerOpen(false);
+                        darEntrada(selected);
+                      }}
+                    >
+                      <PackageCheck className="w-4 h-4" /> Registrar Recebimento
+                    </Button>
+                  )}
+                </div>
               </div>
             ) : undefined;
 
@@ -1213,6 +1310,7 @@ const PedidosCompra = () => {
               open={drawerOpen}
               onClose={() => setDrawerOpen(false)}
               title={pedidoNumero(selected)}
+              subtitle={`${selected.fornecedores?.nome_razao_social || "Fornecedor não informado"} · ${formatDate(selected.data_pedido)}`}
               badge={<StatusBadge status={selected.status} label={statusLabels[selected.status] || selected.status} />}
               actions={
                 <>
@@ -1263,9 +1361,19 @@ const PedidosCompra = () => {
                   </div>
                   <div className="bg-accent/30 rounded-lg p-3 text-center">
                     <p className="text-xs text-muted-foreground">Recebimento</p>
-                    <p className={`font-semibold text-xs leading-tight mt-0.5 ${recebimentoColorClass[recebimentoStatus.color] ?? "text-muted-foreground"}`}>
-                      {recebimentoStatus.label}
-                    </p>
+                    {pctRecebimento > 0 ? (
+                      <p
+                        className={`font-semibold text-sm font-mono mt-0.5 ${pctRecebimento === 100 ? "text-success" : "text-warning"}`}
+                      >
+                        {pctRecebimento}%
+                      </p>
+                    ) : (
+                      <p
+                        className={`font-semibold text-xs leading-tight mt-0.5 ${recebimentoColorClass[recebimentoStatus.color] ?? "text-muted-foreground"}`}
+                      >
+                        {recebimentoStatus.label}
+                      </p>
+                    )}
                   </div>
                   <div className="bg-accent/30 rounded-lg p-3 text-center">
                     <p className="text-xs text-muted-foreground">Total</p>
