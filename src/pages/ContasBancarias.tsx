@@ -3,9 +3,7 @@ import { AppLayout } from "@/components/AppLayout";
 import { ModulePage } from "@/components/ModulePage";
 import { DataTable } from "@/components/DataTable";
 import { FormModal } from "@/components/FormModal";
-import { ViewDrawer } from "@/components/ViewDrawer";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Edit, Trash2 } from "lucide-react";
+import { ContaBancariaDrawer } from "@/components/financeiro/ContaBancariaDrawer";
 import { SummaryCard } from "@/components/SummaryCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { formatCurrency } from "@/lib/format";
 import { supabase } from "@/integrations/supabase/client";
-import { Wallet, Landmark, CreditCard, Building2 } from "lucide-react";
+import { Wallet, Landmark } from "lucide-react";
 
 interface Banco { id: string; nome: string; tipo: string; ativo: boolean; }
 interface ContaBancaria {
@@ -150,49 +148,13 @@ const ContasBancarias = () => {
         </form>
       </FormModal>
 
-      <ViewDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} title="Detalhes da Conta"
-        actions={selected ? <>
-          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setDrawerOpen(false); openEdit(selected); }}><Edit className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Editar</TooltipContent></Tooltip>
-          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => { setDrawerOpen(false); handleDelete(selected); }}><Trash2 className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Excluir</TooltipContent></Tooltip>
-        </> : undefined}
-      >
-        {selected && (
-          <div className="space-y-5">
-            {/* Header with identity */}
-            <div>
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="font-semibold text-lg truncate">{selected.descricao}</h3>
-                </div>
-                <p className="text-sm text-muted-foreground truncate">{selected.bancos?.nome}</p>
-              </div>
-            </div>
-
-            {/* KPI Card - Saldo */}
-            <div className="rounded-lg border bg-card p-5 text-center space-y-1">
-              <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Saldo Atual</p>
-              <p className={`font-mono font-bold text-2xl ${Number(selected.saldo_atual || 0) >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"}`}>
-                {formatCurrency(Number(selected.saldo_atual || 0))}
-              </p>
-            </div>
-
-            {/* Details */}
-            <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-              {[
-                { label: "Agência", value: selected.agencia, mono: true },
-                { label: "Conta", value: selected.conta, mono: true },
-                { label: "Titular", value: selected.titular },
-                { label: "Banco", value: selected.bancos?.nome },
-              ].map((field, i) => (
-                <div key={i}>
-                  <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-0.5">{field.label}</p>
-                  <p className={`text-sm ${field.mono ? "font-mono" : ""}`}>{field.value || "—"}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </ViewDrawer>
+      <ContaBancariaDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        selected={selected}
+        onEdit={(c) => openEdit(c)}
+        onDelete={(c) => handleDelete(c)}
+      />
     </AppLayout>
   );
 };
