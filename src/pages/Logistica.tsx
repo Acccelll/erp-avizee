@@ -10,6 +10,8 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { formatNumber } from "@/lib/format";
+import { EntregaDrawer } from "@/components/logistica/EntregaDrawer";
+import { Eye } from "lucide-react";
 
 type Entrega = {
   id: string;
@@ -71,6 +73,7 @@ export default function Logistica() {
   const [loading, setLoading] = useState(true);
   const [entregas, setEntregas] = useState<Entrega[]>([]);
   const [recebimentos, setRecebimentos] = useState<Recebimento[]>([]);
+  const [selectedEntrega, setSelectedEntrega] = useState<Entrega | null>(null);
 
   const canEdit = can("logistica", "editar");
 
@@ -207,14 +210,21 @@ export default function Logistica() {
     {
       key: "acoes",
       label: "Ações",
-      render: (item: Entrega) => canEdit ? (
-        <Select value={item.status_logistico} onValueChange={(value) => updateEntregaStatus(item, value)}>
-          <SelectTrigger className="h-8 w-[180px] text-xs"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            {entregaStatusOptions.map((status) => <SelectItem key={status} value={status}>{statusLabel(status)}</SelectItem>)}
-          </SelectContent>
-        </Select>
-      ) : <span className="text-xs text-muted-foreground">Somente visualização</span>,
+      render: (item: Entrega) => (
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => setSelectedEntrega(item)}>
+            <Eye className="h-3.5 w-3.5" />Ver entrega
+          </Button>
+          {canEdit ? (
+            <Select value={item.status_logistico} onValueChange={(value) => updateEntregaStatus(item, value)}>
+              <SelectTrigger className="h-8 w-[180px] text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {entregaStatusOptions.map((status) => <SelectItem key={status} value={status}>{statusLabel(status)}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          ) : <span className="text-xs text-muted-foreground">Somente visualização</span>}
+        </div>
+      ),
     },
   ];
 
@@ -270,6 +280,12 @@ export default function Logistica() {
           </TabsContent>
         </Tabs>
       </ModulePage>
+
+      <EntregaDrawer
+        open={!!selectedEntrega}
+        onClose={() => setSelectedEntrega(null)}
+        entrega={selectedEntrega}
+      />
     </AppLayout>
   );
 }
