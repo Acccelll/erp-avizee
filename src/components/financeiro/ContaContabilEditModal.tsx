@@ -198,8 +198,6 @@ export function ContaContabilEditModal({
   const hasFilhasWarning =
     isEdit && filhasCount > 0 && aceitaLancamento;
   const inativarComVinculos = isEdit && !ativo && conta?.ativo && totalVinculos > 0;
-  const coerenciaLancamento =
-    isEdit && filhasCount > 0 && aceitaLancamento;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
