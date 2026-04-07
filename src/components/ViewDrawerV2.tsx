@@ -8,6 +8,7 @@ interface ViewDrawerV2Props {
   open: boolean;
   onClose: () => void;
   title: string;
+  subtitle?: ReactNode;
   children?: ReactNode;
   badge?: ReactNode;
   actions?: ReactNode;
@@ -18,17 +19,20 @@ interface ViewDrawerV2Props {
 }
 
 export function ViewDrawerV2({
-  open, onClose, title, children, badge, actions, summary, tabs, defaultTab, footer,
+  open, onClose, title, subtitle, children, badge, actions, summary, tabs, defaultTab, footer,
 }: ViewDrawerV2Props) {
   return (
     <Sheet open={open} onOpenChange={onClose}>
       <SheetContent className="w-full sm:max-w-xl overflow-y-auto p-0 flex flex-col">
         <SheetHeader className="sticky top-0 z-10 bg-card border-b px-6 py-4">
           <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3 min-w-0">
-              <SheetTitle className="text-lg truncate">{title}</SheetTitle>
-              <SheetDescription className="sr-only">Visualização detalhada de {title}</SheetDescription>
-              {badge}
+            <div className="flex flex-col min-w-0">
+              <div className="flex items-center gap-3 min-w-0">
+                <SheetTitle className="text-lg truncate leading-tight">{title}</SheetTitle>
+                <SheetDescription className="sr-only">Visualização detalhada de {title}</SheetDescription>
+                {badge}
+              </div>
+              {subtitle && <p className="text-xs text-muted-foreground truncate mt-0.5">{subtitle}</p>}
             </div>
             {actions && <div className="flex items-center gap-1 shrink-0">{actions}</div>}
           </div>
