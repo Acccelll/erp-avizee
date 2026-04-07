@@ -5,7 +5,7 @@ import { DataTable } from "@/components/DataTable";
 import { StatusBadge } from "@/components/StatusBadge";
 import { SummaryCard } from "@/components/SummaryCard";
 import { FormModal } from "@/components/FormModal";
-import { ViewDrawer } from "@/components/ViewDrawer";
+import { EstoqueMovimentacaoDrawer } from "@/components/estoque/EstoqueMovimentacaoDrawer";
 import { EstoquePosicaoDrawer } from "@/components/estoque/EstoquePosicaoDrawer";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -27,6 +27,7 @@ interface Movimento {
   id: string; produto_id: string; tipo: string; quantidade: number;
   saldo_anterior: number; saldo_atual: number; motivo: string;
   documento_tipo: string; documento_id: string; created_at: string;
+  usuario_id?: string | null;
   produtos?: { nome: string; sku: string };
 }
 
@@ -325,24 +326,11 @@ const Estoque = () => {
         </form>
       </FormModal>
 
-      <ViewDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} title="Detalhes da Movimentação">
-        {selected && (
-          <div className="space-y-3">
-            <div><span className="text-xs text-muted-foreground">Produto</span><p className="font-medium">{(selected as any).produtos?.nome}</p></div>
-            <div className="grid grid-cols-2 gap-4">
-              <div><span className="text-xs text-muted-foreground">Tipo</span><p className="capitalize">{selected.tipo}</p></div>
-              <div><span className="text-xs text-muted-foreground">Origem</span><p>{origemLabel(selected)}</p></div>
-            </div>
-            <div><span className="text-xs text-muted-foreground">Quantidade</span><p className="font-mono">{selected.quantidade}</p></div>
-            <div className="grid grid-cols-2 gap-4">
-              <div><span className="text-xs text-muted-foreground">Saldo Anterior</span><p className="font-mono">{selected.saldo_anterior}</p></div>
-              <div><span className="text-xs text-muted-foreground">Saldo Atual</span><p className="font-semibold font-mono">{selected.saldo_atual}</p></div>
-            </div>
-            <div><span className="text-xs text-muted-foreground">Motivo</span><p>{selected.motivo || "—"}</p></div>
-            <div><span className="text-xs text-muted-foreground">Data</span><p>{new Date(selected.created_at).toLocaleString("pt-BR")}</p></div>
-          </div>
-        )}
-      </ViewDrawer>
+      <EstoqueMovimentacaoDrawer
+        open={drawerOpen}
+        onClose={() => { setDrawerOpen(false); setSelected(null); }}
+        movimentacao={selected}
+      />
 
       <EstoquePosicaoDrawer
         open={posicaoDrawerOpen}
