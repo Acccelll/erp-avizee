@@ -417,17 +417,11 @@ const Produtos = () => {
     });
 
     estoqueFilters.forEach(f => {
-      const estoqueLabels: Record<string, string> = {
-        zerado: "Sem estoque",
-        critico: "Abaixo do mínimo",
-        atencao: "Em atenção",
-        normal: "Normal",
-      };
       chips.push({
         key: "estoque",
         label: "Estoque",
         value: [f],
-        displayValue: estoqueLabels[f] || f,
+        displayValue: situacaoEstoqueConfig[f as SituacaoEstoque]?.label ?? f,
       });
     });
 
