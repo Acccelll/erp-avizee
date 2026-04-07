@@ -24,9 +24,11 @@ import { toast } from "sonner";
 import {
   Search, User2, Phone, ShoppingCart, MapPin,
   Info, Loader2, Calendar, Mail, CheckCircle2, Handshake, BadgeCheck, Package,
+  Truck, Users, UserCheck,
 } from "lucide-react";
 import { formatDate, formatCurrency } from "@/lib/format";
 import { clienteFornecedorSchema, validateForm } from "@/lib/validationSchemas";
+import { StatCard } from "@/components/StatCard";
 
 const MAX_OBSERVACOES_LENGTH = 2000;
 const MAX_PRAZO_DAYS = 365;
@@ -85,6 +87,7 @@ const Fornecedores = () => {
   const [isDirty, setIsDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [tipoFilters, setTipoFilters] = useState<string[]>([]);
+  const [ativoFilters, setAtivoFilters] = useState<string[]>([]);
   const [modalProdutosForn, setModalProdutosForn] = useState<Array<{
     id: string; produto_nome: string; preco_compra: number | null;
     lead_time_dias: number | null; eh_principal: boolean | null;
@@ -188,17 +191,65 @@ const Fornecedores = () => {
     // Text search is now server-side; only apply local dropdown filters
     return data.filter((fornecedor) => {
       if (tipoFilters.length > 0 && !tipoFilters.includes(fornecedor.tipo_pessoa)) return false;
+      if (ativoFilters.length > 0) {
+        const status = fornecedor.ativo ? "ativo" : "inativo";
+        if (!ativoFilters.includes(status)) return false;
+      }
       return true;
     });
-  }, [data, tipoFilters]);
+  }, [data, tipoFilters, ativoFilters]);
 
   const columns = [
-  { key: "nome_razao_social", label: "Razão Social", sortable: true },
-  { key: "cpf_cnpj", label: "CNPJ", render: (f: Fornecedor) => <span className="font-mono text-xs">{f.cpf_cnpj || "—"}</span> },
-  { key: "email", label: "E-mail", sortable: true },
-  { key: "telefone", label: "Telefone" },
-  { key: "cidade", label: "Cidade", sortable: true, render: (f: Fornecedor) => f.cidade ? `${f.cidade}/${f.uf}` : "—" },
-  { key: "ativo", label: "Status", render: (f: Fornecedor) => <StatusBadge status={f.ativo ? "Ativo" : "Inativo"} /> }];
+  {
+    key: "nome_razao_social", label: "Nome / Razão Social", sortable: true,
+    render: (f: Fornecedor) => (
+      <div>
+        <p className="font-medium leading-tight">{f.nome_razao_social}</p>
+        {f.nome_fantasia && f.nome_fantasia !== f.nome_razao_social && (
+          <p className="text-xs text-muted-foreground truncate max-w-xs">{f.nome_fantasia}</p>
+        )}
+      </div>
+    ),
+  },
+  {
+    key: "cpf_cnpj", label: "CPF / CNPJ",
+    render: (f: Fornecedor) => <span className="font-mono text-xs">{f.cpf_cnpj || "—"}</span>,
+  },
+  {
+    key: "tipo_pessoa", label: "Tipo",
+    render: (f: Fornecedor) => (
+      <span className={`text-xs font-semibold ${f.tipo_pessoa === "F" ? "text-blue-600 dark:text-blue-400" : "text-violet-600 dark:text-violet-400"}`}>
+        {f.tipo_pessoa === "F" ? "PF" : "PJ"}
+      </span>
+    ),
+  },
+  {
+    key: "contato_principal", label: "Contato",
+    render: (f: Fornecedor) => {
+      const phone = f.celular || f.telefone;
+      if (!phone && !f.email) return <span className="text-muted-foreground text-xs">—</span>;
+      return (
+        <div className="text-xs space-y-0.5">
+          {phone && <p className="font-medium tabular-nums">{phone}</p>}
+          {f.email && <p className="text-muted-foreground truncate max-w-xs">{f.email}</p>}
+        </div>
+      );
+    },
+  },
+  {
+    key: "prazo_padrao", label: "Prazo",
+    render: (f: Fornecedor) => f.prazo_padrao
+      ? <span className="font-mono text-xs font-medium">{f.prazo_padrao}d</span>
+      : <span className="text-muted-foreground text-xs">—</span>,
+  },
+  {
+    key: "cidade", label: "Cidade", sortable: true,
+    render: (f: Fornecedor) => f.cidade
+      ? <span className="text-xs">{f.cidade}{f.uf ? `/${f.uf}` : ""}</span>
+      : <span className="text-muted-foreground text-xs">—</span>,
+  },
+  { key: "ativo", label: "Status", render: (f: Fornecedor) => <StatusBadge status={f.ativo ? "Ativo" : "Inativo"} /> },
+  ];
 
 
   const fornActiveFilters = useMemo(() => {
@@ -211,11 +262,20 @@ const Fornecedores = () => {
         displayValue: f === "J" ? "Pessoa Jurídica" : "Pessoa Física"
       });
     });
+    ativoFilters.forEach(f => {
+      chips.push({
+        key: "ativo",
+        label: "Status",
+        value: [f],
+        displayValue: f === "ativo" ? "Ativo" : "Inativo"
+      });
+    });
     return chips;
-  }, [tipoFilters]);
+  }, [tipoFilters, ativoFilters]);
 
   const handleRemoveFornFilter = (key: string, value?: string) => {
     if (key === "tipo") setTipoFilters(prev => prev.filter(v => v !== value));
+    if (key === "ativo") setAtivoFilters(prev => prev.filter(v => v !== value));
   };
 
   const tipoOptions: MultiSelectOption[] = [
@@ -223,19 +283,45 @@ const Fornecedores = () => {
     { label: "Pessoa Física", value: "F" },
   ];
 
+  const ativoOptions: MultiSelectOption[] = [
+    { label: "Ativo", value: "ativo" },
+    { label: "Inativo", value: "inativo" },
+  ];
+
+  const summaryAtivos = useMemo(() => data.filter(f => f.ativo).length, [data]);
+
   return (
     <AppLayout>
-      <ModulePage title="Fornecedores" subtitle="Cadastro e gestão de fornecedores" addLabel="Novo Fornecedor" onAdd={openCreate}>
+      <ModulePage
+        title="Fornecedores"
+        subtitle="Consulta e gestão de fornecedores"
+        addLabel="Novo Fornecedor"
+        onAdd={openCreate}
+        summaryCards={
+          <>
+            <StatCard title="Total de Fornecedores" value={String(data.length)} icon={Users} />
+            <StatCard title="Ativos" value={String(summaryAtivos)} icon={UserCheck} iconColor="text-success" />
+            <StatCard title="Inativos" value={String(data.length - summaryAtivos)} icon={Truck} />
+          </>
+        }
+      >
         
         <AdvancedFilterBar
           searchValue={searchTerm}
           onSearchChange={setSearchTerm}
-          searchPlaceholder="Buscar por razão social, CNPJ ou cidade..."
+          searchPlaceholder="Buscar por razão social, CNPJ, e-mail ou cidade..."
           activeFilters={fornActiveFilters}
           onRemoveFilter={handleRemoveFornFilter}
-          onClearAll={() => setTipoFilters([])}
+          onClearAll={() => { setTipoFilters([]); setAtivoFilters([]); }}
           count={filteredData.length}
         >
+          <MultiSelect
+            options={ativoOptions}
+            selected={ativoFilters}
+            onChange={setAtivoFilters}
+            placeholder="Status"
+            className="w-[130px]"
+          />
           <MultiSelect
             options={tipoOptions}
             selected={tipoFilters}
@@ -245,8 +331,16 @@ const Fornecedores = () => {
           />
         </AdvancedFilterBar>
 
-        <DataTable columns={columns} data={filteredData} loading={loading}
-        onView={openView} onEdit={openEdit} onDelete={(f) => remove(f.id)} />
+        <DataTable
+          columns={columns}
+          data={filteredData}
+          loading={loading}
+          moduleKey="fornecedores"
+          showColumnToggle={true}
+          onView={openView}
+          onEdit={openEdit}
+          onDelete={(f) => remove(f.id)}
+        />
       </ModulePage>
 
       <FormModal open={modalOpen} onClose={() => {
