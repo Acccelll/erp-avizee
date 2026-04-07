@@ -24,7 +24,7 @@ import { toast } from "sonner";
 import {
   Search, User2, Phone, ShoppingCart, MapPin,
   Info, Loader2, Calendar, Mail, CheckCircle2, Handshake, BadgeCheck, Package,
-  Truck, Users, UserCheck,
+  Users, UserCheck, UserX,
 } from "lucide-react";
 import { formatDate, formatCurrency } from "@/lib/format";
 import { clienteFornecedorSchema, validateForm } from "@/lib/validationSchemas";
@@ -301,7 +301,7 @@ const Fornecedores = () => {
           <>
             <StatCard title="Total de Fornecedores" value={String(data.length)} icon={Users} />
             <StatCard title="Ativos" value={String(summaryAtivos)} icon={UserCheck} iconColor="text-success" />
-            <StatCard title="Inativos" value={String(data.length - summaryAtivos)} icon={Truck} />
+            <StatCard title="Inativos" value={String(data.length - summaryAtivos)} icon={UserX} />
           </>
         }
       >
