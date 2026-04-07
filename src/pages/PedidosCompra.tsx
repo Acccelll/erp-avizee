@@ -307,6 +307,8 @@ const PedidosCompra = () => {
   const openEdit = async (p: PedidoCompra) => {
     setMode("edit");
     setSelected(p);
+    setViewEstoque([]);
+    setViewCotacao(null);
     setForm({
       fornecedor_id: p.fornecedor_id ? String(p.fornecedor_id) : "",
       data_pedido: p.data_pedido || new Date().toISOString().split("T")[0],
@@ -344,6 +346,22 @@ const PedidosCompra = () => {
         valor_total: Number(i.valor_total || 0),
       })),
     );
+
+    // Load estoque and cotação for the contextual edit header
+    const estResult = await supabase
+      .from("estoque_movimentos")
+      .select("produto_id, quantidade")
+      .eq("documento_id", String(p.id))
+      .eq("documento_tipo", "pedido_compra");
+    setViewEstoque((estResult.data as any[]) || []);
+
+    if (p.cotacao_compra_id) {
+      const { data: cot } = await (supabase.from as any)("cotacoes_compra")
+        .select("id, numero, status, data_cotacao")
+        .eq("id", p.cotacao_compra_id)
+        .single();
+      setViewCotacao(cot || null);
+    }
 
     setModalOpen(true);
   };
@@ -669,50 +687,163 @@ const PedidosCompra = () => {
       <FormModal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
-        title={mode === "create" ? "Novo Pedido de Compra" : "Editar Pedido"}
+        title={
+          mode === "create"
+            ? "Novo Pedido de Compra"
+            : `Editando ${selected ? pedidoNumero(selected) : "Pedido"}`
+        }
         size="xl"
       >
         <form onSubmit={handleSubmit} className="space-y-5">
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
-            <div className="space-y-2">
-              <Label>Data</Label>
-              <Input
-                type="date"
-                value={form.data_pedido}
-                onChange={(e) => setForm({ ...form, data_pedido: e.target.value })}
-              />
-            </div>
 
-            <div className="space-y-2">
-              <Label>Entrega Prevista</Label>
-              <Input
-                type="date"
-                value={form.data_entrega_prevista}
-                onChange={(e) => setForm({ ...form, data_entrega_prevista: e.target.value })}
-              />
-            </div>
+          {/* ── Banner de contexto operacional (apenas edição) ─────────── */}
+          {mode === "edit" && selected && (() => {
+            const estoquePorProdutoEdit: Record<string, number> = viewEstoque.reduce(
+              (acc: Record<string, number>, m: any) => {
+                const key = String(m.produto_id);
+                acc[key] = (acc[key] || 0) + Number(m.quantidade || 0);
+                return acc;
+              },
+              {},
+            );
+            const totalOrdenadoEdit = items.reduce((s, i) => s + Number(i.quantidade || 0), 0);
+            const totalRecebidoEdit = Object.values(estoquePorProdutoEdit).reduce((s, v) => s + v, 0);
+            const pctEdit =
+              totalOrdenadoEdit > 0
+                ? Math.min(100, Math.round((totalRecebidoEdit / totalOrdenadoEdit) * 100))
+                : 0;
 
-            <div className="space-y-2">
-              <Label>Status</Label>
-              <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="rascunho">Rascunho</SelectItem>
-                  <SelectItem value="aprovado">Aprovado</SelectItem>
-                  <SelectItem value="enviado_ao_fornecedor">Enviado ao Fornecedor</SelectItem>
-                  <SelectItem value="aguardando_recebimento">Aguardando Recebimento</SelectItem>
-                  <SelectItem value="parcialmente_recebido">Parcialmente Recebido</SelectItem>
-                  <SelectItem value="recebido">Recebido</SelectItem>
-                  <SelectItem value="cancelado">Cancelado</SelectItem>
-                </SelectContent>
-              </Select>
+            const recStatusEdit = (() => {
+              const s = form.status;
+              if (s === "recebido") return { label: "Recebido", colorClass: "text-success", Icon: CheckCircle2 };
+              if (s === "parcialmente_recebido") return { label: "Parcial", colorClass: "text-warning", Icon: ArrowDownToLine };
+              if (["aguardando_recebimento", "enviado_ao_fornecedor", "aprovado"].includes(s))
+                return { label: "Aguardando", colorClass: "text-warning", Icon: Clock };
+              if (s === "cancelado") return { label: "Cancelado", colorClass: "text-destructive", Icon: XCircle };
+              return { label: "Rascunho", colorClass: "text-muted-foreground", Icon: FileText };
+            })();
+            const RecStatusIcon = recStatusEdit.Icon;
+
+            const isEditOverdue =
+              !["recebido", "cancelado"].includes(form.status) &&
+              !!selected.data_entrega_prevista &&
+              new Date(selected.data_entrega_prevista) < new Date();
+
+            return (
+              <div className="rounded-lg border bg-accent/20 p-4 space-y-3">
+                {isEditOverdue && (
+                  <div className="flex items-center gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-1.5 text-xs text-destructive">
+                    <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                    Entrega prevista em {formatDate(selected.data_entrega_prevista)} — pedido em atraso.
+                  </div>
+                )}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono font-bold text-base text-primary">{pedidoNumero(selected)}</span>
+                      <StatusBadge status={form.status} label={statusLabels[form.status] || form.status} />
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      <Building2 className="inline h-3 w-3 mr-1" />
+                      {selected.fornecedores?.nome_razao_social || "—"}
+                      {selected.fornecedores?.cpf_cnpj && (
+                        <span className="ml-1 opacity-60">· {selected.fornecedores.cpf_cnpj}</span>
+                      )}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      <Calendar className="inline h-3 w-3 mr-1" />
+                      Pedido em {formatDate(selected.data_pedido)}
+                      {selected.data_entrega_prevista && (
+                        <span className={isEditOverdue ? "text-destructive font-medium" : ""}>
+                          {" "}· Entrega prevista {formatDate(selected.data_entrega_prevista)}
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-3 border-t pt-3">
+                  <div>
+                    <p className="text-[10px] text-muted-foreground uppercase font-semibold">Total</p>
+                    <p className="font-mono font-semibold text-sm text-primary">{formatCurrency(valorTotal)}</p>
+                    {Number(form.frete_valor || 0) > 0 && (
+                      <p className="text-[10px] text-muted-foreground font-mono">
+                        + {formatCurrency(Number(form.frete_valor))} frete
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-muted-foreground uppercase font-semibold">Recebimento</p>
+                    <div className="flex items-center gap-1 mt-0.5">
+                      <RecStatusIcon className={`h-3.5 w-3.5 shrink-0 ${recStatusEdit.colorClass}`} />
+                      <p className={`font-semibold text-xs ${recStatusEdit.colorClass}`}>
+                        {pctEdit > 0 ? `${pctEdit}%` : recStatusEdit.label}
+                      </p>
+                    </div>
+                    {pctEdit > 0 && <Progress value={pctEdit} className="h-1 mt-1" />}
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-muted-foreground uppercase font-semibold">Cotação</p>
+                    {viewCotacao ? (
+                      <p className="font-mono font-semibold text-xs flex items-center gap-1 mt-0.5">
+                        <Receipt className="h-3 w-3 text-muted-foreground" />
+                        {viewCotacao.numero}
+                      </p>
+                    ) : selected.cotacao_compra_id ? (
+                      <p className="font-mono text-xs text-muted-foreground mt-0.5">Carregando...</p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground mt-0.5">Avulso</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* ── Seção: Datas e Status ─────────────────────────────────── */}
+          <div className="space-y-3">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+              Datas e Status
+            </p>
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
+              <div className="space-y-2">
+                <Label>Data do Pedido</Label>
+                <Input
+                  type="date"
+                  value={form.data_pedido}
+                  onChange={(e) => setForm({ ...form, data_pedido: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Entrega Prevista</Label>
+                <Input
+                  type="date"
+                  value={form.data_entrega_prevista}
+                  onChange={(e) => setForm({ ...form, data_entrega_prevista: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Status do Pedido</Label>
+                <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(statusPedidoCompra).map(([value, { label }]) => (
+                      <SelectItem key={value} value={value}>{label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
 
+          {/* ── Seção: Fornecedor ─────────────────────────────────────── */}
           <div className="space-y-3 rounded-lg bg-accent/30 p-4">
-            <Label className="text-sm font-semibold">Fornecedor</Label>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+              Fornecedor
+            </p>
             <AutocompleteSearch
               options={fornecedorOptions}
               value={String(form.fornecedor_id || "")}
@@ -726,61 +857,74 @@ const PedidosCompra = () => {
             )}
           </div>
 
-          {!produtosLoading && produtosOptionsData.length === 0 && (
-            <p className="text-xs text-warning">
-              Nenhum produto disponível para seleção. Verifique cadastro/ativo no banco legado.
+          {/* ── Seção: Itens do Pedido ────────────────────────────────── */}
+          <div className="space-y-3">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+              {mode === "edit" ? "Itens Fechados" : "Itens do Pedido"}
             </p>
-          )}
-          <ItemsGrid
-            items={items}
-            onChange={setItems}
-            produtos={produtosOptionsData}
-            title={produtosLoading ? "Itens do Pedido (carregando produtos...)" : "Itens do Pedido"}
-          />
+            {!produtosLoading && produtosOptionsData.length === 0 && (
+              <p className="text-xs text-warning">
+                Nenhum produto disponível para seleção. Verifique cadastro/ativo no banco legado.
+              </p>
+            )}
+            <ItemsGrid
+              items={items}
+              onChange={setItems}
+              produtos={produtosOptionsData}
+              title={produtosLoading ? "Carregando produtos..." : ""}
+            />
+          </div>
 
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
-            <div className="space-y-2">
-              <Label>Frete (R$)</Label>
-              <Input
-                type="number"
-                min="0"
-                step="0.01"
-                value={form.frete_valor}
-                onChange={(e) => setForm({ ...form, frete_valor: e.target.value })}
-                placeholder="0,00"
-              />
-            </div>
+          {/* ── Seção: Condições Finais ───────────────────────────────── */}
+          <div className="space-y-3">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+              {mode === "edit" ? "Condições Finais" : "Condições"}
+            </p>
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
+              <div className="space-y-2">
+                <Label>Frete (R$)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={form.frete_valor}
+                  onChange={(e) => setForm({ ...form, frete_valor: e.target.value })}
+                  placeholder="0,00"
+                />
+              </div>
 
-            <div className="space-y-2">
-              <Label>Condição de Pagamento</Label>
-              <Select
-                value={form.condicao_pagamento || ""}
-                onValueChange={(v) => setForm({ ...form, condicao_pagamento: v === "__none__" ? "" : v })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">— Nenhuma —</SelectItem>
-                  {formasPagamentoRaw.map((fp) => (
-                    <SelectItem key={fp.id} value={fp.descricao}>
-                      {fp.descricao}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+              <div className="space-y-2">
+                <Label>Condição de Pagamento</Label>
+                <Select
+                  value={form.condicao_pagamento || ""}
+                  onValueChange={(v) => setForm({ ...form, condicao_pagamento: v === "__none__" ? "" : v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">— Nenhuma —</SelectItem>
+                    {formasPagamentoRaw.map((fp) => (
+                      <SelectItem key={fp.id} value={fp.descricao}>
+                        {fp.descricao}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-            <div className="space-y-2">
-              <Label>Data Entrega Real</Label>
-              <Input
-                type="date"
-                value={form.data_entrega_real}
-                onChange={(e) => setForm({ ...form, data_entrega_real: e.target.value })}
-              />
+              <div className="space-y-2">
+                <Label>Data de Entrega Real</Label>
+                <Input
+                  type="date"
+                  value={form.data_entrega_real}
+                  onChange={(e) => setForm({ ...form, data_entrega_real: e.target.value })}
+                />
+              </div>
             </div>
           </div>
 
+          {/* ── Totalizador ───────────────────────────────────────────── */}
           <div className="flex items-center justify-end rounded-lg bg-accent/50 p-4 gap-6">
             <span className="text-sm text-muted-foreground">
               Produtos: <span className="font-mono font-medium">{formatCurrency(valorProdutos)}</span>
@@ -793,8 +937,11 @@ const PedidosCompra = () => {
             <span className="text-lg font-bold font-mono text-primary">{formatCurrency(valorTotal)}</span>
           </div>
 
+          {/* ── Seção: Observações ────────────────────────────────────── */}
           <div className="space-y-2">
-            <Label>Observações</Label>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+              Observações
+            </p>
             <Textarea
               value={form.observacoes}
               onChange={(e) => setForm({ ...form, observacoes: e.target.value })}
@@ -806,7 +953,11 @@ const PedidosCompra = () => {
               Cancelar
             </Button>
             <Button type="submit" disabled={saving || fornecedoresLoading || produtosLoading}>
-              {saving ? "Salvando..." : "Salvar"}
+              {saving
+                ? "Salvando..."
+                : mode === "edit"
+                ? "Salvar Alterações"
+                : "Criar Pedido"}
             </Button>
           </div>
         </form>
