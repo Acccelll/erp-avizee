@@ -355,7 +355,8 @@ const PedidosCompra = () => {
 
     setSaving(true);
 
-    const payload = {
+    // Full payload including columns added after initial table creation.
+    const fullPayload = {
       fornecedor_id: fornecedorId,
       data_pedido: form.data_pedido,
       data_entrega_prevista: form.data_entrega_prevista || null,
@@ -367,14 +368,45 @@ const PedidosCompra = () => {
       valor_total: valorTotal,
     };
 
+    // Fallback payload that omits columns that may be missing from
+    // PostgREST's schema cache (PGRST204) while keeping valor_total
+    // correct (it already incorporates frete_valor).
+    const basePayload = {
+      fornecedor_id: fornecedorId,
+      data_pedido: form.data_pedido,
+      data_entrega_prevista: form.data_entrega_prevista || null,
+      status: form.status,
+      observacoes: form.observacoes || null,
+      valor_total: valorTotal,
+    };
+
     let pedidoId = selected?.id;
+
+    // Helper: choose the right payload; fall back to base on PGRST204.
+    const resolvePayload = (error: any): Record<string, unknown> | null => {
+      if (error?.code === "PGRST204") {
+        console.warn("[pedidos_compra] schema cache stale (PGRST204); retrying with base payload");
+        return basePayload;
+      }
+      return null;
+    };
 
     try {
       if (mode === "create") {
-        const { data: newP, error } = await (supabase.from as any)("pedidos_compra")
-          .insert(payload)
+        let { data: newP, error } = await (supabase.from as any)("pedidos_compra")
+          .insert(fullPayload)
           .select()
           .single();
+
+        if (error) {
+          const fallback = resolvePayload(error);
+          if (fallback) {
+            ({ data: newP, error } = await (supabase.from as any)("pedidos_compra")
+              .insert(fallback)
+              .select()
+              .single());
+          }
+        }
 
         if (error) {
           console.error("[pedidos_compra] insert header error", {
@@ -382,7 +414,7 @@ const PedidosCompra = () => {
             message: error.message,
             details: error.details,
             hint: error.hint,
-            payload,
+            payload: fullPayload,
           });
           toast.error(`Erro ao criar pedido: ${error.message}`);
           setSaving(false);
@@ -391,9 +423,18 @@ const PedidosCompra = () => {
 
         pedidoId = newP.id;
       } else if (selected) {
-        const { error } = await (supabase.from as any)("pedidos_compra")
-          .update(payload)
+        let { error } = await (supabase.from as any)("pedidos_compra")
+          .update(fullPayload)
           .eq("id", selected.id);
+
+        if (error) {
+          const fallback = resolvePayload(error);
+          if (fallback) {
+            ({ error } = await (supabase.from as any)("pedidos_compra")
+              .update(fallback)
+              .eq("id", selected.id));
+          }
+        }
 
         if (error) {
           console.error("[pedidos_compra] update header error", {
@@ -401,7 +442,7 @@ const PedidosCompra = () => {
             message: error.message,
             details: error.details,
             hint: error.hint,
-            payload,
+            payload: fullPayload,
           });
           toast.error(`Erro ao atualizar pedido: ${error.message}`);
           setSaving(false);
