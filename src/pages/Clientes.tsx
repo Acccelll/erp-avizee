@@ -24,8 +24,9 @@ import { formatDate } from "@/lib/format";
 import { toast } from "sonner";
 import {
   Building2, Search, User2, Phone, CreditCard, MapPin, Truck, FileText,
-  Info, Loader2, Calendar, Mail, Star,
+  Info, Loader2, Calendar, Mail, Star, Users, UserCheck,
 } from "lucide-react";
+import { StatCard } from "@/components/StatCard";
 import { clienteFornecedorSchema, validateForm } from "@/lib/validationSchemas";
 
 interface Cliente {
@@ -89,6 +90,7 @@ const Clientes = () => {
   const [formasPagamento, setFormasPagamento] = useState<FormaPagamentoBasic[]>([]);
   const [tipoFilters, setTipoFilters] = useState<string[]>([]);
   const [grupoFilters, setGrupoFilters] = useState<string[]>([]);
+  const [ativoFilters, setAtivoFilters] = useState<string[]>([]);
   const [modalTransportadoras, setModalTransportadoras] = useState<Array<{
     id: string; transportadora_id: string; transportadora_nome: string;
     prioridade: number | null; modalidade: string | null; prazo_medio: string | null;
@@ -197,19 +199,63 @@ const Clientes = () => {
         const groupId = cliente.grupo_economico_id || "sem_grupo";
         if (!grupoFilters.includes(groupId)) return false;
       }
+      if (ativoFilters.length > 0) {
+        const status = cliente.ativo ? "ativo" : "inativo";
+        if (!ativoFilters.includes(status)) return false;
+      }
       return true;
     });
-  }, [data, grupoFilters, tipoFilters]);
+  }, [data, grupoFilters, tipoFilters, ativoFilters]);
 
   const columns = [
-  { key: "nome_razao_social", label: "Nome / Razão Social", sortable: true },
-  { key: "tipo_pessoa", label: "Tipo", render: (c: Cliente) => c.tipo_pessoa === "F" ? "PF" : "PJ" },
-  { key: "cpf_cnpj", label: "CPF/CNPJ", render: (c: Cliente) => <span className="font-mono text-xs">{c.cpf_cnpj || "—"}</span> },
-  { key: "email", label: "E-mail", sortable: true },
-  { key: "telefone", label: "Telefone" },
-  { key: "cidade", label: "Cidade", sortable: true, render: (c: Cliente) => c.cidade ? `${c.cidade}/${c.uf}` : "—" },
-  { key: "grupo", label: "Grupo Econômico", render: (c: Cliente) => grupoNome(c.grupo_economico_id) },
-  { key: "ativo", label: "Status", render: (c: Cliente) => <StatusBadge status={c.ativo ? "Ativo" : "Inativo"} /> }];
+  {
+    key: "nome_razao_social", label: "Nome / Razão Social", sortable: true,
+    render: (c: Cliente) => (
+      <div>
+        <p className="font-medium leading-tight">{c.nome_razao_social}</p>
+        {c.nome_fantasia && c.nome_fantasia !== c.nome_razao_social && (
+          <p className="text-xs text-muted-foreground truncate max-w-xs">{c.nome_fantasia}</p>
+        )}
+      </div>
+    ),
+  },
+  {
+    key: "cpf_cnpj", label: "CPF / CNPJ",
+    render: (c: Cliente) => <span className="font-mono text-xs">{c.cpf_cnpj || "—"}</span>,
+  },
+  {
+    key: "tipo_pessoa", label: "Tipo",
+    render: (c: Cliente) => (
+      <span className={`text-xs font-semibold ${c.tipo_pessoa === "F" ? "text-blue-600 dark:text-blue-400" : "text-violet-600 dark:text-violet-400"}`}>
+        {c.tipo_pessoa === "F" ? "PF" : "PJ"}
+      </span>
+    ),
+  },
+  {
+    key: "contato_principal", label: "Contato",
+    render: (c: Cliente) => {
+      const phone = c.celular || c.telefone;
+      if (!phone && !c.email) return <span className="text-muted-foreground text-xs">—</span>;
+      return (
+        <div className="text-xs space-y-0.5">
+          {phone && <p className="font-medium tabular-nums">{phone}</p>}
+          {c.email && <p className="text-muted-foreground truncate max-w-xs">{c.email}</p>}
+        </div>
+      );
+    },
+  },
+  {
+    key: "prazo_padrao", label: "Prazo",
+    render: (c: Cliente) => c.prazo_padrao
+      ? <span className="font-mono text-xs font-medium">{c.prazo_padrao}d</span>
+      : <span className="text-muted-foreground text-xs">—</span>,
+  },
+  {
+    key: "grupo", label: "Grupo Econômico",
+    render: (c: Cliente) => grupoNome(c.grupo_economico_id),
+  },
+  { key: "ativo", label: "Status", render: (c: Cliente) => <StatusBadge status={c.ativo ? "Ativo" : "Inativo"} /> },
+  ];
 
 
   const cliActiveFilters = useMemo(() => {
@@ -234,12 +280,22 @@ const Clientes = () => {
       });
     });
 
+    ativoFilters.forEach(f => {
+      chips.push({
+        key: "ativo",
+        label: "Status",
+        value: [f],
+        displayValue: f === "ativo" ? "Ativo" : "Inativo"
+      });
+    });
+
     return chips;
-  }, [tipoFilters, grupoFilters, grupos]);
+  }, [tipoFilters, grupoFilters, grupos, ativoFilters]);
 
   const handleRemoveCliFilter = (key: string, value?: string) => {
     if (key === "tipo") setTipoFilters(prev => prev.filter(v => v !== value));
     if (key === "grupo") setGrupoFilters(prev => prev.filter(v => v !== value));
+    if (key === "ativo") setAtivoFilters(prev => prev.filter(v => v !== value));
   };
 
   const tipoOptions: MultiSelectOption[] = [
@@ -252,9 +308,30 @@ const Clientes = () => {
     { label: "Sem grupo", value: "sem_grupo" }
   ];
 
+  const ativoOptions: MultiSelectOption[] = [
+    { label: "Ativo", value: "ativo" },
+    { label: "Inativo", value: "inativo" },
+  ];
+
+  const summaryAtivos = useMemo(() => data.filter(c => c.ativo).length, [data]);
+  const summaryComGrupo = useMemo(() => data.filter(c => c.grupo_economico_id).length, [data]);
+
   return (
     <AppLayout>
-      <ModulePage title="Clientes" subtitle="Cadastro e gestão de clientes" addLabel="Novo Cliente" onAdd={openCreate}>
+      <ModulePage
+        title="Clientes"
+        subtitle="Consulta comercial e cadastro de clientes"
+        addLabel="Novo Cliente"
+        onAdd={openCreate}
+        summaryCards={
+          <>
+            <StatCard title="Total de Clientes" value={String(data.length)} icon={Users} />
+            <StatCard title="Ativos" value={String(summaryAtivos)} icon={UserCheck} iconColor="text-success" />
+            <StatCard title="Inativos" value={String(data.length - summaryAtivos)} icon={User2} />
+            <StatCard title="Com Grupo Econômico" value={String(summaryComGrupo)} icon={Building2} />
+          </>
+        }
+      >
         
         <AdvancedFilterBar
           searchValue={searchTerm}
@@ -262,9 +339,16 @@ const Clientes = () => {
           searchPlaceholder="Buscar por nome, CNPJ, e-mail ou cidade..."
           activeFilters={cliActiveFilters}
           onRemoveFilter={handleRemoveCliFilter}
-          onClearAll={() => { setTipoFilters([]); setGrupoFilters([]); }}
+          onClearAll={() => { setTipoFilters([]); setGrupoFilters([]); setAtivoFilters([]); }}
           count={filteredData.length}
         >
+          <MultiSelect
+            options={ativoOptions}
+            selected={ativoFilters}
+            onChange={setAtivoFilters}
+            placeholder="Status"
+            className="w-[130px]"
+          />
           <MultiSelect
             options={tipoOptions}
             selected={tipoFilters}
@@ -281,8 +365,16 @@ const Clientes = () => {
           />
         </AdvancedFilterBar>
 
-        <DataTable columns={columns} data={filteredData} loading={loading}
-        onView={openView} onEdit={openEdit} onDelete={(c) => remove(c.id)} />
+        <DataTable
+          columns={columns}
+          data={filteredData}
+          loading={loading}
+          moduleKey="clientes"
+          showColumnToggle={true}
+          onView={openView}
+          onEdit={openEdit}
+          onDelete={(c) => remove(c.id)}
+        />
       </ModulePage>
 
       <FormModal open={modalOpen} onClose={() => {
