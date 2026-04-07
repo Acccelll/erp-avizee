@@ -4,9 +4,7 @@ import { ModulePage } from "@/components/ModulePage";
 import { DataTable } from "@/components/DataTable";
 import { StatusBadge } from "@/components/StatusBadge";
 import { FormModal } from "@/components/FormModal";
-import { ViewDrawer } from "@/components/ViewDrawer";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Edit, Trash2 } from "lucide-react";
+import { ContaContabilDrawer } from "@/components/financeiro/ContaContabilDrawer";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { ChevronRight, FolderTree, FileText } from "lucide-react";
+import { FolderTree, FileText } from "lucide-react";
 
 interface ContaContabil {
   id: string;
@@ -190,67 +188,14 @@ const ContasContabeis = () => {
         </form>
       </FormModal>
 
-      <ViewDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} title="Detalhes da Conta"
-        actions={selected ? <>
-          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setDrawerOpen(false); openEdit(selected); }}><Edit className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Editar</TooltipContent></Tooltip>
-          <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => { setDrawerOpen(false); remove(selected.id); }}><Trash2 className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Excluir</TooltipContent></Tooltip>
-        </> : undefined}
-      >
-        {selected && (
-          <div className="space-y-5">
-            {/* Header with identity */}
-            <div>
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="font-semibold text-lg truncate">{selected.descricao}</h3>
-                  <StatusBadge status={selected.ativo ? "Ativo" : "Inativo"} />
-                </div>
-                <p className="text-xs text-muted-foreground font-mono mt-0.5">{selected.codigo}</p>
-              </div>
-            </div>
-
-            {/* KPI Cards */}
-            <div className="grid grid-cols-3 gap-3">
-              <div className="rounded-lg border bg-card p-4 text-center space-y-1">
-                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Natureza</p>
-                <p className="font-semibold text-sm text-foreground capitalize">{selected.natureza}</p>
-              </div>
-              <div className="rounded-lg border bg-card p-4 text-center space-y-1">
-                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Tipo</p>
-                <Badge variant={selected.aceita_lancamento ? "default" : "secondary"} className="text-xs">
-                  {selected.aceita_lancamento ? "Analítica" : "Sintética"}
-                </Badge>
-              </div>
-              <div className="rounded-lg border bg-card p-4 text-center space-y-1">
-                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Conta Pai</p>
-                <p className="font-mono font-bold text-sm text-foreground">{selected.conta_pai_id ? data.find(c => c.id === selected.conta_pai_id)?.codigo || "—" : "Raiz"}</p>
-              </div>
-            </div>
-
-            {/* Sub-accounts */}
-            {(() => {
-              const filhas = data.filter(c => c.conta_pai_id === selected.id);
-              if (filhas.length === 0) return null;
-              return (
-                <div className="border-t pt-4">
-                  <h4 className="font-semibold text-sm mb-3">Subcontas ({filhas.length})</h4>
-                  <div className="space-y-1">
-                    {filhas.map(f => (
-                      <div key={f.id} className="flex items-center justify-between py-2 px-2 rounded-md hover:bg-muted/30 transition-colors border-b last:border-b-0 text-sm">
-                        <div className="flex items-center gap-2">
-                          {f.aceita_lancamento ? <FileText className="w-3.5 h-3.5 text-muted-foreground" /> : <FolderTree className="w-3.5 h-3.5 text-primary" />}
-                          <span className="font-mono text-primary">{f.codigo}</span>
-                        </div>
-                        <span className="truncate ml-2">{f.descricao}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })()}
-          </div>
-        )}
-      </ViewDrawer>
+      <ContaContabilDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        selected={selected}
+        allContas={data}
+        onEdit={openEdit}
+        onDelete={(c) => remove(c.id)}
+      />
     </AppLayout>
   );
 };
