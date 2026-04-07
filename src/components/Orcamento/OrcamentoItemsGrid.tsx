@@ -30,6 +30,9 @@ export interface OrcamentoItem {
   peso_unitario: number;
   peso_total: number;
   override_justificativa?: string;
+  cost_source?: "ultimo_custo_compra" | "custo_medio" | "custo_manual_cotacao" | "custo_produto";
+  custo_manual_unitario?: number;
+  observacao_interna_margem?: string;
 }
 
 interface Props {
