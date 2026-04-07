@@ -6,8 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { LogIn, Eye, EyeOff, Mail, Lock } from "lucide-react";
+import { LogIn, Eye, EyeOff, Mail, Lock, Zap } from "lucide-react";
 import logoAvizee from "@/assets/logoavizee.png";
+
+const DEV_EMAIL = import.meta.env.VITE_DEV_EMAIL as string | undefined;
+const DEV_PASSWORD = import.meta.env.VITE_DEV_PASSWORD as string | undefined;
+const showDevButton = Boolean(DEV_EMAIL && DEV_PASSWORD);
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -135,6 +139,18 @@ export default function Login() {
             <LogIn className="w-4 h-4" />
             {loading ? "Entrando..." : "Entrar"}
           </Button>
+
+          {showDevButton && (
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full gap-2 border-dashed text-muted-foreground hover:text-foreground"
+              onClick={() => { setEmail(DEV_EMAIL!); setPassword(DEV_PASSWORD!); setErrors({}); }}
+            >
+              <Zap className="w-4 h-4" />
+              Preencher como Dev
+            </Button>
+          )}
 
           <p className="text-center text-sm text-muted-foreground">
             Não tem conta?{" "}
