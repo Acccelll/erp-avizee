@@ -28,7 +28,6 @@ const ContasBancarias = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selected, setSelected] = useState<ContaBancaria | null>(null);
-  const [mode, setMode] = useState<"create" | "edit">("create");
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ banco_id: "", descricao: "", agencia: "", conta: "", titular: "", saldo_atual: 0 });
 
@@ -53,29 +52,17 @@ const ContasBancarias = () => {
     setModalOpen(true);
   };
 
-  const openEdit = (c: ContaBancaria) => {
-    setMode("edit"); setSelected(c);
-    setForm({ banco_id: c.banco_id, descricao: c.descricao, agencia: c.agencia || "", conta: c.conta || "", titular: c.titular || "", saldo_atual: Number(c.saldo_atual || 0) });
-    setModalOpen(true);
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.banco_id || !form.descricao) { toast.error("Banco e descrição são obrigatórios"); return; }
     setSaving(true);
     try {
-      if (mode === "create") {
-        const { error } = await supabase.from("contas_bancarias").insert(form);
-        if (error) throw error;
-        toast.success("Conta criada com sucesso!");
-      } else if (selected) {
-        const { error } = await supabase.from("contas_bancarias").update(form).eq("id", selected.id);
-        if (error) throw error;
-        toast.success("Conta atualizada com sucesso!");
-      }
+      const { error } = await supabase.from("contas_bancarias").insert(form);
+      if (error) throw error;
+      toast.success("Conta criada com sucesso!");
       setModalOpen(false);
       fetchData();
-    } catch (err: any) { console.error('[contas-bancarias]', err); toast.error("Erro ao salvar conta bancária."); }
+    } catch (err: unknown) { console.error('[contas-bancarias]', err); toast.error("Erro ao salvar conta bancária."); }
     setSaving(false);
   };
 
@@ -124,7 +111,7 @@ const ContasBancarias = () => {
           onView={(c) => { setSelected(c); setDrawerOpen(true); }} />
       </ModulePage>
 
-      <FormModal open={modalOpen} onClose={() => setModalOpen(false)} title={mode === "create" ? "Nova Conta Bancária" : "Editar Conta"} size="md">
+      <FormModal open={modalOpen} onClose={() => setModalOpen(false)} title="Nova Conta Bancária" size="md">
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2"><Label>Banco *</Label>
@@ -152,7 +139,8 @@ const ContasBancarias = () => {
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         selected={selected}
-        onEdit={(c) => openEdit(c)}
+        bancos={bancos}
+        onSaved={() => { fetchData(); }}
         onDelete={(c) => handleDelete(c)}
       />
     </AppLayout>
