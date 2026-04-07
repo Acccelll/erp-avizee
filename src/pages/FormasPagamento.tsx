@@ -4,13 +4,17 @@ import { ModulePage } from "@/components/ModulePage";
 import { DataTable } from "@/components/DataTable";
 import { StatusBadge } from "@/components/StatusBadge";
 import { FormModal } from "@/components/FormModal";
+import { AdvancedFilterBar } from "@/components/AdvancedFilterBar";
+import type { FilterChip } from "@/components/AdvancedFilterBar";
+import { StatCard } from "@/components/StatCard";
 import { ViewDrawerV2, ViewField, ViewSection } from "@/components/ViewDrawerV2";
 import { RelationalLink } from "@/components/ui/RelationalLink";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { MultiSelect, type MultiSelectOption } from "@/components/ui/MultiSelect";
 import {
   Edit, Trash2, Plus, X, FileText, Banknote, CreditCard, QrCode, CheckSquare,
   Building2, Wallet, AlertTriangle, Users, TrendingUp, CalendarDays, StickyNote,
-  Info,
+  Info, CheckCircle, Ban,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -71,6 +75,11 @@ export default function FormasPagamento() {
   const [form, setForm] = useState(emptyForm);
   const [searchTerm, setSearchTerm] = useState("");
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+
+  // Advanced filters
+  const [ativoFilters, setAtivoFilters] = useState<string[]>([]);
+  const [tipoFilters, setTipoFilters] = useState<string[]>([]);
+  const [geraFinanceiroFilters, setGeraFinanceiroFilters] = useState<string[]>([]);
 
   // Dynamic intervals
   const [newIntervalo, setNewIntervalo] = useState<number>(30);
@@ -154,30 +163,177 @@ export default function FormasPagamento() {
 
   const filteredData = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
-    if (!query) return data;
-    return data.filter(f => f.descricao.toLowerCase().includes(query));
-  }, [data, searchTerm]);
+    return data.filter((f) => {
+      if (ativoFilters.length > 0) {
+        const val = f.ativo ? "ativo" : "inativo";
+        if (!ativoFilters.includes(val)) return false;
+      }
+      if (tipoFilters.length > 0) {
+        if (!tipoFilters.includes(f.tipo)) return false;
+      }
+      if (geraFinanceiroFilters.length > 0) {
+        const val = f.gera_financeiro ? "sim" : "nao";
+        if (!geraFinanceiroFilters.includes(val)) return false;
+      }
+      if (!query) return true;
+      return f.descricao.toLowerCase().includes(query);
+    });
+  }, [data, searchTerm, ativoFilters, tipoFilters, geraFinanceiroFilters]);
+
+  const activeFilterChips = useMemo<FilterChip[]>(() => {
+    const chips: FilterChip[] = [];
+    ativoFilters.forEach((v) =>
+      chips.push({ key: "ativo", label: "Status", value: v, displayValue: v === "ativo" ? "Ativo" : "Inativo" })
+    );
+    tipoFilters.forEach((v) =>
+      chips.push({ key: "tipo", label: "Tipo", value: v, displayValue: tipoLabel[v] || v })
+    );
+    geraFinanceiroFilters.forEach((v) =>
+      chips.push({ key: "gera_financeiro", label: "Gera Financeiro", value: v, displayValue: v === "sim" ? "Sim" : "Não" })
+    );
+    return chips;
+  }, [ativoFilters, tipoFilters, geraFinanceiroFilters]);
+
+  const handleRemoveFilter = (key: string, value?: string) => {
+    if (key === "ativo") setAtivoFilters((prev) => prev.filter((v) => v !== value));
+    if (key === "tipo") setTipoFilters((prev) => prev.filter((v) => v !== value));
+    if (key === "gera_financeiro") setGeraFinanceiroFilters((prev) => prev.filter((v) => v !== value));
+  };
+
+  const summaryAtivos = useMemo(() => data.filter((f) => f.ativo).length, [data]);
+  const summaryGeraFin = useMemo(() => data.filter((f) => f.gera_financeiro).length, [data]);
+
+  const ativoOptions: MultiSelectOption[] = [
+    { label: "Ativo", value: "ativo" },
+    { label: "Inativo", value: "inativo" },
+  ];
+
+  const tipoOptions: MultiSelectOption[] = Object.entries(tipoLabel).map(([value, label]) => ({ value, label }));
+
+  const geraFinanceiroOptions: MultiSelectOption[] = [
+    { label: "Gera Financeiro", value: "sim" },
+    { label: "Não Gera", value: "nao" },
+  ];
 
   const columns = [
-    { key: "descricao", label: "Descrição" },
-    { key: "tipo", label: "Tipo", render: (f: FormaPagamento) => tipoLabel[f.tipo] || f.tipo },
     {
-      key: "intervalos", label: "Intervalos", render: (f: FormaPagamento) => {
-        const intervals = Array.isArray(f.intervalos_dias) && f.intervalos_dias.length > 0 ? f.intervalos_dias : null;
-        if (intervals) return <span className="font-mono text-xs">{intervals.join(" / ")} dias</span>;
-        return <span className="text-xs text-muted-foreground">{f.prazo_dias === 0 ? "À vista" : `${f.prazo_dias}d`}</span>;
+      key: "descricao", label: "Forma de Pagamento", sortable: true,
+      render: (f: FormaPagamento) => {
+        const Icon = tipoIcon[f.tipo];
+        return (
+          <div className="flex items-center gap-2">
+            {Icon && <Icon className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />}
+            <span className="font-medium leading-tight">{f.descricao}</span>
+          </div>
+        );
       },
     },
-    { key: "parcelas", label: "Parcelas", render: (f: FormaPagamento) => `${Array.isArray(f.intervalos_dias) && f.intervalos_dias.length > 0 ? f.intervalos_dias.length : f.parcelas}x` },
-    { key: "gera_financeiro", label: "Gera Financeiro", render: (f: FormaPagamento) => f.gera_financeiro ? "Sim" : "Não" },
+    {
+      key: "tipo", label: "Tipo",
+      render: (f: FormaPagamento) => (
+        <span className="text-xs font-medium">{tipoLabel[f.tipo] || f.tipo}</span>
+      ),
+    },
+    {
+      key: "prazo", label: "Prazo / Parcelas", sortable: true,
+      render: (f: FormaPagamento) => {
+        const intervals = Array.isArray(f.intervalos_dias) && f.intervalos_dias.length > 0 ? f.intervalos_dias : null;
+        if (intervals) {
+          return (
+            <div>
+              <span className="font-mono text-xs font-medium">{intervals.join(" / ")} d</span>
+              <span className="ml-1 text-xs text-muted-foreground">({intervals.length}x)</span>
+            </div>
+          );
+        }
+        return (
+          <span className="font-mono text-xs font-medium">
+            {f.prazo_dias === 0 ? "À vista" : `${f.prazo_dias}d`}
+          </span>
+        );
+      },
+    },
+    {
+      key: "gera_financeiro", label: "Gera Financeiro",
+      render: (f: FormaPagamento) => (
+        <Badge
+          variant="outline"
+          className={f.gera_financeiro
+            ? "bg-success/10 text-success border-success/30 text-xs gap-1"
+            : "text-xs gap-1 text-muted-foreground"}
+        >
+          {f.gera_financeiro ? <CheckCircle className="w-3 h-3" /> : <Ban className="w-3 h-3" />}
+          {f.gera_financeiro ? "Sim" : "Não"}
+        </Badge>
+      ),
+    },
     { key: "ativo", label: "Status", render: (f: FormaPagamento) => <StatusBadge status={f.ativo ? "Ativo" : "Inativo"} /> },
+    {
+      key: "observacoes", label: "Observações", hidden: true,
+      render: (f: FormaPagamento) => f.observacoes
+        ? <span className="text-xs text-muted-foreground truncate max-w-xs block">{f.observacoes}</span>
+        : <span className="text-xs text-muted-foreground">—</span>,
+    },
   ];
 
   return (
     <AppLayout>
-      <ModulePage title="Formas de Pagamento" subtitle="Condições de pagamento com intervalos dinâmicos" addLabel="Nova Forma" onAdd={openCreate} count={filteredData.length}
-        searchValue={searchTerm} onSearchChange={setSearchTerm} searchPlaceholder="Buscar por descrição...">
-        <DataTable columns={columns} data={filteredData} loading={loading} onView={openView} />
+      <ModulePage
+        title="Formas de Pagamento"
+        subtitle="Central de consulta e parametrização de condições de pagamento"
+        addLabel="Nova Forma"
+        onAdd={openCreate}
+        summaryCards={
+          <>
+            <StatCard title="Total" value={String(data.length)} icon={CreditCard} />
+            <StatCard title="Ativas" value={String(summaryAtivos)} icon={CheckCircle} iconColor="text-success" />
+            <StatCard title="Inativas" value={String(data.length - summaryAtivos)} icon={Ban} />
+            <StatCard title="Geram Financeiro" value={String(summaryGeraFin)} icon={Wallet} iconColor="text-primary" />
+          </>
+        }
+      >
+        <AdvancedFilterBar
+          searchValue={searchTerm}
+          onSearchChange={setSearchTerm}
+          searchPlaceholder="Buscar por descrição..."
+          activeFilters={activeFilterChips}
+          onRemoveFilter={handleRemoveFilter}
+          onClearAll={() => { setAtivoFilters([]); setTipoFilters([]); setGeraFinanceiroFilters([]); }}
+          count={filteredData.length}
+        >
+          <MultiSelect
+            options={ativoOptions}
+            selected={ativoFilters}
+            onChange={setAtivoFilters}
+            placeholder="Status"
+            className="w-[130px]"
+          />
+          <MultiSelect
+            options={tipoOptions}
+            selected={tipoFilters}
+            onChange={setTipoFilters}
+            placeholder="Tipo"
+            className="w-[130px]"
+          />
+          <MultiSelect
+            options={geraFinanceiroOptions}
+            selected={geraFinanceiroFilters}
+            onChange={setGeraFinanceiroFilters}
+            placeholder="Financeiro"
+            className="w-[140px]"
+          />
+        </AdvancedFilterBar>
+
+        <DataTable
+          columns={columns}
+          data={filteredData}
+          loading={loading}
+          moduleKey="formas_pagamento"
+          showColumnToggle={true}
+          onView={openView}
+          onEdit={openEdit}
+          onDelete={(f) => { setSelected(f); setDeleteConfirmOpen(true); }}
+        />
       </ModulePage>
 
       <FormModal open={modalOpen} onClose={() => setModalOpen(false)} title={mode === "create" ? "Nova Forma de Pagamento" : "Editar Forma de Pagamento"} size="lg">
