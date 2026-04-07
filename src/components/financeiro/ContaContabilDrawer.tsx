@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ViewDrawerV2, ViewField, ViewSection } from "@/components/ViewDrawerV2";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Badge } from "@/components/ui/badge";
@@ -42,20 +42,40 @@ interface ContaContabilDrawerProps {
   onDelete: (c: ContaContabil) => void;
 }
 
-function getDepth(conta: ContaContabil, allContas: ContaContabil[]): number {
-  if (!conta.conta_pai_id) return 0;
-  const parent = allContas.find((c) => c.id === conta.conta_pai_id);
-  return parent ? 1 + getDepth(parent, allContas) : 0;
+function buildParentMap(
+  allContas: ContaContabil[]
+): Map<string, ContaContabil> {
+  const map = new Map<string, ContaContabil>();
+  for (const c of allContas) map.set(c.id, c);
+  return map;
+}
+
+function getDepth(
+  conta: ContaContabil,
+  parentMap: Map<string, ContaContabil>
+): number {
+  let depth = 0;
+  let current: ContaContabil | undefined = conta;
+  while (current?.conta_pai_id) {
+    current = parentMap.get(current.conta_pai_id);
+    depth++;
+  }
+  return depth;
 }
 
 function getAncestors(
   conta: ContaContabil,
-  allContas: ContaContabil[]
+  parentMap: Map<string, ContaContabil>
 ): ContaContabil[] {
-  if (!conta.conta_pai_id) return [];
-  const parent = allContas.find((c) => c.id === conta.conta_pai_id);
-  if (!parent) return [];
-  return [...getAncestors(parent, allContas), parent];
+  const ancestors: ContaContabil[] = [];
+  let current: ContaContabil | undefined = conta;
+  while (current?.conta_pai_id) {
+    const parent = parentMap.get(current.conta_pai_id);
+    if (!parent) break;
+    ancestors.unshift(parent);
+    current = parent;
+  }
+  return ancestors;
 }
 
 const naturezaLabel: Record<string, string> = {
@@ -75,27 +95,30 @@ export function ContaContabilDrawer({
   const [vinculos, setVinculos] = useState<VinculoContagem | null>(null);
   const [loadingVinculos, setLoadingVinculos] = useState(false);
 
+  const parentMap = useMemo(() => buildParentMap(allContas), [allContas]);
+
   useEffect(() => {
     if (!open || !selected) {
       setVinculos(null);
       return;
     }
+    const id = selected.id;
     setLoadingVinculos(true);
     Promise.all([
       supabase
         .from("financeiro_lancamentos")
         .select("id", { count: "exact", head: true })
-        .eq("conta_contabil_id", selected.id)
+        .eq("conta_contabil_id", id)
         .eq("ativo", true),
       supabase
         .from("notas_fiscais")
         .select("id", { count: "exact", head: true })
-        .eq("conta_contabil_id", selected.id)
+        .eq("conta_contabil_id", id)
         .eq("ativo", true),
       supabase
         .from("grupos_produto")
         .select("id", { count: "exact", head: true })
-        .eq("conta_contabil_id", selected.id),
+        .eq("conta_contabil_id", id),
     ]).then(([lanc, nf, gp]) => {
       setVinculos({
         lancamentos: lanc.count ?? 0,
@@ -109,10 +132,10 @@ export function ContaContabilDrawer({
   if (!selected) return <ViewDrawerV2 open={open} onClose={onClose} title="" />;
 
   const isAnalitica = selected.aceita_lancamento;
-  const nivel = getDepth(selected, allContas);
-  const ancestrais = getAncestors(selected, allContas);
+  const nivel = getDepth(selected, parentMap);
+  const ancestrais = getAncestors(selected, parentMap);
   const contaPai = selected.conta_pai_id
-    ? allContas.find((c) => c.id === selected.conta_pai_id)
+    ? parentMap.get(selected.conta_pai_id) ?? null
     : null;
   const filhas = allContas.filter((c) => c.conta_pai_id === selected.id);
 
