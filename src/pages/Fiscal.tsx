@@ -27,6 +27,7 @@ import { DanfeViewer } from "@/components/DanfeViewer";
 import { DevolucaoDialog } from "@/components/fiscal/DevolucaoDialog";
 import { NotaFiscalDrawer } from "@/components/fiscal/NotaFiscalDrawer";
 import { confirmarNotaFiscal, estornarNotaFiscal } from "@/services/fiscal.service";
+import { NotaFiscalEditModal } from "@/components/fiscal/NotaFiscalEditModal";
 
 interface NotaFiscal {
   id: string; tipo: string; numero: string; serie: string; chave_acesso: string;
@@ -190,6 +191,58 @@ const Fiscal = () => {
     }
   };
 
+  const handleCancelarRascunho = async () => {
+    if (!selected) return;
+    if (!window.confirm(`Cancelar o rascunho da NF ${selected.numero}? Esta ação não pode ser desfeita.`)) return;
+    try {
+      await supabase.from("notas_fiscais").update({ status: "cancelada" }).eq("id", selected.id);
+      toast.success("Rascunho cancelado.");
+      setModalOpen(false);
+      fetchData();
+    } catch (err: any) {
+      console.error('[fiscal] cancelar rascunho:', err);
+      toast.error("Erro ao cancelar rascunho.");
+    }
+  };
+
+  const handleSaveAndConfirm = async () => {
+    if (!form.numero) { toast.error("Número é obrigatório"); return; }
+    if (!selected) return;
+    setSaving(true);
+    try {
+      const savedTotal = totalNF || form.valor_total;
+      const payload = {
+        ...form,
+        fornecedor_id: form.fornecedor_id || null,
+        cliente_id: form.cliente_id || null,
+        ordem_venda_id: form.ordem_venda_id || null,
+        conta_contabil_id: form.conta_contabil_id || null,
+        valor_total: savedTotal,
+      };
+      await supabase.from("notas_fiscais").update(payload as any).eq("id", selected.id);
+      await supabase.from("notas_fiscais_itens").delete().eq("nota_fiscal_id", selected.id);
+      if (items.length > 0) {
+        const itemsPayload = items.filter(i => i.produto_id).map((i, idx) => ({
+          nota_fiscal_id: selected.id,
+          produto_id: i.produto_id,
+          quantidade: i.quantidade,
+          valor_unitario: i.valor_unitario,
+          conta_contabil_id: itemContaContabil[idx] || null,
+        }));
+        if (itemsPayload.length > 0) await supabase.from("notas_fiscais_itens").insert(itemsPayload);
+      }
+      const nfForConfirm = { ...selected, ...payload, valor_total: savedTotal };
+      await confirmarNotaFiscal({ nf: nfForConfirm as any, parcelas });
+      toast.success("Nota fiscal salva e confirmada! Estoque e financeiro atualizados.");
+      setModalOpen(false);
+      fetchData();
+    } catch (err: any) {
+      console.error('[fiscal] salvar e confirmar NF:', err);
+      toast.error("Erro ao salvar e confirmar nota fiscal.");
+    }
+    setSaving(false);
+  };
+
   const handleXmlImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -339,8 +392,8 @@ const Fiscal = () => {
         <DataTable columns={columns} data={filteredData} loading={loading} onView={openView} onEdit={openEdit} />
       </ModulePage>
 
-      {/* Form Modal */}
-      <FormModal open={modalOpen} onClose={() => setModalOpen(false)} title={mode === "create" ? "Nova Nota Fiscal" : "Editar Nota Fiscal"} size="xl">
+      {/* Form Modal - Create */}
+      <FormModal open={modalOpen && mode === "create"} onClose={() => setModalOpen(false)} title="Nova Nota Fiscal" size="xl">
         <form onSubmit={handleSubmit} className="space-y-5">
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             <div className="space-y-2"><Label>Tipo</Label>
@@ -420,6 +473,35 @@ const Fiscal = () => {
           </div>
         </form>
       </FormModal>
+
+      {/* Edit Modal */}
+      {selected && (
+        <NotaFiscalEditModal
+          open={modalOpen && mode === "edit"}
+          onClose={() => setModalOpen(false)}
+          selected={selected}
+          form={form}
+          setForm={setForm}
+          items={items}
+          setItems={setItems}
+          itemContaContabil={itemContaContabil}
+          setItemContaContabil={setItemContaContabil}
+          parcelas={parcelas}
+          setParcelas={setParcelas}
+          saving={saving}
+          onSubmit={handleSubmit}
+          onSaveAndConfirm={selected.status === "pendente" ? handleSaveAndConfirm : undefined}
+          onCancelarRascunho={selected.status === "pendente" ? handleCancelarRascunho : undefined}
+          fornecedores={fornecedoresCrud.data}
+          clientes={clientesCrud.data}
+          ordensVenda={ordensVenda}
+          contasContabeis={contasContabeis}
+          produtosCrud={produtosCrud.data}
+          valorProdutos={valorProdutos}
+          totalImpostos={totalImpostos}
+          totalNF={totalNF}
+        />
+      )}
 
       {/* View Drawer */}
       <NotaFiscalDrawer
