@@ -2,6 +2,7 @@ import { ViewDrawerV2, ViewField, ViewSection } from "@/components/ViewDrawerV2"
 import { StatusBadge } from "@/components/StatusBadge";
 import { Badge } from "@/components/ui/badge";
 import { RelationalLink } from "@/components/ui/RelationalLink";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { formatNumber } from "@/lib/format";
 import {
   ArrowUpCircle,
@@ -38,15 +39,15 @@ const tipoConfig: Record<
   string,
   { label: string; status: string; icon: typeof ArrowUpCircle; color: string }
 > = {
-  entrada:           { label: "Entrada",            status: "confirmado", icon: ArrowUpCircle,   color: "text-success" },
-  saida:             { label: "Saída",              status: "cancelado",  icon: ArrowDownCircle, color: "text-destructive" },
-  ajuste:            { label: "Ajuste Manual",      status: "pendente",   icon: RotateCcw,       color: "text-warning" },
-  transferencia:     { label: "Transferência",      status: "pendente",   icon: RotateCcw,       color: "text-warning" },
-  reserva:           { label: "Reserva",            status: "pendente",   icon: Package,         color: "text-muted-foreground" },
-  liberacao_reserva: { label: "Lib. de Reserva",   status: "confirmado", icon: ArrowUpCircle,   color: "text-success" },
-  estorno:           { label: "Estorno",            status: "pendente",   icon: RotateCcw,       color: "text-warning" },
-  inventario:        { label: "Inventário",         status: "pendente",   icon: RotateCcw,       color: "text-warning" },
-  perda_avaria:      { label: "Perda / Avaria",     status: "cancelado",  icon: ArrowDownCircle, color: "text-destructive" },
+  entrada: { label: "Entrada", status: "confirmado", icon: ArrowUpCircle, color: "text-success" },
+  saida: { label: "Saída", status: "cancelado", icon: ArrowDownCircle, color: "text-destructive" },
+  ajuste: { label: "Ajuste Manual", status: "pendente", icon: RotateCcw, color: "text-warning" },
+  transferencia: { label: "Transferência", status: "pendente", icon: RotateCcw, color: "text-warning" },
+  reserva: { label: "Reserva", status: "pendente", icon: Package, color: "text-muted-foreground" },
+  liberacao_reserva: { label: "Lib. de Reserva", status: "confirmado", icon: ArrowUpCircle, color: "text-success" },
+  estorno: { label: "Estorno", status: "pendente", icon: RotateCcw, color: "text-warning" },
+  inventario: { label: "Inventário", status: "pendente", icon: RotateCcw, color: "text-warning" },
+  perda_avaria: { label: "Perda / Avaria", status: "cancelado", icon: ArrowDownCircle, color: "text-destructive" },
 };
 
 function getTipoConfig(tipo: string) {
@@ -170,7 +171,12 @@ export function EstoqueMovimentacaoDrawer({
         </p>
         <p className="text-sm font-semibold leading-tight truncate">
           {m.usuario_id ? (
-            <span className="font-mono text-xs">{m.usuario_id.slice(0, 8)}…</span>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="font-mono text-xs cursor-default">{m.usuario_id.slice(0, 8)}…</span>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="font-mono text-xs">{m.usuario_id}</TooltipContent>
+            </Tooltip>
           ) : (
             "—"
           )}
@@ -291,7 +297,12 @@ export function EstoqueMovimentacaoDrawer({
             {m.usuario_id ? (
               <div className="flex items-center gap-1.5">
                 <User className="h-3 w-3 text-muted-foreground" />
-                <span className="font-mono text-xs">{m.usuario_id.slice(0, 8)}…</span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="font-mono text-xs cursor-default">{m.usuario_id.slice(0, 8)}…</span>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="font-mono text-xs">{m.usuario_id}</TooltipContent>
+                </Tooltip>
               </div>
             ) : (
               <span className="text-muted-foreground">—</span>
