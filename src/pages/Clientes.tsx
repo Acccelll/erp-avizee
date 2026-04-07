@@ -214,7 +214,7 @@ const Clientes = () => {
       <div>
         <p className="font-medium leading-tight">{c.nome_razao_social}</p>
         {c.nome_fantasia && c.nome_fantasia !== c.nome_razao_social && (
-          <p className="text-xs text-muted-foreground truncate max-w-[200px]">{c.nome_fantasia}</p>
+          <p className="text-xs text-muted-foreground truncate max-w-xs">{c.nome_fantasia}</p>
         )}
       </div>
     ),
@@ -239,7 +239,7 @@ const Clientes = () => {
       return (
         <div className="text-xs space-y-0.5">
           {phone && <p className="font-medium tabular-nums">{phone}</p>}
-          {c.email && <p className="text-muted-foreground truncate max-w-[160px]">{c.email}</p>}
+          {c.email && <p className="text-muted-foreground truncate max-w-xs">{c.email}</p>}
         </div>
       );
     },
