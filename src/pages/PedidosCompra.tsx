@@ -584,7 +584,7 @@ const PedidosCompra = () => {
       await refreshAll();
     } catch (err: any) {
       console.error("[cancelarPedido]", err);
-      toast.error("Erro ao cancelar pedido.");
+      toast.error(`Erro ao cancelar pedido: ${err?.message || "tente novamente."}`);
     }
   };
 

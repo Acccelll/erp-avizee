@@ -471,8 +471,7 @@ export function PedidoCompraView({ id }: Props) {
             {viewEstoque.length > 0 ? (
               <p className="text-sm text-success flex items-center gap-1.5">
                 <CheckCircle2 className="h-4 w-4" />
-                {viewEstoque.length} entrada{viewEstoque.length !== 1 ? "s" : ""} de estoque registrada
-                {viewEstoque.length !== 1 ? "s" : ""}.
+                {viewEstoque.length} {viewEstoque.length !== 1 ? "entradas de estoque registradas" : "entrada de estoque registrada"}.
               </p>
             ) : (
               <p className="text-sm text-muted-foreground">Nenhuma movimentação de estoque registrada.</p>
