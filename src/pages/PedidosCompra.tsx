@@ -199,6 +199,18 @@ const PedidosCompra = () => {
     },
   });
 
+  const { data: formasPagamentoRaw = [] } = useQuery({
+    queryKey: ["pedidos_compra_formas_pagamento"],
+    queryFn: async () => {
+      const { data, error } = await (supabase.from as any)("formas_pagamento")
+        .select("id, descricao")
+        .eq("ativo", true)
+        .order("descricao", { ascending: true });
+      if (error) throw error;
+      return (data || []) as { id: string; descricao: string }[];
+    },
+  });
+
   const data = pedidosRaw;
 
   const fornecedoresAtivos = fornecedoresRaw.filter((f) => f.ativo !== false);
@@ -753,11 +765,22 @@ const PedidosCompra = () => {
 
             <div className="space-y-2">
               <Label>Condição de Pagamento</Label>
-              <Input
-                value={form.condicao_pagamento}
-                onChange={(e) => setForm({ ...form, condicao_pagamento: e.target.value })}
-                placeholder="Ex: 30/60/90"
-              />
+              <Select
+                value={form.condicao_pagamento || ""}
+                onValueChange={(v) => setForm({ ...form, condicao_pagamento: v === "__none__" ? "" : v })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">— Nenhuma —</SelectItem>
+                  {formasPagamentoRaw.map((fp) => (
+                    <SelectItem key={fp.id} value={fp.descricao}>
+                      {fp.descricao}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">
