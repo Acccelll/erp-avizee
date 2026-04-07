@@ -128,13 +128,14 @@ const GruposEconomicos = () => {
       const clienteIds = Object.keys(clienteToGrupo);
       if (clienteIds.length === 0) return;
 
-      const { data: titulos } = await supabase
+      const { data: titulos, error: finError } = await supabase
         .from("financeiro_lancamentos")
         .select("cliente_id, valor, status")
         .in("cliente_id", clienteIds)
         .eq("tipo", "receber")
         .eq("ativo", true)
         .in("status", ["aberto", "vencido"]);
+      if (finError) { console.error("[grupos-economicos] erro ao carregar dados financeiros:", finError); return; }
 
       const vencidosMap: Record<string, number> = {};
       const saldoMap: Record<string, number> = {};
@@ -426,7 +427,7 @@ const GruposEconomicos = () => {
         return (
           <div className="flex items-center gap-1.5">
             <Users className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-            <span className="font-semibold text-sm tabular-nums">{count}</span>
+            <span className="font-medium text-sm tabular-nums">{count}</span>
           </div>
         );
       },
