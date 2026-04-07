@@ -58,14 +58,14 @@ interface PedidoCompra {
   ativo?: boolean | null;
   created_at?: string | null;
   fornecedores?: {
-    nome_razao: string | null;
+    nome_razao_social: string | null;
     cpf_cnpj?: string | null;
   } | null;
 }
 
 interface FornecedorOptionRow {
   id: string | number;
-  nome_razao: string | null;
+  nome_razao_social: string | null;
   cpf_cnpj?: string | null;
   ativo?: boolean | null;
 }
@@ -120,7 +120,7 @@ const PedidosCompra = () => {
     queryKey: ["pedidos_compra"],
     queryFn: async () => {
       const { data, error } = await (supabase.from as any)("pedidos_compra")
-        .select("*, fornecedores(nome_razao, cpf_cnpj)")
+        .select("*, fornecedores(nome_razao_social, cpf_cnpj)")
         .eq("ativo", true)
         .order("id", { ascending: false });
 
@@ -145,7 +145,7 @@ const PedidosCompra = () => {
     queryKey: ["pedidos_compra_fornecedores"],
     queryFn: async () => {
       const { data, error } = await (supabase.from as any)("fornecedores")
-        .select("id, nome_razao, cpf_cnpj, ativo")
+        .select("id, nome_razao_social, cpf_cnpj, ativo")
         .order("id", { ascending: false });
 
       if (error) {
@@ -212,7 +212,7 @@ const PedidosCompra = () => {
 
   const fornecedorOptions = fornecedoresAtivos.map((f) => ({
     id: String(f.id),
-    label: f.nome_razao || "",
+    label: f.nome_razao_social || "",
     sublabel: f.cpf_cnpj || "",
   }));
 
@@ -350,25 +350,18 @@ const PedidosCompra = () => {
       return;
     }
 
-    const fornecedorIdNormalizado =
-      form.fornecedor_id === "" || form.fornecedor_id === null || form.fornecedor_id === undefined
-        ? null
-        : Number(form.fornecedor_id);
-
-    if (!fornecedorIdNormalizado || Number.isNaN(fornecedorIdNormalizado)) {
-      toast.error("Fornecedor inválido");
-      return;
-    }
+    // fornecedor_id is a UUID string; keep it as-is (no numeric conversion)
+    const fornecedorId = String(form.fornecedor_id);
 
     setSaving(true);
 
     const payload = {
-      fornecedor_id: fornecedorIdNormalizado,
+      fornecedor_id: fornecedorId,
       data_pedido: form.data_pedido,
       data_entrega_prevista: form.data_entrega_prevista || null,
       data_entrega_real: form.data_entrega_real || null,
       frete_valor: Number(form.frete_valor || 0),
-      condicoes_pagamento: form.condicao_pagamento || null,
+      condicao_pagamento: form.condicao_pagamento || null,
       status: form.status,
       observacoes: form.observacoes || null,
       valor_total: valorTotal,
@@ -422,8 +415,8 @@ const PedidosCompra = () => {
         const itemsPayload = items
           .filter((i) => i.produto_id)
           .map((i) => ({
-            pedido_compra_id: Number(pedidoId),
-            produto_id: Number(i.produto_id),
+            pedido_compra_id: String(pedidoId),
+            produto_id: String(i.produto_id),
             quantidade: Number(i.quantidade || 0),
             valor_unitario: Number(i.valor_unitario || 0),
             valor_total: Number(i.valor_total || 0),
@@ -515,12 +508,12 @@ const PedidosCompra = () => {
       if (vTotal > 0) {
         await supabase.from("financeiro_lancamentos").insert({
           tipo: "pagar" as any,
-          descricao: `${pedidoNumero(p)} — ${p.fornecedores?.nome_razao || "Fornecedor"}`,
+          descricao: `${pedidoNumero(p)} — ${p.fornecedores?.nome_razao_social || "Fornecedor"}`,
           valor: vTotal,
           saldo_restante: vTotal,
           data_vencimento: p.data_entrega_prevista || new Date().toISOString().split("T")[0],
           status: "aberto" as any,
-          fornecedor_id: p.fornecedor_id ? Number(p.fornecedor_id) : null,
+          fornecedor_id: p.fornecedor_id || null,
         });
       }
 
@@ -565,7 +558,7 @@ const PedidosCompra = () => {
     {
       key: "fornecedor",
       label: "Fornecedor",
-      render: (p: PedidoCompra) => p.fornecedores?.nome_razao || "—",
+      render: (p: PedidoCompra) => p.fornecedores?.nome_razao_social || "—",
     },
     {
       key: "data_pedido",
@@ -819,7 +812,7 @@ const PedidosCompra = () => {
                 <ViewField label="Fornecedor">
                   {selected.fornecedor_id ? (
                     <RelationalLink type="fornecedor" id={selected.fornecedor_id}>
-                      {selected.fornecedores?.nome_razao || "—"}
+                      {selected.fornecedores?.nome_razao_social || "—"}
                     </RelationalLink>
                   ) : (
                     <span className="text-muted-foreground">Não informado</span>
@@ -1083,7 +1076,7 @@ const PedidosCompra = () => {
                   {selected.fornecedor_id ? (
                     <RelationalLink type="fornecedor" id={selected.fornecedor_id}>
                       <Building2 className="h-3.5 w-3.5" />
-                      {selected.fornecedores?.nome_razao || "—"}
+                      {selected.fornecedores?.nome_razao_social || "—"}
                     </RelationalLink>
                   ) : (
                     <span className="text-muted-foreground">Não vinculado</span>
