@@ -75,18 +75,8 @@ export function RelationalDrawerStack() {
               }}
             >
               <SheetHeader className="sticky top-0 z-10 bg-card border-b px-6 py-3 flex flex-col gap-1 space-y-0">
-                <div className="flex items-center justify-between text-xs text-muted-foreground leading-none">
-                  <span>Drawers: {stack.length}/{MAX_DRAWER_DEPTH}</span>
-                  <Button variant="ghost" size="sm" className="h-7 px-2.5 text-xs" onClick={clearStack}>Fechar todos</Button>
-                </div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2.5 min-w-0">
-                    {index > 0 && (
-                      <Button variant="ghost" size="sm" className="h-7 shrink-0 gap-1 px-2.5" onClick={popView}>
-                        <ArrowLeft className="h-4 w-4" />
-                        <span className="text-xs">Voltar para {getTitle(stack[index - 1].type)}</span>
-                      </Button>
-                    )}
                     <SheetTitle className="text-base truncate">{getTitle(view.type)}</SheetTitle>
                     <SheetDescription className="sr-only">Visualização de {getTitle(view.type)}</SheetDescription>
                   </div>
@@ -101,13 +91,28 @@ export function RelationalDrawerStack() {
                     )}
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={clearStack}><X className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={popView}><X className="h-4 w-4" /></Button>
                       </TooltipTrigger>
-                      <TooltipContent side="bottom">Fechar tudo <kbd className="ml-1 text-xs opacity-70">⇧ ESC</kbd></TooltipContent>
+                      <TooltipContent side="bottom">Fechar drawer</TooltipContent>
                     </Tooltip>
                   </div>
                 </div>
               </SheetHeader>
+
+              <div className="border-b bg-muted/20 px-6 py-2.5 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 text-xs text-muted-foreground min-w-0">
+                  <span className="shrink-0">Drawers: {stack.length}/{MAX_DRAWER_DEPTH}</span>
+                  {index > 0 && (
+                    <Button variant="ghost" size="sm" className="h-7 gap-1 px-2.5 -ml-1" onClick={popView}>
+                      <ArrowLeft className="h-4 w-4" />
+                      <span className="text-xs truncate">Voltar para {getTitle(stack[index - 1].type)}</span>
+                    </Button>
+                  )}
+                </div>
+                <Button variant="ghost" size="sm" className="h-7 px-2.5 text-xs shrink-0" onClick={clearStack}>
+                  Fechar todos
+                </Button>
+              </div>
 
               <div className="flex-1 px-6 pt-3 pb-4">
                 <DrawerContent view={view} />
