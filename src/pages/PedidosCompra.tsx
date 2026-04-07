@@ -96,6 +96,57 @@ const emptyForm = {
 
 const pedidoNumero = (p: Pick<PedidoCompra, "id" | "numero">) => p.numero || `PC-${p.id}`;
 
+const MOCK_PEDIDOS: PedidoCompra[] = [
+  {
+    id: "b3b3b3b3-b003-b003-b003-b00300000001",
+    numero: "PC-EX-0001",
+    fornecedor_id: "a5a5a5a5-0005-0005-0005-000000000001",
+    data_pedido: "2026-03-12",
+    data_entrega_prevista: "2026-03-20",
+    data_entrega_real: "2026-03-20",
+    valor_total: 3190.0,
+    frete_valor: 120.0,
+    condicao_pagamento: "30 dias",
+    status: "recebido",
+    observacoes: "Pedido exemplo recebido integralmente.",
+    cotacao_compra_id: null,
+    ativo: true,
+    fornecedores: { nome_razao_social: "BioVet Insumos Ltda", cpf_cnpj: "11.222.333/0001-44" },
+  },
+  {
+    id: "b3b3b3b3-b003-b003-b003-b00300000002",
+    numero: "PC-EX-0002",
+    fornecedor_id: "a5a5a5a5-0005-0005-0005-000000000002",
+    data_pedido: "2026-03-28",
+    data_entrega_prevista: "2026-04-10",
+    data_entrega_real: null,
+    valor_total: 2880.0,
+    frete_valor: 85.0,
+    condicao_pagamento: "45 dias",
+    status: "aguardando_recebimento",
+    observacoes: "Pedido exemplo aguardando recebimento do fornecedor.",
+    cotacao_compra_id: null,
+    ativo: true,
+    fornecedores: { nome_razao_social: "Agroinsumos do Sul Ltda", cpf_cnpj: "22.333.444/0001-55" },
+  },
+  {
+    id: "b3b3b3b3-b003-b003-b003-b00300000003",
+    numero: "PC-EX-0003",
+    fornecedor_id: "a5a5a5a5-0005-0005-0005-000000000003",
+    data_pedido: "2026-04-03",
+    data_entrega_prevista: "2026-04-18",
+    data_entrega_real: null,
+    valor_total: 1860.0,
+    frete_valor: 60.0,
+    condicao_pagamento: "a_vista",
+    status: "pedido_emitido",
+    observacoes: "Pedido exemplo recém emitido para acompanhamento de recebimento.",
+    cotacao_compra_id: null,
+    ativo: true,
+    fornecedores: { nome_razao_social: "Pack Rural Embalagens Ltda", cpf_cnpj: "33.444.555/0001-66" },
+  },
+];
+
 const PedidosCompra = () => {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -199,7 +250,7 @@ const PedidosCompra = () => {
     },
   });
 
-  const data = pedidosRaw;
+  const data = pedidosRaw.length > 0 ? pedidosRaw : MOCK_PEDIDOS;
 
   const fornecedoresAtivos = fornecedoresRaw.filter((f) => f.ativo !== false);
 
