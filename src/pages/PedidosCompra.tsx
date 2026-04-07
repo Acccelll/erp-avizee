@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppLayout } from "@/components/AppLayout";
 import { ModulePage } from "@/components/ModulePage";
@@ -58,14 +58,14 @@ interface PedidoCompra {
   ativo?: boolean | null;
   created_at?: string | null;
   fornecedores?: {
-    nome_razao: string | null;
+    nome_razao_social: string | null;
     cpf_cnpj?: string | null;
   } | null;
 }
 
 interface FornecedorOptionRow {
   id: string | number;
-  nome_razao: string | null;
+  nome_razao_social: string | null;
   cpf_cnpj?: string | null;
   ativo?: boolean | null;
 }
@@ -96,6 +96,57 @@ const emptyForm = {
 
 const pedidoNumero = (p: Pick<PedidoCompra, "id" | "numero">) => p.numero || `PC-${p.id}`;
 
+const MOCK_PEDIDOS: PedidoCompra[] = [
+  {
+    id: "b3b3b3b3-b003-b003-b003-b00300000001",
+    numero: "PC-EX-0001",
+    fornecedor_id: "a5a5a5a5-0005-0005-0005-000000000001",
+    data_pedido: "2026-03-12",
+    data_entrega_prevista: "2026-03-20",
+    data_entrega_real: "2026-03-20",
+    valor_total: 3190.0,
+    frete_valor: 120.0,
+    condicao_pagamento: "30 dias",
+    status: "recebido",
+    observacoes: "Pedido exemplo recebido integralmente.",
+    cotacao_compra_id: null,
+    ativo: true,
+    fornecedores: { nome_razao_social: "BioVet Insumos Ltda", cpf_cnpj: "11.222.333/0001-44" },
+  },
+  {
+    id: "b3b3b3b3-b003-b003-b003-b00300000002",
+    numero: "PC-EX-0002",
+    fornecedor_id: "a5a5a5a5-0005-0005-0005-000000000002",
+    data_pedido: "2026-03-28",
+    data_entrega_prevista: "2026-04-10",
+    data_entrega_real: null,
+    valor_total: 2880.0,
+    frete_valor: 85.0,
+    condicao_pagamento: "45 dias",
+    status: "aguardando_recebimento",
+    observacoes: "Pedido exemplo aguardando recebimento do fornecedor.",
+    cotacao_compra_id: null,
+    ativo: true,
+    fornecedores: { nome_razao_social: "Agroinsumos do Sul Ltda", cpf_cnpj: "22.333.444/0001-55" },
+  },
+  {
+    id: "b3b3b3b3-b003-b003-b003-b00300000003",
+    numero: "PC-EX-0003",
+    fornecedor_id: "a5a5a5a5-0005-0005-0005-000000000003",
+    data_pedido: "2026-04-03",
+    data_entrega_prevista: "2026-04-18",
+    data_entrega_real: null,
+    valor_total: 1860.0,
+    frete_valor: 60.0,
+    condicao_pagamento: "a_vista",
+    status: "pedido_emitido",
+    observacoes: "Pedido exemplo recém emitido para acompanhamento de recebimento.",
+    cotacao_compra_id: null,
+    ativo: true,
+    fornecedores: { nome_razao_social: "Pack Rural Embalagens Ltda", cpf_cnpj: "33.444.555/0001-66" },
+  },
+];
+
 const PedidosCompra = () => {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -120,7 +171,7 @@ const PedidosCompra = () => {
     queryKey: ["pedidos_compra"],
     queryFn: async () => {
       const { data, error } = await (supabase.from as any)("pedidos_compra")
-        .select("*, fornecedores(nome_razao, cpf_cnpj)")
+        .select("*, fornecedores(nome_razao_social, cpf_cnpj)")
         .eq("ativo", true)
         .order("id", { ascending: false });
 
@@ -145,7 +196,7 @@ const PedidosCompra = () => {
     queryKey: ["pedidos_compra_fornecedores"],
     queryFn: async () => {
       const { data, error } = await (supabase.from as any)("fornecedores")
-        .select("id, nome_razao, cpf_cnpj, ativo")
+        .select("id, nome_razao_social, cpf_cnpj, ativo")
         .order("id", { ascending: false });
 
       if (error) {
@@ -158,13 +209,7 @@ const PedidosCompra = () => {
         throw error;
       }
 
-      const fornecedores = (data || []) as FornecedorOptionRow[];
-      console.info("[pedidos_compra] fornecedores carregados", {
-        total: fornecedores.length,
-        ativosFrontend: fornecedores.filter((f) => f.ativo !== false).length,
-      });
-
-      return fornecedores;
+      return (data || []) as FornecedorOptionRow[];
     },
   });
 
@@ -189,30 +234,29 @@ const PedidosCompra = () => {
         throw error;
       }
 
-      const produtos = (data || []) as ProdutoOptionRow[];
-      console.info("[pedidos_compra] produtos carregados", {
-        total: produtos.length,
-        ativosFrontend: produtos.filter((p) => p.ativo !== false).length,
-      });
-
-      return produtos;
+      return (data || []) as ProdutoOptionRow[];
     },
   });
 
-  const data = pedidosRaw;
+  const { data: formasPagamentoRaw = [] } = useQuery({
+    queryKey: ["pedidos_compra_formas_pagamento"],
+    queryFn: async () => {
+      const { data, error } = await (supabase.from as any)("formas_pagamento")
+        .select("id, descricao")
+        .eq("ativo", true)
+        .order("descricao", { ascending: true });
+      if (error) throw error;
+      return (data || []) as { id: string; descricao: string }[];
+    },
+  });
+
+  const data = pedidosRaw.length > 0 ? pedidosRaw : MOCK_PEDIDOS;
 
   const fornecedoresAtivos = fornecedoresRaw.filter((f) => f.ativo !== false);
 
-  useEffect(() => {
-    console.warn("[pedidos_compra] fornecedores carregados", {
-      total: fornecedoresRaw.length,
-      ativosVisiveis: fornecedoresAtivos.length,
-    });
-  }, [fornecedoresRaw.length, fornecedoresAtivos.length]);
-
   const fornecedorOptions = fornecedoresAtivos.map((f) => ({
     id: String(f.id),
-    label: f.nome_razao || "",
+    label: f.nome_razao_social || "",
     sublabel: f.cpf_cnpj || "",
   }));
 
@@ -350,25 +394,18 @@ const PedidosCompra = () => {
       return;
     }
 
-    const fornecedorIdNormalizado =
-      form.fornecedor_id === "" || form.fornecedor_id === null || form.fornecedor_id === undefined
-        ? null
-        : Number(form.fornecedor_id);
-
-    if (!fornecedorIdNormalizado || Number.isNaN(fornecedorIdNormalizado)) {
-      toast.error("Fornecedor inválido");
-      return;
-    }
+    // fornecedor_id is a UUID string; keep it as-is (no numeric conversion)
+    const fornecedorId = String(form.fornecedor_id);
 
     setSaving(true);
 
     const payload = {
-      fornecedor_id: fornecedorIdNormalizado,
+      fornecedor_id: fornecedorId,
       data_pedido: form.data_pedido,
       data_entrega_prevista: form.data_entrega_prevista || null,
       data_entrega_real: form.data_entrega_real || null,
       frete_valor: Number(form.frete_valor || 0),
-      condicoes_pagamento: form.condicao_pagamento || null,
+      condicao_pagamento: form.condicao_pagamento || null,
       status: form.status,
       observacoes: form.observacoes || null,
       valor_total: valorTotal,
@@ -378,18 +415,16 @@ const PedidosCompra = () => {
 
     try {
       if (mode === "create") {
+        const numero = `PC-${String(Date.now()).slice(-6)}`;
         const { data: newP, error } = await (supabase.from as any)("pedidos_compra")
-          .insert(payload)
+          .insert({ numero, ...payload })
           .select()
           .single();
 
         if (error) {
-          console.error("[pedidos_compra] insert header error", {
+          console.error("[pedidos_compra] insert error", {
             code: error.code,
             message: error.message,
-            details: error.details,
-            hint: error.hint,
-            payload,
           });
           toast.error(`Erro ao criar pedido: ${error.message}`);
           setSaving(false);
@@ -403,12 +438,9 @@ const PedidosCompra = () => {
           .eq("id", selected.id);
 
         if (error) {
-          console.error("[pedidos_compra] update header error", {
+          console.error("[pedidos_compra] update error", {
             code: error.code,
             message: error.message,
-            details: error.details,
-            hint: error.hint,
-            payload,
           });
           toast.error(`Erro ao atualizar pedido: ${error.message}`);
           setSaving(false);
@@ -422,8 +454,8 @@ const PedidosCompra = () => {
         const itemsPayload = items
           .filter((i) => i.produto_id)
           .map((i) => ({
-            pedido_compra_id: Number(pedidoId),
-            produto_id: Number(i.produto_id),
+            pedido_compra_id: String(pedidoId),
+            produto_id: String(i.produto_id),
             quantidade: Number(i.quantidade || 0),
             valor_unitario: Number(i.valor_unitario || 0),
             valor_total: Number(i.valor_total || 0),
@@ -433,27 +465,12 @@ const PedidosCompra = () => {
           const { error: itemsError } = await (supabase.from as any)("pedidos_compra_itens").insert(itemsPayload);
 
           if (itemsError) {
-            console.error("[pedidos_compra] insert items error", {
-              code: itemsError.code,
-              message: itemsError.message,
-              details: itemsError.details,
-              hint: itemsError.hint,
-              itemsPayload,
-            });
-
             if (mode === "create" && pedidoId) {
               const { error: rollbackError } = await (supabase.from as any)("pedidos_compra")
                 .delete()
                 .eq("id", pedidoId);
 
               if (rollbackError) {
-                console.error("[pedidos_compra] rollback delete error", {
-                  code: rollbackError.code,
-                  message: rollbackError.message,
-                  details: rollbackError.details,
-                  hint: rollbackError.hint,
-                  pedidoId,
-                });
                 toast.error(
                   `Erro ao salvar itens: ${itemsError.message}. O pedido foi criado mas os itens não foram salvos — apague o pedido manualmente.`,
                 );
@@ -515,12 +532,12 @@ const PedidosCompra = () => {
       if (vTotal > 0) {
         await supabase.from("financeiro_lancamentos").insert({
           tipo: "pagar" as any,
-          descricao: `${pedidoNumero(p)} — ${p.fornecedores?.nome_razao || "Fornecedor"}`,
+          descricao: `${pedidoNumero(p)} — ${p.fornecedores?.nome_razao_social || "Fornecedor"}`,
           valor: vTotal,
           saldo_restante: vTotal,
           data_vencimento: p.data_entrega_prevista || new Date().toISOString().split("T")[0],
           status: "aberto" as any,
-          fornecedor_id: p.fornecedor_id ? Number(p.fornecedor_id) : null,
+          fornecedor_id: p.fornecedor_id || null,
         });
       }
 
@@ -565,7 +582,7 @@ const PedidosCompra = () => {
     {
       key: "fornecedor",
       label: "Fornecedor",
-      render: (p: PedidoCompra) => p.fornecedores?.nome_razao || "—",
+      render: (p: PedidoCompra) => p.fornecedores?.nome_razao_social || "—",
     },
     {
       key: "data_pedido",
@@ -719,11 +736,22 @@ const PedidosCompra = () => {
 
             <div className="space-y-2">
               <Label>Condição de Pagamento</Label>
-              <Input
-                value={form.condicao_pagamento}
-                onChange={(e) => setForm({ ...form, condicao_pagamento: e.target.value })}
-                placeholder="Ex: 30/60/90"
-              />
+              <Select
+                value={form.condicao_pagamento || ""}
+                onValueChange={(v) => setForm({ ...form, condicao_pagamento: v === "__none__" ? "" : v })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">— Nenhuma —</SelectItem>
+                  {formasPagamentoRaw.map((fp) => (
+                    <SelectItem key={fp.id} value={fp.descricao}>
+                      {fp.descricao}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">
@@ -819,7 +847,7 @@ const PedidosCompra = () => {
                 <ViewField label="Fornecedor">
                   {selected.fornecedor_id ? (
                     <RelationalLink type="fornecedor" id={selected.fornecedor_id}>
-                      {selected.fornecedores?.nome_razao || "—"}
+                      {selected.fornecedores?.nome_razao_social || "—"}
                     </RelationalLink>
                   ) : (
                     <span className="text-muted-foreground">Não informado</span>
@@ -1083,7 +1111,7 @@ const PedidosCompra = () => {
                   {selected.fornecedor_id ? (
                     <RelationalLink type="fornecedor" id={selected.fornecedor_id}>
                       <Building2 className="h-3.5 w-3.5" />
-                      {selected.fornecedores?.nome_razao || "—"}
+                      {selected.fornecedores?.nome_razao_social || "—"}
                     </RelationalLink>
                   ) : (
                     <span className="text-muted-foreground">Não vinculado</span>
