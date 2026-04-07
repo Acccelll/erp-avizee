@@ -6,6 +6,10 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { FormModal } from "@/components/FormModal";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { ViewDrawerV2, ViewField, ViewSection } from "@/components/ViewDrawerV2";
+import { AdvancedFilterBar } from "@/components/AdvancedFilterBar";
+import type { FilterChip } from "@/components/AdvancedFilterBar";
+import { StatCard } from "@/components/StatCard";
+import { MultiSelect, type MultiSelectOption } from "@/components/ui/MultiSelect";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Edit, Trash2, DollarSign, Users, UserCheck, UserX, CalendarDays, FileText, AlertTriangle, CheckCircle2, HelpCircle, Loader2, Info } from "lucide-react";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
@@ -14,11 +18,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { SummaryCard } from "@/components/SummaryCard";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { formatCurrency, formatDate, formatNumber } from "@/lib/format";
+import { formatCurrency, formatDate } from "@/lib/format";
 
 interface Funcionario {
   id: string; nome: string; cpf: string; cargo: string; departamento: string;
@@ -77,6 +80,8 @@ export default function Funcionarios() {
   const [searchTerm, setSearchTerm] = useState("");
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [ativoFilters, setAtivoFilters] = useState<string[]>([]);
+  const [tipoContratoFilters, setTipoContratoFilters] = useState<string[]>([]);
 
   // Folha states
   const [folhaModalOpen, setFolhaModalOpen] = useState(false);
@@ -213,18 +218,50 @@ export default function Funcionarios() {
 
   const filteredData = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
-    if (!q) return data;
-    return data.filter(f => [f.nome, f.cpf, f.cargo, f.departamento].filter(Boolean).join(" ").toLowerCase().includes(q));
-  }, [data, searchTerm]);
+    return data.filter(f => {
+      if (q && ![f.nome, f.cpf, f.cargo, f.departamento].filter(Boolean).join(" ").toLowerCase().includes(q)) return false;
+      if (ativoFilters.length > 0) {
+        const status = f.ativo ? "ativo" : "inativo";
+        if (!ativoFilters.includes(status)) return false;
+      }
+      if (tipoContratoFilters.length > 0 && !tipoContratoFilters.includes(f.tipo_contrato)) return false;
+      return true;
+    });
+  }, [data, searchTerm, ativoFilters, tipoContratoFilters]);
+
+  const activeFilters = useMemo<FilterChip[]>(() => {
+    const chips: FilterChip[] = [];
+    ativoFilters.forEach(f => chips.push({ key: "ativo", label: "Status", value: [f], displayValue: f === "ativo" ? "Ativo" : "Inativo" }));
+    tipoContratoFilters.forEach(f => chips.push({ key: "tipo_contrato", label: "Contrato", value: [f], displayValue: tipoContratoLabel[f] || f }));
+    return chips;
+  }, [ativoFilters, tipoContratoFilters]);
+
+  const handleRemoveFilter = (key: string, value?: string) => {
+    if (key === "ativo") setAtivoFilters(prev => prev.filter(v => v !== value));
+    else if (key === "tipo_contrato") setTipoContratoFilters(prev => prev.filter(v => v !== value));
+  };
+
+  const ativoOptions: MultiSelectOption[] = [
+    { label: "Ativo", value: "ativo" },
+    { label: "Inativo", value: "inativo" },
+  ];
+
+  const tipoContratoOptions: MultiSelectOption[] = [
+    { label: "CLT", value: "clt" },
+    { label: "PJ", value: "pj" },
+    { label: "Estágio", value: "estagio" },
+    { label: "Temporário", value: "temporario" },
+  ];
 
   const columns = [
     { key: "nome", label: "Nome" },
+    { key: "ativo", label: "Status", render: (f: Funcionario) => <StatusBadge status={f.ativo ? "Ativo" : "Inativo"} /> },
     { key: "cargo", label: "Cargo", render: (f: Funcionario) => f.cargo || "—" },
     { key: "departamento", label: "Depto.", render: (f: Funcionario) => f.departamento || "—" },
-    { key: "tipo_contrato", label: "Tipo", render: (f: Funcionario) => tipoContratoLabel[f.tipo_contrato] || f.tipo_contrato },
-    { key: "salario_base", label: "Salário Base", render: (f: Funcionario) => <span className="font-mono">{formatCurrency(Number(f.salario_base))}</span> },
+    { key: "tipo_contrato", label: "Contrato", render: (f: Funcionario) => tipoContratoLabel[f.tipo_contrato] || f.tipo_contrato },
     { key: "data_admissao", label: "Admissão", render: (f: Funcionario) => formatDate(f.data_admissao) },
-    { key: "ativo", label: "Status", render: (f: Funcionario) => <StatusBadge status={f.ativo ? "Ativo" : "Inativo"} /> },
+    { key: "cpf", label: "CPF", hidden: true, render: (f: Funcionario) => f.cpf || "—" },
+    { key: "salario_base", label: "Salário Base", hidden: true, render: (f: Funcionario) => <span className="font-mono">{formatCurrency(Number(f.salario_base))}</span> },
   ];
 
   // Current month as YYYY-MM for default competencia
@@ -232,17 +269,53 @@ export default function Funcionarios() {
 
   return (
     <AppLayout>
-      <ModulePage title="Funcionários" subtitle="Cadastro e folha de pagamento simplificada" addLabel="Novo Funcionário" onAdd={openCreate}
-        count={filteredData.length} searchValue={searchTerm} onSearchChange={setSearchTerm} searchPlaceholder="Buscar por nome, cargo, CPF...">
+      <ModulePage
+        title="Funcionários"
+        subtitle="Central de consulta e gestão de funcionários"
+        addLabel="Novo Funcionário"
+        onAdd={openCreate}
+        summaryCards={
+          <>
+            <StatCard title="Total de Funcionários" value={String(kpis.total)} icon={Users} />
+            <StatCard title="Ativos" value={String(kpis.ativos)} icon={UserCheck} iconColor="text-success" />
+            <StatCard title="Inativos" value={String(kpis.inativos)} icon={UserX} iconColor={kpis.inativos > 0 ? "text-destructive" : undefined} />
+            <StatCard title="Folha Mensal" value={formatCurrency(kpis.totalSalarios)} icon={DollarSign} />
+          </>
+        }
+      >
+        <AdvancedFilterBar
+          searchValue={searchTerm}
+          onSearchChange={setSearchTerm}
+          searchPlaceholder="Buscar por nome, cargo, CPF, departamento..."
+          activeFilters={activeFilters}
+          onRemoveFilter={handleRemoveFilter}
+          onClearAll={() => { setAtivoFilters([]); setTipoContratoFilters([]); }}
+          count={filteredData.length}
+        >
+          <MultiSelect
+            options={ativoOptions}
+            selected={ativoFilters}
+            onChange={setAtivoFilters}
+            placeholder="Status"
+            className="w-[130px]"
+          />
+          <MultiSelect
+            options={tipoContratoOptions}
+            selected={tipoContratoFilters}
+            onChange={setTipoContratoFilters}
+            placeholder="Contrato"
+            className="w-[150px]"
+          />
+        </AdvancedFilterBar>
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <SummaryCard title="Total" value={formatNumber(kpis.total)} icon={Users} variationType="neutral" variation="funcionários" />
-          <SummaryCard title="Ativos" value={formatNumber(kpis.ativos)} icon={UserCheck} variationType="positive" variation="em atividade" />
-          <SummaryCard title="Inativos" value={formatNumber(kpis.inativos)} icon={UserX} variationType={kpis.inativos > 0 ? "negative" : "neutral"} variation="desligados" />
-          <SummaryCard title="Folha Mensal" value={formatCurrency(kpis.totalSalarios)} icon={DollarSign} variationType="neutral" variation="salários base" />
-        </div>
-
-        <DataTable columns={columns} data={filteredData} loading={loading} onView={openView} />
+        <DataTable
+          columns={columns}
+          data={filteredData}
+          loading={loading}
+          moduleKey="funcionarios"
+          showColumnToggle={true}
+          onView={openView}
+        />
       </ModulePage>
 
       {/* Create/Edit Modal */}
