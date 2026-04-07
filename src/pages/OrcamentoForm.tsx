@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AutocompleteSearch } from "@/components/ui/AutocompleteSearch";
 import { OrcamentoItemsGrid, type OrcamentoItem } from "@/components/Orcamento/OrcamentoItemsGrid";
+import { OrcamentoInternalAnalysisPanel } from "@/components/Orcamento/OrcamentoInternalAnalysisPanel";
 import { OrcamentoTotaisCard } from "@/components/Orcamento/OrcamentoTotaisCard";
 import { OrcamentoCondicoesCard } from "@/components/Orcamento/OrcamentoCondicoesCard";
 import { FreteCorreiosCard } from "@/components/Orcamento/FreteCorreiosCard";
@@ -25,6 +26,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Tables } from "@/integrations/supabase/types";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { TemplateConfig } from "@/types/orcamento";
+import { calcularRentabilidade, type InternalCostCandidate } from "@/lib/orcamentoRentabilidade";
+import { getOrcamentoInternalAccess } from "@/lib/orcamentoInternalAccess";
 
 interface ClienteSnapshot {
   nome_razao_social: string; nome_fantasia: string; cpf_cnpj: string;
@@ -56,7 +59,7 @@ export default function OrcamentoForm() {
   const pdfRef = useRef<HTMLDivElement>(null);
   const isEdit = !!id;
   const isMobile = useIsMobile();
-  const { user } = useAuth();
+  const { user, roles } = useAuth();
 
   const [saving, setSaving] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(searchParams.get("preview") === "1");
@@ -105,6 +108,43 @@ export default function OrcamentoForm() {
   const valorSimulado = Math.max(0, valorTotal - simDescontoGeral + simFreteSeguro);
   const quantidadeTotal = items.reduce((sum, i) => sum + (i.quantidade || 0), 0);
   const pesoTotal = items.reduce((sum, i) => sum + (i.peso_total || 0), 0);
+  const internalAccess = useMemo(() => getOrcamentoInternalAccess(roles), [roles]);
+
+  const productCostMap = useMemo(() => {
+    const map = new Map<string, InternalCostCandidate>();
+    for (const product of produtos) {
+      const fornecedores = product.produtos_fornecedores || [];
+      const lastPurchase = [...fornecedores]
+        .filter((row) => row.preco_compra && Number(row.preco_compra) > 0)
+        .sort((a, b) => {
+          const dateA = a.ultima_compra ? new Date(a.ultima_compra).getTime() : 0;
+          const dateB = b.ultima_compra ? new Date(b.ultima_compra).getTime() : 0;
+          return dateB - dateA;
+        })[0];
+
+      map.set(product.id, {
+        productCost: product.preco_custo,
+        lastPurchaseCost: lastPurchase?.preco_compra ?? null,
+        avgCost: null,
+      });
+    }
+    return map;
+  }, [produtos]);
+
+  const internalAnalysis = useMemo(() => calcularRentabilidade(
+    items,
+    {
+      descontoGlobal: desconto,
+      frete: freteValor,
+      impostoSt,
+      impostoIpi,
+      outrasDespesas,
+    },
+    (item) => ({
+      ...(productCostMap.get(item.produto_id) || {}),
+      manualCost: item.custo_manual_unitario ?? null,
+    }),
+  ), [items, desconto, freteValor, impostoSt, impostoIpi, outrasDespesas, productCostMap]);
 
   useEffect(() => {
     if (!supabase) {
@@ -652,6 +692,11 @@ export default function OrcamentoForm() {
             onChange={setItems}
             produtos={produtos}
             precosEspeciais={precosEspeciais}
+          />
+
+          <OrcamentoInternalAnalysisPanel
+            analysis={internalAnalysis}
+            access={internalAccess}
           />
 
           <OrcamentoTotaisCard
