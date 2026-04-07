@@ -96,7 +96,16 @@ const GruposEconomicos = () => {
     searchColumns: ["nome"],
   });
 
-  // Load client counts per group and matriz names
+  // Stable string keys derived from data - avoids infinite effect loops caused by
+  // useSupabaseCrud returning a new [] reference on every render while loading.
+  const dataIdsKey = useMemo(() => data.map((g) => g.id).join(","), [data]);
+  const matrizIdsKey = useMemo(
+    () =>
+      [...new Set(data.map((g) => g.empresa_matriz_id).filter(Boolean) as string[])].sort().join(","),
+    [data],
+  );
+
+  // Load client counts per group whenever the set of group IDs changes
   useEffect(() => {
     supabase
       .from("clientes")
@@ -111,12 +120,16 @@ const GruposEconomicos = () => {
         }
         setClienteCountMap(counts);
       });
-  }, [data]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dataIdsKey]);
 
-  // Build a lookup of empresa_matriz_id -> nome_razao_social from data
+  // Build a lookup of empresa_matriz_id -> nome_razao_social when the set of matriz IDs changes
   useEffect(() => {
-    const matrizIds = [...new Set(data.map((g) => g.empresa_matriz_id).filter(Boolean) as string[])];
-    if (matrizIds.length === 0) { setMatrizNomeMap({}); return; }
+    if (!matrizIdsKey) {
+      setMatrizNomeMap((prev) => (Object.keys(prev).length === 0 ? prev : {}));
+      return;
+    }
+    const matrizIds = matrizIdsKey.split(",");
     supabase
       .from("clientes")
       .select("id, nome_razao_social")
@@ -129,7 +142,7 @@ const GruposEconomicos = () => {
         }
         setMatrizNomeMap(map);
       });
-  }, [data]);
+  }, [matrizIdsKey]);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
