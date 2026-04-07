@@ -348,13 +348,11 @@ const PedidosCompra = () => {
     );
 
     // Load estoque and cotação for the contextual edit header
-    const [estResult] = await Promise.all([
-      supabase
-        .from("estoque_movimentos")
-        .select("produto_id, quantidade")
-        .eq("documento_id", String(p.id))
-        .eq("documento_tipo", "pedido_compra"),
-    ]);
+    const estResult = await supabase
+      .from("estoque_movimentos")
+      .select("produto_id, quantidade")
+      .eq("documento_id", String(p.id))
+      .eq("documento_tipo", "pedido_compra");
     setViewEstoque((estResult.data as any[]) || []);
 
     if (p.cotacao_compra_id) {
@@ -724,6 +722,7 @@ const PedidosCompra = () => {
               if (s === "cancelado") return { label: "Cancelado", colorClass: "text-destructive", Icon: XCircle };
               return { label: "Rascunho", colorClass: "text-muted-foreground", Icon: FileText };
             })();
+            const RecStatusIcon = recStatusEdit.Icon;
 
             const isEditOverdue =
               !["recebido", "cancelado"].includes(form.status) &&
@@ -775,7 +774,7 @@ const PedidosCompra = () => {
                   <div>
                     <p className="text-[10px] text-muted-foreground uppercase font-semibold">Recebimento</p>
                     <div className="flex items-center gap-1 mt-0.5">
-                      <recStatusEdit.Icon className={`h-3.5 w-3.5 shrink-0 ${recStatusEdit.colorClass}`} />
+                      <RecStatusIcon className={`h-3.5 w-3.5 shrink-0 ${recStatusEdit.colorClass}`} />
                       <p className={`font-semibold text-xs ${recStatusEdit.colorClass}`}>
                         {pctEdit > 0 ? `${pctEdit}%` : recStatusEdit.label}
                       </p>
