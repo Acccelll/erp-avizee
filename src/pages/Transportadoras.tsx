@@ -4,10 +4,13 @@ import { ModulePage } from "@/components/ModulePage";
 import { DataTable } from "@/components/DataTable";
 import { StatusBadge } from "@/components/StatusBadge";
 import { FormModal } from "@/components/FormModal";
+import { AdvancedFilterBar } from "@/components/AdvancedFilterBar";
+import type { FilterChip } from "@/components/AdvancedFilterBar";
 import { ViewDrawerV2, ViewField, ViewSection } from "@/components/ViewDrawerV2";
 import { RelationalLink } from "@/components/ui/RelationalLink";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Edit, Trash2, Search, Building2, MapPin, Package, Truck, Star, AlertTriangle, Phone, FileText, Loader2, Users } from "lucide-react";
+import { MultiSelect, type MultiSelectOption } from "@/components/ui/MultiSelect";
+import { Edit, Trash2, Search, Building2, MapPin, Package, Truck, Star, AlertTriangle, Phone, FileText, Loader2, Users, UserCheck, UserX } from "lucide-react";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
 import { useRelationalNavigation } from "@/contexts/RelationalNavigationContext";
 import { useCnpjLookup } from "@/hooks/useCnpjLookup";
@@ -21,6 +24,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MaskedInput } from "@/components/ui/MaskedInput";
+import { StatCard } from "@/components/StatCard";
+import { formatDate } from "@/lib/format";
 import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 
@@ -55,7 +60,21 @@ const emptyForm: Record<string, string> = {
 };
 
 export default function Transportadoras() {
-  const { data, loading, create, update, remove } = useSupabaseCrud<Transportadora>({ table: "transportadoras" });
+  const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [ativoFilters, setAtivoFilters] = useState<string[]>([]);
+  const [modalidadeFilters, setModalidadeFilters] = useState<string[]>([]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchTerm), 350);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  const { data, loading, create, update, remove } = useSupabaseCrud<Transportadora>({
+    table: "transportadoras",
+    searchTerm: debouncedSearch,
+    searchColumns: ["nome_razao_social", "nome_fantasia", "cpf_cnpj", "cidade"],
+  });
   const { pushView } = useRelationalNavigation();
   const { buscarCnpj, loading: cnpjLoading } = useCnpjLookup();
   const { buscarCep, loading: cepLoading } = useViaCep();
@@ -66,7 +85,6 @@ export default function Transportadoras() {
   const [form, setForm] = useState(emptyForm);
   const [formAtivo, setFormAtivo] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
   const [clientesVinculados, setClientesVinculados] = useState<any[]>([]);
   const [remessasVinculadas, setRemessasVinculadas] = useState<any[]>([]);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -183,25 +201,152 @@ export default function Transportadoras() {
   };
 
   const filteredData = useMemo(() => {
-    const query = searchTerm.trim().toLowerCase();
-    if (!query) return data;
-    return data.filter(t => [t.nome_razao_social, t.cpf_cnpj, t.cidade, t.uf].filter(Boolean).join(" ").toLowerCase().includes(query));
-  }, [data, searchTerm]);
+    return data.filter(t => {
+      if (ativoFilters.length > 0) {
+        const status = t.ativo ? "ativo" : "inativo";
+        if (!ativoFilters.includes(status)) return false;
+      }
+      if (modalidadeFilters.length > 0) {
+        if (!modalidadeFilters.includes(t.modalidade || "")) return false;
+      }
+      return true;
+    });
+  }, [data, ativoFilters, modalidadeFilters]);
 
   const columns = [
-    { key: "nome_razao_social", label: "Razão Social" },
-    { key: "cpf_cnpj", label: "CNPJ", render: (t: Transportadora) => <span className="font-mono text-xs">{t.cpf_cnpj || "—"}</span> },
-    { key: "telefone", label: "Telefone" },
-    { key: "cidade", label: "Cidade", render: (t: Transportadora) => t.cidade ? `${t.cidade}/${t.uf}` : "—" },
-    { key: "modalidade", label: "Modalidade", render: (t: Transportadora) => modalidadeLabel[t.modalidade] || t.modalidade },
+    {
+      key: "nome_razao_social", label: "Transportadora", sortable: true,
+      render: (t: Transportadora) => (
+        <div>
+          <p className="font-medium leading-tight">{t.nome_razao_social}</p>
+          {t.nome_fantasia && t.nome_fantasia !== t.nome_razao_social && (
+            <p className="text-xs text-muted-foreground truncate max-w-xs">{t.nome_fantasia}</p>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: "cpf_cnpj", label: "CNPJ",
+      render: (t: Transportadora) => <span className="font-mono text-xs">{t.cpf_cnpj || "—"}</span>,
+    },
+    {
+      key: "contato_principal", label: "Contato",
+      render: (t: Transportadora) => {
+        if (!t.telefone && !t.email) return <span className="text-muted-foreground text-xs">—</span>;
+        return (
+          <div className="text-xs space-y-0.5">
+            {t.telefone && <p className="font-medium tabular-nums">{t.telefone}</p>}
+            {t.email && <p className="text-muted-foreground truncate max-w-xs">{t.email}</p>}
+          </div>
+        );
+      },
+    },
+    {
+      key: "cidade", label: "Cidade / UF", sortable: true,
+      render: (t: Transportadora) => t.cidade
+        ? <span className="text-xs">{t.cidade}{t.uf ? `/${t.uf}` : ""}</span>
+        : <span className="text-muted-foreground text-xs">—</span>,
+    },
+    {
+      key: "modalidade", label: "Modalidade",
+      render: (t: Transportadora) => {
+        const label = modalidadeLabel[t.modalidade] || t.modalidade;
+        if (!label) return <span className="text-muted-foreground text-xs">—</span>;
+        return <span className="text-xs font-medium">{label}</span>;
+      },
+    },
+    {
+      key: "prazo_medio", label: "Prazo Médio",
+      render: (t: Transportadora) => t.prazo_medio
+        ? <span className="font-mono text-xs font-medium">{t.prazo_medio}d</span>
+        : <span className="text-muted-foreground text-xs">—</span>,
+    },
     { key: "ativo", label: "Status", render: (t: Transportadora) => <StatusBadge status={t.ativo ? "Ativo" : "Inativo"} /> },
   ];
 
+  const ativoOptions: MultiSelectOption[] = [
+    { label: "Ativo", value: "ativo" },
+    { label: "Inativo", value: "inativo" },
+  ];
+
+  const modalidadeOptions: MultiSelectOption[] = [
+    { label: "Rodoviário", value: "rodoviario" },
+    { label: "Aéreo", value: "aereo" },
+    { label: "Marítimo", value: "maritimo" },
+    { label: "Ferroviário", value: "ferroviario" },
+    { label: "Multimodal", value: "multimodal" },
+  ];
+
+  const activeFilterChips = useMemo(() => {
+    const chips: FilterChip[] = [];
+    ativoFilters.forEach(f => chips.push({
+      key: "ativo", label: "Status", value: [f],
+      displayValue: f === "ativo" ? "Ativo" : "Inativo",
+    }));
+    modalidadeFilters.forEach(f => chips.push({
+      key: "modalidade", label: "Modalidade", value: [f],
+      displayValue: modalidadeLabel[f] || f,
+    }));
+    return chips;
+  }, [ativoFilters, modalidadeFilters]);
+
+  const handleRemoveFilter = (key: string, value?: string) => {
+    if (key === "ativo") setAtivoFilters(prev => prev.filter(v => v !== value));
+    if (key === "modalidade") setModalidadeFilters(prev => prev.filter(v => v !== value));
+  };
+
+  const summaryAtivos = useMemo(() => data.filter(t => t.ativo).length, [data]);
+
   return (
     <AppLayout>
-      <ModulePage title="Transportadoras" subtitle="Cadastro de transportadoras e logística" addLabel="Nova Transportadora" onAdd={openCreate} count={filteredData.length}
-        searchValue={searchTerm} onSearchChange={setSearchTerm} searchPlaceholder="Buscar por nome ou CNPJ...">
-        <DataTable columns={columns} data={filteredData} loading={loading} onView={openView} onEdit={openEdit} />
+      <ModulePage
+        title="Transportadoras"
+        subtitle="Central de consulta de transportadoras e logística"
+        addLabel="Nova Transportadora"
+        onAdd={openCreate}
+        summaryCards={
+          <>
+            <StatCard title="Total" value={String(data.length)} icon={Truck} />
+            <StatCard title="Ativas" value={String(summaryAtivos)} icon={UserCheck} iconColor="text-success" />
+            <StatCard title="Inativas" value={String(data.length - summaryAtivos)} icon={UserX} />
+          </>
+        }
+      >
+        <AdvancedFilterBar
+          searchValue={searchTerm}
+          onSearchChange={setSearchTerm}
+          searchPlaceholder="Buscar por nome, CNPJ ou cidade..."
+          activeFilters={activeFilterChips}
+          onRemoveFilter={handleRemoveFilter}
+          onClearAll={() => { setAtivoFilters([]); setModalidadeFilters([]); }}
+          count={filteredData.length}
+        >
+          <MultiSelect
+            options={ativoOptions}
+            selected={ativoFilters}
+            onChange={setAtivoFilters}
+            placeholder="Status"
+            className="w-[130px]"
+          />
+          <MultiSelect
+            options={modalidadeOptions}
+            selected={modalidadeFilters}
+            onChange={setModalidadeFilters}
+            placeholder="Modalidade"
+            className="w-[150px]"
+          />
+        </AdvancedFilterBar>
+
+        <DataTable
+          columns={columns}
+          data={filteredData}
+          loading={loading}
+          moduleKey="transportadoras"
+          showColumnToggle={true}
+          onView={openView}
+          onEdit={openEdit}
+          onDelete={(t) => { setSelected(t); setDeleteConfirmOpen(true); }}
+        />
       </ModulePage>
 
       <FormModal open={modalOpen} onClose={() => setModalOpen(false)} title={mode === "create" ? "Nova Transportadora" : "Editar Transportadora"} size="xl">
@@ -211,8 +356,8 @@ export default function Transportadoras() {
           {mode === "edit" && selected && (
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 mb-5 text-xs text-muted-foreground rounded-md border bg-muted/30">
               <StatusBadge status={selected.ativo ? "Ativo" : "Inativo"} />
-              <span>Cadastro: {new Date(selected.created_at).toLocaleDateString("pt-BR")}</span>
-              {selected.updated_at && <span>Atualizado: {new Date(selected.updated_at).toLocaleDateString("pt-BR")}</span>}
+              {selected.created_at && <span>Cadastro: {formatDate(selected.created_at)}</span>}
+              {selected.updated_at && <span>Atualizado: {formatDate(selected.updated_at)}</span>}
               <span className="flex items-center gap-1"><Truck className="h-3 w-3" />{modalidadeLabel[selected.modalidade] || "—"}</span>
               {selected.cidade && <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{selected.cidade}{selected.uf ? `/${selected.uf}` : ""}</span>}
             </div>
