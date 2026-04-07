@@ -306,14 +306,14 @@ export function EntregaDrawer({ open, onClose, entrega }: EntregaDrawerProps) {
       const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL as string || "").replace(/\/$/, "");
       const url = `${supabaseUrl}/functions/v1/correios-api?action=rastrear&codigo=${encodeURIComponent(codigo)}`;
       const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData.session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || "";
+      const token = sessionData.session?.access_token || "";
       const res = await fetch(url, {
         headers: {
           apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || "",
-          Authorization: `Bearer ${token}`,
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
       });
-      const tracking = await res.json() as { error?: string; warning?: string; objetos?: Array<{ eventos?: unknown[] }>; data?: { eventos?: unknown[] } };
+      const tracking = await res.json() as { error?: string; warning?: string };
       if (!res.ok || tracking.error) throw new Error(tracking.error || `Erro (${res.status})`);
       toast.success(tracking.warning === "fallback_mock" ? "Dados simulados — Correios não configurado." : "Rastreio consultado com sucesso.");
       // Refresh events
