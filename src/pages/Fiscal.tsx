@@ -7,13 +7,9 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { FormModal } from "@/components/FormModal";
 import { AdvancedFilterBar } from "@/components/AdvancedFilterBar";
 import type { FilterChip } from "@/components/AdvancedFilterBar";
-import { ViewField, ViewSection } from "@/components/ViewDrawer";
-import { ViewDrawerV2 } from "@/components/ViewDrawerV2";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Edit, Trash2, Upload, ArrowLeftRight } from "lucide-react";
+import { Upload } from "lucide-react";
 import { SummaryCard } from "@/components/SummaryCard";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
-import { useRelationalNavigation } from "@/contexts/RelationalNavigationContext";
 import { AutocompleteSearch } from "@/components/ui/AutocompleteSearch";
 import { ItemsGrid, type GridItem } from "@/components/ui/ItemsGrid";
 import { Button } from "@/components/ui/button";
@@ -25,11 +21,11 @@ import { MultiSelect, type MultiSelectOption } from "@/components/ui/MultiSelect
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { FileText, DollarSign, CheckCircle, XCircle, Clock, Truck } from "lucide-react";
+import { FileText, DollarSign, CheckCircle, Clock } from "lucide-react";
 import { parseNFeXml, type NFeData } from "@/lib/nfeXmlParser";
 import { DanfeViewer } from "@/components/DanfeViewer";
-import { LogisticaRastreioSection } from "@/components/logistica/LogisticaRastreioSection";
 import { DevolucaoDialog } from "@/components/fiscal/DevolucaoDialog";
+import { NotaFiscalDrawer } from "@/components/fiscal/NotaFiscalDrawer";
 import { confirmarNotaFiscal, estornarNotaFiscal } from "@/services/fiscal.service";
 
 interface NotaFiscal {
@@ -64,7 +60,6 @@ const Fiscal = () => {
   const { data, loading, create, update, remove, fetchData } = useSupabaseCrud<NotaFiscal>({
     table: "notas_fiscais", select: "*, fornecedores(nome_razao_social, cpf_cnpj), clientes(nome_razao_social), ordens_venda(numero)"
   });
-  const { pushView } = useRelationalNavigation();
   const fornecedoresCrud = useSupabaseCrud<any>({ table: "fornecedores" });
   const clientesCrud = useSupabaseCrud<any>({ table: "clientes" });
   const produtosCrud = useSupabaseCrud<any>({ table: "produtos" });
@@ -77,7 +72,6 @@ const Fiscal = () => {
   const [items, setItems] = useState<GridItem[]>([]);
   const [saving, setSaving] = useState(false);
   const [parcelas, setParcelas] = useState(1);
-  const [viewItems, setViewItems] = useState<any[]>([]);
   const [searchParams] = useSearchParams();
   const [consultaSearch, setConsultaSearch] = useState("");
   const [itemContaContabil, setItemContaContabil] = useState<Record<number, string>>({});
@@ -150,12 +144,8 @@ const Fiscal = () => {
     setModalOpen(true);
   };
 
-  const openView = async (n: NotaFiscal) => {
+  const openView = (n: NotaFiscal) => {
     setSelected(n);
-    const { data: itens } = await supabase.from("notas_fiscais_itens")
-      .select("*, produtos(nome, sku), contas_contabeis(codigo, descricao)")
-      .eq("nota_fiscal_id", n.id);
-    setViewItems(itens || []);
     setDrawerOpen(true);
   };
 
@@ -432,121 +422,17 @@ const Fiscal = () => {
       </FormModal>
 
       {/* View Drawer */}
-      {selected && (() => {
-        const subtotalProdutos = viewItems.reduce((s: number, i: any) => s + (i.quantidade * i.valor_unitario), 0);
-        const totalImpostosView = Number(selected.icms_valor || 0) + Number(selected.ipi_valor || 0) + Number(selected.pis_valor || 0) + Number(selected.cofins_valor || 0) + Number(selected.icms_st_valor || 0);
-        const condicaoLabel = selected.condicao_pagamento === 'a_vista' ? 'À Vista' : selected.condicao_pagamento === 'a_prazo' ? 'A Prazo' : selected.condicao_pagamento || '—';
-
-        return (
-          <ViewDrawerV2
-            open={drawerOpen} onClose={() => setDrawerOpen(false)} title={`NF ${selected.numero}`}
-            badge={<StatusBadge status={selected.status} />}
-            actions={<>
-              {selected.status === "confirmada" && selected.tipo === "saida" && (selected.tipo_operacao || "normal") === "normal" && (
-                <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-warning hover:text-warning" onClick={() => { setDrawerOpen(false); openDevolucao(selected); }}><ArrowLeftRight className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Gerar Devolução</TooltipContent></Tooltip>
-              )}
-              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setDrawerOpen(false); openEdit(selected); }}><Edit className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Editar</TooltipContent></Tooltip>
-              <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => { setDrawerOpen(false); remove(selected.id); }}><Trash2 className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Excluir</TooltipContent></Tooltip>
-            </>}
-            summary={
-              <div className="grid grid-cols-3 gap-3">
-                <div className="bg-accent/30 rounded-lg p-3 text-center"><p className="text-xs text-muted-foreground">Tipo</p><p className="font-semibold text-sm capitalize">{selected.tipo === 'entrada' ? 'Entrada' : 'Saída'}</p></div>
-                <div className="bg-accent/30 rounded-lg p-3 text-center"><p className="text-xs text-muted-foreground">Itens</p><p className="font-semibold text-sm font-mono">{viewItems.length}</p></div>
-                <div className="bg-accent/30 rounded-lg p-3 text-center"><p className="text-xs text-muted-foreground">Total</p><p className="font-semibold text-sm font-mono">{formatCurrency(Number(selected.valor_total))}</p></div>
-              </div>
-            }
-            tabs={[
-              { value: "resumo", label: "Resumo", content: (
-                <div className="space-y-5">
-                  <ViewSection title="Informações Gerais"><div className="grid grid-cols-2 gap-4">
-                    <ViewField label="Tipo"><span className="capitalize font-medium">{selected.tipo === 'entrada' ? 'Entrada' : 'Saída'}</span></ViewField>
-                    <ViewField label="Modelo"><span className="font-mono font-medium">{modeloLabels[selected.modelo_documento || '55'] || selected.modelo_documento}</span></ViewField>
-                    <ViewField label="Número / Série"><span className="font-mono font-medium">{selected.numero} / {selected.serie || '1'}</span></ViewField>
-                    <ViewField label="Data Emissão">{formatDate(selected.data_emissao)}</ViewField>
-                    <ViewField label="Status"><StatusBadge status={selected.status} /></ViewField>
-                    {(selected.tipo_operacao || 'normal') !== 'normal' && <ViewField label="Operação"><span className="font-medium capitalize text-warning">{selected.tipo_operacao}</span></ViewField>}
-                  </div>
-                  {selected.chave_acesso && <div className="mt-3"><ViewField label="Chave de Acesso"><span className="font-mono text-xs break-all">{selected.chave_acesso}</span></ViewField></div>}
-                  </ViewSection>
-                  <ViewSection title="Parceiro"><div className="grid grid-cols-2 gap-4">
-                    <ViewField label={selected.tipo === "entrada" ? "Fornecedor" : "Cliente"}>{selected.tipo === "entrada" ? selected.fornecedores?.nome_razao_social || "—" : selected.clientes?.nome_razao_social || "—"}</ViewField>
-                    {selected.ordem_venda_id && selected.ordens_venda && <ViewField label="Pedido"><span className="font-mono font-medium">{selected.ordens_venda.numero}</span></ViewField>}
-                  </div></ViewSection>
-                  <ViewSection title="Pagamento"><div className="grid grid-cols-2 gap-4">
-                    <ViewField label="Condição">{condicaoLabel}</ViewField>
-                    <ViewField label="Forma"><span className="capitalize">{selected.forma_pagamento || '—'}</span></ViewField>
-                    <ViewField label="Gera Financeiro"><span className={selected.gera_financeiro !== false ? "text-green-600 font-medium" : "text-muted-foreground"}>{selected.gera_financeiro !== false ? "Sim" : "Não"}</span></ViewField>
-                    <ViewField label="Mov. Estoque"><span className={selected.movimenta_estoque !== false ? "text-green-600 font-medium" : "text-muted-foreground"}>{selected.movimenta_estoque !== false ? "Sim" : "Não"}</span></ViewField>
-                  </div></ViewSection>
-                  {selected.observacoes && <ViewSection title="Observações"><p className="text-sm text-muted-foreground">{selected.observacoes}</p></ViewSection>}
-                </div>
-              )},
-              { value: "itens", label: `Itens (${viewItems.length})`, content: (
-                <div className="space-y-4">
-                  {viewItems.length > 0 ? (
-                    <div className="rounded-lg border overflow-hidden"><table className="w-full text-sm"><thead><tr className="bg-muted/50 border-b">
-                      <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground">Produto</th>
-                      <th className="px-3 py-2 text-right text-xs font-semibold text-muted-foreground">Qtd</th>
-                      <th className="px-3 py-2 text-right text-xs font-semibold text-muted-foreground">Vlr. Unit.</th>
-                      <th className="px-3 py-2 text-right text-xs font-semibold text-muted-foreground">Total</th>
-                      <th className="px-3 py-2 text-center text-xs font-semibold text-muted-foreground">CST</th>
-                      <th className="px-3 py-2 text-center text-xs font-semibold text-muted-foreground">CFOP</th>
-                    </tr></thead><tbody>
-                      {viewItems.map((i: any, idx: number) => (
-                        <tr key={idx} className="border-b last:border-b-0 hover:bg-muted/20">
-                          <td className="px-3 py-2">{i.produtos?.nome || "—"}</td>
-                          <td className="px-3 py-2 text-right font-mono">{i.quantidade}</td>
-                          <td className="px-3 py-2 text-right font-mono text-muted-foreground">{formatCurrency(i.valor_unitario)}</td>
-                          <td className="px-3 py-2 text-right font-mono font-medium">{formatCurrency(i.quantidade * i.valor_unitario)}</td>
-                          <td className="px-3 py-2 text-center font-mono text-xs">{i.cst || "—"}</td>
-                          <td className="px-3 py-2 text-center font-mono text-xs">{i.cfop || "—"}</td>
-                        </tr>
-                      ))}
-                    </tbody></table></div>
-                  ) : <p className="text-sm text-muted-foreground text-center py-4">Nenhum item</p>}
-                </div>
-              )},
-              { value: "impostos", label: "Impostos", content: (
-                <div className="bg-accent/30 rounded-lg p-4 space-y-2">
-                  {[{ label: "Subtotal Produtos", val: subtotalProdutos }, { label: "Frete", val: Number(selected.frete_valor || 0) }, { label: "ICMS", val: Number(selected.icms_valor || 0) }, { label: "IPI", val: Number(selected.ipi_valor || 0) }, { label: "PIS", val: Number(selected.pis_valor || 0) }, { label: "COFINS", val: Number(selected.cofins_valor || 0) }, { label: "ICMS-ST", val: Number(selected.icms_st_valor || 0) }, { label: "Outras Despesas", val: Number(selected.outras_despesas || 0) }].map(({ label, val }) => (
-                    <div key={label} className="flex justify-between text-sm"><span className="text-muted-foreground">{label}</span><span className="font-mono">{val > 0 ? formatCurrency(val) : '—'}</span></div>
-                  ))}
-                  {Number(selected.desconto_valor || 0) > 0 && <div className="flex justify-between text-sm text-destructive"><span>Desconto</span><span className="font-mono">-{formatCurrency(Number(selected.desconto_valor))}</span></div>}
-                  <div className="flex justify-between font-bold border-t pt-2 mt-2"><span>Total da NF</span><span className="font-mono text-lg">{formatCurrency(Number(selected.valor_total))}</span></div>
-                </div>
-              )},
-              { value: "logistica", label: "Logística", content: (
-                <div className="space-y-4"><h4 className="text-sm font-semibold flex items-center gap-2 px-1"><Truck className="w-4 h-4" /> Rastreamento Logístico</h4><LogisticaRastreioSection notaFiscalId={selected.id} /></div>
-              )},
-              { value: "vinculos", label: "Vínculos", content: (
-                <div className="space-y-4">
-                  <ViewSection title="Vínculos"><div className="grid grid-cols-2 gap-4">
-                    <ViewField label="Pedido">{selected.ordens_venda?.numero || "—"}</ViewField>
-                    <ViewField label={selected.tipo === "entrada" ? "Fornecedor" : "Cliente"}>{selected.tipo === "entrada" ? selected.fornecedores?.nome_razao_social || "—" : selected.clientes?.nome_razao_social || "—"}</ViewField>
-                  </div></ViewSection>
-                  {viewItems.some((i: any) => i.contas_contabeis) && (
-                    <ViewSection title="Contas Contábeis por Item"><div className="space-y-1">
-                      {viewItems.filter((i: any) => i.contas_contabeis).map((i: any, idx: number) => (
-                        <div key={idx} className="flex justify-between text-sm"><span className="text-muted-foreground truncate">{i.produtos?.nome || `Item ${idx + 1}`}</span><span className="font-mono text-xs">{i.contas_contabeis.codigo}</span></div>
-                      ))}
-                    </div></ViewSection>
-                  )}
-                </div>
-              )},
-            ]}
-            footer={
-              <div className="space-y-2">
-                {selected.status === "pendente" && <Button className="w-full" onClick={() => { handleConfirmar(selected); setDrawerOpen(false); }}><CheckCircle className="w-4 h-4 mr-2" /> Confirmar Nota Fiscal</Button>}
-                {selected.status === "confirmada" && selected.tipo === "saida" && (selected.tipo_operacao || "normal") === "normal" && (
-                  <Button variant="outline" className="w-full gap-2" onClick={() => { setDrawerOpen(false); openDevolucao(selected); }}><ArrowLeftRight className="w-4 h-4" /> Gerar Nota de Devolução</Button>
-                )}
-                {selected.status === "confirmada" && <Button variant="destructive" className="w-full" onClick={() => { handleEstornar(selected); setDrawerOpen(false); }}><XCircle className="w-4 h-4 mr-2" /> Estornar Nota Fiscal</Button>}
-                <Button variant="outline" className="w-full" onClick={() => { setDrawerOpen(false); openDanfe(selected); }}><FileText className="w-4 h-4 mr-2" /> Visualizar DANFE</Button>
-              </div>
-            }
-          />
-        );
-      })()}
+      <NotaFiscalDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        selected={selected}
+        onEdit={openEdit}
+        onDelete={(id) => remove(id)}
+        onConfirmar={handleConfirmar}
+        onEstornar={handleEstornar}
+        onDevolucao={openDevolucao}
+        onDanfe={(nf) => { setDrawerOpen(false); openDanfe(nf); }}
+      />
 
       {/* Devolução Dialog */}
       <DevolucaoDialog
