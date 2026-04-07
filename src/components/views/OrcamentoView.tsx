@@ -221,7 +221,7 @@ export function OrcamentoView({ id }: Props) {
   return (
     <div className="space-y-4">
       {/* Action bar */}
-      <div className="flex items-center justify-between gap-1 border-b pb-3">
+      <div className="flex items-center justify-between gap-1">
         <div className="flex items-center gap-1 flex-wrap">
           {selected.status === "rascunho" && (
             <Button

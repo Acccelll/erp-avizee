@@ -74,17 +74,13 @@ export function RelationalDrawerStack() {
                 borderLeftColor: `hsl(var(--primary) / ${Math.min(0.18 + index * 0.06, 0.45)})`,
               }}
             >
-              <SheetHeader className="sticky top-0 z-10 bg-card border-b px-6 py-3 flex flex-col gap-1 space-y-0">
-                <div className="flex items-center justify-between text-xs text-muted-foreground leading-none">
-                  <span>Drawers: {stack.length}/{MAX_DRAWER_DEPTH}</span>
-                  <Button variant="ghost" size="sm" className="h-7 px-2.5 text-xs" onClick={clearStack}>Fechar todos</Button>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5 min-w-0">
+              <SheetHeader className="sticky top-0 z-10 bg-card border-b px-6 py-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
                     {index > 0 && (
                       <Button variant="ghost" size="sm" className="h-7 shrink-0 gap-1 px-2.5" onClick={popView}>
                         <ArrowLeft className="h-4 w-4" />
-                        <span className="text-xs">Voltar para {getTitle(stack[index - 1].type)}</span>
+                        <span className="text-xs">Voltar</span>
                       </Button>
                     )}
                     <SheetTitle className="text-base truncate">{getTitle(view.type)}</SheetTitle>
@@ -108,6 +104,11 @@ export function RelationalDrawerStack() {
                   </div>
                 </div>
               </SheetHeader>
+
+              <div className="flex items-center justify-between bg-muted/40 border-b px-6 py-1.5">
+                <span className="text-xs text-muted-foreground">Drawers: {stack.length}/{MAX_DRAWER_DEPTH}</span>
+                <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={clearStack}>Fechar todos</Button>
+              </div>
 
               <div className="flex-1 px-6 pt-3 pb-4">
                 <DrawerContent view={view} />

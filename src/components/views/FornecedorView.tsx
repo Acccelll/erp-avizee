@@ -114,7 +114,7 @@ export function FornecedorView({ id }: Props) {
   return (
     <div className="space-y-5">
       {/* Action bar */}
-      <div className="flex items-center justify-end gap-1 border-b pb-3">
+      <div className="flex items-center justify-end gap-1">
         <Tooltip>
           <TooltipTrigger asChild>
             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { clearStack(); navigate('/fornecedores', { state: { editId: id } }); }}>

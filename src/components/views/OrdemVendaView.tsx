@@ -245,7 +245,7 @@ export function OrdemVendaView({ id }: Props) {
   return (
     <div className="space-y-4">
       {/* Action bar */}
-      <div className="flex items-center gap-1.5 flex-wrap border-b pb-3">
+      <div className="flex items-center gap-1.5 flex-wrap">
         {canGenerateNF && (
           <Button
             size="sm"
