@@ -11,7 +11,6 @@ import { ViewField, ViewSection } from "@/components/ViewDrawer";
 import { RelationalLink } from "@/components/ui/RelationalLink";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Edit, Trash2, PackageCheck, SendHorizontal, AlertCircle, Calendar, Building2, FileText, Boxes, ArrowDownToLine, Receipt } from "lucide-react";
-import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
 import { useRelationalNavigation } from "@/contexts/RelationalNavigationContext";
 import { AutocompleteSearch } from "@/components/ui/AutocompleteSearch";
 import { ItemsGrid, type GridItem } from "@/components/ui/ItemsGrid";
@@ -28,15 +27,15 @@ import { useNavigate } from "react-router-dom";
 import { LogisticaRastreioSection } from "@/components/logistica/LogisticaRastreioSection";
 import { statusPedidoCompra } from "@/lib/statusSchema";
 
-// PedidoCompra reflects the current (legacy/manual) database schema:
-//   - IDs are bigint (returned by Supabase as number or numeric string)
+// PedidoCompra reflects the current database schema.
+//   - IDs are UUIDs (returned by Supabase as strings)
 //   - `numero` column does NOT exist yet; display uses pedidoNumero()
-//   - `fornecedores` join uses `nome_razao` (not `nome_razao_social`)
+//   - `fornecedores` join uses `nome_razao_social` (standard column name)
 interface PedidoCompra {
-  id: string | number;
+  id: string;
   /** Not present in the current DB. Kept optional for future schema addition. */
   numero?: string | null;
-  fornecedor_id: string | number | null;
+  fornecedor_id: string | null;
   data_pedido: string;
   data_entrega_prevista: string | null;
   data_entrega_real: string | null;
@@ -45,11 +44,10 @@ interface PedidoCompra {
   condicao_pagamento: string | null;
   status: string;
   observacoes: string | null;
-  cotacao_compra_id: string | number | null;
+  cotacao_compra_id: string | null;
   ativo?: boolean;
   created_at?: string;
-  /** Real DB uses `nome_razao`, not `nome_razao_social`. */
-  fornecedores?: { nome_razao: string; cpf_cnpj?: string | null };
+  fornecedores?: { nome_razao_social: string; cpf_cnpj?: string | null };
 }
 
 /**
@@ -76,7 +74,8 @@ const PedidosCompra = () => {
     queryKey: ["pedidos_compra"],
     queryFn: async () => {
       const { data: rows, error } = await (supabase.from as any)("pedidos_compra")
-        .select("*, fornecedores(nome_razao, cpf_cnpj)")
+        .select("*, fornecedores(nome_razao_social, cpf_cnpj)")
+        .eq("ativo", true)
         .order("id", { ascending: false });
       if (error) {
         console.error("[pedidos_compra] fetch error", {
@@ -90,8 +89,36 @@ const PedidosCompra = () => {
   const data = pedidosRaw || [];
   const fetchData = () => { void _refetchPedidos(); };
   const { pushView } = useRelationalNavigation();
-  const fornecedoresCrud = useSupabaseCrud<any>({ table: "fornecedores" });
-  const produtosCrud = useSupabaseCrud<any>({ table: "produtos" });
+  const { data: fornecedoresData = [] } = useQuery({
+    queryKey: ["fornecedores_autocomplete"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("fornecedores")
+        .select("id, nome_razao_social, cpf_cnpj")
+        .eq("ativo", true)
+        .order("nome_razao_social");
+      if (error) {
+        console.error("[fornecedores] fetch error", { code: error.code, message: error.message });
+        return [] as { id: string; nome_razao_social: string; cpf_cnpj: string | null }[];
+      }
+      return (data || []) as { id: string; nome_razao_social: string; cpf_cnpj: string | null }[];
+    },
+  });
+  const { data: produtosData = [] } = useQuery({
+    queryKey: ["produtos_compra_grid"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("produtos")
+        .select("id, nome, sku, codigo_interno, unidade_medida, preco_venda")
+        .eq("ativo", true)
+        .order("nome");
+      if (error) {
+        console.error("[produtos] fetch error", { code: error.code, message: error.message });
+        return [] as { id: string; nome: string; sku: string | null; codigo_interno: string | null; unidade_medida: string; preco_venda: number }[];
+      }
+      return (data || []) as { id: string; nome: string; sku: string | null; codigo_interno: string | null; unidade_medida: string; preco_venda: number }[];
+    },
+  });
   const [modalOpen, setModalOpen] = useState(false);
   const [selected, setSelected] = useState<PedidoCompra | null>(null);
   const [mode, setMode] = useState<"create" | "edit">("create");
@@ -292,7 +319,7 @@ const PedidosCompra = () => {
       if (vTotal > 0) {
         await supabase.from("financeiro_lancamentos").insert({
           tipo: "pagar" as any,
-          descricao: `${pedidoNumero(p)} — ${p.fornecedores?.nome_razao || "Fornecedor"}`,
+          descricao: `${pedidoNumero(p)} — ${p.fornecedores?.nome_razao_social || "Fornecedor"}`,
           valor: vTotal,
           saldo_restante: vTotal,
           data_vencimento: p.data_entrega_prevista || new Date().toISOString().split("T")[0],
@@ -332,12 +359,11 @@ const PedidosCompra = () => {
     }
   };
 
-  // Real DB uses `nome_razao` (not `nome_razao_social`) in the fornecedores table.
-  const fornecedorOptions = fornecedoresCrud.data.map((f: any) => ({ id: f.id, label: f.nome_razao || "", sublabel: f.cpf_cnpj || "" }));
+  const fornecedorOptions = fornecedoresData.map((f) => ({ id: f.id, label: f.nome_razao_social || "", sublabel: f.cpf_cnpj || "" }));
 
   const columns = [
     { key: "id", label: "Nº", render: (p: PedidoCompra) => <span className="font-mono text-xs font-medium text-primary">{pedidoNumero(p)}</span> },
-    { key: "fornecedor", label: "Fornecedor", render: (p: PedidoCompra) => p.fornecedores?.nome_razao || "—" },
+    { key: "fornecedor", label: "Fornecedor", render: (p: PedidoCompra) => p.fornecedores?.nome_razao_social || "—" },
     { key: "data_pedido", label: "Data", render: (p: PedidoCompra) => new Date(p.data_pedido).toLocaleDateString("pt-BR") },
     { key: "valor_total", label: "Total", render: (p: PedidoCompra) => <span className="font-semibold font-mono">{formatCurrency(Number(p.valor_total || 0))}</span> },
     { key: "status", label: "Status", render: (p: PedidoCompra) => <StatusBadge status={p.status} label={statusLabels[p.status] || p.status} /> },
@@ -379,7 +405,7 @@ const PedidosCompra = () => {
             <Label className="text-sm font-semibold">Fornecedor</Label>
             <AutocompleteSearch options={fornecedorOptions} value={form.fornecedor_id} onChange={(id) => setForm({ ...form, fornecedor_id: id })} placeholder="Buscar por nome ou CNPJ..." />
           </div>
-          <ItemsGrid items={items} onChange={setItems} produtos={produtosCrud.data} title="Itens do Pedido" />
+          <ItemsGrid items={items} onChange={setItems} produtos={produtosData} title="Itens do Pedido" />
           <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
             <div className="space-y-2">
               <Label>Frete (R$)</Label>
@@ -448,7 +474,7 @@ const PedidosCompra = () => {
               <ViewField label="Fornecedor">
                 {selected.fornecedor_id ? (
                   <RelationalLink type="fornecedor" id={selected.fornecedor_id}>
-                    {selected.fornecedores?.nome_razao || "—"}
+                    {selected.fornecedores?.nome_razao_social || "—"}
                   </RelationalLink>
                 ) : <span className="text-muted-foreground">Não informado</span>}
               </ViewField>
@@ -674,7 +700,7 @@ const PedidosCompra = () => {
                 {selected.fornecedor_id ? (
                   <RelationalLink type="fornecedor" id={selected.fornecedor_id}>
                     <Building2 className="h-3.5 w-3.5" />
-                    {selected.fornecedores?.nome_razao || "—"}
+                    {selected.fornecedores?.nome_razao_social || "—"}
                   </RelationalLink>
                 ) : <span className="text-muted-foreground">Não vinculado</span>}
               </ViewField>
