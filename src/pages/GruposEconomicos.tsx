@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { AppLayout } from "@/components/AppLayout";
 import { ModulePage } from "@/components/ModulePage";
 import { DataTable } from "@/components/DataTable";
@@ -10,12 +10,16 @@ import { RelationalLink } from "@/components/ui/RelationalLink";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Edit, Trash2, AlertTriangle, CheckCircle2, ShieldAlert, Building2, Info, Star, FileText, TrendingUp, ExternalLink, Users, Calendar } from "lucide-react";
+import { AdvancedFilterBar } from "@/components/AdvancedFilterBar";
+import type { FilterChip } from "@/components/AdvancedFilterBar";
+import { MultiSelect, type MultiSelectOption } from "@/components/ui/MultiSelect";
+import { Edit, Trash2, AlertTriangle, CheckCircle2, ShieldAlert, Building2, Info, Star, FileText, TrendingUp, ExternalLink, Users, Calendar, UserCheck } from "lucide-react";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { StatCard } from "@/components/StatCard";
 import { supabase } from "@/integrations/supabase/client";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { toast } from "sonner";
@@ -75,7 +79,58 @@ function getRiskInfo(titulosVencidos: number, saldoConsolidado: number) {
 }
 
 const GruposEconomicos = () => {
-  const { data, loading, create, update, remove } = useSupabaseCrud<GrupoEconomico>({ table: "grupos_economicos" });
+  const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [ativoFilters, setAtivoFilters] = useState<string[]>([]);
+  const [clienteCountMap, setClienteCountMap] = useState<Record<string, number>>({});
+  const [matrizNomeMap, setMatrizNomeMap] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchTerm), 350);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  const { data, loading, create, update, remove } = useSupabaseCrud<GrupoEconomico>({
+    table: "grupos_economicos",
+    searchTerm: debouncedSearch,
+    searchColumns: ["nome"],
+  });
+
+  // Load client counts per group and matriz names
+  useEffect(() => {
+    supabase
+      .from("clientes")
+      .select("grupo_economico_id, id")
+      .eq("ativo", true)
+      .not("grupo_economico_id", "is", null)
+      .then(({ data: clientes, error }) => {
+        if (error) { console.error("[grupos-economicos] erro ao carregar contagem de clientes:", error); return; }
+        const counts: Record<string, number> = {};
+        for (const c of (clientes || []) as { grupo_economico_id: string; id: string }[]) {
+          counts[c.grupo_economico_id] = (counts[c.grupo_economico_id] || 0) + 1;
+        }
+        setClienteCountMap(counts);
+      });
+  }, [data]);
+
+  // Build a lookup of empresa_matriz_id -> nome_razao_social from data
+  useEffect(() => {
+    const matrizIds = [...new Set(data.map((g) => g.empresa_matriz_id).filter(Boolean) as string[])];
+    if (matrizIds.length === 0) { setMatrizNomeMap({}); return; }
+    supabase
+      .from("clientes")
+      .select("id, nome_razao_social")
+      .in("id", matrizIds)
+      .then(({ data: clientes, error }) => {
+        if (error) { console.error("[grupos-economicos] erro ao carregar nomes de matriz:", error); return; }
+        const map: Record<string, string> = {};
+        for (const c of (clientes || []) as { id: string; nome_razao_social: string }[]) {
+          map[c.id] = c.nome_razao_social;
+        }
+        setMatrizNomeMap(map);
+      });
+  }, [data]);
+
   const [modalOpen, setModalOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selected, setSelected] = useState<GrupoEconomico | null>(null);
@@ -98,6 +153,15 @@ const GruposEconomicos = () => {
   const [modalSaldo, setModalSaldo] = useState(0);
   const [modalVencidos, setModalVencidos] = useState(0);
   const [loadingSummary, setLoadingSummary] = useState(false);
+
+  const filteredData = useMemo(() => {
+    if (ativoFilters.length === 0) return data;
+    return data.filter((g) => {
+      if (ativoFilters.includes("ativo") && g.ativo) return true;
+      if (ativoFilters.includes("inativo") && !g.ativo) return true;
+      return false;
+    });
+  }, [data, ativoFilters]);
 
   const isDirty =
     form.nome !== initialForm.nome ||
@@ -281,9 +345,81 @@ const GruposEconomicos = () => {
   };
 
   const columns = [
-    { key: "nome", label: "Nome do Grupo" },
-    { key: "ativo", label: "Status", render: (g: GrupoEconomico) => <StatusBadge status={g.ativo ? "Ativo" : "Inativo"} /> },
+    {
+      key: "nome",
+      label: "Nome do Grupo",
+      sortable: true,
+      render: (g: GrupoEconomico) => {
+        const matrizNome = g.empresa_matriz_id ? matrizNomeMap[g.empresa_matriz_id] : null;
+        return (
+          <div>
+            <p className="font-medium leading-tight">{g.nome}</p>
+            {matrizNome && (
+              <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                <Star className="h-2.5 w-2.5 text-primary/50 shrink-0" />
+                {matrizNome}
+              </p>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      key: "qtd_clientes",
+      label: "Clientes",
+      render: (g: GrupoEconomico) => {
+        const count = clienteCountMap[g.id] ?? 0;
+        return count > 0 ? (
+          <div className="flex items-center gap-1.5">
+            <Users className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            <span className="font-medium text-sm tabular-nums">{count}</span>
+          </div>
+        ) : (
+          <span className="text-muted-foreground text-xs">—</span>
+        );
+      },
+    },
+    {
+      key: "empresa_matriz_id",
+      label: "Empresa Matriz",
+      hidden: true,
+      render: (g: GrupoEconomico) => {
+        const nome = g.empresa_matriz_id ? (matrizNomeMap[g.empresa_matriz_id] ?? "—") : "—";
+        return <span className="text-xs">{nome}</span>;
+      },
+    },
+    {
+      key: "ativo",
+      label: "Status",
+      render: (g: GrupoEconomico) => <StatusBadge status={g.ativo ? "Ativo" : "Inativo"} />,
+    },
+    {
+      key: "created_at",
+      label: "Cadastro",
+      hidden: true,
+      render: (g: GrupoEconomico) => (
+        <span className="text-xs text-muted-foreground">{g.created_at ? formatDate(g.created_at) : "—"}</span>
+      ),
+    },
   ];
+
+  const ativoOptions: MultiSelectOption[] = [
+    { label: "Ativo", value: "ativo" },
+    { label: "Inativo", value: "inativo" },
+  ];
+
+  const activeFilters: FilterChip[] = ativoFilters.map((f) => ({
+    key: "ativo",
+    label: "Status",
+    value: [f],
+    displayValue: f === "ativo" ? "Ativo" : "Inativo",
+  }));
+
+  const summaryAtivos = useMemo(() => data.filter((g) => g.ativo).length, [data]);
+  const summaryComClientes = useMemo(
+    () => data.filter((g) => (clienteCountMap[g.id] ?? 0) > 0).length,
+    [data, clienteCountMap],
+  );
 
   // Derived values used across tabs
   const riskInfo = getRiskInfo(titulosVencidos, saldoConsolidado);
@@ -519,12 +655,49 @@ const GruposEconomicos = () => {
     <AppLayout>
       <ModulePage
         title="Grupos Econômicos"
-        subtitle="Gestão de grupos (matriz, filial, coligada)"
+        subtitle="Central de consulta e gestão de grupos econômicos"
         addLabel="Novo Grupo"
         onAdd={openCreate}
-        count={data.length}
+        count={filteredData.length}
+        summaryCards={
+          <>
+            <StatCard title="Total de Grupos" value={String(data.length)} icon={Building2} />
+            <StatCard title="Ativos" value={String(summaryAtivos)} icon={UserCheck} iconColor="text-success" />
+            <StatCard title="Inativos" value={String(data.length - summaryAtivos)} icon={Building2} />
+            <StatCard title="Com Clientes" value={String(summaryComClientes)} icon={Users} />
+          </>
+        }
       >
-        <DataTable columns={columns} data={data} loading={loading} onView={openView} />
+        <AdvancedFilterBar
+          searchValue={searchTerm}
+          onSearchChange={setSearchTerm}
+          searchPlaceholder="Buscar por nome do grupo..."
+          activeFilters={activeFilters}
+          onRemoveFilter={(key) => {
+            if (key === "ativo") setAtivoFilters([]);
+          }}
+          onClearAll={() => setAtivoFilters([])}
+          count={filteredData.length}
+        >
+          <MultiSelect
+            options={ativoOptions}
+            selected={ativoFilters}
+            onChange={setAtivoFilters}
+            placeholder="Status"
+            className="w-[130px]"
+          />
+        </AdvancedFilterBar>
+
+        <DataTable
+          columns={columns}
+          data={filteredData}
+          loading={loading}
+          moduleKey="grupos-economicos"
+          showColumnToggle={true}
+          onView={openView}
+          onEdit={openEdit}
+          onDelete={(g) => remove(g.id)}
+        />
       </ModulePage>
 
       <FormModal open={modalOpen} onClose={handleCancel} title={mode === "create" ? "Novo Grupo Econômico" : "Editar Grupo Econômico"} size="lg">
