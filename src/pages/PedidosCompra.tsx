@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppLayout } from "@/components/AppLayout";
 import { ModulePage } from "@/components/ModulePage";
@@ -158,13 +158,7 @@ const PedidosCompra = () => {
         throw error;
       }
 
-      const fornecedores = (data || []) as FornecedorOptionRow[];
-      console.info("[pedidos_compra] fornecedores carregados", {
-        total: fornecedores.length,
-        ativosFrontend: fornecedores.filter((f) => f.ativo !== false).length,
-      });
-
-      return fornecedores;
+      return (data || []) as FornecedorOptionRow[];
     },
   });
 
@@ -189,13 +183,7 @@ const PedidosCompra = () => {
         throw error;
       }
 
-      const produtos = (data || []) as ProdutoOptionRow[];
-      console.info("[pedidos_compra] produtos carregados", {
-        total: produtos.length,
-        ativosFrontend: produtos.filter((p) => p.ativo !== false).length,
-      });
-
-      return produtos;
+      return (data || []) as ProdutoOptionRow[];
     },
   });
 
@@ -214,13 +202,6 @@ const PedidosCompra = () => {
   const data = pedidosRaw;
 
   const fornecedoresAtivos = fornecedoresRaw.filter((f) => f.ativo !== false);
-
-  useEffect(() => {
-    console.warn("[pedidos_compra] fornecedores carregados", {
-      total: fornecedoresRaw.length,
-      ativosVisiveis: fornecedoresAtivos.length,
-    });
-  }, [fornecedoresRaw.length, fornecedoresAtivos.length]);
 
   const fornecedorOptions = fornecedoresAtivos.map((f) => ({
     id: String(f.id),
@@ -367,8 +348,7 @@ const PedidosCompra = () => {
 
     setSaving(true);
 
-    // Full payload including columns added after initial table creation.
-    const fullPayload = {
+    const payload = {
       fornecedor_id: fornecedorId,
       data_pedido: form.data_pedido,
       data_entrega_prevista: form.data_entrega_prevista || null,
@@ -380,53 +360,20 @@ const PedidosCompra = () => {
       valor_total: valorTotal,
     };
 
-    // Fallback payload that omits columns that may be missing from
-    // PostgREST's schema cache (PGRST204) while keeping valor_total
-    // correct (it already incorporates frete_valor).
-    const basePayload = {
-      fornecedor_id: fornecedorId,
-      data_pedido: form.data_pedido,
-      data_entrega_prevista: form.data_entrega_prevista || null,
-      status: form.status,
-      observacoes: form.observacoes || null,
-      valor_total: valorTotal,
-    };
-
     let pedidoId = selected?.id;
-
-    // Helper: choose the right payload; fall back to base on PGRST204.
-    const resolvePayload = (error: any): Record<string, unknown> | null => {
-      if (error?.code === "PGRST204") {
-        console.warn("[pedidos_compra] schema cache stale (PGRST204); retrying with base payload");
-        return basePayload;
-      }
-      return null;
-    };
 
     try {
       if (mode === "create") {
-        let { data: newP, error } = await (supabase.from as any)("pedidos_compra")
-          .insert(fullPayload)
+        const numero = `PC-${String(Date.now()).slice(-6)}`;
+        const { data: newP, error } = await (supabase.from as any)("pedidos_compra")
+          .insert({ numero, ...payload })
           .select()
           .single();
 
         if (error) {
-          const fallback = resolvePayload(error);
-          if (fallback) {
-            ({ data: newP, error } = await (supabase.from as any)("pedidos_compra")
-              .insert(fallback)
-              .select()
-              .single());
-          }
-        }
-
-        if (error) {
-          console.error("[pedidos_compra] insert header error", {
+          console.error("[pedidos_compra] insert error", {
             code: error.code,
             message: error.message,
-            details: error.details,
-            hint: error.hint,
-            payload: fullPayload,
           });
           toast.error(`Erro ao criar pedido: ${error.message}`);
           setSaving(false);
@@ -435,26 +382,14 @@ const PedidosCompra = () => {
 
         pedidoId = newP.id;
       } else if (selected) {
-        let { error } = await (supabase.from as any)("pedidos_compra")
-          .update(fullPayload)
+        const { error } = await (supabase.from as any)("pedidos_compra")
+          .update(payload)
           .eq("id", selected.id);
 
         if (error) {
-          const fallback = resolvePayload(error);
-          if (fallback) {
-            ({ error } = await (supabase.from as any)("pedidos_compra")
-              .update(fallback)
-              .eq("id", selected.id));
-          }
-        }
-
-        if (error) {
-          console.error("[pedidos_compra] update header error", {
+          console.error("[pedidos_compra] update error", {
             code: error.code,
             message: error.message,
-            details: error.details,
-            hint: error.hint,
-            payload: fullPayload,
           });
           toast.error(`Erro ao atualizar pedido: ${error.message}`);
           setSaving(false);
@@ -479,27 +414,12 @@ const PedidosCompra = () => {
           const { error: itemsError } = await (supabase.from as any)("pedidos_compra_itens").insert(itemsPayload);
 
           if (itemsError) {
-            console.error("[pedidos_compra] insert items error", {
-              code: itemsError.code,
-              message: itemsError.message,
-              details: itemsError.details,
-              hint: itemsError.hint,
-              itemsPayload,
-            });
-
             if (mode === "create" && pedidoId) {
               const { error: rollbackError } = await (supabase.from as any)("pedidos_compra")
                 .delete()
                 .eq("id", pedidoId);
 
               if (rollbackError) {
-                console.error("[pedidos_compra] rollback delete error", {
-                  code: rollbackError.code,
-                  message: rollbackError.message,
-                  details: rollbackError.details,
-                  hint: rollbackError.hint,
-                  pedidoId,
-                });
                 toast.error(
                   `Erro ao salvar itens: ${itemsError.message}. O pedido foi criado mas os itens não foram salvos — apague o pedido manualmente.`,
                 );
