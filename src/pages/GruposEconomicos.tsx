@@ -82,7 +82,10 @@ const GruposEconomicos = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [ativoFilters, setAtivoFilters] = useState<string[]>([]);
+  const [vinculoFilters, setVinculoFilters] = useState<string[]>([]);
   const [clienteCountMap, setClienteCountMap] = useState<Record<string, number>>({});
+  const [grupoVencidosMap, setGrupoVencidosMap] = useState<Record<string, number>>({});
+  const [grupoSaldoMap, setGrupoSaldoMap] = useState<Record<string, number>>({});
   const [matrizNomeMap, setMatrizNomeMap] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -105,21 +108,45 @@ const GruposEconomicos = () => {
     [data],
   );
 
-  // Load client counts per group whenever the set of group IDs changes
+  // Load client counts and financial risk per group whenever the set of group IDs changes
   useEffect(() => {
-    supabase
-      .from("clientes")
-      .select("grupo_economico_id, id")
-      .eq("ativo", true)
-      .not("grupo_economico_id", "is", null)
-      .then(({ data: clientes, error }) => {
-        if (error) { console.error("[grupos-economicos] erro ao carregar contagem de clientes:", error); return; }
-        const counts: Record<string, number> = {};
-        for (const c of (clientes || []) as { grupo_economico_id: string; id: string }[]) {
-          counts[c.grupo_economico_id] = (counts[c.grupo_economico_id] || 0) + 1;
-        }
-        setClienteCountMap(counts);
-      });
+    (async () => {
+      const { data: clientes, error } = await supabase
+        .from("clientes")
+        .select("grupo_economico_id, id")
+        .eq("ativo", true)
+        .not("grupo_economico_id", "is", null);
+      if (error) { console.error("[grupos-economicos] erro ao carregar contagem de clientes:", error); return; }
+      const counts: Record<string, number> = {};
+      const clienteToGrupo: Record<string, string> = {};
+      for (const c of (clientes || []) as { grupo_economico_id: string; id: string }[]) {
+        counts[c.grupo_economico_id] = (counts[c.grupo_economico_id] || 0) + 1;
+        clienteToGrupo[c.id] = c.grupo_economico_id;
+      }
+      setClienteCountMap(counts);
+
+      const clienteIds = Object.keys(clienteToGrupo);
+      if (clienteIds.length === 0) return;
+
+      const { data: titulos } = await supabase
+        .from("financeiro_lancamentos")
+        .select("cliente_id, valor, status")
+        .in("cliente_id", clienteIds)
+        .eq("tipo", "receber")
+        .eq("ativo", true)
+        .in("status", ["aberto", "vencido"]);
+
+      const vencidosMap: Record<string, number> = {};
+      const saldoMap: Record<string, number> = {};
+      for (const t of (titulos || []) as { cliente_id: string; valor: string | number; status: string }[]) {
+        const grupoId = clienteToGrupo[t.cliente_id];
+        if (!grupoId) continue;
+        saldoMap[grupoId] = (saldoMap[grupoId] || 0) + Number(t.valor || 0);
+        if (t.status === "vencido") vencidosMap[grupoId] = (vencidosMap[grupoId] || 0) + 1;
+      }
+      setGrupoVencidosMap(vencidosMap);
+      setGrupoSaldoMap(saldoMap);
+    })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataIdsKey]);
 
@@ -168,13 +195,21 @@ const GruposEconomicos = () => {
   const [loadingSummary, setLoadingSummary] = useState(false);
 
   const filteredData = useMemo(() => {
-    if (ativoFilters.length === 0) return data;
     return data.filter((g) => {
-      if (ativoFilters.includes("ativo") && g.ativo) return true;
-      if (ativoFilters.includes("inativo") && !g.ativo) return true;
-      return false;
+      if (ativoFilters.length > 0) {
+        const matchAtivo = ativoFilters.includes("ativo") && g.ativo;
+        const matchInativo = ativoFilters.includes("inativo") && !g.ativo;
+        if (!matchAtivo && !matchInativo) return false;
+      }
+      if (vinculoFilters.length > 0) {
+        const count = clienteCountMap[g.id] ?? 0;
+        const matchCom = vinculoFilters.includes("com_clientes") && count > 0;
+        const matchSem = vinculoFilters.includes("sem_clientes") && count === 0;
+        if (!matchCom && !matchSem) return false;
+      }
+      return true;
     });
-  }, [data, ativoFilters]);
+  }, [data, ativoFilters, vinculoFilters, clienteCountMap]);
 
   const isDirty =
     form.nome !== initialForm.nome ||
@@ -382,13 +417,17 @@ const GruposEconomicos = () => {
       label: "Clientes",
       render: (g: GrupoEconomico) => {
         const count = clienteCountMap[g.id] ?? 0;
-        return count > 0 ? (
+        if (count === 0)
+          return (
+            <Badge variant="outline" className="text-[10px] text-muted-foreground border-muted-foreground/30 font-normal">
+              Sem clientes
+            </Badge>
+          );
+        return (
           <div className="flex items-center gap-1.5">
             <Users className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-            <span className="font-medium text-sm tabular-nums">{count}</span>
+            <span className="font-semibold text-sm tabular-nums">{count}</span>
           </div>
-        ) : (
-          <span className="text-muted-foreground text-xs">—</span>
         );
       },
     },
@@ -402,9 +441,37 @@ const GruposEconomicos = () => {
       },
     },
     {
+      key: "situacao_fin",
+      label: "Situação",
+      hidden: true,
+      render: (g: GrupoEconomico) => {
+        const count = clienteCountMap[g.id] ?? 0;
+        if (count === 0) return <span className="text-muted-foreground text-xs">—</span>;
+        const risk = getRiskInfo(grupoVencidosMap[g.id] ?? 0, grupoSaldoMap[g.id] ?? 0);
+        const { Icon: RiskIcon } = risk;
+        return (
+          <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${risk.badgeClass}`}>
+            <RiskIcon className="w-2.5 h-2.5 mr-1" />
+            {risk.label}
+          </Badge>
+        );
+      },
+    },
+    {
       key: "ativo",
       label: "Status",
       render: (g: GrupoEconomico) => <StatusBadge status={g.ativo ? "Ativo" : "Inativo"} />,
+    },
+    {
+      key: "observacoes",
+      label: "Observações",
+      hidden: true,
+      render: (g: GrupoEconomico) =>
+        g.observacoes ? (
+          <span className="text-xs text-muted-foreground truncate max-w-xs block">{g.observacoes}</span>
+        ) : (
+          <span className="text-xs text-muted-foreground">—</span>
+        ),
     },
     {
       key: "created_at",
@@ -421,12 +488,25 @@ const GruposEconomicos = () => {
     { label: "Inativo", value: "inativo" },
   ];
 
-  const activeFilters: FilterChip[] = ativoFilters.map((f) => ({
-    key: "ativo",
-    label: "Status",
-    value: [f],
-    displayValue: f === "ativo" ? "Ativo" : "Inativo",
-  }));
+  const vinculoOptions: MultiSelectOption[] = [
+    { label: "Com Clientes", value: "com_clientes" },
+    { label: "Sem Clientes", value: "sem_clientes" },
+  ];
+
+  const activeFilters: FilterChip[] = [
+    ...ativoFilters.map((f) => ({
+      key: "ativo",
+      label: "Status",
+      value: [f],
+      displayValue: f === "ativo" ? "Ativo" : "Inativo",
+    })),
+    ...vinculoFilters.map((f) => ({
+      key: "vinculo",
+      label: "Vínculos",
+      value: [f],
+      displayValue: f === "com_clientes" ? "Com Clientes" : "Sem Clientes",
+    })),
+  ];
 
   const summaryAtivos = useMemo(() => data.filter((g) => g.ativo).length, [data]);
   const summaryComClientes = useMemo(
@@ -688,8 +768,9 @@ const GruposEconomicos = () => {
           activeFilters={activeFilters}
           onRemoveFilter={(key) => {
             if (key === "ativo") setAtivoFilters([]);
+            if (key === "vinculo") setVinculoFilters([]);
           }}
-          onClearAll={() => setAtivoFilters([])}
+          onClearAll={() => { setAtivoFilters([]); setVinculoFilters([]); }}
           count={filteredData.length}
         >
           <MultiSelect
@@ -698,6 +779,13 @@ const GruposEconomicos = () => {
             onChange={setAtivoFilters}
             placeholder="Status"
             className="w-[130px]"
+          />
+          <MultiSelect
+            options={vinculoOptions}
+            selected={vinculoFilters}
+            onChange={setVinculoFilters}
+            placeholder="Vínculos"
+            className="w-[140px]"
           />
         </AdvancedFilterBar>
 
