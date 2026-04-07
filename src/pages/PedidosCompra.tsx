@@ -51,6 +51,7 @@ interface PedidoCompra {
   valor_total: number | null;
   frete_valor: number | null;
   condicao_pagamento: string | null;
+  condicoes_pagamento?: string | null;
   status: string;
   observacoes: string | null;
   cotacao_compra_id: string | number | null;
@@ -146,7 +147,6 @@ const PedidosCompra = () => {
     queryFn: async () => {
       const { data, error } = await (supabase.from as any)("fornecedores")
         .select("id, nome_razao, cpf_cnpj, ativo")
-        .eq("ativo", true)
         .order("id", { ascending: false });
 
       if (error) {
@@ -159,7 +159,13 @@ const PedidosCompra = () => {
         throw error;
       }
 
-      return (data || []) as FornecedorOptionRow[];
+      const fornecedores = (data || []) as FornecedorOptionRow[];
+      console.info("[pedidos_compra] fornecedores carregados", {
+        total: fornecedores.length,
+        ativosFrontend: fornecedores.filter((f) => f.ativo !== false).length,
+      });
+
+      return fornecedores;
     },
   });
 
@@ -171,7 +177,6 @@ const PedidosCompra = () => {
     queryFn: async () => {
       const { data, error } = await (supabase.from as any)("produtos")
         .select("id, nome, sku, codigo_interno, preco_venda, unidade_medida, ativo")
-        .eq("ativo", true)
         .order("id", { ascending: false });
 
       if (error) {
@@ -184,27 +189,38 @@ const PedidosCompra = () => {
         throw error;
       }
 
-      return (data || []) as ProdutoOptionRow[];
+      const produtos = (data || []) as ProdutoOptionRow[];
+      console.info("[pedidos_compra] produtos carregados", {
+        total: produtos.length,
+        ativosFrontend: produtos.filter((p) => p.ativo !== false).length,
+      });
+
+      return produtos;
     },
   });
 
   const data = pedidosRaw;
 
-  const fornecedorOptions = fornecedoresRaw.map((f) => ({
-    id: String(f.id),
-    label: f.nome_razao || "",
-    sublabel: f.cpf_cnpj || "",
-  }));
+  const fornecedorOptions = fornecedoresRaw
+    .filter((f) => f.ativo !== false)
+    .map((f) => ({
+      id: String(f.id),
+      label: f.nome_razao || "",
+      sublabel: f.cpf_cnpj || "",
+      searchTerms: [f.nome_razao, f.cpf_cnpj].filter(Boolean) as string[],
+    }));
 
-  const produtosOptionsData = produtosRaw.map((p) => ({
-    ...p,
-    id: String(p.id),
-    nome: p.nome || "",
-    sku: p.sku || "",
-    codigo_interno: p.codigo_interno || "",
-    preco_venda: Number(p.preco_venda || 0),
-    unidade_medida: p.unidade_medida || "",
-  }));
+  const produtosOptionsData = produtosRaw
+    .filter((p) => p.ativo !== false)
+    .map((p) => ({
+      ...p,
+      id: String(p.id),
+      nome: p.nome || "",
+      sku: p.sku || "",
+      codigo_interno: p.codigo_interno || "",
+      preco_venda: Number(p.preco_venda || 0),
+      unidade_medida: p.unidade_medida || "",
+    }));
 
   const valorProdutos = items.reduce((s, i) => s + Number(i.valor_total || 0), 0);
   const valorTotal = valorProdutos + Number(form.frete_valor || 0);
@@ -248,7 +264,7 @@ const PedidosCompra = () => {
       data_entrega_prevista: p.data_entrega_prevista || "",
       data_entrega_real: p.data_entrega_real || "",
       frete_valor: p.frete_valor ?? "",
-      condicao_pagamento: p.condicao_pagamento || "",
+      condicao_pagamento: p.condicao_pagamento || p.condicoes_pagamento || "",
       status: p.status || "rascunho",
       observacoes: p.observacoes || "",
     });
@@ -349,7 +365,7 @@ const PedidosCompra = () => {
       data_entrega_prevista: form.data_entrega_prevista || null,
       data_entrega_real: form.data_entrega_real || null,
       frete_valor: Number(form.frete_valor || 0),
-      condicao_pagamento: form.condicao_pagamento || null,
+      condicoes_pagamento: form.condicao_pagamento || null,
       status: form.status,
       observacoes: form.observacoes || null,
       valor_total: valorTotal,
@@ -666,8 +682,18 @@ const PedidosCompra = () => {
               onChange={(id) => setForm({ ...form, fornecedor_id: id })}
               placeholder={fornecedoresLoading ? "Carregando fornecedores..." : "Buscar por nome ou CNPJ..."}
             />
+            {!fornecedoresLoading && fornecedorOptions.length === 0 && (
+              <p className="text-xs text-warning">
+                Nenhum fornecedor disponível. Verifique cadastro/ativo no banco legado.
+              </p>
+            )}
           </div>
 
+          {!produtosLoading && produtosOptionsData.length === 0 && (
+            <p className="text-xs text-warning">
+              Nenhum produto disponível para seleção. Verifique cadastro/ativo no banco legado.
+            </p>
+          )}
           <ItemsGrid
             items={items}
             onChange={setItems}
