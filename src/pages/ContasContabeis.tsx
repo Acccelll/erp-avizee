@@ -3,16 +3,11 @@ import { AppLayout } from "@/components/AppLayout";
 import { ModulePage } from "@/components/ModulePage";
 import { DataTable } from "@/components/DataTable";
 import { StatusBadge } from "@/components/StatusBadge";
-import { FormModal } from "@/components/FormModal";
 import { ContaContabilDrawer } from "@/components/financeiro/ContaContabilDrawer";
+import { ContaContabilEditModal } from "@/components/financeiro/ContaContabilEditModal";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
-import { toast } from "sonner";
 import { FolderTree, FileText } from "lucide-react";
 
 interface ContaContabil {
@@ -26,41 +21,27 @@ interface ContaContabil {
   created_at: string;
 }
 
-const emptyForm: Record<string, any> = {
-  codigo: "", descricao: "", natureza: "devedora", aceita_lancamento: true, conta_pai_id: null,
-};
-
 const ContasContabeis = () => {
   const { data, loading, create, update, remove } = useSupabaseCrud<ContaContabil>({ table: "contas_contabeis" });
-  const [modalOpen, setModalOpen] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selected, setSelected] = useState<ContaContabil | null>(null);
-  const [mode, setMode] = useState<"create" | "edit">("create");
-  const [form, setForm] = useState(emptyForm);
-  const [saving, setSaving] = useState(false);
   const [viewMode, setViewMode] = useState<"tree" | "flat">("tree");
 
-  const openCreate = () => { setMode("create"); setForm({ ...emptyForm }); setSelected(null); setModalOpen(true); };
-  const openEdit = (c: ContaContabil) => {
-    setMode("edit"); setSelected(c);
-    setForm({ codigo: c.codigo, descricao: c.descricao, natureza: c.natureza, aceita_lancamento: c.aceita_lancamento, conta_pai_id: c.conta_pai_id || null });
-    setModalOpen(true);
-  };
+  const openCreate = () => { setSelected(null); setEditModalOpen(true); };
+  const openEdit = (c: ContaContabil) => { setSelected(c); setEditModalOpen(true); };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!form.codigo || !form.descricao) { toast.error("Código e descrição são obrigatórios"); return; }
-    setSaving(true);
+  const handleSave = async (payload: Partial<ContaContabil>) => {
     try {
-      const payload = { ...form, conta_pai_id: form.conta_pai_id || null };
-      if (mode === "create") await create(payload);
-      else if (selected) await update(selected.id, payload);
-      setModalOpen(false);
+      if (selected) {
+        await update(selected.id, payload);
+      } else {
+        await create(payload);
+      }
     } catch (err) {
       console.error('[contas-contabeis] erro ao salvar:', err);
-      toast.error("Erro ao salvar conta contábil");
+      throw err;
     }
-    setSaving(false);
   };
 
   // Build tree structure
@@ -142,58 +123,20 @@ const ContasContabeis = () => {
           onView={(c) => { setSelected(c); setDrawerOpen(true); }} />
       </ModulePage>
 
-      <FormModal open={modalOpen} onClose={() => setModalOpen(false)} title={mode === "create" ? "Nova Conta Contábil" : "Editar Conta Contábil"} size="md">
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Código *</Label>
-              <Input value={form.codigo} onChange={e => setForm({ ...form, codigo: e.target.value })} placeholder="1.1.01" className="font-mono" required />
-            </div>
-            <div className="space-y-2">
-              <Label>Natureza</Label>
-              <Select value={form.natureza} onValueChange={v => setForm({ ...form, natureza: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="devedora">Devedora</SelectItem>
-                  <SelectItem value="credora">Credora</SelectItem>
-                  <SelectItem value="mista">Mista</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label>Descrição *</Label>
-            <Input value={form.descricao} onChange={e => setForm({ ...form, descricao: e.target.value })} required />
-          </div>
-          <div className="space-y-2">
-            <Label>Conta Pai (opcional)</Label>
-            <Select value={form.conta_pai_id || "none"} onValueChange={v => setForm({ ...form, conta_pai_id: v === "none" ? null : v })}>
-              <SelectTrigger><SelectValue placeholder="Nenhuma (raiz)" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">Nenhuma (raiz)</SelectItem>
-                {data.filter(c => !selected || c.id !== selected.id).map(c => (
-                  <SelectItem key={c.id} value={c.id}>{c.codigo} - {c.descricao}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex items-center gap-2">
-            <Checkbox id="aceita" checked={form.aceita_lancamento} onCheckedChange={v => setForm({ ...form, aceita_lancamento: !!v })} />
-            <Label htmlFor="aceita" className="cursor-pointer">Aceita lançamento (conta analítica)</Label>
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={() => setModalOpen(false)}>Cancelar</Button>
-            <Button type="submit" disabled={saving}>{saving ? "Salvando..." : "Salvar"}</Button>
-          </div>
-        </form>
-      </FormModal>
+      <ContaContabilEditModal
+        open={editModalOpen}
+        onClose={() => setEditModalOpen(false)}
+        conta={selected}
+        allContas={data}
+        onSave={handleSave}
+      />
 
       <ContaContabilDrawer
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         selected={selected}
         allContas={data}
-        onEdit={openEdit}
+        onEdit={(c) => { setDrawerOpen(false); openEdit(c); }}
         onDelete={(c) => remove(c.id)}
       />
     </AppLayout>
