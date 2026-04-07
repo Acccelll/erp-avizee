@@ -40,6 +40,7 @@ interface Lancamento {
   parcela_numero: number; parcela_total: number;
   documento_pai_id: string; saldo_restante: number | null;
   observacoes: string; ativo: boolean;
+  created_at?: string;
   clientes?: { nome_razao_social: string }; fornecedores?: { nome_razao_social: string };
   contas_bancarias?: { descricao: string; bancos?: { nome: string } };
   contas_contabeis?: { codigo: string; descricao: string };
