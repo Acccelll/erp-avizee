@@ -6,6 +6,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { SummaryCard } from "@/components/SummaryCard";
 import { FormModal } from "@/components/FormModal";
 import { ViewDrawer } from "@/components/ViewDrawer";
+import { EstoquePosicaoDrawer } from "@/components/estoque/EstoquePosicaoDrawer";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -47,6 +48,8 @@ const Estoque = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selected, setSelected] = useState<Movimento | null>(null);
+  const [posicaoDrawerOpen, setPosicaoDrawerOpen] = useState(false);
+  const [selectedPosicao, setSelectedPosicao] = useState<ProdutoPosicao | null>(null);
   const [form, setForm] = useState({ produto_id: "", tipo: "entrada", quantidade: 0, motivo: "" });
   const [saving, setSaving] = useState(false);
   const [tipoFilters, setTipoFilters] = useState<string[]>([]);
@@ -250,7 +253,8 @@ const Estoque = () => {
                 <span className="font-mono font-semibold text-foreground">{formatCurrency(posicaoKpis.valorEstoque)}</span>
               </div>
             </div>
-            <DataTable columns={posColumns} data={posicaoAtual} loading={produtosCrud.loading} />
+            <DataTable columns={posColumns} data={posicaoAtual} loading={produtosCrud.loading}
+              onView={(p) => { setSelectedPosicao(p as ProdutoPosicao); setPosicaoDrawerOpen(true); }} />
           </TabsContent>
 
           <TabsContent value="movimentacao">
@@ -339,6 +343,13 @@ const Estoque = () => {
           </div>
         )}
       </ViewDrawer>
+
+      <EstoquePosicaoDrawer
+        open={posicaoDrawerOpen}
+        onClose={() => setPosicaoDrawerOpen(false)}
+        produto={selectedPosicao}
+        movimentos={data}
+      />
     </AppLayout>
   );
 };
