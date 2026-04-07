@@ -109,7 +109,7 @@ export function NotaFiscalDrawer({
       setMovimentos((mov as any[]) || []);
       setLoadingExtra(false);
     });
-  }, [open, selected?.id]);
+  }, [open, selected]);
 
   if (!selected) return <ViewDrawerV2 open={open} onClose={onClose} title="" />;
 
@@ -541,9 +541,7 @@ export function NotaFiscalDrawer({
                         {formatCurrency(Number(l.valor))}
                       </td>
                       <td className="px-3 py-2">
-                        {l.data_vencimento
-                          ? new Date(l.data_vencimento + "T00:00:00").toLocaleDateString("pt-BR")
-                          : "—"}
+                        {l.data_vencimento ? formatDate(l.data_vencimento) : "—"}
                       </td>
                       <td className="px-3 py-2">
                         <Badge variant="outline" className="text-xs capitalize">{l.status}</Badge>
