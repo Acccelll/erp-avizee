@@ -4,6 +4,7 @@ import { AppLayout } from "@/components/AppLayout";
 import { DataTable } from "@/components/DataTable";
 import { StatusBadge } from "@/components/StatusBadge";
 import { ModulePage } from "@/components/ModulePage";
+import { SummaryCard } from "@/components/SummaryCard";
 import { FormModal } from "@/components/FormModal";
 import { AdvancedFilterBar } from "@/components/AdvancedFilterBar";
 import type { FilterChip } from "@/components/AdvancedFilterBar";
@@ -52,6 +53,24 @@ interface FornecedorLink {
   preco_compra: number;
 }
 
+type SituacaoEstoque = "normal" | "atencao" | "critico" | "zerado";
+
+function getSituacaoEstoque(p: { estoque_atual?: number | null; estoque_minimo?: number | null }): SituacaoEstoque {
+  const atual = Number(p.estoque_atual || 0);
+  const minimo = Number(p.estoque_minimo || 0);
+  if (atual <= 0) return "zerado";
+  if (minimo > 0 && atual <= minimo) return "critico";
+  if (minimo > 0 && atual <= minimo * 1.2) return "atencao";
+  return "normal";
+}
+
+const situacaoEstoqueConfig: Record<SituacaoEstoque, { label: string; statusBadge: string; textClass: string }> = {
+  normal:  { label: "Normal",           statusBadge: "confirmado",  textClass: "text-foreground"   },
+  atencao: { label: "Em atenção",        statusBadge: "pendente",    textClass: "text-warning"      },
+  critico: { label: "Abaixo do mínimo", statusBadge: "cancelado",   textClass: "text-destructive"  },
+  zerado:  { label: "Sem estoque",      statusBadge: "cancelado",   textClass: "text-destructive"  },
+};
+
 const emptyProduto: Record<string, any> = {
   nome: "", sku: "", codigo_interno: "", descricao: "", unidade_medida: "UN",
   preco_custo: 0, preco_venda: 0, estoque_minimo: 0, ncm: "", cst: "", cfop_padrao: "", peso: 0, eh_composto: false,
@@ -76,6 +95,7 @@ const Produtos = () => {
   const [tipoFilters, setTipoFilters] = useState<string[]>([]);
   const [estoqueFilters, setEstoqueFilters] = useState<string[]>([]);
   const [grupoFilters, setGrupoFilters] = useState<string[]>([]);
+  const [ativoFilters, setAtivoFilters] = useState<string[]>([]);
   const [grupos, setGrupos] = useState<{id: string; nome: string}[]>([]);
   const { buscarNcm, loading: ncmLoading } = useNcmLookup();
 
@@ -233,7 +253,12 @@ const Produtos = () => {
     const query = searchTerm.trim().toLowerCase();
     return data.filter((p) => {
       const isComposto = Boolean(p.eh_composto);
-      const baixoEstoque = Number(p.estoque_minimo || 0) > 0 && Number(p.estoque_atual || 0) <= Number(p.estoque_minimo || 0);
+      const situacao = getSituacaoEstoque(p);
+
+      if (ativoFilters.length > 0) {
+        const val = p.ativo !== false ? "ativo" : "inativo";
+        if (!ativoFilters.includes(val)) return false;
+      }
 
       if (tipoFilters.length > 0) {
         const type = isComposto ? "composto" : "simples";
@@ -241,8 +266,7 @@ const Produtos = () => {
       }
 
       if (estoqueFilters.length > 0) {
-        const stockStatus = baixoEstoque ? "baixo" : "ok";
-        if (!estoqueFilters.includes(stockStatus)) return false;
+        if (!estoqueFilters.includes(situacao)) return false;
       }
 
       if (grupoFilters.length > 0 && !grupoFilters.includes(p.grupo_id || "sem_grupo")) {
@@ -252,44 +276,143 @@ const Produtos = () => {
       if (!query) return true;
       return [p.nome, p.sku, p.codigo_interno, p.descricao, p.ncm].filter(Boolean).join(" ").toLowerCase().includes(query);
     });
-  }, [data, estoqueFilters, searchTerm, tipoFilters, grupoFilters]);
+  }, [data, ativoFilters, estoqueFilters, searchTerm, tipoFilters, grupoFilters]);
 
   const columns = [
-  { key: "sku", label: "SKU", sortable: true, render: (p: Produto) => <span className="font-mono text-xs font-medium text-primary">{p.sku || "—"}</span> },
-  { key: "nome", label: "Nome", sortable: true },
-  { key: "unidade_medida", label: "UN" },
-  { key: "estoque_atual", label: "Estoque", sortable: true, render: (p: Produto) =>
-    <span className={Number(p.estoque_atual) <= Number(p.estoque_minimo) && Number(p.estoque_minimo) > 0 ? "text-destructive font-semibold" : ""}>{p.estoque_atual}</span>
-  },
-  { key: "preco_custo", label: "Custo", sortable: true, render: (p: Produto) => <span className="font-mono">{formatCurrency(p.preco_custo || 0)}</span> },
-  { key: "preco_venda", label: "Preço Venda", sortable: true, render: (p: Produto) => <span className="font-semibold font-mono">{formatCurrency(p.preco_venda)}</span> },
-  { key: "margem", label: "Margem", render: (p: Produto) => {
-      const custo = Number(p.preco_custo || 0);
-      const venda = Number(p.preco_venda);
-      const margem = custo > 0 ? (venda / custo - 1) * 100 : 0;
-      return (
-        <div className="flex flex-col">
-          <span className={`font-mono text-xs ${margem > 0 ? "text-success" : margem < 0 ? "text-destructive" : ""}`}>
-            {custo > 0 ? `${margem.toFixed(1)}%` : "—"}
-          </span>
-          <span className="text-[10px] text-muted-foreground font-mono">
-            +{formatCurrency(venda - custo)}
-          </span>
+    {
+      key: "codigo_interno",
+      label: "Código",
+      sortable: true,
+      render: (p: Produto) => (
+        <span className="font-mono text-xs text-muted-foreground">
+          {p.codigo_interno || p.sku || "—"}
+        </span>
+      ),
+    },
+    {
+      key: "nome",
+      label: "Produto",
+      sortable: true,
+      render: (p: Produto) => (
+        <div>
+          <span className="font-medium text-sm">{p.nome}</span>
+          {p.sku && (
+            <p className="text-[11px] text-muted-foreground font-mono leading-tight">{p.sku}</p>
+          )}
         </div>
-      );
-    } },
-  { key: "eh_composto", label: "Tipo", render: (p: Produto) => p.eh_composto ? <StatusBadge status="Composto" /> : <StatusBadge status="Simples" /> }];
+      ),
+    },
+    {
+      key: "unidade_medida",
+      label: "UN",
+      render: (p: Produto) => (
+        <span className="text-xs text-muted-foreground">{p.unidade_medida || "UN"}</span>
+      ),
+    },
+    {
+      key: "estoque_atual",
+      label: "Estoque",
+      sortable: true,
+      render: (p: Produto) => {
+        const situacao = getSituacaoEstoque(p);
+        const cfg = situacaoEstoqueConfig[situacao];
+        return (
+          <div className="space-y-0.5">
+            <span className={`font-mono text-sm font-semibold ${cfg.textClass}`}>
+              {p.estoque_atual ?? 0}
+              <span className="text-[11px] text-muted-foreground ml-1 font-normal">{p.unidade_medida}</span>
+            </span>
+            {Number(p.estoque_minimo) > 0 && (
+              <p className="text-[10px] text-muted-foreground font-mono leading-none">
+                mín: {p.estoque_minimo}
+              </p>
+            )}
+            {situacao !== "normal" && (
+              <StatusBadge
+                status={cfg.statusBadge}
+                label={cfg.label}
+                className="text-[10px] px-1.5 h-4 mt-0.5"
+              />
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      key: "preco_venda",
+      label: "P. Venda",
+      sortable: true,
+      render: (p: Produto) => (
+        <span className="font-semibold font-mono text-sm">{formatCurrency(p.preco_venda)}</span>
+      ),
+    },
+    {
+      key: "preco_custo",
+      label: "P. Custo",
+      sortable: true,
+      render: (p: Produto) => (
+        <span className="font-mono text-sm text-muted-foreground">{formatCurrency(p.preco_custo || 0)}</span>
+      ),
+    },
+    {
+      key: "margem",
+      label: "Margem",
+      render: (p: Produto) => {
+        const custo = Number(p.preco_custo || 0);
+        const venda = Number(p.preco_venda);
+        const margem = custo > 0 ? (venda / custo - 1) * 100 : 0;
+        return (
+          <div className="flex flex-col">
+            <span className={`font-mono text-xs ${margem > 0 ? "text-success" : margem < 0 ? "text-destructive" : ""}`}>
+              {custo > 0 ? `${margem.toFixed(1)}%` : "—"}
+            </span>
+            <span className="text-[10px] text-muted-foreground font-mono">
+              +{formatCurrency(venda - custo)}
+            </span>
+          </div>
+        );
+      },
+    },
+    {
+      key: "ativo",
+      label: "Status",
+      render: (p: Produto) => <StatusBadge status={p.ativo !== false ? "ativo" : "inativo"} />,
+    },
+    {
+      key: "eh_composto",
+      label: "Tipo",
+      hidden: true,
+      render: (p: Produto) => <StatusBadge status={p.eh_composto ? "composto" : "simples"} />,
+    },
+  ];
 
+  const kpis = useMemo(() => {
+    const ativos = data.filter(p => p.ativo !== false);
+    const criticos = data.filter(p => {
+      const s = getSituacaoEstoque(p);
+      return s === "critico" || s === "zerado";
+    });
+    return { total: data.length, ativos: ativos.length, criticos: criticos.length };
+  }, [data]);
 
   const prodActiveFilters = useMemo(() => {
     const chips: FilterChip[] = [];
+
+    ativoFilters.forEach(f => {
+      chips.push({
+        key: "ativo",
+        label: "Status",
+        value: [f],
+        displayValue: f === "ativo" ? "Ativo" : "Inativo",
+      });
+    });
 
     tipoFilters.forEach(f => {
       chips.push({
         key: "tipo",
         label: "Tipo",
         value: [f],
-        displayValue: f === "simples" ? "Simples" : "Composto"
+        displayValue: f === "simples" ? "Simples" : "Composto",
       });
     });
 
@@ -298,7 +421,7 @@ const Produtos = () => {
         key: "estoque",
         label: "Estoque",
         value: [f],
-        displayValue: f === "baixo" ? "Abaixo do mínimo" : "Normal"
+        displayValue: situacaoEstoqueConfig[f as SituacaoEstoque]?.label ?? f,
       });
     });
 
@@ -308,14 +431,15 @@ const Produtos = () => {
         key: "grupo",
         label: "Grupo",
         value: [f],
-        displayValue: g?.nome || "Sem grupo"
+        displayValue: g?.nome || "Sem grupo",
       });
     });
 
     return chips;
-  }, [tipoFilters, estoqueFilters, grupoFilters, grupos]);
+  }, [ativoFilters, tipoFilters, estoqueFilters, grupoFilters, grupos]);
 
   const handleRemoveProdFilter = (key: string, value?: string) => {
+    if (key === "ativo") setAtivoFilters(prev => prev.filter(v => v !== value));
     if (key === "tipo") setTipoFilters(prev => prev.filter(v => v !== value));
     if (key === "estoque") setEstoqueFilters(prev => prev.filter(v => v !== value));
     if (key === "grupo") setGrupoFilters(prev => prev.filter(v => v !== value));
@@ -326,34 +450,77 @@ const Produtos = () => {
     { label: "Composto", value: "composto" },
   ];
 
+  const ativoOptions: MultiSelectOption[] = [
+    { label: "Ativos", value: "ativo" },
+    { label: "Inativos", value: "inativo" },
+  ];
+
   const estoqueOptions: MultiSelectOption[] = [
-    { label: "Abaixo do mínimo", value: "baixo" },
-    { label: "Normal", value: "ok" },
+    { label: "Sem estoque", value: "zerado" },
+    { label: "Abaixo do mínimo", value: "critico" },
+    { label: "Em atenção", value: "atencao" },
+    { label: "Normal", value: "normal" },
   ];
 
   const grupoOptions: MultiSelectOption[] = [
     ...grupos.map(g => ({ label: g.nome, value: g.id })),
-    { label: "Sem grupo", value: "sem_grupo" }
+    { label: "Sem grupo", value: "sem_grupo" },
   ];
 
   return (
     <AppLayout>
-      <ModulePage title="Produtos" subtitle="Cadastro e gestão de produtos" addLabel="Novo Produto" onAdd={openCreate}>
-        
+      <ModulePage
+        title="Produtos"
+        subtitle="Consulta e gestão de produtos"
+        addLabel="Novo Produto"
+        onAdd={openCreate}
+        summaryCards={
+          <>
+            <SummaryCard
+              title="Total de Produtos"
+              value={kpis.total}
+              icon={Package}
+              variant="info"
+            />
+            <SummaryCard
+              title="Produtos Ativos"
+              value={kpis.ativos}
+              icon={CheckCircle2}
+              variant="success"
+            />
+            <SummaryCard
+              title="Abaixo do Mínimo"
+              value={kpis.criticos}
+              icon={AlertCircle}
+              variant={kpis.criticos > 0 ? "danger" : "default"}
+              onClick={kpis.criticos > 0 ? () => setEstoqueFilters(["critico", "zerado"]) : undefined}
+              subtitle={kpis.criticos > 0 ? "Clique para filtrar" : undefined}
+            />
+          </>
+        }
+      >
+
         <AdvancedFilterBar
           searchValue={searchTerm}
           onSearchChange={setSearchTerm}
           searchPlaceholder="Buscar por nome, SKU ou código..."
           activeFilters={prodActiveFilters}
           onRemoveFilter={handleRemoveProdFilter}
-          onClearAll={() => { setTipoFilters([]); setEstoqueFilters([]); setGrupoFilters([]); }}
+          onClearAll={() => { setAtivoFilters([]); setTipoFilters([]); setEstoqueFilters([]); setGrupoFilters([]); }}
           count={filteredData.length}
         >
+          <MultiSelect
+            options={ativoOptions}
+            selected={ativoFilters}
+            onChange={setAtivoFilters}
+            placeholder="Status"
+            className="w-[150px]"
+          />
           <MultiSelect
             options={tipoOptions}
             selected={tipoFilters}
             onChange={setTipoFilters}
-            placeholder="Tipos"
+            placeholder="Tipo"
             className="w-[150px]"
           />
           <MultiSelect
@@ -372,8 +539,16 @@ const Produtos = () => {
           />
         </AdvancedFilterBar>
 
-        <DataTable columns={columns} data={filteredData} loading={loading}
-        onView={openView} onEdit={openEdit} onDelete={(p) => remove(p.id)} />
+        <DataTable
+          columns={columns}
+          data={filteredData}
+          loading={loading}
+          moduleKey="produtos"
+          showColumnToggle={true}
+          onView={openView}
+          onEdit={openEdit}
+          onDelete={(p) => remove(p.id)}
+        />
       </ModulePage>
 
       {/* Form Modal */}
