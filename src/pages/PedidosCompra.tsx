@@ -51,6 +51,7 @@ interface PedidoCompra {
   valor_total: number | null;
   frete_valor: number | null;
   condicao_pagamento: string | null;
+  condicoes_pagamento?: string | null;
   status: string;
   observacoes: string | null;
   cotacao_compra_id: string | number | null;
@@ -157,7 +158,13 @@ const PedidosCompra = () => {
         throw error;
       }
 
-      return (data || []) as FornecedorOptionRow[];
+      const fornecedores = (data || []) as FornecedorOptionRow[];
+      console.info("[pedidos_compra] fornecedores carregados", {
+        total: fornecedores.length,
+        ativosFrontend: fornecedores.filter((f) => f.ativo !== false).length,
+      });
+
+      return fornecedores;
     },
   });
 
@@ -182,7 +189,13 @@ const PedidosCompra = () => {
         throw error;
       }
 
-      return (data || []) as ProdutoOptionRow[];
+      const produtos = (data || []) as ProdutoOptionRow[];
+      console.info("[pedidos_compra] produtos carregados", {
+        total: produtos.length,
+        ativosFrontend: produtos.filter((p) => p.ativo !== false).length,
+      });
+
+      return produtos;
     },
   });
 
@@ -254,7 +267,7 @@ const PedidosCompra = () => {
       data_entrega_prevista: p.data_entrega_prevista || "",
       data_entrega_real: p.data_entrega_real || "",
       frete_valor: p.frete_valor ?? "",
-      condicao_pagamento: p.condicao_pagamento || "",
+      condicao_pagamento: p.condicao_pagamento || p.condicoes_pagamento || "",
       status: p.status || "rascunho",
       observacoes: p.observacoes || "",
     });
@@ -672,8 +685,18 @@ const PedidosCompra = () => {
               onChange={(id) => setForm({ ...form, fornecedor_id: id })}
               placeholder={fornecedoresLoading ? "Carregando fornecedores..." : "Buscar por nome ou CNPJ..."}
             />
+            {!fornecedoresLoading && fornecedorOptions.length === 0 && (
+              <p className="text-xs text-warning">
+                Nenhum fornecedor disponível. Verifique cadastro/ativo no banco legado.
+              </p>
+            )}
           </div>
 
+          {!produtosLoading && produtosOptionsData.length === 0 && (
+            <p className="text-xs text-warning">
+              Nenhum produto disponível para seleção. Verifique cadastro/ativo no banco legado.
+            </p>
+          )}
           <ItemsGrid
             items={items}
             onChange={setItems}
