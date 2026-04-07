@@ -392,8 +392,8 @@ export function NotaFiscalEditModal({
                   </div>
                 ) : (
                   <p className="text-xs text-muted-foreground py-1 italic">
-                    Chave de acesso não informada — documento não identificado
-                    como NF-e eletrônica
+                    Chave de acesso não informada — documento sem chave de
+                    acesso eletrônica
                   </p>
                 )
               ) : (
@@ -843,9 +843,8 @@ export function NotaFiscalEditModal({
                 </div>
                 {!form.gera_financeiro && !rules.isStructurallyLocked && (
                   <div className="rounded-lg bg-warning/10 border border-warning/30 p-3 text-xs text-warning">
-                    ⚠️ "Gera Financeiro" está desmarcado — esta NF{" "}
-                    <strong>não</strong> gerará lançamentos financeiros ao ser
-                    confirmada.
+                    ⚠️ "Gera Financeiro" está desmarcado — ao confirmar, esta
+                    NF <strong>não</strong> gerará lançamentos financeiros.
                   </div>
                 )}
                 {contasContabeis.length > 0 && (
