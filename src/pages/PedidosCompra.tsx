@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppLayout } from "@/components/AppLayout";
 import { ModulePage } from "@/components/ModulePage";
@@ -73,7 +73,6 @@ interface FornecedorOptionRow {
 interface ProdutoOptionRow {
   id: string | number;
   nome: string | null;
-  sku?: string | null;
   codigo_interno?: string | null;
   preco_venda?: number | null;
   unidade_medida?: string | null;
@@ -176,7 +175,8 @@ const PedidosCompra = () => {
     queryKey: ["pedidos_compra_produtos"],
     queryFn: async () => {
       const { data, error } = await (supabase.from as any)("produtos")
-        .select("id, nome, sku, codigo_interno, preco_venda, unidade_medida, ativo")
+        .select("id, nome, codigo_interno, preco_venda, unidade_medida, ativo")
+        .eq("ativo", true)
         .order("id", { ascending: false });
 
       if (error) {
@@ -201,26 +201,29 @@ const PedidosCompra = () => {
 
   const data = pedidosRaw;
 
-  const fornecedorOptions = fornecedoresRaw
-    .filter((f) => f.ativo !== false)
-    .map((f) => ({
-      id: String(f.id),
-      label: f.nome_razao || "",
-      sublabel: f.cpf_cnpj || "",
-      searchTerms: [f.nome_razao, f.cpf_cnpj].filter(Boolean) as string[],
-    }));
+  const fornecedoresAtivos = fornecedoresRaw.filter((f) => f.ativo !== false);
 
-  const produtosOptionsData = produtosRaw
-    .filter((p) => p.ativo !== false)
-    .map((p) => ({
-      ...p,
-      id: String(p.id),
-      nome: p.nome || "",
-      sku: p.sku || "",
-      codigo_interno: p.codigo_interno || "",
-      preco_venda: Number(p.preco_venda || 0),
-      unidade_medida: p.unidade_medida || "",
-    }));
+  useEffect(() => {
+    console.warn("[pedidos_compra] fornecedores carregados", {
+      total: fornecedoresRaw.length,
+      ativosVisiveis: fornecedoresAtivos.length,
+    });
+  }, [fornecedoresRaw.length, fornecedoresAtivos.length]);
+
+  const fornecedorOptions = fornecedoresAtivos.map((f) => ({
+    id: String(f.id),
+    label: f.nome_razao || "",
+    sublabel: f.cpf_cnpj || "",
+  }));
+
+  const produtosOptionsData = produtosRaw.map((p) => ({
+    ...p,
+    id: String(p.id),
+    nome: p.nome || "",
+    codigo_interno: p.codigo_interno || "",
+    preco_venda: Number(p.preco_venda || 0),
+    unidade_medida: p.unidade_medida || "",
+  }));
 
   const valorProdutos = items.reduce((s, i) => s + Number(i.valor_total || 0), 0);
   const valorTotal = valorProdutos + Number(form.frete_valor || 0);
@@ -270,7 +273,7 @@ const PedidosCompra = () => {
     });
 
     const { data: itens, error } = await (supabase.from as any)("pedidos_compra_itens")
-      .select("*, produtos(nome, sku)")
+      .select("*, produtos(nome, codigo_interno)")
       .eq("pedido_compra_id", p.id);
 
     if (error) {
@@ -288,7 +291,7 @@ const PedidosCompra = () => {
       (itens || []).map((i: any) => ({
         id: String(i.id),
         produto_id: i.produto_id ? String(i.produto_id) : "",
-        codigo: i.produtos?.sku || "",
+        codigo: i.produtos?.codigo_interno || "",
         descricao: i.produtos?.nome || "",
         quantidade: Number(i.quantidade || 0),
         valor_unitario: Number(i.valor_unitario || 0),
@@ -309,11 +312,11 @@ const PedidosCompra = () => {
 
     const [itensResult, estResult] = await Promise.all([
       (supabase.from as any)("pedidos_compra_itens")
-        .select("*, produtos(nome, sku)")
+        .select("*, produtos(nome, codigo_interno)")
         .eq("pedido_compra_id", p.id),
       supabase
         .from("estoque_movimentos")
-        .select("*, produtos(nome, sku)")
+        .select("*, produtos(nome, codigo_interno)")
         .eq("documento_id", p.id)
         .eq("documento_tipo", "pedido_compra"),
     ]);
@@ -481,7 +484,7 @@ const PedidosCompra = () => {
 
   const darEntrada = async (p: PedidoCompra) => {
     const { data: itens } = await (supabase.from as any)("pedidos_compra_itens")
-      .select("*, produtos(nome, sku, estoque_atual)")
+      .select("*, produtos(nome, codigo_interno, estoque_atual)")
       .eq("pedido_compra_id", p.id);
 
     if (!itens || itens.length === 0) {
@@ -859,7 +862,7 @@ const PedidosCompra = () => {
                         <tr className="bg-muted/50 border-b">
                           <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground">Produto</th>
                           <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground hidden sm:table-cell">
-                            SKU
+                            Código
                           </th>
                           <th className="px-3 py-2 text-right text-xs font-semibold text-muted-foreground">Qtd</th>
                           <th className="px-3 py-2 text-right text-xs font-semibold text-muted-foreground">
@@ -873,7 +876,7 @@ const PedidosCompra = () => {
                           <tr key={idx} className="border-b last:border-b-0 hover:bg-muted/20">
                             <td className="px-3 py-2 font-medium">{i.produtos?.nome || "—"}</td>
                             <td className="px-3 py-2 text-xs text-muted-foreground font-mono hidden sm:table-cell">
-                              {i.produtos?.sku || "—"}
+                              {i.produtos?.codigo_interno || "—"}
                             </td>
                             <td className="px-3 py-2 text-right font-mono">{i.quantidade}</td>
                             <td className="px-3 py-2 text-right font-mono text-muted-foreground text-xs">

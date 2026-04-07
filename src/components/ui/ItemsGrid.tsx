@@ -36,7 +36,7 @@ export function ItemsGrid({ items, onChange, produtos, title = "Itens", readOnly
     if (field === "produto_id" && value) {
       const prod = produtos.find((p: any) => p.id === value);
       if (prod) {
-        item.codigo = prod.sku || prod.codigo_interno || "";
+        item.codigo = prod.codigo_interno || "";
         item.descricao = prod.nome;
         item.valor_unitario = prod.preco_venda || 0;
       }
@@ -57,8 +57,8 @@ export function ItemsGrid({ items, onChange, produtos, title = "Itens", readOnly
   const produtoOptions = produtos.map((p: any) => ({
     id: p.id,
     label: p.nome,
-    sublabel: [p.sku, p.unidade_medida].filter(Boolean).join(" • "),
-    searchTerms: [p.sku, p.codigo_interno, p.referencia_fornecedor].filter(Boolean),
+    sublabel: [p.codigo_interno, p.unidade_medida].filter(Boolean).join(" • "),
+    searchTerms: [p.codigo_interno, p.referencia_fornecedor].filter(Boolean),
   }));
 
   return (
@@ -99,7 +99,7 @@ export function ItemsGrid({ items, onChange, produtos, title = "Itens", readOnly
                       options={produtoOptions}
                       value={item.produto_id}
                       onChange={(id) => updateItem(idx, "produto_id", id)}
-                      placeholder="Buscar produto (nome, SKU)..."
+                      placeholder="Buscar produto (nome, código)..."
                       className="min-w-[200px]"
                     />
                   )}
