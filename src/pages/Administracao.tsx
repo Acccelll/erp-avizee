@@ -256,7 +256,8 @@ export default function Administracao() {
         status: 'success',
         message: `E-mail de teste enviado com sucesso para ${emailTestAddress}.`,
       });
-    } catch {
+    } catch (err) {
+      console.error('[admin] Erro ao enviar e-mail de teste:', err);
       setEmailTestResult({
         status: 'error',
         message: 'Não foi possível enviar o e-mail de teste. Verifique se a configuração do serviço de envio está ativa.',
@@ -716,7 +717,7 @@ export default function Administracao() {
               value={config.email.assinatura}
               onChange={(e) => { updateSection('email', { assinatura: e.target.value }); setEmailErrors((p) => ({ ...p, assinatura: '' })); }}
               rows={5}
-              placeholder={'Equipe AviZee\ncomercial@empresa.com.br\n(11) 99999-0000'}
+              placeholder={'Equipe Comercial\ncontato@empresa.com.br\n(11) 99999-0000'}
               className={cn(emailErrors.assinatura ? 'border-destructive focus-visible:ring-destructive' : '')}
             />
             <div className="flex items-start justify-between gap-2">
