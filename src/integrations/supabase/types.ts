@@ -859,9 +859,15 @@ export type Database = {
           updated_by?: string | null
           whatsapp?: string | null
         }
-        Relationships: []
-      }
-      estoque_movimentos: {
+        Relationships: [
+          {
+            foreignKeyName: "empresa_config_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
         Row: {
           created_at: string
           documento_id: string | null
