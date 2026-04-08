@@ -21,6 +21,8 @@ export interface RelatorioResultado<T = Record<string, unknown>> {
   rows: T[];
   chartData?: Array<{ name: string; value: number }>;
   totals?: Record<string, number>;
+  /** Rich KPI values keyed by the ReportKpiDef.key for the current report */
+  kpis?: Record<string, number>;
   _isQuantityReport?: boolean;
   _isDreReport?: boolean;
 }
@@ -44,7 +46,7 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
     case "estoque": {
       let query = supabase
         .from("produtos")
-        .select("codigo_interno, nome, unidade_medida, estoque_atual, estoque_minimo, preco_custo, preco_venda")
+        .select("codigo_interno, nome, unidade_medida, estoque_atual, estoque_minimo, preco_custo, preco_venda, grupos_produto(nome)")
         .eq("ativo", true)
         .order("nome");
       if (filtros.grupoProdutoIds) query = query.in('grupo_id', filtros.grupoProdutoIds);
@@ -54,39 +56,46 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
 
       const rows = (data || []).map((item: any) => {
         const qty = Number(item.estoque_atual || 0);
+        const min = Number(item.estoque_minimo || 0);
         const custo = Number(item.preco_custo || 0);
         const venda = Number(item.preco_venda || 0);
+        let criticidade: string;
+        if (qty <= 0) criticidade = "Zerado";
+        else if (min > 0 && qty <= min) criticidade = "Abaixo do mínimo";
+        else criticidade = "OK";
         return {
           codigo: item.codigo_interno || "-",
           produto: item.nome,
+          grupo: (item.grupos_produto as { nome: string } | null)?.nome || "-",
           unidade: item.unidade_medida || "UN",
           estoqueAtual: qty,
-          estoqueMinimo: Number(item.estoque_minimo || 0),
+          estoqueMinimo: min,
+          criticidade,
           custoUnit: custo,
           vendaUnit: venda,
           totalCusto: qty * custo,
           totalVenda: qty * venda,
-          situacao: qty <= Number(item.estoque_minimo || 0) ? "Abaixo do mínimo" : "OK",
         };
       });
 
+      const totalItens = rows.length;
       const totalQtd = rows.reduce((s, r) => s + r.estoqueAtual, 0);
       const totalCusto = rows.reduce((s, r) => s + r.totalCusto, 0);
       const totalVenda = rows.reduce((s, r) => s + r.totalVenda, 0);
+      const itensZerados = rows.filter((r) => r.criticidade === "Zerado").length;
+      const itensCriticos = rows.filter((r) => r.criticidade === "Abaixo do mínimo").length;
 
       return {
-        title: "Posição de estoque",
-        subtitle: "Saldo atual, custo unitário, preço de venda e totalizadores.",
+        title: "Posição de Estoque",
+        subtitle: "Saldo atual, custo unitário, preço de venda e criticidade por produto.",
         rows,
         chartData: [
-          { name: "Abaixo do mínimo", value: rows.filter((row) => row.situacao !== "OK").length },
-          { name: "Estoque OK", value: rows.filter((row) => row.situacao === "OK").length },
+          { name: "Zerado", value: itensZerados },
+          { name: "Abaixo do mínimo", value: itensCriticos },
+          { name: "Estoque OK", value: rows.filter((r) => r.criticidade === "OK").length },
         ],
-        totals: {
-          totalQtd,
-          totalCusto,
-          totalVenda,
-        },
+        totals: { totalQtd, totalCusto, totalVenda },
+        kpis: { totalItens, totalQtd, totalCusto, itensCriticos, itensZerados },
       };
     }
 
@@ -136,6 +145,12 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
           totalAjustes: Math.abs(ajustes),
           saldoAtual: saldoFinal,
         },
+        kpis: {
+          totalMovimentos: rows.length,
+          totalEntradas: entradas,
+          totalSaidas: Math.abs(saidas),
+          totalAjustes: Math.abs(ajustes),
+        },
         _isQuantityReport: true,
       };
     }
@@ -143,7 +158,7 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
     case "financeiro": {
       let query = supabase
         .from("financeiro_lancamentos")
-        .select("tipo, descricao, valor, status, data_vencimento, data_pagamento, banco, forma_pagamento")
+        .select("tipo, descricao, valor, saldo_restante, valor_pago, status, data_vencimento, data_pagamento, banco, forma_pagamento, clientes(nome_razao_social), fornecedores(nome_razao_social)")
         .eq("ativo", true)
         .order("data_vencimento", { ascending: true });
 
@@ -152,25 +167,50 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
       const { data, error } = await query;
       if (error) throw error;
 
-      const rows = (data || []).map((item: any) => ({
-        tipo: item.tipo,
-        descricao: item.descricao || "-",
-        valor: Number(item.valor || 0),
-        status: item.status || "-",
-        vencimento: item.data_vencimento,
-        pagamento: item.data_pagamento,
-        banco: item.banco || "-",
-        formaPagamento: item.forma_pagamento || "-",
-      }));
+      const hoje = new Date();
+      hoje.setHours(0, 0, 0, 0);
+
+      const rows = (data || []).map((item: any) => {
+        const valor = Number(item.valor || 0);
+        const valorEmAberto = item.saldo_restante != null ? Number(item.saldo_restante) : (item.status === 'pago' ? 0 : valor);
+        const venc = item.data_vencimento ? new Date(item.data_vencimento) : null;
+        const atraso = (venc && item.status !== 'pago' && venc < hoje)
+          ? Math.floor((hoje.getTime() - venc.getTime()) / (1000 * 60 * 60 * 24))
+          : 0;
+        const parceiro = item.tipo === 'receber'
+          ? (item.clientes as { nome_razao_social: string } | null)?.nome_razao_social || '-'
+          : (item.fornecedores as { nome_razao_social: string } | null)?.nome_razao_social || '-';
+        return {
+          tipo: item.tipo === 'receber' ? 'Receber' : 'Pagar',
+          parceiro,
+          descricao: item.descricao || "-",
+          valor,
+          valorEmAberto,
+          atraso,
+          status: item.status || "-",
+          vencimento: item.data_vencimento,
+          pagamento: item.data_pagamento,
+          banco: item.banco || "-",
+          formaPagamento: item.forma_pagamento || "-",
+        };
+      });
+
+      const totalReceber = rows.filter((r) => r.tipo === 'Receber' && r.status !== 'pago').reduce((s, r) => s + r.valorEmAberto, 0);
+      const totalPagar = rows.filter((r) => r.tipo === 'Pagar' && r.status !== 'pago').reduce((s, r) => s + r.valorEmAberto, 0);
+      const totalVencido = rows.filter((r) => r.atraso > 0).reduce((s, r) => s + r.valorEmAberto, 0);
+      const totalPago = rows.filter((r) => r.status === 'pago').reduce((s, r) => s + r.valor, 0);
 
       return {
-        title: "Contas a pagar e receber",
-        subtitle: "Títulos financeiros por tipo, status e vencimento.",
+        title: "Contas a Pagar e Receber",
+        subtitle: "Títulos financeiros por tipo, status, parceiro e vencimento.",
         rows,
         chartData: [
-          { name: "Receber", value: rows.filter((row) => row.tipo === "receber").reduce((sum, row) => sum + row.valor, 0) },
-          { name: "Pagar", value: rows.filter((row) => row.tipo === "pagar").reduce((sum, row) => sum + row.valor, 0) },
+          { name: "A Receber", value: totalReceber },
+          { name: "A Pagar", value: totalPagar },
+          { name: "Vencido", value: totalVencido },
+          { name: "Pago", value: totalPago },
         ],
+        kpis: { totalReceber, totalPagar, totalVencido, totalPago },
       };
     }
 
@@ -218,6 +258,7 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
           totalSaidas,
           saldoFinal,
         },
+        kpis: { totalEntradas, totalSaidas, saldoFinal },
       };
     }
 
@@ -242,6 +283,11 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
         faturamento: item.status_faturamento || "-",
       }));
 
+      const totalVendido = rows.reduce((s, r) => s + r.valor, 0);
+      const qtdPedidos = rows.length;
+      const ticketMedio = qtdPedidos > 0 ? totalVendido / qtdPedidos : 0;
+      const aguardandoFaturamento = rows.filter((r) => r.faturamento === 'aguardando' || r.faturamento === '-').length;
+
       return {
         title: "Vendas por período",
         subtitle: "Ordens de venda emitidas com status comercial e faturamento.",
@@ -251,6 +297,7 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
           { name: "Parcial", value: rows.filter((row) => row.faturamento === "parcial").reduce((sum, row) => sum + row.valor, 0) },
           { name: "Total", value: rows.filter((row) => row.faturamento === "total").reduce((sum, row) => sum + row.valor, 0) },
         ],
+        kpis: { totalVendido, qtdPedidos, ticketMedio, aguardandoFaturamento },
       };
     }
 
@@ -319,6 +366,7 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
             value,
           })),
         totals: { totalBruto, totalImpostos, totalLiquido },
+        kpis: { totalNotas: rows.length, totalBruto, totalImpostos, totalLiquido },
       };
     }
 
@@ -334,24 +382,42 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
       const { data, error } = await query;
       if (error) throw error;
 
-      const rows = (data || []).map((item: any) => ({
-        numero: item.numero,
-        fornecedor: item.fornecedores?.nome_razao_social || "-",
-        compra: item.data_compra,
-        prevista: item.data_entrega_prevista,
-        entrega: item.data_entrega_real,
-        valor: Number(item.valor_total || 0),
-        status: item.status || "-",
-      }));
+      const hoje = new Date();
+      hoje.setHours(0, 0, 0, 0);
+
+      const rows = (data || []).map((item: any) => {
+        const prevista = item.data_entrega_prevista ? new Date(item.data_entrega_prevista) : null;
+        const entregaReal = item.data_entrega_real;
+        const statusVal = item.status || '-';
+        const emAberto = ['pendente', 'aprovado', 'em_transito'].includes(statusVal);
+        const atraso = (prevista && emAberto && prevista < hoje)
+          ? Math.floor((hoje.getTime() - prevista.getTime()) / (1000 * 60 * 60 * 24))
+          : 0;
+        return {
+          numero: item.numero,
+          fornecedor: (item.fornecedores as { nome_razao_social: string } | null)?.nome_razao_social || "-",
+          compra: item.data_compra,
+          prevista: item.data_entrega_prevista,
+          entrega: entregaReal,
+          valor: Number(item.valor_total || 0),
+          atraso,
+          status: statusVal,
+        };
+      });
+
+      const totalComprado = rows.reduce((s, r) => s + r.valor, 0);
+      const emAberto = rows.filter((r) => ['pendente', 'aprovado', 'em_transito'].includes(r.status)).length;
+      const atrasadas = rows.filter((r) => r.atraso > 0).length;
 
       return {
-        title: "Compras por fornecedor",
-        subtitle: "Pedidos de compra emitidos, entregas e valor total.",
+        title: "Compras",
+        subtitle: "Pedidos de compra — entrega prevista, real e situação.",
         rows,
         chartData: rows.slice(0, 8).map((row: any) => ({
           name: row.fornecedor,
           value: row.valor,
         })),
+        kpis: { qtdCompras: rows.length, totalComprado, emAberto, atrasadas },
       };
     }
 
@@ -429,6 +495,7 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
           receitaLiquida,
           resultado,
         },
+        kpis: { receitaBruta, receitaLiquida, resultado },
         _isDreReport: true,
       };
     }
@@ -464,8 +531,8 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
           tipo: item.tipo === "receber" ? "Receber" : "Pagar",
           descricao: item.descricao || "-",
           parceiro: item.tipo === "receber"
-            ? item.clientes?.nome_razao_social || "-"
-            : item.fornecedores?.nome_razao_social || "-",
+            ? (item.clientes as { nome_razao_social: string } | null)?.nome_razao_social || "-"
+            : (item.fornecedores as { nome_razao_social: string } | null)?.nome_razao_social || "-",
           valor: Number(item.valor || 0),
           vencimento: item.data_vencimento,
           diasVencido: diffDays > 0 ? diffDays : 0,
@@ -479,6 +546,10 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
         value: rows.filter((r) => r.faixa === f).reduce((s, r) => s + r.valor, 0),
       }));
 
+      const totalVencido = rows.filter((r) => r.diasVencido > 0).reduce((s, r) => s + r.valor, 0);
+      const titulosVencidos = rows.filter((r) => r.diasVencido > 0).length;
+      const maisAntigosDias = rows.reduce((max, r) => Math.max(max, r.diasVencido), 0);
+
       return {
         title: "Aging — Vencidos por faixa",
         subtitle: "Títulos a pagar e receber agrupados por faixa de vencimento.",
@@ -488,6 +559,7 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
           totalTitulos: rows.length,
           totalValor: rows.reduce((s, r) => s + r.valor, 0),
         },
+        kpis: { totalVencido, titulosVencidos, maisAntigosDias },
       };
     }
 
@@ -555,13 +627,14 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
           { name: `C (${classC.length} itens)`, value: classC.reduce((s, r) => s + r.faturamento, 0) },
         ],
         totals: { grandTotal },
+        kpis: { grandTotal, itensClasseA: classA.length, itensClasseB: classB.length, itensClasseC: classC.length },
       };
     }
 
     case "margem_produtos": {
       let query = supabase
         .from("produtos")
-        .select("codigo_interno, nome, preco_custo, preco_venda, estoque_atual, unidade_medida")
+        .select("codigo_interno, nome, preco_custo, preco_venda, estoque_atual, unidade_medida, grupos_produto(nome)")
         .eq("ativo", true)
         .order("nome");
       if (filtros.grupoProdutoIds) query = query.in('grupo_id', filtros.grupoProdutoIds);
@@ -577,7 +650,7 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
         return {
           codigo: item.codigo_interno || "-",
           produto: item.nome,
-          unidade: item.unidade_medida || "UN",
+          grupo: (item.grupos_produto as { nome: string } | null)?.nome || "-",
           custUnit: custo,
           vendaUnit: venda,
           lucroUnit: venda - custo,
@@ -588,6 +661,10 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
       });
 
       const sorted = [...rows].sort((a, b) => b.margem - a.margem);
+      const mediaMargemPct = rows.length > 0 ? Number((rows.reduce((s, r) => s + r.margem, 0) / rows.length).toFixed(1)) : 0;
+      const itensMargNeg = rows.filter((r) => r.margem < 0).length;
+      const maiorMargem = sorted.length > 0 ? sorted[0].margem : 0;
+      const menorMargem = sorted.length > 0 ? sorted[sorted.length - 1].margem : 0;
 
       return {
         title: "Análise de Margem de Produtos",
@@ -597,38 +674,53 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
           name: r.produto.substring(0, 20),
           value: r.margem,
         })),
-        totals: {
-          mediaMargemPct: rows.length > 0 ? Number((rows.reduce((s, r) => s + r.margem, 0) / rows.length).toFixed(1)) : 0,
-        },
+        totals: { mediaMargemPct },
+        kpis: { mediaMargemPct, itensMargNeg, maiorMargem, menorMargem },
       };
     }
 
     case "estoque_minimo": {
-      const { data, error } = await supabase
+      let query = supabase
         .from("produtos")
-        .select("codigo_interno, nome, unidade_medida, estoque_atual, estoque_minimo, preco_custo")
+        .select("codigo_interno, nome, unidade_medida, estoque_atual, estoque_minimo, preco_custo, grupos_produto(nome)")
         .eq("ativo", true)
         .order("nome");
+      if (filtros.grupoProdutoIds) query = query.in('grupo_id', filtros.grupoProdutoIds);
+      const { data, error } = await query;
       if (error) throw error;
 
       const rows = (data || [])
         .filter((p: any) => Number(p.estoque_atual || 0) <= Number(p.estoque_minimo || 0) && Number(p.estoque_minimo || 0) > 0)
-        .map((p: any) => ({
-          codigo: p.codigo_interno || "-",
-          produto: p.nome,
-          unidade: p.unidade_medida || "UN",
-          estoqueAtual: Number(p.estoque_atual || 0),
-          estoqueMinimo: Number(p.estoque_minimo || 0),
-          deficit: Number(p.estoque_minimo || 0) - Number(p.estoque_atual || 0),
-          custoReposicao: (Number(p.estoque_minimo || 0) - Number(p.estoque_atual || 0)) * Number(p.preco_custo || 0),
-        }));
+        .map((p: any) => {
+          const atual = Number(p.estoque_atual || 0);
+          const min = Number(p.estoque_minimo || 0);
+          const custo = Number(p.preco_custo || 0);
+          const criticidade = atual <= 0 ? "Zerado" : "Abaixo do mínimo";
+          return {
+            codigo: p.codigo_interno || "-",
+            produto: p.nome,
+            grupo: (p.grupos_produto as { nome: string } | null)?.nome || "-",
+            unidade: p.unidade_medida || "UN",
+            estoqueAtual: atual,
+            estoqueMinimo: min,
+            deficit: min - atual,
+            criticidade,
+            custoReposicao: (min - atual) * custo,
+          };
+        });
+
+      const itensZerados = rows.filter((r) => r.criticidade === "Zerado").length;
+      const itensCriticos = rows.filter((r) => r.criticidade === "Abaixo do mínimo").length;
+      const deficitTotal = rows.reduce((s, r) => s + r.deficit, 0);
+      const custoTotal = rows.reduce((s, r) => s + r.custoReposicao, 0);
 
       return {
         title: "Estoque Abaixo do Mínimo",
         subtitle: "Produtos com estoque atual igual ou inferior ao mínimo definido.",
         rows,
         chartData: rows.slice(0, 8).map(r => ({ name: r.produto.substring(0, 20), value: r.deficit })),
-        totals: { totalItens: rows.length, custoTotal: rows.reduce((s, r) => s + r.custoReposicao, 0) },
+        totals: { totalItens: rows.length, custoTotal },
+        kpis: { itensCriticos, itensZerados, deficitTotal, custoTotal },
         _isQuantityReport: true,
       };
     }
@@ -659,11 +751,26 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
         ticketMedio: r.qtd > 0 ? r.total / r.qtd : 0,
       }));
 
+      const totalVendido = rows.reduce((r, s) => r + s.valorTotal, 0);
+      const grandTotalVcli = totalVendido;
+
+      const rowsWithParticipacao = rows.map(r => ({
+        ...r,
+        participacao: grandTotalVcli > 0 ? Number(((r.valorTotal / grandTotalVcli) * 100).toFixed(1)) : 0,
+      }));
+
+      const clientesAtendidos = rowsWithParticipacao.length;
+      const totalPedidos = rowsWithParticipacao.reduce((s, r) => s + r.pedidos, 0);
+      const ticketMedioGeral = totalPedidos > 0 ? grandTotalVcli / totalPedidos : 0;
+      const top5Total = rowsWithParticipacao.slice(0, 5).reduce((s, r) => s + r.valorTotal, 0);
+      const top5Concentracao = grandTotalVcli > 0 ? Number(((top5Total / grandTotalVcli) * 100).toFixed(1)) : 0;
+
       return {
         title: "Vendas por Cliente",
         subtitle: "Ranking de clientes por volume de vendas.",
-        rows,
-        chartData: rows.slice(0, 8).map(r => ({ name: r.cliente.substring(0, 20), value: r.valorTotal })),
+        rows: rowsWithParticipacao,
+        chartData: rowsWithParticipacao.slice(0, 8).map(r => ({ name: r.cliente.substring(0, 20), value: r.valorTotal })),
+        kpis: { totalVendido: grandTotalVcli, clientesAtendidos, ticketMedioGeral, top5Concentracao },
       };
     }
 
@@ -693,11 +800,24 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
         ticketMedio: r.qtd > 0 ? r.total / r.qtd : 0,
       }));
 
+      const totalCompradoCf = rows.reduce((s, r) => s + r.valorTotal, 0);
+      const rowsWithParticipacao = rows.map(r => ({
+        ...r,
+        participacao: totalCompradoCf > 0 ? Number(((r.valorTotal / totalCompradoCf) * 100).toFixed(1)) : 0,
+      }));
+
+      const fornecedoresAtivos = rowsWithParticipacao.length;
+      const totalPedidosCf = rowsWithParticipacao.reduce((s, r) => s + r.pedidos, 0);
+      const ticketMedioGeral = totalPedidosCf > 0 ? totalCompradoCf / totalPedidosCf : 0;
+      const top5TotalCf = rowsWithParticipacao.slice(0, 5).reduce((s, r) => s + r.valorTotal, 0);
+      const top5Concentracao = totalCompradoCf > 0 ? Number(((top5TotalCf / totalCompradoCf) * 100).toFixed(1)) : 0;
+
       return {
         title: "Compras por Fornecedor",
         subtitle: "Ranking de fornecedores por volume de compras.",
-        rows,
-        chartData: rows.slice(0, 8).map(r => ({ name: r.fornecedor.substring(0, 20), value: r.valorTotal })),
+        rows: rowsWithParticipacao,
+        chartData: rowsWithParticipacao.slice(0, 8).map(r => ({ name: r.fornecedor.substring(0, 20), value: r.valorTotal })),
+        kpis: { totalComprado: totalCompradoCf, fornecedoresAtivos, ticketMedioGeral, top5Concentracao },
       };
     }
 
@@ -737,6 +857,7 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
           parceiro: fornecedor?.nome_razao_social || "-",
           valor: Number(pc.valor_total || 0),
           status: pc.status,
+          criticidade: "Alta",
           observacao: "Pedido de compra sem nota fiscal vinculada",
         });
       }
@@ -748,6 +869,7 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
           parceiro: "-",
           valor: Number(nf.valor_total || 0),
           status: nf.tipo,
+          criticidade: "Alta",
           observacao: "Nota fiscal com flag financeiro mas sem lançamento",
         });
       }
@@ -761,6 +883,12 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
           { name: "NF s/ Financeiro", value: nfsSemFinanceiro.length },
         ],
         totals: { total: rows.length },
+        kpis: {
+          totalDivergencias: rows.length,
+          valorImpactado: rows.reduce((s, r) => s + Number(r.valor || 0), 0),
+          pedidosSemNf: (pedidos || []).length,
+          nfSemFinanceiro: nfsSemFinanceiro.length,
+        },
       };
     }
   }
