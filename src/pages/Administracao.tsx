@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Building2, Calendar, Globe, Image, Info, Loader2, Mail, MapPin, Phone, Receipt, Shield, Upload, Users, Wallet } from 'lucide-react';
+import { Building2, Calendar, CheckCircle2, Globe, Image, Info, Loader2, Mail, MapPin, PenLine, Phone, Receipt, Reply, Send, Shield, Upload, User, Users, Wallet, XCircle } from 'lucide-react';
 import { AppLayout } from '@/components/AppLayout';
 import { ModulePage } from '@/components/ModulePage';
 import { Button } from '@/components/ui/button';
@@ -96,6 +96,13 @@ export default function Administracao() {
   const [logoUploading, setLogoUploading] = useState(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
 
+  const [emailErrors, setEmailErrors] = useState<Record<string, string>>({});
+  const [emailTestAddress, setEmailTestAddress] = useState('');
+  const [emailTestLoading, setEmailTestLoading] = useState(false);
+  const [emailTestResult, setEmailTestResult] = useState<{ status: 'success' | 'error'; message: string } | null>(null);
+  const [emailLastSaved, setEmailLastSaved] = useState<{ at: string | null; by: string | null }>({ at: null, by: null });
+  const [emailLastTest, setEmailLastTest] = useState<string | null>(null);
+
   useEffect(() => {
     const tab = searchParams.get('tab');
     if (tab && tab !== activeSection) setActiveSection(tab);
@@ -113,6 +120,8 @@ export default function Administracao() {
         ]);
         const empresa = empresaRows?.[0];
         const appConfig = Object.fromEntries((appRows || []).map((row: { chave: string; valor: unknown }) => [row.chave, row.valor || {}]));
+        const emailRaw = (appConfig.email as any) || {};
+        const { _updatedAt: emailUpdatedAt, _updatedBy: emailUpdatedBy, ...emailData } = emailRaw;
         const merged = {
           ...defaultConfig,
           geral: {
@@ -139,7 +148,7 @@ export default function Administracao() {
             corSecundaria: (appConfig.geral as any)?.corSecundaria || defaultConfig.geral.corSecundaria,
           },
           usuarios: { ...defaultConfig.usuarios, ...((appConfig.usuarios as any) || {}) },
-          email: { ...defaultConfig.email, ...((appConfig.email as any) || {}) },
+          email: { ...defaultConfig.email, ...emailData },
           fiscal: { ...defaultConfig.fiscal, ...((appConfig.fiscal as any) || {}) },
           financeiro: { ...defaultConfig.financeiro, ...((appConfig.financeiro as any) || {}) },
         };
@@ -148,6 +157,7 @@ export default function Administracao() {
           setEmpresaUpdatedAt(empresa?.updated_at || null);
           setEmpresaCreatedAt(empresa?.created_at || null);
           setConfig(merged);
+          setEmailLastSaved({ at: emailUpdatedAt || null, by: emailUpdatedBy || null });
         }
       } catch {
         console.error('[admin] Erro ao carregar configurações do Supabase');
@@ -203,7 +213,70 @@ export default function Administracao() {
     }
   };
 
+  const isValidEmailFormat = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
+  const validateEmailSection = (): Record<string, string> => {
+    const errors: Record<string, string> = {};
+    if (!config.email.remetenteNome.trim()) {
+      errors.remetenteNome = 'Nome do remetente é obrigatório.';
+    }
+    if (!config.email.remetenteEmail.trim()) {
+      errors.remetenteEmail = 'E-mail do remetente é obrigatório.';
+    } else if (!isValidEmailFormat(config.email.remetenteEmail)) {
+      errors.remetenteEmail = 'Informe um e-mail válido.';
+    }
+    if (config.email.responderPara && !isValidEmailFormat(config.email.responderPara)) {
+      errors.responderPara = 'Informe um e-mail válido.';
+    }
+    if (config.email.assinatura.length > 1000) {
+      errors.assinatura = 'A assinatura deve ter no máximo 1.000 caracteres.';
+    }
+    return errors;
+  };
+
+  const handleEmailTest = async () => {
+    if (!emailTestAddress.trim() || !isValidEmailFormat(emailTestAddress)) {
+      setEmailErrors((p) => ({ ...p, emailTeste: 'Informe um e-mail válido para o teste.' }));
+      return;
+    }
+    setEmailTestLoading(true);
+    setEmailTestResult(null);
+    try {
+      const { error } = await supabase.functions.invoke('send-test-email', {
+        body: {
+          to: emailTestAddress,
+          remetenteNome: config.email.remetenteNome,
+          remetenteEmail: config.email.remetenteEmail,
+          assinatura: config.email.assinatura,
+        },
+      });
+      if (error) throw error;
+      setEmailLastTest(new Date().toISOString());
+      setEmailTestResult({
+        status: 'success',
+        message: `E-mail de teste enviado com sucesso para ${emailTestAddress}.`,
+      });
+    } catch (err) {
+      console.error('[admin] Erro ao enviar e-mail de teste:', err);
+      setEmailTestResult({
+        status: 'error',
+        message: 'Não foi possível enviar o e-mail de teste. Verifique se a configuração do serviço de envio está ativa.',
+      });
+    } finally {
+      setEmailTestLoading(false);
+    }
+  };
+
   const handleSave = async () => {
+    if (activeSection === 'email') {
+      const errors = validateEmailSection();
+      if (Object.keys(errors).length > 0) {
+        setEmailErrors(errors);
+        toast.error('Corrija os campos obrigatórios antes de salvar.');
+        return;
+      }
+      setEmailErrors({});
+    }
     setSaving(true);
     try {
       const now = new Date().toISOString();
@@ -239,11 +312,12 @@ export default function Administracao() {
       const appRows = [
         { chave: 'geral', valor: { logoUrl: config.geral.logoUrl, corPrimaria: config.geral.corPrimaria, corSecundaria: config.geral.corSecundaria } as any, descricao: 'Configurações gerais' },
         { chave: 'usuarios', valor: config.usuarios as any, descricao: 'Parâmetros de usuários' },
-        { chave: 'email', valor: config.email as any, descricao: 'Remetente e assinatura' },
+        { chave: 'email', valor: { ...config.email, _updatedAt: now, _updatedBy: user?.id ?? null } as any, descricao: 'Parâmetros de envio e remetente' },
         { chave: 'fiscal', valor: config.fiscal as any, descricao: 'Parâmetros fiscais' },
         { chave: 'financeiro', valor: config.financeiro as any, descricao: 'Parâmetros financeiros' },
       ];
       await supabase.from('app_configuracoes').upsert(appRows, { onConflict: 'chave' });
+      setEmailLastSaved({ at: now, by: user?.id ?? null });
       toast.success('Configurações salvas com sucesso.');
     } catch (error: unknown) {
       console.error('[admin] Erro ao salvar:', error);
@@ -551,6 +625,232 @@ export default function Administracao() {
     );
   };
 
+  const renderEmail = () => (
+    <div className="space-y-6">
+      {/* Bloco 1 — Identidade do remetente */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-start gap-3">
+            <User className="mt-0.5 h-5 w-5 text-muted-foreground shrink-0" />
+            <div>
+              <CardTitle>Identidade do remetente</CardTitle>
+              <CardDescription>Nome e endereço utilizados como origem dos e-mails comerciais e notificações automáticas do sistema.</CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="grid gap-4 md:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label>Nome do remetente <span className="text-destructive">*</span></Label>
+            <Input
+              value={config.email.remetenteNome}
+              onChange={(e) => { updateSection('email', { remetenteNome: e.target.value }); setEmailErrors((p) => ({ ...p, remetenteNome: '' })); }}
+              placeholder="ERP AviZee"
+              className={cn(emailErrors.remetenteNome ? 'border-destructive focus-visible:ring-destructive' : '')}
+            />
+            {emailErrors.remetenteNome
+              ? <p className="text-[11px] text-destructive">{emailErrors.remetenteNome}</p>
+              : <p className="text-[11px] text-muted-foreground flex items-center gap-1"><Info className="h-3 w-3" />Nome exibido ao destinatário no campo "De:".</p>}
+          </div>
+          <div className="space-y-1.5">
+            <Label>E-mail do remetente <span className="text-destructive">*</span></Label>
+            <div className="relative">
+              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                value={config.email.remetenteEmail}
+                onChange={(e) => { updateSection('email', { remetenteEmail: e.target.value }); setEmailErrors((p) => ({ ...p, remetenteEmail: '' })); }}
+                placeholder="contato@empresa.com.br"
+                className={cn('pl-9', emailErrors.remetenteEmail ? 'border-destructive focus-visible:ring-destructive' : '')}
+              />
+            </div>
+            {emailErrors.remetenteEmail
+              ? <p className="text-[11px] text-destructive">{emailErrors.remetenteEmail}</p>
+              : <p className="text-[11px] text-muted-foreground flex items-center gap-1"><Info className="h-3 w-3" />Endereço configurado no serviço de envio do sistema.</p>}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Bloco 2 — Resposta e roteamento */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-start gap-3">
+            <Reply className="mt-0.5 h-5 w-5 text-muted-foreground shrink-0" />
+            <div>
+              <CardTitle>Resposta e roteamento</CardTitle>
+              <CardDescription>Define para onde as respostas dos destinatários serão encaminhadas quando eles responderem a um e-mail do sistema.</CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-1.5">
+            <Label>Responder para</Label>
+            <div className="relative">
+              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                value={config.email.responderPara}
+                onChange={(e) => { updateSection('email', { responderPara: e.target.value }); setEmailErrors((p) => ({ ...p, responderPara: '' })); }}
+                placeholder="comercial@empresa.com.br"
+                className={cn('pl-9', emailErrors.responderPara ? 'border-destructive focus-visible:ring-destructive' : '')}
+              />
+            </div>
+            {emailErrors.responderPara
+              ? <p className="text-[11px] text-destructive">{emailErrors.responderPara}</p>
+              : <p className="text-[11px] text-muted-foreground flex items-center gap-1"><Info className="h-3 w-3" />Opcional. Se não preenchido, as respostas chegam ao próprio remetente.</p>}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Bloco 3 — Assinatura padrão */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-start gap-3">
+            <PenLine className="mt-0.5 h-5 w-5 text-muted-foreground shrink-0" />
+            <div>
+              <CardTitle>Assinatura padrão</CardTitle>
+              <CardDescription>Texto inserido ao final de e-mails comerciais, orçamentos, pedidos e notificações automáticas.</CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-1.5">
+            <Label>Assinatura</Label>
+            <Textarea
+              value={config.email.assinatura}
+              onChange={(e) => { updateSection('email', { assinatura: e.target.value }); setEmailErrors((p) => ({ ...p, assinatura: '' })); }}
+              rows={5}
+              placeholder={'Equipe Comercial\ncontato@empresa.com.br\n(11) 99999-0000'}
+              className={cn(emailErrors.assinatura ? 'border-destructive focus-visible:ring-destructive' : '')}
+            />
+            <div className="flex items-start justify-between gap-2">
+              {emailErrors.assinatura
+                ? <p className="text-[11px] text-destructive">{emailErrors.assinatura}</p>
+                : <p className="text-[11px] text-muted-foreground flex items-center gap-1"><Info className="h-3 w-3" />Aplicada em e-mails comerciais e notificações automáticas.</p>}
+              <p className="text-[11px] text-muted-foreground shrink-0">{config.email.assinatura.length}/1000</p>
+            </div>
+          </div>
+          {config.email.assinatura && (
+            <>
+              <Separator />
+              <div className="space-y-1.5">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Pré-visualização</p>
+                <div className="rounded-md border bg-muted/30 px-4 py-3">
+                  <pre className="text-sm text-foreground font-sans whitespace-pre-wrap break-words">{config.email.assinatura}</pre>
+                </div>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Bloco 4 — Teste de envio */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-start gap-3">
+            <Send className="mt-0.5 h-5 w-5 text-muted-foreground shrink-0" />
+            <div>
+              <CardTitle>Teste de envio</CardTitle>
+              <CardDescription>Valide a configuração enviando uma mensagem de teste antes de usar em produção.</CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+            <div className="flex-1 space-y-1.5">
+              <Label>E-mail para teste</Label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  value={emailTestAddress}
+                  onChange={(e) => { setEmailTestAddress(e.target.value); setEmailErrors((p) => ({ ...p, emailTeste: '' })); }}
+                  placeholder="seu@email.com.br"
+                  className={cn('pl-9', emailErrors.emailTeste ? 'border-destructive focus-visible:ring-destructive' : '')}
+                />
+              </div>
+              {emailErrors.emailTeste && <p className="text-[11px] text-destructive">{emailErrors.emailTeste}</p>}
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={emailTestLoading}
+              onClick={handleEmailTest}
+              className="shrink-0"
+            >
+              {emailTestLoading
+                ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                : <Send className="mr-2 h-4 w-4" />}
+              Enviar teste
+            </Button>
+          </div>
+          {emailTestResult && (
+            <div className={cn(
+              'flex items-start gap-2 rounded-md border p-3 text-sm',
+              emailTestResult.status === 'success'
+                ? 'border-green-200 bg-green-50 text-green-800 dark:border-green-800 dark:bg-green-950 dark:text-green-200'
+                : 'border-destructive/30 bg-destructive/5 text-destructive',
+            )}>
+              {emailTestResult.status === 'success'
+                ? <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" />
+                : <XCircle className="h-4 w-4 mt-0.5 shrink-0" />}
+              <p>{emailTestResult.message}</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Bloco 5 — Governança e uso no sistema */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-start gap-3">
+            <Calendar className="mt-0.5 h-5 w-5 text-muted-foreground shrink-0" />
+            <div>
+              <CardTitle>Governança e uso no sistema</CardTitle>
+              <CardDescription>Rastreabilidade desta configuração e visibilidade do seu alcance nos fluxos do ERP.</CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="rounded-md border bg-muted/30 p-3 space-y-0.5">
+              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Última atualização</p>
+              <p className="text-sm font-medium">
+                {emailLastSaved.at
+                  ? new Date(emailLastSaved.at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
+                  : '—'}
+              </p>
+            </div>
+            <div className="rounded-md border bg-muted/30 p-3 space-y-0.5">
+              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Último teste realizado</p>
+              <p className="text-sm font-medium">
+                {emailLastTest
+                  ? new Date(emailLastTest).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
+                  : '—'}
+              </p>
+            </div>
+          </div>
+          <Separator />
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Esta configuração impacta</p>
+            <ul className="grid gap-1 sm:grid-cols-2">
+              {[
+                'Envio de orçamentos e pedidos',
+                'Notificações automáticas do sistema',
+                'E-mails de confirmação e cobrança',
+                'Comunicações institucionais',
+              ].map((item) => (
+                <li key={item} className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <span className="h-1.5 w-1.5 rounded-full bg-primary shrink-0" />
+                  {item}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Alterações nesta seção refletem imediatamente nos e-mails gerados pelo sistema. Valide a configuração com um teste de envio antes de aplicar em produção.
+          </p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+
   const renderContent = () => {
     switch (activeSection) {
       case 'empresa':
@@ -560,20 +860,7 @@ export default function Administracao() {
         return <UsuariosTab />;
 
       case 'email':
-        return (
-          <Card>
-            <CardHeader>
-              <CardTitle>Configuração de remetente</CardTitle>
-              <CardDescription>Base para e-mails comerciais e notificações automáticas.</CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2"><Label>Nome do remetente</Label><Input value={config.email.remetenteNome} onChange={(e) => updateSection('email', { remetenteNome: e.target.value })} /></div>
-              <div className="space-y-2"><Label>E-mail do remetente</Label><Input value={config.email.remetenteEmail} onChange={(e) => updateSection('email', { remetenteEmail: e.target.value })} /></div>
-              <div className="space-y-2 md:col-span-2"><Label>Responder para</Label><Input value={config.email.responderPara} onChange={(e) => updateSection('email', { responderPara: e.target.value })} /></div>
-              <div className="space-y-2 md:col-span-2"><Label>Assinatura padrão</Label><Textarea value={config.email.assinatura} onChange={(e) => updateSection('email', { assinatura: e.target.value })} rows={4} /></div>
-            </CardContent>
-          </Card>
-        );
+        return renderEmail();
 
       case 'fiscal':
         return (
