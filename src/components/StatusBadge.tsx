@@ -1,7 +1,7 @@
 import { Badge } from '@/components/ui/badge';
 import {
   FileEdit, Clock, CheckCircle, Cog, CheckCheck,
-  AlertTriangle, XCircle, AlarmClock, Ban, Send, FileSearch, GitMerge,
+  AlertTriangle, XCircle, AlarmClock, Ban, Send, FileSearch, GitMerge, FileDown,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -29,6 +29,7 @@ const statusConfig: Record<string, { classes: string; icon: typeof Clock; label:
   parcial:         { classes: 'bg-warning/10 text-warning border-warning/20', icon: AlertTriangle, label: 'Parcial' },
   cancelado:       { classes: 'bg-destructive/10 text-destructive border-destructive/20', icon: XCircle, label: 'Cancelado' },
   cancelada:       { classes: 'bg-destructive/10 text-destructive border-destructive/20', icon: XCircle, label: 'Cancelada' },
+  importada:       { classes: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-800', icon: FileDown, label: 'Importada' },
   rejeitado:       { classes: 'bg-destructive/10 text-destructive border-destructive/20', icon: XCircle, label: 'Rejeitado' },
   rejeitada:       { classes: 'bg-destructive/10 text-destructive border-destructive/20', icon: XCircle, label: 'Rejeitada' },
   aguardando_aprovacao: { classes: 'bg-warning/10 text-warning border-warning/20', icon: Clock, label: 'Aguardando Aprovação' },
