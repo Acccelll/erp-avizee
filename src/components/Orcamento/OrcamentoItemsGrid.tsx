@@ -30,21 +30,9 @@ export interface OrcamentoItem {
   peso_unitario: number;
   peso_total: number;
   override_justificativa?: string;
-  custo_base_padrao?: number | null;
-  custo_simulado?: number | null;
-  usa_custo_simulado?: boolean;
-  preco_simulado_unitario?: number | null;
-  desconto_simulado_percentual?: number | null;
-  outros_custos_simulados_unitario?: number | null;
-  frete_rateado_simulado_unitario?: number | null;
-  imposto_rateado_simulado_unitario?: number | null;
-  usar_cenario?: boolean;
-  origem_custo_padrao?: "cadastro_produto";
-  origem_custo_analise?: "cadastro_produto" | "simulado";
   cost_source?: "ultimo_custo_compra" | "custo_medio" | "custo_manual_cotacao" | "custo_produto";
+  custo_manual_unitario?: number;
   observacao_interna_margem?: string;
-  observacao_simulacao_custo?: string;
-  observacao_interna_cenario?: string;
 }
 
 interface Props {

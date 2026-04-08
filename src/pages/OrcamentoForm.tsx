@@ -26,7 +26,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Tables } from "@/integrations/supabase/types";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { TemplateConfig } from "@/types/orcamento";
-import { calcularRentabilidade, type InternalCostCandidate, type RentabilidadeScenarioConfig } from "@/lib/orcamentoRentabilidade";
+import { calcularRentabilidade, type InternalCostCandidate } from "@/lib/orcamentoRentabilidade";
 import { getOrcamentoInternalAccess } from "@/lib/orcamentoInternalAccess";
 
 interface ClienteSnapshot {
@@ -114,8 +114,19 @@ export default function OrcamentoForm() {
   const productCostMap = useMemo(() => {
     const map = new Map<string, InternalCostCandidate>();
     for (const product of produtos) {
+      const fornecedores = product.produtos_fornecedores || [];
+      const lastPurchase = [...fornecedores]
+        .filter((row) => row.preco_compra && Number(row.preco_compra) > 0)
+        .sort((a, b) => {
+          const dateA = a.ultima_compra ? new Date(a.ultima_compra).getTime() : 0;
+          const dateB = b.ultima_compra ? new Date(b.ultima_compra).getTime() : 0;
+          return dateB - dateA;
+        })[0];
+
       map.set(product.id, {
         productCost: product.preco_custo,
+        lastPurchaseCost: lastPurchase?.preco_compra ?? null,
+        avgCost: null,
       });
     }
     return map;
@@ -130,33 +141,11 @@ export default function OrcamentoForm() {
       impostoIpi,
       outrasDespesas,
     },
-    scenarioConfig,
     (item) => ({
       ...(productCostMap.get(item.produto_id) || {}),
+      manualCost: item.custo_manual_unitario ?? null,
     }),
-  ), [items, desconto, freteValor, impostoSt, impostoIpi, outrasDespesas, scenarioConfig, productCostMap]);
-
-  const updateItemSimulation = useCallback((itemIndex: number, payload: Record<string, number | boolean | null | string>) => {
-    setItems((prev) => prev.map((item, index) => {
-      if (index !== itemIndex) return item;
-      return { ...item, ...payload };
-    }));
-  }, []);
-
-  const clearItemSimulation = useCallback((itemIndex: number) => {
-    setItems((prev) => prev.map((item, index) => index === itemIndex
-      ? { ...item, custo_simulado: null, preco_simulado_unitario: null, desconto_simulado_percentual: null, outros_custos_simulados_unitario: null, frete_rateado_simulado_unitario: null, imposto_rateado_simulado_unitario: null, observacao_interna_cenario: "", usar_cenario: false }
-      : item));
-  }, []);
-
-  const clearAllSimulations = useCallback(() => {
-    setItems((prev) => prev.map((item) => ({ ...item, custo_simulado: null, preco_simulado_unitario: null, desconto_simulado_percentual: null, outros_custos_simulados_unitario: null, frete_rateado_simulado_unitario: null, imposto_rateado_simulado_unitario: null, observacao_interna_cenario: "", usar_cenario: false })));
-  }, []);
-
-  const restoreScenarioBase = useCallback(() => {
-    clearAllSimulations();
-    setScenarioConfig({});
-  }, [clearAllSimulations]);
+  ), [items, desconto, freteValor, impostoSt, impostoIpi, outrasDespesas, productCostMap]);
 
   useEffect(() => {
     if (!supabase) {
@@ -709,12 +698,6 @@ export default function OrcamentoForm() {
           <OrcamentoInternalAnalysisPanel
             analysis={internalAnalysis}
             access={internalAccess}
-            scenarioConfig={scenarioConfig}
-            onScenarioConfigChange={(patch) => setScenarioConfig((prev) => ({ ...prev, ...patch }))}
-            onUpdateItemScenario={updateItemSimulation}
-            onResetItemScenario={clearItemSimulation}
-            onClearAllSimulations={clearAllSimulations}
-            onRestoreBase={restoreScenarioBase}
           />
 
           <OrcamentoTotaisCard
