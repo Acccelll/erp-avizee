@@ -42,7 +42,7 @@ export function ImportacaoResumoCards({
     },
     {
       title: "Inconsistências",
-      value: formatNumber(totalRegistrosRejeitados > 0 ? totalRegistrosRejeitados : totalErrors),
+      value: formatNumber(totalRegistrosRejeitados !== undefined ? totalRegistrosRejeitados : totalErrors),
       description: "Registros com falhas detectadas",
       icon: XCircle,
       color: "text-rose-500",
@@ -50,11 +50,11 @@ export function ImportacaoResumoCards({
     },
     {
       title: "Pendentes de Conferência",
-      value: totalPendenciasConferencia > 0 ? totalPendenciasConferencia : totalPending,
+      value: totalPendenciasConferencia !== undefined ? totalPendenciasConferencia : totalPending,
       description: "Lotes aguardando revisão",
       icon: totalConcluidosComAlertas > 0 ? AlertCircle : ClipboardList,
-      color: totalPendenciasConferencia > 0 || totalConcluidosComAlertas > 0 ? "text-amber-500" : "text-slate-400",
-      bg: totalPendenciasConferencia > 0 || totalConcluidosComAlertas > 0 ? "bg-amber-50" : "bg-slate-50",
+      color: (totalPendenciasConferencia ?? totalPending) > 0 || totalConcluidosComAlertas > 0 ? "text-amber-500" : "text-slate-400",
+      bg: (totalPendenciasConferencia ?? totalPending) > 0 || totalConcluidosComAlertas > 0 ? "bg-amber-50" : "bg-slate-50",
     },
   ];
 
