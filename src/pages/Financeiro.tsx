@@ -266,7 +266,8 @@ const Financeiro = () => {
         const es = getLancamentoStatus(l);
         const isOverdue = es === "vencido";
         const isToday = l.data_vencimento === hojeStr;
-        const venc = new Date(l.data_vencimento + "T00:00:00");
+        const [y, m, d] = l.data_vencimento.split("-").map(Number);
+        const venc = new Date(y, m - 1, d);
         const diasAtraso = isOverdue
           ? Math.floor((hoje.getTime() - venc.getTime()) / (1000 * 60 * 60 * 24))
           : 0;
