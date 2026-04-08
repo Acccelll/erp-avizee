@@ -8,43 +8,66 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
 import { MultiSelect } from "@/components/ui/MultiSelect";
-import { AdvancedFilterBar } from "@/components/AdvancedFilterBar";
-import type { FilterChip } from "@/components/AdvancedFilterBar";
 import { DataTable } from '@/components/DataTable';
 import { PreviewModal } from '@/components/ui/PreviewModal';
-import { BarChart3, Package, Wallet, ShoppingCart, TrendingUp, Truck, Download, RefreshCcw, Hash, AlertTriangle, DollarSign, FileText, Eye, ArrowLeftRight, FileSpreadsheet, CalendarClock, Receipt } from 'lucide-react';
-import { ResponsiveContainer, BarChart, XAxis, YAxis, Tooltip, Bar, PieChart, Pie, Cell, Legend } from 'recharts';
+import { cn } from '@/lib/utils';
+import { BarChart3, Package, Wallet, ShoppingCart, TrendingUp, Truck, Download, RefreshCcw, Hash, AlertTriangle, DollarSign, FileText, Eye, ArrowLeftRight, FileSpreadsheet, CalendarClock, Receipt, Layers, Building2, Boxes, Landmark, PieChart as PieChartIcon, LineChart } from 'lucide-react';
+import { ResponsiveContainer, BarChart, XAxis, YAxis, Tooltip, Bar, PieChart, Pie, Cell, Legend, LineChart as RechartsLineChart, Line } from 'recharts';
 import { carregarRelatorio, exportarCsv, exportarXlsx, formatCellValue, type RelatorioResultado, type TipoRelatorio } from '@/services/relatorios.service';
 import { formatCurrency, formatNumber, formatDate } from '@/lib/format';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 
-const reportCards: Array<{ type: TipoRelatorio; title: string; description: string; icon: typeof Package }> = [
-  { type: 'estoque', title: 'Estoque', description: 'Posição atual, custo e alertas', icon: Package },
-  { type: 'estoque_minimo', title: 'Estoque Mínimo', description: 'Produtos abaixo do estoque mínimo', icon: AlertTriangle },
-  { type: 'movimentos_estoque', title: 'Movimentos de Estoque', description: 'Entradas, saídas e ajustes por período', icon: ArrowLeftRight },
-  { type: 'financeiro', title: 'Financeiro', description: 'Contas a pagar e receber', icon: Wallet },
-  { type: 'fluxo_caixa', title: 'Fluxo de Caixa', description: 'Entradas, saídas e saldo', icon: TrendingUp },
-  { type: 'vendas', title: 'Vendas', description: 'Ordens por período e faturamento', icon: ShoppingCart },
-  { type: 'faturamento', title: 'Faturamento', description: 'NFs de saída confirmadas com impostos e receita líquida', icon: Receipt },
-  { type: 'vendas_cliente', title: 'Vendas/Cliente', description: 'Ranking de clientes por volume', icon: ShoppingCart },
-  { type: 'compras', title: 'Compras', description: 'Consolidado por fornecedor', icon: Truck },
-  { type: 'compras_fornecedor', title: 'Compras/Fornecedor', description: 'Ranking de fornecedores por volume', icon: Truck },
-  { type: 'aging', title: 'Aging', description: 'Vencidos por faixa de dias', icon: CalendarClock },
-  { type: 'dre', title: 'DRE', description: 'Demonstrativo de resultado', icon: BarChart3 },
-  { type: 'curva_abc', title: 'Curva ABC', description: 'Classificação de produtos por faturamento', icon: TrendingUp },
-  { type: 'margem_produtos', title: 'Margem', description: 'Análise de margem por produto', icon: DollarSign },
-  { type: 'divergencias', title: 'Divergências', description: 'Pedidos sem NF, NF sem financeiro', icon: AlertTriangle },
+type ReportCategory = 'comercial' | 'financeiro' | 'estoque_suprimentos' | 'fiscal_faturamento';
+type ChartMode = 'bar' | 'pie' | 'line' | 'auto';
+
+interface ReportMeta {
+  type: TipoRelatorio;
+  title: string;
+  description: string;
+  icon: typeof Package;
+  category: ReportCategory;
+  priority?: boolean;
+  chartMode?: ChartMode;
+}
+
+const reportCards: ReportMeta[] = [
+  { type: 'vendas', title: 'Vendas', description: 'Ordens por período e faturamento', icon: ShoppingCart, category: 'comercial', chartMode: 'line' },
+  { type: 'vendas_cliente', title: 'Vendas/Cliente', description: 'Ranking de clientes por volume', icon: ShoppingCart, category: 'comercial', chartMode: 'bar' },
+  { type: 'curva_abc', title: 'Curva ABC', description: 'Classificação de produtos por faturamento', icon: TrendingUp, category: 'comercial', chartMode: 'pie' },
+  { type: 'margem_produtos', title: 'Margem', description: 'Análise de margem por produto', icon: DollarSign, category: 'comercial', chartMode: 'bar' },
+
+  { type: 'financeiro', title: 'Financeiro', description: 'Contas a pagar e receber', icon: Wallet, category: 'financeiro', priority: true, chartMode: 'pie' },
+  { type: 'fluxo_caixa', title: 'Fluxo de Caixa', description: 'Entradas, saídas e saldo', icon: TrendingUp, category: 'financeiro', priority: true, chartMode: 'line' },
+  { type: 'aging', title: 'Aging', description: 'Vencidos por faixa de dias', icon: CalendarClock, category: 'financeiro', chartMode: 'bar' },
+  { type: 'dre', title: 'DRE', description: 'Demonstrativo de resultado', icon: BarChart3, category: 'financeiro', priority: true, chartMode: 'bar' },
+
+  { type: 'estoque', title: 'Estoque', description: 'Posição atual, custo e alertas', icon: Package, category: 'estoque_suprimentos', chartMode: 'pie' },
+  { type: 'estoque_minimo', title: 'Estoque Mínimo', description: 'Produtos abaixo do estoque mínimo', icon: AlertTriangle, category: 'estoque_suprimentos', priority: true, chartMode: 'bar' },
+  { type: 'movimentos_estoque', title: 'Movimentos de Estoque', description: 'Entradas, saídas e ajustes por período', icon: ArrowLeftRight, category: 'estoque_suprimentos', chartMode: 'line' },
+  { type: 'compras_fornecedor', title: 'Compras/Fornecedor', description: 'Ranking de fornecedores por volume', icon: Truck, category: 'estoque_suprimentos', chartMode: 'bar' },
+  { type: 'compras', title: 'Compras', description: 'Consolidado por fornecedor', icon: Truck, category: 'estoque_suprimentos', chartMode: 'bar' },
+
+  { type: 'faturamento', title: 'Faturamento', description: 'NFs de saída confirmadas com impostos e receita líquida', icon: Receipt, category: 'fiscal_faturamento', priority: true, chartMode: 'line' },
+  { type: 'divergencias', title: 'Divergências', description: 'Pedidos sem NF, NF sem financeiro', icon: AlertTriangle, category: 'fiscal_faturamento', priority: true, chartMode: 'bar' },
 ];
 
+const categoryMeta: Record<ReportCategory, { title: string; icon: typeof Building2 }> = {
+  comercial: { title: 'Comercial', icon: Building2 },
+  financeiro: { title: 'Financeiro', icon: Landmark },
+  estoque_suprimentos: { title: 'Estoque e Suprimentos', icon: Boxes },
+  fiscal_faturamento: { title: 'Fiscal / Faturamento', icon: Receipt },
+};
+
 const CHART_COLORS = [
-  "hsl(var(--primary))",
-  "hsl(var(--secondary))",
-  "hsl(142 76% 36%)",
-  "hsl(38 92% 50%)",
-  "hsl(0 84% 60%)",
-  "hsl(262 83% 58%)",
+  'hsl(var(--primary))',
+  'hsl(var(--secondary))',
+  'hsl(142 76% 36%)',
+  'hsl(38 92% 50%)',
+  'hsl(0 84% 60%)',
+  'hsl(262 83% 58%)',
 ];
 
 function buildPdf(resultado: RelatorioResultado, dataInicio: string, dataFim: string) {
@@ -90,16 +113,12 @@ function buildPdf(resultado: RelatorioResultado, dataInicio: string, dataFim: st
 
       const maxRows = Math.min(rows.length, 200);
       if (rows.length > 200) {
-        // Add warning at bottom of last page
         y += 10;
         if (y > doc.internal.pageSize.getHeight() - 20) { doc.addPage(); y = 20; }
         doc.setFontSize(8);
         doc.setFont('helvetica', 'bolditalic');
         doc.setTextColor(180, 0, 0);
-        doc.text(
-          `⚠ PDF limitado a 200 de ${rows.length} registros. Use "Exportar Excel" para o relatório completo.`,
-          margin, y
-        );
+        doc.text(`⚠ PDF limitado a 200 de ${rows.length} registros. Use "Exportar Excel" para o relatório completo.`, margin, y);
       }
       for (let r = 0; r < maxRows; r++) {
         if (y > doc.internal.pageSize.getHeight() - 20) {
@@ -137,12 +156,15 @@ export default function Relatorios() {
   const [filtroFornecedorIds, setFiltroFornecedorIds] = useState<string[]>([]);
   const [filtroGrupoIds, setFiltroGrupoIds] = useState<string[]>([]);
   const [filtroTipos, setFiltroTipos] = useState<string[]>([]);
+  const [statusFiltro, setStatusFiltro] = useState<string>('todos');
+  const [agrupamento, setAgrupamento] = useState<string>('padrao');
   const [dreCompetencia, setDreCompetencia] = useState<'mes' | 'trimestre' | 'ano' | 'personalizado'>('mes');
   const [dreMes, setDreMes] = useState(() => new Date().toISOString().slice(0, 7));
   const [clientes, setClientes] = useState<{ id: string; nome_razao_social: string }[]>([]);
   const [fornecedores, setFornecedores] = useState<{ id: string; nome_razao_social: string }[]>([]);
   const [grupos, setGrupos] = useState<{ id: string; nome: string }[]>([]);
   const [loading, setLoading] = useState(false);
+  const [errorLoading, setErrorLoading] = useState<string | null>(null);
   const [resultado, setResultado] = useState<RelatorioResultado>({ title: '', subtitle: '', rows: [] });
   const [previewOpen, setPreviewOpen] = useState(false);
   const selectedReport = tipo;
@@ -164,24 +186,44 @@ export default function Relatorios() {
     if (tipoQuery && tipoQuery !== tipo) setTipo(tipoQuery);
   }, [searchParams, tipo]);
 
+  const getDreDateRange = () => {
+    if (dreCompetencia === 'personalizado') return { dataInicio, dataFim };
+    const now = new Date();
+    if (dreCompetencia === 'mes') {
+      const [y, m] = dreMes.split('-').map(Number);
+      const start = `${y}-${String(m).padStart(2, '0')}-01`;
+      const end = new Date(y, m, 0).toISOString().slice(0, 10);
+      return { dataInicio: start, dataFim: end };
+    }
+    if (dreCompetencia === 'trimestre') {
+      const q = Math.floor(now.getMonth() / 3);
+      const start = new Date(now.getFullYear(), q * 3, 1).toISOString().slice(0, 10);
+      const end = new Date(now.getFullYear(), q * 3 + 3, 0).toISOString().slice(0, 10);
+      return { dataInicio: start, dataFim: end };
+    }
+    return { dataInicio: `${now.getFullYear()}-01-01`, dataFim: `${now.getFullYear()}-12-31` };
+  };
+
   const loadData = async () => {
     setLoading(true);
+    setErrorLoading(null);
     try {
       const filtros = selectedReport === 'dre'
         ? { ...getDreDateRange(), clienteId: undefined, fornecedorId: undefined, grupoProdutoId: undefined }
         : {
-            dataInicio,
-            dataFim,
-            clienteIds: filtroClienteIds.length > 0 ? filtroClienteIds : undefined,
-            fornecedorIds: filtroFornecedorIds.length > 0 ? filtroFornecedorIds : undefined,
-            grupoProdutoIds: filtroGrupoIds.length > 0 ? filtroGrupoIds : undefined,
-            tiposFinanceiros: filtroTipos.length > 0 ? filtroTipos : undefined
-          };
+          dataInicio,
+          dataFim,
+          clienteIds: filtroClienteIds.length > 0 ? filtroClienteIds : undefined,
+          fornecedorIds: filtroFornecedorIds.length > 0 ? filtroFornecedorIds : undefined,
+          grupoProdutoIds: filtroGrupoIds.length > 0 ? filtroGrupoIds : undefined,
+          tiposFinanceiros: filtroTipos.length > 0 ? filtroTipos : undefined,
+        };
       const report = await carregarRelatorio(tipo, filtros);
       setResultado(report);
     } catch (error: unknown) {
       console.error('[relatorios]', error);
-      toast.error("Não foi possível carregar o relatório.");
+      setErrorLoading('Não foi possível carregar os dados desse relatório. Revise filtros e tente novamente.');
+      toast.error('Não foi possível carregar o relatório.');
     } finally {
       setLoading(false);
     }
@@ -192,39 +234,151 @@ export default function Relatorios() {
   const isQtyReport = resultado._isQuantityReport === true;
   const isDreReport = resultado._isDreReport === true;
 
-  const kpis = useMemo(() => {
-    const rows = resultado.rows as Record<string, unknown>[];
-    const total = rows.length;
+  const filteredRows = useMemo(() => {
+    const rows = (resultado.rows || []) as Record<string, unknown>[];
+    if (statusFiltro === 'todos') return rows;
+    return rows.filter((r) => {
+      const status = String(r.status || r.situacao || r.faturamento || '').toLowerCase();
+      return status.includes(statusFiltro.toLowerCase());
+    });
+  }, [resultado.rows, statusFiltro]);
+
+  const sortedRows = useMemo(() => {
+    const rows = [...filteredRows];
+    if (agrupamento === 'valor_desc') {
+      return rows.sort((a, b) => Number(b.valor || b.valorTotal || 0) - Number(a.valor || a.valorTotal || 0));
+    }
+    if (agrupamento === 'vencimento') {
+      return rows.sort((a, b) => String(a.vencimento || a.data || '').localeCompare(String(b.vencimento || b.data || '')));
+    }
+    if (agrupamento === 'status') {
+      return rows.sort((a, b) => String(a.status || a.situacao || '').localeCompare(String(b.status || b.situacao || ''), 'pt-BR'));
+    }
+    return rows;
+  }, [filteredRows, agrupamento]);
+
+  const kpiCards = useMemo(() => {
+    const rows = sortedRows;
+    const totals = resultado.totals || {};
+
+    if (tipo === 'financeiro') {
+      const total = rows.reduce((s, r) => s + Number(r.valor || 0), 0);
+      const vencido = rows.filter((r) => String(r.status).toLowerCase() === 'vencido').reduce((s, r) => s + Number(r.valor || 0), 0);
+      const pago = rows.filter((r) => String(r.status).toLowerCase() === 'pago').reduce((s, r) => s + Number(r.valor || 0), 0);
+      return [
+        { title: 'Total', value: formatCurrency(total), icon: Wallet, variation: 'carteira no período' },
+        { title: 'Vencido', value: formatCurrency(vencido), icon: AlertTriangle, variation: 'requer ação' },
+        { title: 'Pago', value: formatCurrency(pago), icon: DollarSign, variation: 'liquidado' },
+        { title: 'Em aberto', value: formatNumber(rows.filter((r) => String(r.status).toLowerCase() === 'aberto').length), icon: Hash, variation: 'títulos' },
+      ];
+    }
+
+    if (tipo === 'estoque_minimo') {
+      return [
+        { title: 'Itens críticos', value: formatNumber(rows.length), icon: AlertTriangle, variation: 'abaixo do mínimo' },
+        { title: 'Qtd em déficit', value: formatNumber(rows.reduce((s, r) => s + Number(r.deficit || 0), 0)), icon: Boxes, variation: 'unidades' },
+        { title: 'Custo de reposição', value: formatCurrency(Number(totals.custoTotal || 0)), icon: DollarSign, variation: 'estimado' },
+      ];
+    }
+
+    if (tipo === 'faturamento') {
+      return [
+        { title: 'Notas', value: formatNumber(rows.length), icon: Receipt, variation: 'confirmadas' },
+        { title: 'Bruto', value: formatCurrency(Number(totals.totalBruto || 0)), icon: DollarSign, variation: 'faturamento bruto' },
+        { title: 'Impostos', value: formatCurrency(Number(totals.totalImpostos || 0)), icon: Landmark, variation: 'retenções' },
+        { title: 'Líquido', value: formatCurrency(Number(totals.totalLiquido || 0)), icon: Wallet, variation: 'resultado líquido' },
+      ];
+    }
+
+    if (tipo === 'fluxo_caixa') {
+      return [
+        { title: 'Entradas', value: formatCurrency(Number(totals.totalEntradas || 0)), icon: TrendingUp, variation: 'período' },
+        { title: 'Saídas', value: formatCurrency(Number(totals.totalSaidas || 0)), icon: ArrowLeftRight, variation: 'período' },
+        { title: 'Saldo', value: formatCurrency(Number(totals.saldoFinal || 0)), icon: Wallet, variation: 'posição final' },
+      ];
+    }
+
+    if (tipo === 'vendas') {
+      const totalVendido = rows.reduce((s, r) => s + Number(r.valor || 0), 0);
+      return [
+        { title: 'Total vendido', value: formatCurrency(totalVendido), icon: DollarSign, variation: 'ordens no período' },
+        { title: 'Pedidos', value: formatNumber(rows.length), icon: ShoppingCart, variation: 'quantidade' },
+        { title: 'Ticket médio', value: formatCurrency(rows.length ? totalVendido / rows.length : 0), icon: Hash, variation: 'por pedido' },
+      ];
+    }
+
+    if (tipo === 'divergencias') {
+      return [
+        { title: 'Pendências', value: formatNumber(rows.length), icon: AlertTriangle, variation: 'itens críticos' },
+        { title: 'Valor impactado', value: formatCurrency(rows.reduce((s, r) => s + Number(r.valor || 0), 0)), icon: DollarSign, variation: 'estimado' },
+      ];
+    }
+
     const chartData = resultado.chartData || [];
     const totalValue = chartData.reduce((s, c) => s + (c.value || 0), 0);
-    const alertCount = tipo === 'estoque'
-      ? rows.filter((r) => r.situacao !== "OK").length
-      : tipo === 'financeiro'
-      ? rows.filter((r) => r.status === "vencido").length
-      : 0;
-    return { total, totalValue, alertCount };
-  }, [resultado, tipo]);
+    return [
+      { title: 'Registros', value: formatNumber(rows.length), icon: Hash, variation: 'no relatório' },
+      { title: isQtyReport ? 'Total Movimentado' : 'Valor Consolidado', value: isQtyReport ? formatNumber(totalValue) : formatCurrency(totalValue), icon: isQtyReport ? Package : DollarSign, variation: isQtyReport ? 'soma das quantidades' : 'soma do gráfico' },
+    ];
+  }, [sortedRows, resultado.totals, resultado.chartData, tipo, isQtyReport]);
 
   const columns = useMemo(() => {
-    if (!resultado.rows.length) return [];
-    return Object.keys(resultado.rows[0]).map((key) => ({
+    if (!sortedRows.length) return [];
+    return Object.keys(sortedRows[0]).map((key) => ({
       key,
       label: key.replace(/([A-Z])/g, ' $1').replace(/^./, (char) => char.toUpperCase()),
-      render: (item: Record<string, unknown>): React.ReactNode => formatCellValue(item[key], key, isQtyReport) as React.ReactNode,
+      render: (item: Record<string, unknown>): React.ReactNode => {
+        const raw = item[key];
+        if ((key.toLowerCase().includes('status') || key.toLowerCase().includes('situacao') || key === 'faixa' || key === 'classe') && typeof raw === 'string') {
+          const normalized = raw.toLowerCase();
+          const isCritical = ['vencido', 'abaixo do mínimo', 'pendente', 'nf s/ financeiro', 'pedido s/ nf', 'c'].some((t) => normalized.includes(t));
+          return <Badge variant={isCritical ? 'destructive' : 'secondary'}>{raw}</Badge>;
+        }
+        return formatCellValue(raw, key, isQtyReport) as React.ReactNode;
+      },
     }));
-  }, [resultado.rows, isQtyReport]);
+  }, [sortedRows, isQtyReport]);
 
   const handleSelectTipo = (nextTipo: TipoRelatorio) => {
     setFiltroClienteIds([]);
     setFiltroFornecedorIds([]);
     setFiltroGrupoIds([]);
     setFiltroTipos([]);
+    setStatusFiltro('todos');
+    setAgrupamento('padrao');
     setTipo(nextTipo);
     setSearchParams((current) => {
       const next = new URLSearchParams(current);
       next.set('tipo', nextTipo);
       return next;
     });
+  };
+
+  const applyQuickPeriod = (period: 'hoje' | '7d' | '30d' | 'mes') => {
+    const now = new Date();
+    const end = now.toISOString().slice(0, 10);
+    if (period === 'hoje') {
+      setDataInicio(end);
+      setDataFim(end);
+      return;
+    }
+    if (period === '7d') {
+      const start = new Date(now);
+      start.setDate(now.getDate() - 7);
+      setDataInicio(start.toISOString().slice(0, 10));
+      setDataFim(end);
+      return;
+    }
+    if (period === '30d') {
+      const start = new Date(now);
+      start.setDate(now.getDate() - 30);
+      setDataInicio(start.toISOString().slice(0, 10));
+      setDataFim(end);
+      return;
+    }
+    const start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+    setDataInicio(start);
+    setDataFim(end);
   };
 
   const handleExportCsv = () => {
@@ -234,10 +388,7 @@ export default function Relatorios() {
 
   const handleExportPdf = async () => {
     if (resultado && resultado.rows.length > 200) {
-      toast.warning(
-        `Este relatório tem ${resultado.rows.length} registros. O PDF mostrará apenas os primeiros 200. Use "Exportar Excel" para exportar tudo.`,
-        { duration: 8000 }
-      );
+      toast.warning(`Este relatório tem ${resultado.rows.length} registros. O PDF mostrará apenas os primeiros 200. Use "Exportar Excel" para exportar tudo.`, { duration: 8000 });
     }
     const doc = await buildPdf(resultado, dataInicio, dataFim);
     doc.save(`${resultado.title || 'relatorio'}.pdf`);
@@ -253,274 +404,318 @@ export default function Relatorios() {
     ? `${dataInicio ? formatDate(dataInicio) : '—'} a ${dataFim ? formatDate(dataFim) : '—'}`
     : new Date().toLocaleDateString('pt-BR');
 
-  const getDreDateRange = () => {
-    if (dreCompetencia === 'personalizado') return { dataInicio, dataFim };
-    const now = new Date();
-    if (dreCompetencia === 'mes') {
-      const [y, m] = dreMes.split('-').map(Number);
-      const start = `${y}-${String(m).padStart(2,'0')}-01`;
-      const end = new Date(y, m, 0).toISOString().slice(0, 10);
-      return { dataInicio: start, dataFim: end };
-    }
-    if (dreCompetencia === 'trimestre') {
-      const q = Math.floor(now.getMonth() / 3);
-      const start = new Date(now.getFullYear(), q * 3, 1).toISOString().slice(0, 10);
-      const end = new Date(now.getFullYear(), q * 3 + 3, 0).toISOString().slice(0, 10);
-      return { dataInicio: start, dataFim: end };
-    }
-    return {
-      dataInicio: `${now.getFullYear()}-01-01`,
-      dataFim: `${now.getFullYear()}-12-31`,
-    };
-  };
+  const groupedReports = useMemo(() => {
+    return Object.entries(categoryMeta).map(([category, meta]) => ({
+      category: category as ReportCategory,
+      ...meta,
+      items: reportCards.filter((r) => r.category === category),
+    }));
+  }, []);
+
+  const selectedMeta = reportCards.find((r) => r.type === tipo);
+  const prioritized = reportCards.filter((r) => r.priority);
+  const showEmptyData = !loading && !errorLoading && sortedRows.length === 0;
+
+  const chartMode = selectedMeta?.chartMode || 'auto';
+  const usePie = chartMode === 'pie' || (chartMode === 'auto' && (resultado.chartData || []).length <= 4);
+  const useLine = chartMode === 'line';
 
   return (
     <AppLayout>
       <ModulePage title="Relatórios" subtitle="Análises gerenciais, exportações e visão consolidada por módulo.">
         <div className="space-y-6">
-          {/* Report type selector */}
-          <div className="grid gap-3 grid-cols-2 md:grid-cols-4 xl:grid-cols-8">
-            {reportCards.map((card) => (
-              <button
-                key={card.type}
-                onClick={() => handleSelectTipo(card.type)}
-                className={`rounded-xl border p-4 text-left transition-all hover:-translate-y-0.5 hover:border-primary/30 ${
-                  tipo === card.type ? 'border-primary bg-primary/5 shadow-sm ring-1 ring-primary/20' : 'bg-card'
-                }`}
-              >
-                <div className="flex items-center gap-3 mb-2">
-                  <div className={`rounded-lg p-2 ${tipo === card.type ? 'bg-primary/20' : 'bg-muted'}`}>
-                    <card.icon className={`h-4 w-4 ${tipo === card.type ? 'text-primary' : 'text-muted-foreground'}`} />
-                  </div>
-                  {tipo === card.type && <BarChart3 className="h-3.5 w-3.5 text-primary ml-auto" />}
-                </div>
-                <p className="text-sm font-semibold">{card.title}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">{card.description}</p>
-              </button>
-            ))}
-          </div>
-
-          {/* KPI Summary */}
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-            <SummaryCard title="Registros" value={formatNumber(kpis.total)} icon={Hash} variationType="neutral" variation="no relatório" />
-            <SummaryCard title={isQtyReport ? "Total Movimentado" : "Valor Consolidado"} value={isQtyReport ? formatNumber(kpis.totalValue) : formatCurrency(kpis.totalValue)} icon={isQtyReport ? Package : DollarSign} variationType="neutral" variation={isQtyReport ? "soma das quantidades" : "soma do gráfico"} />
-            {kpis.alertCount > 0 && (
-              <SummaryCard title="Alertas" value={String(kpis.alertCount)} icon={AlertTriangle} variationType="negative" variation={tipo === 'estoque' ? 'abaixo do mínimo' : 'vencidos'} />
-            )}
-          </div>
-
-          {/* Filters */}
           <Card>
-            <CardContent className="pt-5 pb-4">
-              <div className="flex flex-wrap items-end gap-4">
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Data inicial</Label>
-                  <Input type="date" value={dataInicio} onChange={(e) => setDataInicio(e.target.value)} className="h-9 w-[160px]" />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Data final</Label>
-                  <Input type="date" value={dataFim} onChange={(e) => setDataFim(e.target.value)} className="h-9 w-[160px]" />
-                </div>
-                <div className="flex flex-wrap gap-2 ml-auto">
-                  <Button variant="outline" size="sm" onClick={loadData} className="gap-1.5"><RefreshCcw className="h-3.5 w-3.5" />Atualizar</Button>
-                  <Button variant="outline" size="sm" onClick={() => setPreviewOpen(true)} disabled={!resultado.rows.length} className="gap-1.5"><Eye className="h-3.5 w-3.5" />Visualizar</Button>
-                  <Button variant="outline" size="sm" onClick={handleExportPdf} className="gap-1.5"><FileText className="h-3.5 w-3.5" />PDF</Button>
-                  <Button variant="outline" size="sm" onClick={handleExportXlsx} disabled={!resultado.rows.length} className="gap-1.5"><FileSpreadsheet className="h-3.5 w-3.5" />Excel</Button>
-                  <Button size="sm" onClick={handleExportCsv} className="gap-1.5"><Download className="h-3.5 w-3.5" />CSV</Button>
+            <CardHeader className="pb-4">
+              <CardTitle className="flex items-center gap-2 text-base"><Layers className="h-4 w-4 text-primary" />Entrada do módulo de Relatórios</CardTitle>
+              <CardDescription>Selecione primeiro o contexto de negócio e o relatório prioritário para seguir para filtros, preview e exportações.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <div>
+                <p className="text-sm font-medium mb-2">Relatórios prioritários</p>
+                <div className="grid gap-3 grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
+                  {prioritized.map((card) => (
+                    <button
+                      key={card.type}
+                      onClick={() => handleSelectTipo(card.type)}
+                      className={cn('rounded-xl border p-3 text-left transition-all hover:-translate-y-0.5 hover:border-primary/30 bg-card', tipo === card.type && 'border-primary bg-primary/5 ring-1 ring-primary/20')}
+                    >
+                      <div className="flex items-center gap-2">
+                        <card.icon className="h-4 w-4 text-primary" />
+                        <p className="text-xs font-semibold leading-tight">{card.title}</p>
+                      </div>
+                    </button>
+                  ))}
                 </div>
               </div>
 
-              {/* Filtros contextuais */}
-              <div className="flex flex-wrap gap-3 items-end mt-3">
-                {['vendas', 'faturamento', 'aging', 'curva_abc', 'vendas_cliente'].includes(selectedReport || '') && (
-                  <div className="space-y-1">
-                    <Label className="text-xs">Clientes</Label>
-                    <MultiSelect
-                      options={clientes.map(c => ({ label: c.nome_razao_social, value: c.id }))}
-                      selected={filtroClienteIds}
-                      onChange={setFiltroClienteIds}
-                      placeholder="Todos os clientes"
-                      className="w-[250px]"
-                    />
-                  </div>
-                )}
-
-                {['compras', 'compras_fornecedor'].includes(selectedReport || '') && (
-                  <div className="space-y-1">
-                    <Label className="text-xs">Fornecedores</Label>
-                    <MultiSelect
-                      options={fornecedores.map(f => ({ label: f.nome_razao_social, value: f.id }))}
-                      selected={filtroFornecedorIds}
-                      onChange={setFiltroFornecedorIds}
-                      placeholder="Todos os fornecedores"
-                      className="w-[250px]"
-                    />
-                  </div>
-                )}
-
-                {['estoque', 'estoque_minimo', 'movimentos_estoque', 'margem_produtos', 'curva_abc'].includes(selectedReport || '') && (
-                  <div className="space-y-1">
-                    <Label className="text-xs">Grupos de Produto</Label>
-                    <MultiSelect
-                      options={grupos.map(g => ({ label: g.nome, value: g.id }))}
-                      selected={filtroGrupoIds}
-                      onChange={setFiltroGrupoIds}
-                      placeholder="Todos os grupos"
-                      className="w-[220px]"
-                    />
-                  </div>
-                )}
-
-                {['financeiro', 'aging'].includes(selectedReport || '') && (
-                  <div className="space-y-1">
-                    <Label className="text-xs">Tipos</Label>
-                    <MultiSelect
-                      options={[
-                        { label: "A Receber", value: "receber" },
-                        { label: "A Pagar", value: "pagar" },
-                      ]}
-                      selected={filtroTipos}
-                      onChange={setFiltroTipos}
-                      placeholder="Todos"
-                      className="w-[180px]"
-                    />
-                  </div>
-                )}
-              </div>
-
-              {selectedReport === 'dre' && (
-                <div className="flex flex-wrap gap-3 items-end mt-3 pt-3 border-t">
-                  <div className="space-y-1">
-                    <Label className="text-xs font-medium">Competência</Label>
-                    <Select value={dreCompetencia} onValueChange={(v: any) => setDreCompetencia(v)}>
-                      <SelectTrigger className="h-9 w-[190px]"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="mes">Mês específico</SelectItem>
-                        <SelectItem value="trimestre">Trimestre atual</SelectItem>
-                        <SelectItem value="ano">Ano atual</SelectItem>
-                        <SelectItem value="personalizado">Personalizado</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  {dreCompetencia === 'mes' && (
-                    <div className="space-y-1">
-                      <Label className="text-xs font-medium">Mês/Ano</Label>
-                      <Input
-                        type="month"
-                        value={dreMes}
-                        onChange={(e) => setDreMes(e.target.value)}
-                        className="h-9 w-[160px]"
-                      />
+              <div className="space-y-4">
+                {groupedReports.map((group) => (
+                  <div key={group.category} className="rounded-lg border p-4">
+                    <p className="text-sm font-semibold mb-3 flex items-center gap-2"><group.icon className="h-4 w-4 text-muted-foreground" />{group.title}</p>
+                    <div className="grid gap-3 grid-cols-1 md:grid-cols-2 xl:grid-cols-4">
+                      {group.items.map((card) => (
+                        <button
+                          key={card.type}
+                          onClick={() => handleSelectTipo(card.type)}
+                          className={cn('rounded-lg border p-3 text-left transition-all hover:border-primary/30', tipo === card.type ? 'border-primary bg-primary/5' : 'bg-card')}
+                        >
+                          <div className="flex items-center gap-2 mb-1.5">
+                            <card.icon className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-sm font-semibold">{card.title}</span>
+                          </div>
+                          <p className="text-xs text-muted-foreground">{card.description}</p>
+                        </button>
+                      ))}
                     </div>
-                  )}
-                  {dreCompetencia === 'trimestre' && (
-                    <p className="text-xs text-muted-foreground self-end pb-2">
-                      {(() => { const q = Math.floor(new Date().getMonth()/3)+1; return `${q}º trimestre de ${new Date().getFullYear()}`; })()}
-                    </p>
-                  )}
-                  {dreCompetencia === 'ano' && (
-                    <p className="text-xs text-muted-foreground self-end pb-2">
-                      Exercício {new Date().getFullYear()}
-                    </p>
-                  )}
-                </div>
-              )}
+                  </div>
+                ))}
+              </div>
             </CardContent>
           </Card>
 
-          {/* Report + Chart */}
-          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base">{resultado.title || 'Relatório'}</CardTitle>
-                <CardDescription>{resultado.subtitle}</CardDescription>
-              </CardHeader>
-              <CardContent className="p-0">
-                {isDreReport ? (
-                  <div className="p-4">
-                    <table className="w-full text-sm">
-                      <tbody>
-                         {(resultado.rows as Array<Record<string, unknown>>).map((row, i) => {
-                          const tipo = row.tipo as string | undefined;
-                          const valor = row.valor as number | undefined;
-                          const linha = row.linha as string | undefined;
-                          return (
-                          <tr key={i} className={
-                            tipo === "header" ? "bg-primary/5 font-bold" :
-                            tipo === "subtotal" ? "bg-muted/50 font-semibold border-t" :
-                            tipo === "resultado" ? "bg-primary/10 font-bold text-lg border-t-2 border-primary/30" :
-                            "text-muted-foreground"
-                          }>
-                            <td className={`px-4 py-3 ${tipo === "deducao" ? "pl-8" : ""}`}>{linha}</td>
-                            <td className={`px-4 py-3 text-right font-mono ${(valor ?? 0) < 0 ? "text-destructive" : ""}`}>
-                              {formatCurrency(valor ?? 0)}
-                            </td>
-                          </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <DataTable columns={columns} data={resultado.rows as Record<string, unknown>[]} loading={loading} />
-                )}
-              </CardContent>
-            </Card>
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Execução e análise — {selectedMeta?.title || 'Relatório'}</CardTitle>
+              <CardDescription>Após selecionar o relatório, ajuste filtros, analise KPIs, veja o gráfico e exporte os dados.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+                {kpiCards.map((kpi) => (
+                  <SummaryCard key={kpi.title} title={kpi.title} value={kpi.value} icon={kpi.icon} variationType="neutral" variation={kpi.variation} />
+                ))}
+              </div>
 
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base">Resumo Visual</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {(resultado.chartData || []).length > 0 ? (
-                  <>
-                    <div className="h-56">
-                      <ResponsiveContainer width="100%" height="100%">
-                        {(resultado.chartData || []).length <= 4 ? (
-                          <PieChart>
-                            <Pie data={resultado.chartData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} innerRadius={40} paddingAngle={3}>
-                              {(resultado.chartData || []).map((_, i) => (
-                                <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
-                              ))}
-                            </Pie>
-                            <Legend verticalAlign="bottom" height={36} />
-                            <Tooltip formatter={(v: number) => isQtyReport ? formatNumber(v) : formatCurrency(v)} />
-                          </PieChart>
-                        ) : (
-                          <BarChart data={resultado.chartData}>
-                            <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                            <YAxis hide />
-                            <Tooltip formatter={(v: number) => isQtyReport ? formatNumber(v) : formatCurrency(v)} />
-                            <Bar dataKey="value" radius={[6, 6, 0, 0]} fill="hsl(var(--primary))" />
-                          </BarChart>
-                        )}
-                      </ResponsiveContainer>
+              <Card>
+                <CardContent className="pt-5 pb-4 space-y-4">
+                  <div className="flex flex-wrap items-end gap-4">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Data inicial</Label>
+                      <Input type="date" value={dataInicio} onChange={(e) => setDataInicio(e.target.value)} className="h-9 w-[160px]" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Data final</Label>
+                      <Input type="date" value={dataFim} onChange={(e) => setDataFim(e.target.value)} className="h-9 w-[160px]" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Períodos rápidos</Label>
+                      <div className="flex gap-2">
+                        <Button size="sm" variant="outline" onClick={() => applyQuickPeriod('hoje')}>Hoje</Button>
+                        <Button size="sm" variant="outline" onClick={() => applyQuickPeriod('7d')}>7 dias</Button>
+                        <Button size="sm" variant="outline" onClick={() => applyQuickPeriod('30d')}>30 dias</Button>
+                        <Button size="sm" variant="outline" onClick={() => applyQuickPeriod('mes')}>Mês atual</Button>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2 ml-auto">
+                      <Button variant="outline" size="sm" onClick={loadData} className="gap-1.5"><RefreshCcw className="h-3.5 w-3.5" />Atualizar</Button>
+                      <Button variant="outline" size="sm" onClick={() => setPreviewOpen(true)} disabled={!resultado.rows.length} className="gap-1.5"><Eye className="h-3.5 w-3.5" />Visualizar</Button>
+                      <Button variant="outline" size="sm" onClick={handleExportPdf} className="gap-1.5"><FileText className="h-3.5 w-3.5" />PDF</Button>
+                      <Button variant="outline" size="sm" onClick={handleExportXlsx} disabled={!resultado.rows.length} className="gap-1.5"><FileSpreadsheet className="h-3.5 w-3.5" />Excel</Button>
+                      <Button size="sm" onClick={handleExportCsv} className="gap-1.5"><Download className="h-3.5 w-3.5" />CSV</Button>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-3 items-end">
+                    {['vendas', 'faturamento', 'aging', 'curva_abc', 'vendas_cliente'].includes(selectedReport || '') && (
+                      <div className="space-y-1">
+                        <Label className="text-xs">Clientes</Label>
+                        <MultiSelect options={clientes.map((c) => ({ label: c.nome_razao_social, value: c.id }))} selected={filtroClienteIds} onChange={setFiltroClienteIds} placeholder="Todos os clientes" className="w-[250px]" />
+                      </div>
+                    )}
+
+                    {['compras', 'compras_fornecedor'].includes(selectedReport || '') && (
+                      <div className="space-y-1">
+                        <Label className="text-xs">Fornecedores</Label>
+                        <MultiSelect options={fornecedores.map((f) => ({ label: f.nome_razao_social, value: f.id }))} selected={filtroFornecedorIds} onChange={setFiltroFornecedorIds} placeholder="Todos os fornecedores" className="w-[250px]" />
+                      </div>
+                    )}
+
+                    {['estoque', 'estoque_minimo', 'movimentos_estoque', 'margem_produtos', 'curva_abc'].includes(selectedReport || '') && (
+                      <div className="space-y-1">
+                        <Label className="text-xs">Grupos de Produto</Label>
+                        <MultiSelect options={grupos.map((g) => ({ label: g.nome, value: g.id }))} selected={filtroGrupoIds} onChange={setFiltroGrupoIds} placeholder="Todos os grupos" className="w-[220px]" />
+                      </div>
+                    )}
+
+                    {['financeiro', 'aging', 'fluxo_caixa', 'vendas', 'faturamento', 'divergencias', 'estoque', 'estoque_minimo'].includes(selectedReport || '') && (
+                      <div className="space-y-1">
+                        <Label className="text-xs">Status</Label>
+                        <Select value={statusFiltro} onValueChange={setStatusFiltro}>
+                          <SelectTrigger className="h-9 w-[160px]"><SelectValue placeholder="Todos" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="todos">Todos</SelectItem>
+                            <SelectItem value="aberto">Em aberto</SelectItem>
+                            <SelectItem value="vencido">Vencido</SelectItem>
+                            <SelectItem value="pago">Pago/Confirmado</SelectItem>
+                            <SelectItem value="pendente">Pendente</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+
+                    <div className="space-y-1">
+                      <Label className="text-xs">Agrupamento</Label>
+                      <Select value={agrupamento} onValueChange={setAgrupamento}>
+                        <SelectTrigger className="h-9 w-[180px]"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="padrao">Padrão do relatório</SelectItem>
+                          <SelectItem value="valor_desc">Maior valor primeiro</SelectItem>
+                          <SelectItem value="status">Por status</SelectItem>
+                          <SelectItem value="vencimento">Por vencimento/data</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
 
-                    <div className="space-y-2">
-                      {(resultado.chartData || []).slice(0, 6).map((item, i) => (
-                        <div key={`${item.name}-${i}`} className="flex items-center justify-between rounded-lg border px-3 py-2.5">
-                          <div className="flex items-center gap-2">
-                            <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }} />
-                            <span className="text-sm font-medium">{item.name}</span>
-                          </div>
-                          <span className="text-sm font-mono font-semibold">{isQtyReport ? formatNumber(item.value) : formatCurrency(item.value)}</span>
+                    {['financeiro', 'aging'].includes(selectedReport || '') && (
+                      <div className="space-y-1">
+                        <Label className="text-xs">Tipos</Label>
+                        <MultiSelect
+                          options={[{ label: 'A Receber', value: 'receber' }, { label: 'A Pagar', value: 'pagar' }]}
+                          selected={filtroTipos}
+                          onChange={setFiltroTipos}
+                          placeholder="Todos"
+                          className="w-[180px]"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {selectedReport === 'dre' && (
+                    <div className="flex flex-wrap gap-3 items-end mt-3 pt-3 border-t">
+                      <div className="space-y-1">
+                        <Label className="text-xs font-medium">Competência</Label>
+                        <Select value={dreCompetencia} onValueChange={(v: 'mes' | 'trimestre' | 'ano' | 'personalizado') => setDreCompetencia(v)}>
+                          <SelectTrigger className="h-9 w-[190px]"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="mes">Mês específico</SelectItem>
+                            <SelectItem value="trimestre">Trimestre atual</SelectItem>
+                            <SelectItem value="ano">Ano atual</SelectItem>
+                            <SelectItem value="personalizado">Personalizado</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      {dreCompetencia === 'mes' && (
+                        <div className="space-y-1">
+                          <Label className="text-xs font-medium">Mês/Ano</Label>
+                          <Input type="month" value={dreMes} onChange={(e) => setDreMes(e.target.value)} className="h-9 w-[160px]" />
                         </div>
-                      ))}
+                      )}
                     </div>
-                  </>
-                ) : (
-                  <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-                    O resumo gráfico aparecerá conforme o relatório possuir dados consolidados.
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base">{resultado.title || 'Relatório'}</CardTitle>
+                    <CardDescription>{resultado.subtitle}</CardDescription>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    {loading && <div className="p-6 text-sm text-muted-foreground">Carregando dados do relatório...</div>}
+                    {errorLoading && !loading && <div className="m-4 rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">{errorLoading}</div>}
+
+                    {!loading && !errorLoading && isDreReport ? (
+                      <div className="p-4">
+                        <table className="w-full text-sm">
+                          <tbody>
+                            {(sortedRows as Array<Record<string, unknown>>).map((row, i) => {
+                              const tipoLinha = row.tipo as string | undefined;
+                              const valor = row.valor as number | undefined;
+                              const linha = row.linha as string | undefined;
+                              return (
+                                <tr key={i} className={
+                                  tipoLinha === 'header' ? 'bg-primary/5 font-bold' :
+                                    tipoLinha === 'subtotal' ? 'bg-muted/50 font-semibold border-t' :
+                                      tipoLinha === 'resultado' ? 'bg-primary/10 font-bold text-lg border-t-2 border-primary/30' :
+                                        'text-muted-foreground'
+                                }>
+                                  <td className={`px-4 py-3 ${tipoLinha === 'deducao' ? 'pl-8' : ''}`}>{linha}</td>
+                                  <td className={`px-4 py-3 text-right font-mono ${(valor ?? 0) < 0 ? 'text-destructive' : ''}`}>{formatCurrency(valor ?? 0)}</td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : null}
+
+                    {!loading && !errorLoading && !isDreReport && (
+                      <DataTable
+                        columns={columns}
+                        data={sortedRows}
+                        loading={loading}
+                        moduleKey={`relatorios-${tipo}`}
+                        emptyTitle="Sem dados para o filtro aplicado"
+                        emptyDescription="Ajuste período e filtros contextuais para encontrar registros relevantes."
+                      />
+                    )}
+
+                    {showEmptyData && (
+                      <div className="px-4 pb-4 text-xs text-muted-foreground">Nenhum dado encontrado para o filtro atual. As exportações permanecem disponíveis para manter o fluxo operacional.</div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">Resumo Visual {useLine ? <LineChart className="h-4 w-4 text-muted-foreground" /> : usePie ? <PieChartIcon className="h-4 w-4 text-muted-foreground" /> : <BarChart3 className="h-4 w-4 text-muted-foreground" />}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {(resultado.chartData || []).length > 0 ? (
+                      <>
+                        <div className="h-56">
+                          <ResponsiveContainer width="100%" height="100%">
+                            {useLine ? (
+                              <RechartsLineChart data={resultado.chartData}>
+                                <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                                <YAxis hide />
+                                <Tooltip formatter={(v: number) => isQtyReport ? formatNumber(v) : formatCurrency(v)} />
+                                <Line type="monotone" dataKey="value" stroke="hsl(var(--primary))" strokeWidth={2.5} dot={{ r: 3 }} />
+                              </RechartsLineChart>
+                            ) : usePie ? (
+                              <PieChart>
+                                <Pie data={resultado.chartData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} innerRadius={40} paddingAngle={3}>
+                                  {(resultado.chartData || []).map((_, i) => (<Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />))}
+                                </Pie>
+                                <Legend verticalAlign="bottom" height={36} />
+                                <Tooltip formatter={(v: number) => isQtyReport ? formatNumber(v) : formatCurrency(v)} />
+                              </PieChart>
+                            ) : (
+                              <BarChart data={resultado.chartData}>
+                                <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                                <YAxis hide />
+                                <Tooltip formatter={(v: number) => isQtyReport ? formatNumber(v) : formatCurrency(v)} />
+                                <Bar dataKey="value" radius={[6, 6, 0, 0]} fill="hsl(var(--primary))" />
+                              </BarChart>
+                            )}
+                          </ResponsiveContainer>
+                        </div>
+
+                        <div className="space-y-2">
+                          {(resultado.chartData || []).slice(0, 6).map((item, i) => (
+                            <div key={`${item.name}-${i}`} className="flex items-center justify-between rounded-lg border px-3 py-2.5">
+                              <div className="flex items-center gap-2">
+                                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }} />
+                                <span className="text-sm font-medium">{item.name}</span>
+                              </div>
+                              <span className="text-sm font-mono font-semibold">{isQtyReport ? formatNumber(item.value) : formatCurrency(item.value)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+                        O resumo gráfico aparecerá conforme o relatório possuir dados consolidados.
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </ModulePage>
 
-      {/* Preview Modal */}
       <PreviewModal
         open={previewOpen}
         onClose={() => setPreviewOpen(false)}
@@ -534,14 +729,12 @@ export default function Relatorios() {
         }
       >
         <div className="space-y-6 print:space-y-4">
-          {/* Report header */}
           <div className="border-b pb-4">
             <h2 className="text-lg font-bold text-foreground">{resultado.title}</h2>
             <p className="text-sm text-muted-foreground">{resultado.subtitle}</p>
             <p className="text-xs text-muted-foreground mt-1">Período: {periodoLabel}</p>
           </div>
 
-          {/* Preview table */}
           <div className="overflow-x-auto">
             <table className="w-full text-sm border-collapse">
               <thead>
@@ -565,7 +758,6 @@ export default function Relatorios() {
             </table>
           </div>
 
-          {/* Totals */}
           <div className="flex flex-wrap items-center justify-between gap-4 border-t pt-3 text-sm">
             <span className="font-semibold text-foreground">Total de registros: {resultado.rows.length}</span>
             {resultado.totals && (
@@ -583,7 +775,6 @@ export default function Relatorios() {
                 {resultado.totals.resultado != null && <span className={`font-semibold ${resultado.totals.resultado >= 0 ? 'text-success' : 'text-destructive'}`}>Resultado: {formatCurrency(resultado.totals.resultado)}</span>}
               </div>
             )}
-            {!resultado.totals && kpis.totalValue > 0 && <span className="font-semibold text-foreground">Valor consolidado: {formatCurrency(kpis.totalValue)}</span>}
           </div>
         </div>
       </PreviewModal>
