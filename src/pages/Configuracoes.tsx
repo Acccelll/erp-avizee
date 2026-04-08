@@ -112,7 +112,7 @@ export default function Configuracoes() {
   }, []);
 
   const initials = nome.trim()
-    ? nome.trim().split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase()
+    ? nome.trim().split(/\s+/).filter(Boolean).map((w) => w[0]).slice(0, 2).join('').toUpperCase()
     : (user?.email || 'U').substring(0, 2).toUpperCase();
 
   const handleSaveProfile = async () => {

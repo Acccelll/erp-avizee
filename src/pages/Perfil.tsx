@@ -29,7 +29,7 @@ export default function Perfil() {
   const [newPassword, setNewPassword] = useState("");
 
   const initials = nome.trim()
-    ? nome.trim().split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase()
+    ? nome.trim().split(/\s+/).filter(Boolean).map((w) => w[0]).slice(0, 2).join("").toUpperCase()
     : (user?.email || "U").substring(0, 2).toUpperCase();
 
   const handleSaveProfile = async () => {
@@ -177,7 +177,7 @@ export default function Perfil() {
                     <Lock className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground" />
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Este é o e-mail de acesso da sua conta. Para alterá-lo, utilize Configurações &gt; Segurança.
+                    Este é o e-mail de acesso da sua conta. Para alterá-lo, utilize Configurações {">"} Segurança.
                   </p>
                 </div>
                 {roles.length > 0 && (
