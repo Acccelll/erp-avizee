@@ -8,8 +8,12 @@ import { SummaryCard } from "@/components/SummaryCard";
 import { FormModal } from "@/components/FormModal";
 import { ViewDrawerV2 } from "@/components/ViewDrawerV2";
 import { ViewField, ViewSection } from "@/components/ViewDrawer";
+import { AdvancedFilterBar } from "@/components/AdvancedFilterBar";
+import type { FilterChip } from "@/components/AdvancedFilterBar";
 import { RelationalLink } from "@/components/ui/RelationalLink";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Badge } from "@/components/ui/badge";
+import { MultiSelect, type MultiSelectOption } from "@/components/ui/MultiSelect";
 import {
   Edit,
   Trash2,
@@ -38,7 +42,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { formatCurrency, formatNumber, formatDate } from "@/lib/format";
+import { formatCurrency, formatNumber, formatDate, calculateDaysBetween } from "@/lib/format";
 import { useNavigate } from "react-router-dom";
 import { LogisticaRastreioSection } from "@/components/logistica/LogisticaRastreioSection";
 import { statusPedidoCompra } from "@/lib/statusSchema";
@@ -84,6 +88,62 @@ interface ProdutoOptionRow {
 const statusLabels: Record<string, string> = Object.fromEntries(
   Object.entries(statusPedidoCompra).map(([k, v]) => [k, v.label]),
 );
+
+const ENTREGA_ALERTA_DIAS = 3;
+const TERMINAL_STATUS_PC = ["recebido", "cancelado"];
+
+function getEntregaStatus(
+  dataEntrega: string | null,
+  status: string,
+): "atrasado" | "proximo" | "ok" | "sem_prazo" {
+  if (!dataEntrega) return "sem_prazo";
+  if (TERMINAL_STATUS_PC.includes(status)) return "ok";
+  const daysLeft = calculateDaysBetween(new Date(), dataEntrega);
+  if (daysLeft < 0) return "atrasado";
+  if (daysLeft <= ENTREGA_ALERTA_DIAS) return "proximo";
+  return "ok";
+}
+
+function EntregaBadge({ dataEntrega, status }: { dataEntrega: string | null; status: string }) {
+  if (!dataEntrega) return <span className="text-muted-foreground text-xs">—</span>;
+  const es = getEntregaStatus(dataEntrega, status);
+  const daysLeft = calculateDaysBetween(new Date(), dataEntrega);
+
+  if (es === "atrasado") {
+    return (
+      <span className="inline-flex flex-col items-start gap-0.5">
+        <span className="text-xs text-destructive font-medium">{formatDate(dataEntrega)}</span>
+        <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 bg-destructive/10 text-destructive border-destructive/20 gap-1">
+          <AlertCircle className="h-2.5 w-2.5" />Atrasado
+        </Badge>
+      </span>
+    );
+  }
+  if (es === "proximo") {
+    return (
+      <span className="inline-flex flex-col items-start gap-0.5">
+        <span className="text-xs text-amber-600 font-medium">{formatDate(dataEntrega)}</span>
+        <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 bg-amber-50 text-amber-600 border-amber-200 gap-1">
+          <Clock className="h-2.5 w-2.5" />{daysLeft}d restantes
+        </Badge>
+      </span>
+    );
+  }
+  return <span className="text-xs">{formatDate(dataEntrega)}</span>;
+}
+
+const recebimentoFilterOptions: MultiSelectOption[] = [
+  { label: "Aguardando Recebimento", value: "aguardando" },
+  { label: "Parcialmente Recebido", value: "parcial" },
+  { label: "Recebido", value: "recebido" },
+];
+
+function getRecebimentoFilter(status: string): string {
+  if (status === "recebido") return "recebido";
+  if (status === "parcialmente_recebido") return "parcial";
+  if (["aguardando_recebimento", "enviado_ao_fornecedor", "aprovado"].includes(status)) return "aguardando";
+  return "";
+}
 
 const emptyForm = {
   fornecedor_id: "",
@@ -164,6 +224,14 @@ const PedidosCompra = () => {
   const [viewEstoque, setViewEstoque] = useState<any[]>([]);
   const [viewFinanceiro, setViewFinanceiro] = useState<any[]>([]);
   const [viewCotacao, setViewCotacao] = useState<any | null>(null);
+
+  // Filter state
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilters, setStatusFilters] = useState<string[]>([]);
+  const [fornecedorFilters, setFornecedorFilters] = useState<string[]>([]);
+  const [recebimentoFilters, setRecebimentoFilters] = useState<string[]>([]);
+  const [dataInicio, setDataInicio] = useState("");
+  const [dataFim, setDataFim] = useState("");
 
   const {
     data: pedidosRaw = [],
@@ -609,45 +677,209 @@ const PedidosCompra = () => {
   const columns = [
     {
       key: "id",
-      label: "Nº",
+      label: "Nº Pedido",
+      sortable: true,
       render: (p: PedidoCompra) => (
-        <span className="font-mono text-xs font-medium text-primary">{pedidoNumero(p)}</span>
+        <span className="font-mono text-xs font-semibold text-primary">{pedidoNumero(p)}</span>
       ),
     },
     {
       key: "fornecedor",
       label: "Fornecedor",
-      render: (p: PedidoCompra) => p.fornecedores?.nome_razao_social || "—",
+      render: (p: PedidoCompra) => (
+        <span className="font-medium text-sm">{p.fornecedores?.nome_razao_social || "—"}</span>
+      ),
     },
     {
       key: "data_pedido",
-      label: "Data",
-      render: (p: PedidoCompra) => new Date(p.data_pedido).toLocaleDateString("pt-BR"),
+      label: "Data Pedido",
+      sortable: true,
+      render: (p: PedidoCompra) => <span className="text-xs">{formatDate(p.data_pedido)}</span>,
+    },
+    {
+      key: "data_entrega_prevista",
+      label: "Entrega Prevista",
+      render: (p: PedidoCompra) => (
+        <EntregaBadge dataEntrega={p.data_entrega_prevista} status={p.status} />
+      ),
+    },
+    {
+      key: "condicao_pagamento",
+      label: "Condição de Pagamento",
+      hidden: true,
+      render: (p: PedidoCompra) => (
+        <span className="text-xs text-muted-foreground">{p.condicao_pagamento || "—"}</span>
+      ),
     },
     {
       key: "valor_total",
       label: "Total",
+      sortable: true,
       render: (p: PedidoCompra) => (
-        <span className="font-semibold font-mono">{formatCurrency(Number(p.valor_total || 0))}</span>
+        <span className="font-semibold font-mono text-sm">{formatCurrency(Number(p.valor_total || 0))}</span>
       ),
     },
     {
       key: "status",
       label: "Status",
+      sortable: true,
       render: (p: PedidoCompra) => (
         <StatusBadge status={p.status} label={statusLabels[p.status] || p.status} />
       ),
     },
+    {
+      key: "recebimento",
+      label: "Recebimento",
+      render: (p: PedidoCompra) => {
+        if (p.status === "recebido") {
+          return (
+            <Badge variant="outline" className="text-[11px] bg-success/10 text-success border-success/30 gap-1">
+              <CheckCircle2 className="h-3 w-3" />Recebido
+            </Badge>
+          );
+        }
+        if (p.status === "parcialmente_recebido") {
+          return (
+            <Badge variant="outline" className="text-[11px] bg-warning/10 text-warning border-warning/30 gap-1">
+              <ArrowDownToLine className="h-3 w-3" />Parcial
+            </Badge>
+          );
+        }
+        if (["aguardando_recebimento", "enviado_ao_fornecedor", "aprovado"].includes(p.status)) {
+          return (
+            <Badge variant="outline" className="text-[11px] bg-warning/10 text-warning border-warning/30 gap-1">
+              <Clock className="h-3 w-3" />Aguardando
+            </Badge>
+          );
+        }
+        if (p.status === "cancelado") {
+          return <span className="text-xs text-muted-foreground">—</span>;
+        }
+        return (
+          <Badge variant="outline" className="text-[11px] gap-1">
+            <FileText className="h-3 w-3" />Rascunho
+          </Badge>
+        );
+      },
+    },
+    {
+      key: "cotacao_origem",
+      label: "Cotação Origem",
+      hidden: true,
+      render: (p: PedidoCompra) =>
+        p.cotacao_compra_id ? (
+          <span className="text-xs font-mono text-muted-foreground">{String(p.cotacao_compra_id).slice(-6)}</span>
+        ) : (
+          <span className="text-xs text-muted-foreground">Avulso</span>
+        ),
+    },
+    {
+      key: "acoes_pc",
+      label: "Ações",
+      sortable: false,
+      render: (p: PedidoCompra) => {
+        const canSend = p.status === "aprovado";
+        const canReceive = ["aprovado", "enviado_ao_fornecedor", "aguardando_recebimento", "parcialmente_recebido"].includes(p.status);
+        return (
+          <div className="flex items-center gap-1">
+            {canSend && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 text-xs gap-1"
+                onClick={(e) => { e.stopPropagation(); marcarEnviado(p); }}
+              >
+                <SendHorizontal className="w-3 h-3" /> Enviar
+              </Button>
+            )}
+            {canReceive && !canSend && (
+              <Button
+                size="sm"
+                variant="default"
+                className="h-7 text-xs gap-1"
+                onClick={(e) => { e.stopPropagation(); darEntrada(p); }}
+              >
+                <PackageCheck className="w-3 h-3" /> Receber
+              </Button>
+            )}
+          </div>
+        );
+      },
+    },
   ];
+
+  const filteredData = useMemo(() => {
+    const query = searchTerm.trim().toLowerCase();
+    return data.filter((p) => {
+      if (statusFilters.length > 0 && !statusFilters.includes(p.status)) return false;
+      if (fornecedorFilters.length > 0 && !fornecedorFilters.includes(String(p.fornecedor_id || ""))) return false;
+
+      if (recebimentoFilters.length > 0) {
+        const rf = getRecebimentoFilter(p.status);
+        if (!recebimentoFilters.includes(rf)) return false;
+      }
+
+      if (dataInicio && p.data_pedido < dataInicio) return false;
+      if (dataFim && p.data_pedido > dataFim) return false;
+
+      if (!query) return true;
+      return [
+        pedidoNumero(p),
+        p.fornecedores?.nome_razao_social,
+        p.observacoes,
+        p.condicao_pagamento,
+      ].filter(Boolean).join(" ").toLowerCase().includes(query);
+    });
+  }, [data, searchTerm, statusFilters, fornecedorFilters, recebimentoFilters, dataInicio, dataFim]);
+
+  const activeFilters = useMemo(() => {
+    const chips: FilterChip[] = [];
+    statusFilters.forEach((f) => {
+      chips.push({ key: "status", label: "Status", value: [f], displayValue: statusLabels[f] || f });
+    });
+    fornecedorFilters.forEach((f) => {
+      const forn = fornecedoresAtivos.find((x) => String(x.id) === f);
+      chips.push({ key: "fornecedor", label: "Fornecedor", value: [f], displayValue: forn?.nome_razao_social || f });
+    });
+    recebimentoFilters.forEach((f) => {
+      const opt = recebimentoFilterOptions.find((x) => x.value === f);
+      chips.push({ key: "recebimento", label: "Recebimento", value: [f], displayValue: opt?.label || f });
+    });
+    if (dataInicio) chips.push({ key: "dataInicio", label: "Pedido desde", value: [dataInicio], displayValue: formatDate(dataInicio) });
+    if (dataFim) chips.push({ key: "dataFim", label: "Pedido até", value: [dataFim], displayValue: formatDate(dataFim) });
+    return chips;
+  }, [statusFilters, fornecedorFilters, recebimentoFilters, dataInicio, dataFim, fornecedoresAtivos]);
+
+  const handleRemoveFilter = (key: string, value?: string) => {
+    if (key === "status") setStatusFilters((prev) => prev.filter((v) => v !== value));
+    if (key === "fornecedor") setFornecedorFilters((prev) => prev.filter((v) => v !== value));
+    if (key === "recebimento") setRecebimentoFilters((prev) => prev.filter((v) => v !== value));
+    if (key === "dataInicio") setDataInicio("");
+    if (key === "dataFim") setDataFim("");
+  };
+
+  const handleClearAllFilters = () => {
+    setStatusFilters([]);
+    setFornecedorFilters([]);
+    setRecebimentoFilters([]);
+    setDataInicio("");
+    setDataFim("");
+  };
+
+  const statusOptions: MultiSelectOption[] = Object.entries(statusLabels).map(([k, v]) => ({ label: v, value: k }));
+  const fornecedorOptions2: MultiSelectOption[] = fornecedoresAtivos.map((f) => ({
+    label: f.nome_razao_social || "",
+    value: String(f.id),
+  }));
 
   return (
     <AppLayout>
       <ModulePage
         title="Pedidos de Compra"
-        subtitle="Acompanhamento operacional de compras: envio, recebimento e integração com estoque/financeiro"
+        subtitle="Central de consulta e acompanhamento operacional de pedidos de compra"
         addLabel="Novo Pedido"
         onAdd={openCreate}
-        count={data.length}
+        count={filteredData.length}
       >
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <SummaryCard
@@ -681,7 +913,64 @@ const PedidosCompra = () => {
           />
         </div>
 
-        <DataTable columns={columns} data={data} loading={loading} onView={openView} onEdit={openEdit} />
+        <AdvancedFilterBar
+          searchValue={searchTerm}
+          onSearchChange={setSearchTerm}
+          searchPlaceholder="Buscar por número, fornecedor ou observações..."
+          activeFilters={activeFilters}
+          onRemoveFilter={handleRemoveFilter}
+          onClearAll={handleClearAllFilters}
+          count={filteredData.length}
+        >
+          <MultiSelect
+            options={statusOptions}
+            selected={statusFilters}
+            onChange={setStatusFilters}
+            placeholder="Status"
+            className="w-[200px]"
+          />
+          <MultiSelect
+            options={recebimentoFilterOptions}
+            selected={recebimentoFilters}
+            onChange={setRecebimentoFilters}
+            placeholder="Recebimento"
+            className="w-[200px]"
+          />
+          <MultiSelect
+            options={fornecedorOptions2}
+            selected={fornecedorFilters}
+            onChange={setFornecedorFilters}
+            placeholder="Fornecedor"
+            className="w-[220px]"
+          />
+          <div className="flex items-center gap-2">
+            <Input
+              type="date"
+              value={dataInicio}
+              onChange={(e) => setDataInicio(e.target.value)}
+              className="h-9 w-[140px] text-xs"
+              title="Pedido desde"
+            />
+            <span className="text-xs text-muted-foreground">até</span>
+            <Input
+              type="date"
+              value={dataFim}
+              onChange={(e) => setDataFim(e.target.value)}
+              className="h-9 w-[140px] text-xs"
+              title="Pedido até"
+            />
+          </div>
+        </AdvancedFilterBar>
+
+        <DataTable
+          columns={columns}
+          data={filteredData}
+          loading={loading}
+          moduleKey="pedidos-compra"
+          showColumnToggle={true}
+          onView={openView}
+          onEdit={openEdit}
+        />
       </ModulePage>
 
       <FormModal
