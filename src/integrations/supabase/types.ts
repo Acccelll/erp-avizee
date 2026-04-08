@@ -792,51 +792,72 @@ export type Database = {
           cep: string | null
           cidade: string | null
           cnpj: string | null
+          complemento: string | null
           created_at: string | null
           email: string | null
           id: string
           inscricao_estadual: string | null
+          inscricao_municipal: string | null
           logo_url: string | null
           logradouro: string | null
           nome_fantasia: string
+          numero: string | null
           razao_social: string
+          responsavel: string | null
+          site: string | null
           telefone: string | null
           uf: string | null
           updated_at: string | null
+          updated_by: string | null
+          whatsapp: string | null
         }
         Insert: {
           bairro?: string | null
           cep?: string | null
           cidade?: string | null
           cnpj?: string | null
+          complemento?: string | null
           created_at?: string | null
           email?: string | null
           id?: string
           inscricao_estadual?: string | null
+          inscricao_municipal?: string | null
           logo_url?: string | null
           logradouro?: string | null
           nome_fantasia?: string
+          numero?: string | null
           razao_social?: string
+          responsavel?: string | null
+          site?: string | null
           telefone?: string | null
           uf?: string | null
           updated_at?: string | null
+          updated_by?: string | null
+          whatsapp?: string | null
         }
         Update: {
           bairro?: string | null
           cep?: string | null
           cidade?: string | null
           cnpj?: string | null
+          complemento?: string | null
           created_at?: string | null
           email?: string | null
           id?: string
           inscricao_estadual?: string | null
+          inscricao_municipal?: string | null
           logo_url?: string | null
           logradouro?: string | null
           nome_fantasia?: string
+          numero?: string | null
           razao_social?: string
+          responsavel?: string | null
+          site?: string | null
           telefone?: string | null
           uf?: string | null
           updated_at?: string | null
+          updated_by?: string | null
+          whatsapp?: string | null
         }
         Relationships: []
       }
