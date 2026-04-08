@@ -1,7 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { downloadTextFile } from "@/lib/utils";
 import { formatCurrency, formatDate, formatNumber } from "@/lib/format";
-import { Tables } from "@/integrations/supabase/types";
 import { getEffectiveFiscalId } from "@/lib/fiscalUtils";
 
 export type TipoRelatorio = "estoque" | "movimentos_estoque" | "financeiro" | "fluxo_caixa" | "vendas" | "compras" | "aging" | "dre" | "curva_abc" | "margem_produtos" | "estoque_minimo" | "vendas_cliente" | "compras_fornecedor" | "divergencias" | "faturamento";
@@ -25,6 +24,26 @@ export interface RelatorioResultado<T = Record<string, unknown>> {
   kpis?: Record<string, number>;
   _isQuantityReport?: boolean;
   _isDreReport?: boolean;
+}
+
+/**
+ * Adds a `participacao` (% share of total) field to each row in a ranking.
+ * Rounds to one decimal place.
+ */
+function addParticipacao<T extends { valorTotal: number }>(rows: T[], grandTotal: number): (T & { participacao: number })[] {
+  return rows.map((r) => ({
+    ...r,
+    participacao: grandTotal > 0 ? Number(((r.valorTotal / grandTotal) * 100).toFixed(1)) : 0,
+  }));
+}
+
+/**
+ * Computes top-N concentration (% of grand total held by the first N items).
+ */
+function computeTop5Concentracao(rows: { valorTotal: number }[], grandTotal: number): number {
+  if (grandTotal <= 0) return 0;
+  const top5Total = rows.slice(0, 5).reduce((s, r) => s + r.valorTotal, 0);
+  return Number(((top5Total / grandTotal) * 100).toFixed(1));
 }
 
 function withDateRange(query: any, column: string, filtros: FiltroRelatorio) {
@@ -172,7 +191,9 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
 
       const rows = (data || []).map((item: any) => {
         const valor = Number(item.valor || 0);
-        const valorEmAberto = item.saldo_restante != null ? Number(item.saldo_restante) : (item.status === 'pago' ? 0 : valor);
+        const valorEmAberto = item.saldo_restante != null
+          ? Number(item.saldo_restante)
+          : item.status === 'pago' ? 0 : valor;
         const venc = item.data_vencimento ? new Date(item.data_vencimento) : null;
         const atraso = (venc && item.status !== 'pago' && venc < hoje)
           ? Math.floor((hoje.getTime() - venc.getTime()) / (1000 * 60 * 60 * 24))
@@ -754,16 +775,12 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
       const totalVendido = rows.reduce((r, s) => r + s.valorTotal, 0);
       const grandTotalVcli = totalVendido;
 
-      const rowsWithParticipacao = rows.map(r => ({
-        ...r,
-        participacao: grandTotalVcli > 0 ? Number(((r.valorTotal / grandTotalVcli) * 100).toFixed(1)) : 0,
-      }));
+      const rowsWithParticipacao = addParticipacao(rows, grandTotalVcli);
 
       const clientesAtendidos = rowsWithParticipacao.length;
       const totalPedidos = rowsWithParticipacao.reduce((s, r) => s + r.pedidos, 0);
       const ticketMedioGeral = totalPedidos > 0 ? grandTotalVcli / totalPedidos : 0;
-      const top5Total = rowsWithParticipacao.slice(0, 5).reduce((s, r) => s + r.valorTotal, 0);
-      const top5Concentracao = grandTotalVcli > 0 ? Number(((top5Total / grandTotalVcli) * 100).toFixed(1)) : 0;
+      const top5Concentracao = computeTop5Concentracao(rowsWithParticipacao, grandTotalVcli);
 
       return {
         title: "Vendas por Cliente",
@@ -801,16 +818,12 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
       }));
 
       const totalCompradoCf = rows.reduce((s, r) => s + r.valorTotal, 0);
-      const rowsWithParticipacao = rows.map(r => ({
-        ...r,
-        participacao: totalCompradoCf > 0 ? Number(((r.valorTotal / totalCompradoCf) * 100).toFixed(1)) : 0,
-      }));
+      const rowsWithParticipacao = addParticipacao(rows, totalCompradoCf);
 
       const fornecedoresAtivos = rowsWithParticipacao.length;
       const totalPedidosCf = rowsWithParticipacao.reduce((s, r) => s + r.pedidos, 0);
       const ticketMedioGeral = totalPedidosCf > 0 ? totalCompradoCf / totalPedidosCf : 0;
-      const top5TotalCf = rowsWithParticipacao.slice(0, 5).reduce((s, r) => s + r.valorTotal, 0);
-      const top5Concentracao = totalCompradoCf > 0 ? Number(((top5TotalCf / totalCompradoCf) * 100).toFixed(1)) : 0;
+      const top5Concentracao = computeTop5Concentracao(rowsWithParticipacao, totalCompradoCf);
 
       return {
         title: "Compras por Fornecedor",

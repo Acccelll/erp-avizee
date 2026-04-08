@@ -21,6 +21,10 @@ import { formatCurrency, formatNumber, formatDate } from '@/lib/format';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 
+// Badge value classification constants used in column rendering
+const BADGE_CRITICAL_VALUES = ['vencido', 'abaixo do mínimo', 'zerado', 'pendente', 'nf s/ financeiro', 'pedido s/ nf', 'c', 'alta'];
+const BADGE_OK_VALUES = ['ok', 'entregue', 'confirmado', 'pago', 'faturado', 'a'];
+
 const CHART_COLORS = [
   'hsl(var(--primary))',
   'hsl(var(--secondary))',
@@ -229,7 +233,7 @@ export default function Relatorios() {
     };
 
     return cfg.kpis.map((kpiDef) => {
-      const val = kpis[kpiDef.key] ?? (resultado.totals?.[kpiDef.key] != null ? resultado.totals![kpiDef.key] : undefined);
+      const val = kpis[kpiDef.key] ?? resultado.totals?.[kpiDef.key];
       return {
         title: kpiDef.label,
         value: formatKpi(val, kpiDef.format),
@@ -265,8 +269,8 @@ export default function Relatorios() {
 
         if (isBadgeKey && typeof raw === 'string' && raw !== '-') {
           const normalized = raw.toLowerCase();
-          const isCritical = ['vencido', 'abaixo do mínimo', 'zerado', 'pendente', 'nf s/ financeiro', 'pedido s/ nf', 'c', 'alta'].some((t) => normalized.includes(t));
-          const isOk = ['ok', 'entregue', 'confirmado', 'pago', 'faturado', 'a'].some((t) => normalized === t);
+          const isCritical = BADGE_CRITICAL_VALUES.some((t) => normalized.includes(t));
+          const isOk = BADGE_OK_VALUES.some((t) => normalized === t);
           const variant = isCritical ? 'destructive' : isOk ? 'default' : 'secondary';
           return <Badge variant={variant}>{raw}</Badge>;
         }

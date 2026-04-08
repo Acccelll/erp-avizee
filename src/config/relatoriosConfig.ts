@@ -579,9 +579,10 @@ const curvaAbcConfig: ReportConfig = {
   },
   kpis: [
     { key: 'grandTotal', label: 'Total Faturado', format: 'currency', variation: 'no período' },
-    { key: 'itensClasseA', label: 'Classe A', format: 'number', variant: 'success', variation: 'produtos (≤ 80%)' },
-    { key: 'itensClasseB', label: 'Classe B', format: 'number', variation: 'produtos (80–95%)' },
-    { key: 'itensClasseC', label: 'Classe C', format: 'number', variation: 'produtos (> 95%)' },
+    { key: 'itensClasseA', label: 'Classe A', format: 'number', variant: 'success', variation: 'produtos (≤ 80% acumulado)' },
+    // NOTE: These thresholds (A ≤ 80%, B 80–95%, C > 95%) must match the service curva_abc case
+    { key: 'itensClasseB', label: 'Classe B', format: 'number', variation: 'produtos (80–95% acumulado)' },
+    { key: 'itensClasseC', label: 'Classe C', format: 'number', variation: 'produtos (> 95% acumulado)' },
   ],
   drillDown: [
     { key: 'produto', label: 'Abrir produto', route: '/produtos', available: true },
