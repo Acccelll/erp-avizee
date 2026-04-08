@@ -83,7 +83,7 @@ const sideNavItems: SideNavItem[] = [
 ];
 
 export default function Administracao() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = searchParams.get('tab') || 'empresa';
   const [config, setConfig] = useState(defaultConfig);
@@ -102,6 +102,9 @@ export default function Administracao() {
   const [emailTestResult, setEmailTestResult] = useState<{ status: 'success' | 'error'; message: string } | null>(null);
   const [emailLastSaved, setEmailLastSaved] = useState<{ at: string | null; by: string | null }>({ at: null, by: null });
   const [emailLastTest, setEmailLastTest] = useState<string | null>(null);
+
+  const [fiscalErrors, setFiscalErrors] = useState<Record<string, string>>({});
+  const [fiscalLastSaved, setFiscalLastSaved] = useState<{ at: string | null; by: string | null }>({ at: null, by: null });
 
   useEffect(() => {
     const tab = searchParams.get('tab');
@@ -122,6 +125,8 @@ export default function Administracao() {
         const appConfig = Object.fromEntries((appRows || []).map((row: { chave: string; valor: unknown }) => [row.chave, row.valor || {}]));
         const emailRaw = (appConfig.email as any) || {};
         const { _updatedAt: emailUpdatedAt, _updatedBy: emailUpdatedBy, ...emailData } = emailRaw;
+        const fiscalRaw = (appConfig.fiscal as any) || {};
+        const { _updatedAt: fiscalUpdatedAt, _updatedByName: fiscalUpdatedByName, ...fiscalData } = fiscalRaw;
         const merged = {
           ...defaultConfig,
           geral: {
@@ -149,7 +154,7 @@ export default function Administracao() {
           },
           usuarios: { ...defaultConfig.usuarios, ...((appConfig.usuarios as any) || {}) },
           email: { ...defaultConfig.email, ...emailData },
-          fiscal: { ...defaultConfig.fiscal, ...((appConfig.fiscal as any) || {}) },
+          fiscal: { ...defaultConfig.fiscal, ...fiscalData },
           financeiro: { ...defaultConfig.financeiro, ...((appConfig.financeiro as any) || {}) },
         };
         if (mounted) {
@@ -158,6 +163,7 @@ export default function Administracao() {
           setEmpresaCreatedAt(empresa?.created_at || null);
           setConfig(merged);
           setEmailLastSaved({ at: emailUpdatedAt || null, by: emailUpdatedBy || null });
+          setFiscalLastSaved({ at: fiscalUpdatedAt || null, by: fiscalUpdatedByName || null });
         }
       } catch {
         console.error('[admin] Erro ao carregar configurações do Supabase');
@@ -234,6 +240,23 @@ export default function Administracao() {
     return errors;
   };
 
+  const validateFiscalSection = (): Record<string, string> => {
+    const errors: Record<string, string> = {};
+    if (!/^\d{4}$/.test(config.fiscal.cfopPadraoVenda)) {
+      errors.cfopPadraoVenda = 'CFOP deve ter exatamente 4 dígitos numéricos (ex.: 5102).';
+    }
+    if (!/^\d{4}$/.test(config.fiscal.cfopPadraoCompra)) {
+      errors.cfopPadraoCompra = 'CFOP deve ter exatamente 4 dígitos numéricos (ex.: 1102).';
+    }
+    if (!/^\d{2,3}$/.test(config.fiscal.cstPadrao)) {
+      errors.cstPadrao = 'CST deve ter 2 ou 3 dígitos numéricos (ex.: 00 para PIS/COFINS, 000 para ICMS).';
+    }
+    if (!/^\d{8}$/.test(config.fiscal.ncmPadrao)) {
+      errors.ncmPadrao = 'NCM deve ter exatamente 8 dígitos numéricos (ex.: 00000000).';
+    }
+    return errors;
+  };
+
   const handleEmailTest = async () => {
     if (!emailTestAddress.trim() || !isValidEmailFormat(emailTestAddress)) {
       setEmailErrors((p) => ({ ...p, emailTeste: 'Informe um e-mail válido para o teste.' }));
@@ -277,6 +300,15 @@ export default function Administracao() {
       }
       setEmailErrors({});
     }
+    if (activeSection === 'fiscal') {
+      const errors = validateFiscalSection();
+      if (Object.keys(errors).length > 0) {
+        setFiscalErrors(errors);
+        toast.error('Corrija os campos obrigatórios antes de salvar.');
+        return;
+      }
+      setFiscalErrors({});
+    }
     setSaving(true);
     try {
       const now = new Date().toISOString();
@@ -313,11 +345,12 @@ export default function Administracao() {
         { chave: 'geral', valor: { logoUrl: config.geral.logoUrl, corPrimaria: config.geral.corPrimaria, corSecundaria: config.geral.corSecundaria } as any, descricao: 'Configurações gerais' },
         { chave: 'usuarios', valor: config.usuarios as any, descricao: 'Parâmetros de usuários' },
         { chave: 'email', valor: { ...config.email, _updatedAt: now, _updatedBy: user?.id ?? null } as any, descricao: 'Parâmetros de envio e remetente' },
-        { chave: 'fiscal', valor: config.fiscal as any, descricao: 'Parâmetros fiscais' },
+        { chave: 'fiscal', valor: { ...config.fiscal, _updatedAt: now, _updatedBy: user?.id ?? null, _updatedByName: profile?.nome ?? user?.email ?? null } as any, descricao: 'Parâmetros fiscais' },
         { chave: 'financeiro', valor: config.financeiro as any, descricao: 'Parâmetros financeiros' },
       ];
       await supabase.from('app_configuracoes').upsert(appRows, { onConflict: 'chave' });
       setEmailLastSaved({ at: now, by: user?.id ?? null });
+      setFiscalLastSaved({ at: now, by: profile?.nome ?? user?.email ?? null });
       toast.success('Configurações salvas com sucesso.');
     } catch (error: unknown) {
       console.error('[admin] Erro ao salvar:', error);
@@ -851,6 +884,195 @@ export default function Administracao() {
     </div>
   );
 
+  const renderFiscal = () => (
+    <div className="space-y-6">
+      {/* Bloco 1 — Classificação fiscal padrão */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-start gap-3">
+            <Receipt className="mt-0.5 h-5 w-5 text-muted-foreground shrink-0" />
+            <div>
+              <CardTitle>Classificação fiscal padrão</CardTitle>
+              <CardDescription>
+                Valores base utilizados como ponto de partida em documentos de entrada e saída. Podem ser complementados por parametrizações específicas de produto ou operação.
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="grid gap-4 md:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label>CFOP padrão para venda</Label>
+            <Input
+              value={config.fiscal.cfopPadraoVenda}
+              onChange={(e) => {
+                const v = e.target.value.replace(/\D/g, '').slice(0, 4);
+                updateSection('fiscal', { cfopPadraoVenda: v });
+                setFiscalErrors((p) => ({ ...p, cfopPadraoVenda: '' }));
+              }}
+              placeholder="5102"
+              maxLength={4}
+              className={cn(fiscalErrors.cfopPadraoVenda ? 'border-destructive focus-visible:ring-destructive' : '')}
+            />
+            {fiscalErrors.cfopPadraoVenda
+              ? <p className="text-[11px] text-destructive">{fiscalErrors.cfopPadraoVenda}</p>
+              : <p className="text-[11px] text-muted-foreground flex items-center gap-1"><Info className="h-3 w-3" />Sugerido em documentos de saída. Ex.: 5102 (venda de mercadoria adquirida).</p>}
+          </div>
+          <div className="space-y-1.5">
+            <Label>CFOP padrão para compra</Label>
+            <Input
+              value={config.fiscal.cfopPadraoCompra}
+              onChange={(e) => {
+                const v = e.target.value.replace(/\D/g, '').slice(0, 4);
+                updateSection('fiscal', { cfopPadraoCompra: v });
+                setFiscalErrors((p) => ({ ...p, cfopPadraoCompra: '' }));
+              }}
+              placeholder="1102"
+              maxLength={4}
+              className={cn(fiscalErrors.cfopPadraoCompra ? 'border-destructive focus-visible:ring-destructive' : '')}
+            />
+            {fiscalErrors.cfopPadraoCompra
+              ? <p className="text-[11px] text-destructive">{fiscalErrors.cfopPadraoCompra}</p>
+              : <p className="text-[11px] text-muted-foreground flex items-center gap-1"><Info className="h-3 w-3" />Sugerido em documentos de entrada. Ex.: 1102 (compra de mercadoria para comercialização).</p>}
+          </div>
+          <div className="space-y-1.5">
+            <Label>CST padrão inicial</Label>
+            <Input
+              value={config.fiscal.cstPadrao}
+              onChange={(e) => {
+                const v = e.target.value.replace(/\D/g, '').slice(0, 3);
+                updateSection('fiscal', { cstPadrao: v });
+                setFiscalErrors((p) => ({ ...p, cstPadrao: '' }));
+              }}
+              placeholder="000"
+              maxLength={3}
+              className={cn(fiscalErrors.cstPadrao ? 'border-destructive focus-visible:ring-destructive' : '')}
+            />
+            {fiscalErrors.cstPadrao
+              ? <p className="text-[11px] text-destructive">{fiscalErrors.cstPadrao}</p>
+              : <p className="text-[11px] text-muted-foreground flex items-center gap-1"><Info className="h-3 w-3" />Classificação fiscal inicial padrão do sistema. Ex.: 000 (tributada integralmente).</p>}
+          </div>
+          <div className="space-y-1.5">
+            <Label>NCM padrão inicial</Label>
+            <Input
+              value={config.fiscal.ncmPadrao}
+              onChange={(e) => {
+                const v = e.target.value.replace(/\D/g, '').slice(0, 8);
+                updateSection('fiscal', { ncmPadrao: v });
+                setFiscalErrors((p) => ({ ...p, ncmPadrao: '' }));
+              }}
+              placeholder="00000000"
+              maxLength={8}
+              className={cn(fiscalErrors.ncmPadrao ? 'border-destructive focus-visible:ring-destructive' : '')}
+            />
+            {fiscalErrors.ncmPadrao
+              ? <p className="text-[11px] text-destructive">{fiscalErrors.ncmPadrao}</p>
+              : <p className="text-[11px] text-muted-foreground flex items-center gap-1"><Info className="h-3 w-3" />Classificação padrão quando não houver NCM específico no cadastro do produto. 8 dígitos.</p>}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Bloco 2 — Comportamento fiscal do sistema */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-start gap-3">
+            <CheckCircle2 className="mt-0.5 h-5 w-5 text-muted-foreground shrink-0" />
+            <div>
+              <CardTitle>Comportamento fiscal do sistema</CardTitle>
+              <CardDescription>
+                Define como o ERP age automaticamente ao processar documentos fiscais. Diferente das classificações acima, esta opção controla o fluxo interno do sistema.
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-start justify-between rounded-lg border p-4 gap-4">
+            <div className="space-y-1">
+              <p className="font-medium text-sm">Gerar financeiro automaticamente por padrão</p>
+              <p className="text-sm text-muted-foreground">
+                Quando ativo, documentos fiscais confirmados geram lançamento financeiro automaticamente por padrão, salvo configuração específica no documento.
+              </p>
+            </div>
+            <Switch
+              checked={config.fiscal.gerarFinanceiroPadrao}
+              onCheckedChange={(checked) => updateSection('fiscal', { gerarFinanceiroPadrao: checked })}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Bloco 3 — Contexto de aplicação */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-start gap-3">
+            <Globe className="mt-0.5 h-5 w-5 text-muted-foreground shrink-0" />
+            <div>
+              <CardTitle>Contexto de aplicação</CardTitle>
+              <CardDescription>
+                Padrões fiscais globais usados como base em documentos de entrada, saída e integrações com financeiro.
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Esta configuração impacta</p>
+            <ul className="grid gap-1 sm:grid-cols-2">
+              {[
+                'Documentos de venda e saída fiscal',
+                'Documentos de compra e entrada fiscal',
+                'Lançamentos gerados a partir de notas fiscais',
+                'Integração automática com financeiro',
+                'Comportamento padrão em novos cadastros',
+                'Classificação inicial de produtos sem NCM',
+              ].map((item) => (
+                <li key={item} className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <span className="h-1.5 w-1.5 rounded-full bg-primary shrink-0" />
+                  {item}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <Separator />
+          <p className="text-xs text-muted-foreground">
+            Esses valores servem como configuração inicial e podem futuramente ser complementados por parametrizações específicas por produto, tipo de documento ou operação.
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* Bloco 4 — Governança e uso no sistema */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-start gap-3">
+            <Calendar className="mt-0.5 h-5 w-5 text-muted-foreground shrink-0" />
+            <div>
+              <CardTitle>Governança e uso no sistema</CardTitle>
+              <CardDescription>Rastreabilidade desta configuração e visibilidade do seu alcance nos fluxos do ERP.</CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="rounded-md border bg-muted/30 p-3 space-y-0.5">
+              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Última atualização</p>
+              <p className="text-sm font-medium">
+                {fiscalLastSaved.at
+                  ? new Date(fiscalLastSaved.at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
+                  : '—'}
+              </p>
+            </div>
+            <div className="rounded-md border bg-muted/30 p-3 space-y-0.5">
+              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Alterado por</p>
+              <p className="text-sm font-medium">{fiscalLastSaved.by ?? '—'}</p>
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Alterações nesta seção impactam o comportamento padrão de documentos futuros, parametrizações do sistema e a integração com o módulo financeiro. Revise com atenção antes de salvar.
+          </p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+
   const renderContent = () => {
     switch (activeSection) {
       case 'empresa':
@@ -863,24 +1085,7 @@ export default function Administracao() {
         return renderEmail();
 
       case 'fiscal':
-        return (
-          <Card>
-            <CardHeader>
-              <CardTitle>Parâmetros fiscais</CardTitle>
-              <CardDescription>Valores padrão para documentos de compra e venda.</CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2"><Label>CFOP padrão venda</Label><Input value={config.fiscal.cfopPadraoVenda} onChange={(e) => updateSection('fiscal', { cfopPadraoVenda: e.target.value })} /></div>
-              <div className="space-y-2"><Label>CFOP padrão compra</Label><Input value={config.fiscal.cfopPadraoCompra} onChange={(e) => updateSection('fiscal', { cfopPadraoCompra: e.target.value })} /></div>
-              <div className="space-y-2"><Label>CST padrão</Label><Input value={config.fiscal.cstPadrao} onChange={(e) => updateSection('fiscal', { cstPadrao: e.target.value })} /></div>
-              <div className="space-y-2"><Label>NCM padrão</Label><Input value={config.fiscal.ncmPadrao} onChange={(e) => updateSection('fiscal', { ncmPadrao: e.target.value })} /></div>
-              <div className="md:col-span-2 flex items-center justify-between rounded-lg border p-4">
-                <div><p className="font-medium">Gerar financeiro por padrão</p><p className="text-sm text-muted-foreground">Flag padrão em notas fiscais.</p></div>
-                <Switch checked={config.fiscal.gerarFinanceiroPadrao} onCheckedChange={(checked) => updateSection('fiscal', { gerarFinanceiroPadrao: checked })} />
-              </div>
-            </CardContent>
-          </Card>
-        );
+        return renderFiscal();
 
       case 'financeiro':
         return (
