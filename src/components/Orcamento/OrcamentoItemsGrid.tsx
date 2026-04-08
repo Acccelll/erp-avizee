@@ -33,6 +33,17 @@ export interface OrcamentoItem {
   cost_source?: "ultimo_custo_compra" | "custo_medio" | "custo_manual_cotacao" | "custo_produto";
   custo_manual_unitario?: number;
   observacao_interna_margem?: string;
+  custo_base_padrao?: number | null;
+  usa_custo_simulado?: boolean;
+  custo_simulado?: number | null;
+  preco_simulado_unitario?: number | null;
+  desconto_simulado_percentual?: number | null;
+  outros_custos_simulados_unitario?: number | null;
+  frete_rateado_simulado_unitario?: number | null;
+  imposto_rateado_simulado_unitario?: number | null;
+  usar_cenario?: boolean;
+  origem_custo_padrao?: string | null;
+  origem_custo_analise?: string | null;
 }
 
 interface Props {
