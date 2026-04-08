@@ -95,11 +95,22 @@ export function OrcamentoItemsGrid({ items, onChange, produtos, precosEspeciais 
         return;
       }
       const prod = produtos.find((p: any) => p.id === value);
-      if (prod) {
+        if (prod) {
         item.codigo_snapshot = prod.sku || prod.codigo_interno || "";
         item.descricao_snapshot = prod.nome;
         item.unidade = prod.unidade_medida || "UN";
-        item.peso_unitario = prod.peso || 0;
+          item.peso_unitario = prod.peso || 0;
+          item.custo_base_padrao = prod.preco_custo ?? null;
+          item.usa_custo_simulado = false;
+          item.custo_simulado = null;
+          item.preco_simulado_unitario = null;
+          item.desconto_simulado_percentual = null;
+          item.outros_custos_simulados_unitario = null;
+          item.frete_rateado_simulado_unitario = null;
+          item.imposto_rateado_simulado_unitario = null;
+          item.usar_cenario = false;
+          item.origem_custo_padrao = "cadastro_produto";
+          item.origem_custo_analise = "cadastro_produto";
 
         const precoEspecial = precosEspeciais?.find((p) => p.produto_id === value);
         const precoBase = prod.preco_venda || 0;

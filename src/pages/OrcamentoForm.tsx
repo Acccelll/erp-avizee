@@ -99,6 +99,7 @@ export default function OrcamentoForm() {
   const [simPagamento, setSimPagamento] = useState('');
   const [mailModalOpen, setMailModalOpen] = useState(false);
   const [emailTemplate, setEmailTemplate] = useState('Olá, segue orçamento atualizado para sua análise.');
+  const [scenarioConfig, setScenarioConfig] = useState<RentabilidadeScenarioConfig>({});
 
   const draftKey = useMemo(() => `orcamento:draft:${id || 'novo'}:${user?.id || 'anon'}`, [id, user?.id]);
 
