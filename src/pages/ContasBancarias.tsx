@@ -92,16 +92,19 @@ const ContasBancarias = () => {
 
   // Derived summaries
   const contasAtivas = useMemo(() => contas.filter((c) => c.ativo), [contas]);
+  const contasInativas = useMemo(() => contas.length - contasAtivas.length, [contas, contasAtivas]);
   const saldoTotal = useMemo(
     () => contasAtivas.reduce((s, c) => s + Number(c.saldo_atual || 0), 0),
     [contasAtivas],
   );
 
-  // Filter options derived from loaded banks
+  // Filter options derived from loaded accounts (same source as filtering logic)
   const tipoOptions = useMemo<MultiSelectOption[]>(() => {
-    const tipos = new Set(bancos.map((b) => b.tipo).filter(Boolean));
+    const tipos = new Set(
+      contas.map((c) => c.bancos?.tipo).filter(Boolean) as string[],
+    );
     return Array.from(tipos).map((t) => ({ value: t, label: getTipoLabel(t) }));
-  }, [bancos]);
+  }, [contas]);
 
   const statusOptions: MultiSelectOption[] = [
     { label: "Ativa", value: "ativo" },
@@ -309,7 +312,7 @@ const ContasBancarias = () => {
           <>
             <StatCard title="Total de Contas" value={String(contas.length)} icon={Building2} />
             <StatCard title="Ativas" value={String(contasAtivas.length)} icon={CheckCircle} iconColor="text-success" />
-            <StatCard title="Inativas" value={String(contas.length - contasAtivas.length)} icon={Ban} />
+            <StatCard title="Inativas" value={String(contasInativas)} icon={Ban} />
             <StatCard
               title="Saldo Total"
               value={formatCurrency(saldoTotal)}
