@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { AppLayout } from '@/components/AppLayout';
 import { ModulePage } from '@/components/ModulePage';
-import { SummaryCard } from '@/components/SummaryCard';
+import { SummaryCard, type SummaryCardProps } from '@/components/SummaryCard';
+import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/StatusBadge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,22 +22,54 @@ import { formatCurrency, formatNumber, formatDate } from '@/lib/format';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 
-const reportCards: Array<{ type: TipoRelatorio; title: string; description: string; icon: typeof Package }> = [
-  { type: 'estoque', title: 'Estoque', description: 'Posição atual, custo e alertas', icon: Package },
-  { type: 'estoque_minimo', title: 'Estoque Mínimo', description: 'Produtos abaixo do estoque mínimo', icon: AlertTriangle },
-  { type: 'movimentos_estoque', title: 'Movimentos de Estoque', description: 'Entradas, saídas e ajustes por período', icon: ArrowLeftRight },
-  { type: 'financeiro', title: 'Financeiro', description: 'Contas a pagar e receber', icon: Wallet },
-  { type: 'fluxo_caixa', title: 'Fluxo de Caixa', description: 'Entradas, saídas e saldo', icon: TrendingUp },
-  { type: 'vendas', title: 'Vendas', description: 'Ordens por período e faturamento', icon: ShoppingCart },
-  { type: 'faturamento', title: 'Faturamento', description: 'NFs de saída confirmadas com impostos e receita líquida', icon: Receipt },
-  { type: 'vendas_cliente', title: 'Vendas/Cliente', description: 'Ranking de clientes por volume', icon: ShoppingCart },
-  { type: 'compras', title: 'Compras', description: 'Consolidado por fornecedor', icon: Truck },
-  { type: 'compras_fornecedor', title: 'Compras/Fornecedor', description: 'Ranking de fornecedores por volume', icon: Truck },
-  { type: 'aging', title: 'Aging', description: 'Vencidos por faixa de dias', icon: CalendarClock },
-  { type: 'dre', title: 'DRE', description: 'Demonstrativo de resultado', icon: BarChart3 },
-  { type: 'curva_abc', title: 'Curva ABC', description: 'Classificação de produtos por faturamento', icon: TrendingUp },
-  { type: 'margem_produtos', title: 'Margem', description: 'Análise de margem por produto', icon: DollarSign },
-  { type: 'divergencias', title: 'Divergências', description: 'Pedidos sem NF, NF sem financeiro', icon: AlertTriangle },
+type ReportCard = { type: TipoRelatorio; title: string; description: string; icon: typeof Package };
+
+const reportGroups: Array<{ label: string; icon: typeof Package; reports: ReportCard[] }> = [
+  {
+    label: 'Comercial',
+    icon: ShoppingCart,
+    reports: [
+      { type: 'vendas', title: 'Vendas', description: 'Ordens por período e faturamento', icon: ShoppingCart },
+      { type: 'vendas_cliente', title: 'Vendas/Cliente', description: 'Ranking de clientes por volume', icon: ShoppingCart },
+      { type: 'faturamento', title: 'Faturamento', description: 'NFs de saída confirmadas com impostos', icon: Receipt },
+    ],
+  },
+  {
+    label: 'Financeiro',
+    icon: Wallet,
+    reports: [
+      { type: 'financeiro', title: 'Financeiro', description: 'Contas a pagar e receber', icon: Wallet },
+      { type: 'fluxo_caixa', title: 'Fluxo de Caixa', description: 'Entradas, saídas e saldo', icon: TrendingUp },
+      { type: 'aging', title: 'Aging', description: 'Vencidos por faixa de dias', icon: CalendarClock },
+      { type: 'dre', title: 'DRE', description: 'Demonstrativo de resultado', icon: BarChart3 },
+    ],
+  },
+  {
+    label: 'Estoque / Suprimentos',
+    icon: Package,
+    reports: [
+      { type: 'estoque', title: 'Estoque', description: 'Posição atual, custo e alertas', icon: Package },
+      { type: 'estoque_minimo', title: 'Estoque Mínimo', description: 'Produtos abaixo do mínimo', icon: AlertTriangle },
+      { type: 'movimentos_estoque', title: 'Movimentos', description: 'Entradas, saídas e ajustes por período', icon: ArrowLeftRight },
+      { type: 'compras', title: 'Compras', description: 'Consolidado por fornecedor', icon: Truck },
+      { type: 'compras_fornecedor', title: 'Compras/Fornecedor', description: 'Ranking de fornecedores', icon: Truck },
+    ],
+  },
+  {
+    label: 'Gerencial',
+    icon: BarChart3,
+    reports: [
+      { type: 'curva_abc', title: 'Curva ABC', description: 'Classificação por faturamento', icon: TrendingUp },
+      { type: 'margem_produtos', title: 'Margem', description: 'Análise de margem por produto', icon: DollarSign },
+    ],
+  },
+  {
+    label: 'Integridade',
+    icon: AlertTriangle,
+    reports: [
+      { type: 'divergencias', title: 'Divergências', description: 'Pedidos sem NF, NF sem financeiro', icon: AlertTriangle },
+    ],
+  },
 ];
 
 const CHART_COLORS = [
@@ -46,6 +80,9 @@ const CHART_COLORS = [
   "hsl(0 84% 60%)",
   "hsl(262 83% 58%)",
 ];
+
+const STATUS_KEYS = new Set(['status', 'situacao', 'faturamento']);
+const MONETARY_KEYS = ['valor', 'custo', 'venda', 'total', 'receita', 'imposto', 'frete', 'desconto', 'lucro', 'ticket', 'saldo', 'bruto', 'liquido', 'reposicao', 'margem', 'markup'];
 
 function buildPdf(resultado: RelatorioResultado, dataInicio: string, dataFim: string) {
   return import('jspdf').then(({ default: jsPDF }) => {
@@ -192,25 +229,175 @@ export default function Relatorios() {
   const isQtyReport = resultado._isQuantityReport === true;
   const isDreReport = resultado._isDreReport === true;
 
-  const kpis = useMemo(() => {
-    const rows = resultado.rows as Record<string, unknown>[];
-    const total = rows.length;
-    const chartData = resultado.chartData || [];
-    const totalValue = chartData.reduce((s, c) => s + (c.value || 0), 0);
-    const alertCount = tipo === 'estoque'
-      ? rows.filter((r) => r.situacao !== "OK").length
-      : tipo === 'financeiro'
-      ? rows.filter((r) => r.status === "vencido").length
-      : 0;
-    return { total, totalValue, alertCount };
-  }, [resultado, tipo]);
+  function buildKpis(tipoRel: TipoRelatorio, res: RelatorioResultado): SummaryCardProps[] {
+    const rows = res.rows as Record<string, unknown>[];
+    const totals = res.totals || {};
+    const chartData = res.chartData || [];
+
+    switch (tipoRel) {
+      case 'estoque': {
+        const alertas = rows.filter((r) => r.situacao !== 'OK').length;
+        return [
+          { title: 'Total de Itens', value: formatNumber(rows.length), icon: Package },
+          { title: 'Valor em Estoque', value: formatCurrency(totals.totalCusto ?? 0), icon: DollarSign, variant: 'info' },
+          { title: 'Abaixo do Mínimo', value: String(alertas), icon: AlertTriangle, variant: alertas > 0 ? 'danger' : 'default', variationType: alertas > 0 ? 'negative' : 'neutral', variation: alertas > 0 ? 'reposição necessária' : 'estoque OK' },
+        ];
+      }
+      case 'estoque_minimo':
+        return [
+          { title: 'Itens Críticos', value: formatNumber(rows.length), icon: AlertTriangle, variant: rows.length > 0 ? 'danger' : 'default', variationType: rows.length > 0 ? 'negative' : 'neutral', variation: 'abaixo do mínimo' },
+          { title: 'Custo de Reposição', value: formatCurrency(totals.custoTotal ?? 0), icon: DollarSign, variant: 'warning' },
+        ];
+      case 'movimentos_estoque':
+        return [
+          { title: 'Movimentos', value: formatNumber(rows.length), icon: ArrowLeftRight },
+          { title: 'Entradas', value: formatNumber(totals.totalEntradas ?? 0), icon: TrendingUp, variant: 'success' },
+          { title: 'Saídas', value: formatNumber(totals.totalSaidas ?? 0), icon: Package, variant: 'warning' },
+        ];
+      case 'financeiro': {
+        const receber = chartData.find((c) => c.name === 'Receber')?.value ?? 0;
+        const pagar = chartData.find((c) => c.name === 'Pagar')?.value ?? 0;
+        const vencidos = rows.filter((r) => r.status === 'vencido').length;
+        return [
+          { title: 'A Receber', value: formatCurrency(receber), icon: TrendingUp, variant: 'success' },
+          { title: 'A Pagar', value: formatCurrency(pagar), icon: Wallet, variant: 'danger' },
+          { title: 'Vencidos', value: String(vencidos), icon: AlertTriangle, variant: vencidos > 0 ? 'danger' : 'default', variationType: vencidos > 0 ? 'negative' : 'neutral', variation: vencidos > 0 ? 'títulos vencidos' : 'sem vencidos' },
+        ];
+      }
+      case 'fluxo_caixa': {
+        const sf = totals.saldoFinal ?? 0;
+        return [
+          { title: 'Total Entradas', value: formatCurrency(totals.totalEntradas ?? 0), icon: TrendingUp, variant: 'success' },
+          { title: 'Total Saídas', value: formatCurrency(totals.totalSaidas ?? 0), icon: Wallet, variant: 'danger' },
+          { title: 'Saldo Final', value: formatCurrency(sf), icon: DollarSign, variant: sf >= 0 ? 'success' : 'danger', variationType: sf >= 0 ? 'positive' : 'negative', variation: sf >= 0 ? 'saldo positivo' : 'saldo negativo' },
+        ];
+      }
+      case 'vendas': {
+        const totalVendas = rows.reduce((s, r) => s + Number(r.valor ?? 0), 0);
+        const ticket = rows.length > 0 ? totalVendas / rows.length : 0;
+        return [
+          { title: 'Pedidos', value: formatNumber(rows.length), icon: ShoppingCart },
+          { title: 'Valor Total', value: formatCurrency(totalVendas), icon: DollarSign, variant: 'info' },
+          { title: 'Ticket Médio', value: formatCurrency(ticket), icon: TrendingUp },
+        ];
+      }
+      case 'faturamento':
+        return [
+          { title: 'NFs Emitidas', value: formatNumber(rows.length), icon: Receipt },
+          { title: 'Receita Bruta', value: formatCurrency(totals.totalBruto ?? 0), icon: DollarSign, variant: 'info' },
+          { title: 'Receita Líquida', value: formatCurrency(totals.totalLiquido ?? 0), icon: TrendingUp, variant: 'success' },
+          { title: 'Impostos', value: formatCurrency(totals.totalImpostos ?? 0), icon: FileText, variant: 'warning' },
+        ];
+      case 'vendas_cliente': {
+        const totalVC = rows.reduce((s, r) => s + Number(r.valorTotal ?? 0), 0);
+        const ticketVC = rows.length > 0 ? totalVC / rows.length : 0;
+        return [
+          { title: 'Clientes', value: formatNumber(rows.length), icon: ShoppingCart },
+          { title: 'Volume Total', value: formatCurrency(totalVC), icon: DollarSign, variant: 'info' },
+          { title: 'Ticket Médio', value: formatCurrency(ticketVC), icon: TrendingUp },
+        ];
+      }
+      case 'compras': {
+        const totalCompras = rows.reduce((s, r) => s + Number(r.valor ?? 0), 0);
+        return [
+          { title: 'Pedidos', value: formatNumber(rows.length), icon: Truck },
+          { title: 'Valor Total', value: formatCurrency(totalCompras), icon: DollarSign, variant: 'info' },
+        ];
+      }
+      case 'compras_fornecedor': {
+        const totalCF = rows.reduce((s, r) => s + Number(r.valorTotal ?? 0), 0);
+        const ticketCF = rows.length > 0 ? totalCF / rows.length : 0;
+        return [
+          { title: 'Fornecedores', value: formatNumber(rows.length), icon: Truck },
+          { title: 'Volume Total', value: formatCurrency(totalCF), icon: DollarSign, variant: 'info' },
+          { title: 'Ticket Médio', value: formatCurrency(ticketCF), icon: TrendingUp },
+        ];
+      }
+      case 'aging': {
+        const vencidosAging = rows.filter((r) => r.faixa !== 'A vencer').length;
+        const critico = rows.filter((r) => r.faixa === '90+ dias').reduce((s, r) => s + Number(r.valor ?? 0), 0);
+        return [
+          { title: 'Títulos Vencidos', value: formatNumber(vencidosAging), icon: CalendarClock, variant: vencidosAging > 0 ? 'danger' : 'default' },
+          { title: 'Valor Total', value: formatCurrency(totals.totalValor ?? 0), icon: DollarSign, variant: 'warning' },
+          { title: 'Crítico (90+ dias)', value: formatCurrency(critico), icon: AlertTriangle, variant: critico > 0 ? 'danger' : 'default' },
+        ];
+      }
+      case 'dre': {
+        const rb = totals.receitaBruta ?? 0;
+        const rl = totals.receitaLiquida ?? 0;
+        const resul = totals.resultado ?? 0;
+        return [
+          { title: 'Receita Bruta', value: formatCurrency(rb), icon: TrendingUp, variant: 'info' },
+          { title: 'Receita Líquida', value: formatCurrency(rl), icon: DollarSign, variant: rl >= 0 ? 'success' : 'danger' },
+          { title: 'Resultado', value: formatCurrency(resul), icon: BarChart3, variant: resul >= 0 ? 'success' : 'danger', variationType: resul >= 0 ? 'positive' : 'negative', variation: resul >= 0 ? 'lucro' : 'prejuízo' },
+        ];
+      }
+      case 'curva_abc': {
+        const classA = rows.filter((r) => r.classe === 'A').length;
+        return [
+          { title: 'Produtos', value: formatNumber(rows.length), icon: Package },
+          { title: 'Faturamento Total', value: formatCurrency(totals.grandTotal ?? 0), icon: DollarSign, variant: 'info' },
+          { title: 'Classe A', value: formatNumber(classA), icon: TrendingUp, variant: 'success', variation: 'itens estratégicos' },
+        ];
+      }
+      case 'margem_produtos': {
+        const media = totals.mediaMargemPct ?? 0;
+        return [
+          { title: 'Produtos', value: formatNumber(rows.length), icon: Package },
+          { title: 'Margem Média', value: `${media}%`, icon: TrendingUp, variant: media > 0 ? 'success' : 'danger' },
+        ];
+      }
+      case 'divergencias': {
+        const pedSemNf = rows.filter((r) => r.tipo === 'Pedido s/ NF').length;
+        const nfSemFin = rows.filter((r) => r.tipo === 'NF s/ Financeiro').length;
+        return [
+          { title: 'Total Divergências', value: formatNumber(rows.length), icon: AlertTriangle, variant: rows.length > 0 ? 'danger' : 'default' },
+          { title: 'Pedidos s/ NF', value: formatNumber(pedSemNf), icon: FileText, variant: pedSemNf > 0 ? 'warning' : 'default' },
+          { title: 'NF s/ Financeiro', value: formatNumber(nfSemFin), icon: Wallet, variant: nfSemFin > 0 ? 'warning' : 'default' },
+        ];
+      }
+      default:
+        return [{ title: 'Registros', value: formatNumber(rows.length), icon: Hash }];
+    }
+  }
 
   const columns = useMemo(() => {
     if (!resultado.rows.length) return [];
     return Object.keys(resultado.rows[0]).map((key) => ({
       key,
       label: key.replace(/([A-Z])/g, ' $1').replace(/^./, (char) => char.toUpperCase()),
-      render: (item: Record<string, unknown>): React.ReactNode => formatCellValue(item[key], key, isQtyReport) as React.ReactNode,
+      render: (item: Record<string, unknown>): React.ReactNode => {
+        const value = item[key];
+
+        if (STATUS_KEYS.has(key) && typeof value === 'string') {
+          return <StatusBadge status={value} />;
+        }
+
+        if (key === 'classe' && typeof value === 'string') {
+          const classColors: Record<string, string> = {
+            A: 'bg-success/10 text-success border-success/20',
+            B: 'bg-warning/10 text-warning border-warning/20',
+            C: 'bg-muted text-muted-foreground border-muted',
+          };
+          return (
+            <Badge variant="outline" className={`text-xs font-semibold ${classColors[value] ?? 'bg-muted text-muted-foreground'}`}>
+              {value}
+            </Badge>
+          );
+        }
+
+        const formatted = formatCellValue(value, key, isQtyReport);
+
+        if (typeof value === 'number' && !isQtyReport) {
+          const lower = key.toLowerCase();
+          const isMonetary = MONETARY_KEYS.some((k) => lower.includes(k));
+          if (isMonetary) {
+            return <span className="block w-full text-right font-mono">{formatted as React.ReactNode}</span>;
+          }
+        }
+
+        return formatted as React.ReactNode;
+      },
     }));
   }, [resultado.rows, isQtyReport]);
 
@@ -278,40 +465,69 @@ export default function Relatorios() {
     <AppLayout>
       <ModulePage title="Relatórios" subtitle="Análises gerenciais, exportações e visão consolidada por módulo.">
         <div className="space-y-6">
-          {/* Report type selector */}
-          <div className="grid gap-3 grid-cols-2 md:grid-cols-4 xl:grid-cols-8">
-            {reportCards.map((card) => (
-              <button
-                key={card.type}
-                onClick={() => handleSelectTipo(card.type)}
-                className={`rounded-xl border p-4 text-left transition-all hover:-translate-y-0.5 hover:border-primary/30 ${
-                  tipo === card.type ? 'border-primary bg-primary/5 shadow-sm ring-1 ring-primary/20' : 'bg-card'
-                }`}
-              >
-                <div className="flex items-center gap-3 mb-2">
-                  <div className={`rounded-lg p-2 ${tipo === card.type ? 'bg-primary/20' : 'bg-muted'}`}>
-                    <card.icon className={`h-4 w-4 ${tipo === card.type ? 'text-primary' : 'text-muted-foreground'}`} />
-                  </div>
-                  {tipo === card.type && <BarChart3 className="h-3.5 w-3.5 text-primary ml-auto" />}
+          {/* Report type selector — grouped by business area */}
+          <div className="space-y-4">
+            {reportGroups.map((group) => (
+              <div key={group.label}>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                  <group.icon className="h-3.5 w-3.5" />
+                  {group.label}
+                </p>
+                <div className="grid gap-2 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+                  {group.reports.map((card) => (
+                    <button
+                      key={card.type}
+                      onClick={() => handleSelectTipo(card.type)}
+                      className={`rounded-xl border p-4 text-left transition-all hover:-translate-y-0.5 hover:border-primary/30 ${
+                        tipo === card.type ? 'border-primary bg-primary/5 shadow-sm ring-1 ring-primary/20' : 'bg-card'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className={`rounded-lg p-2 ${tipo === card.type ? 'bg-primary/20' : 'bg-muted'}`}>
+                          <card.icon className={`h-4 w-4 ${tipo === card.type ? 'text-primary' : 'text-muted-foreground'}`} />
+                        </div>
+                        {tipo === card.type && <BarChart3 className="h-3.5 w-3.5 text-primary ml-auto" />}
+                      </div>
+                      <p className="text-sm font-semibold">{card.title}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{card.description}</p>
+                    </button>
+                  ))}
                 </div>
-                <p className="text-sm font-semibold">{card.title}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">{card.description}</p>
-              </button>
+              </div>
             ))}
           </div>
 
-          {/* KPI Summary */}
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-            <SummaryCard title="Registros" value={formatNumber(kpis.total)} icon={Hash} variationType="neutral" variation="no relatório" />
-            <SummaryCard title={isQtyReport ? "Total Movimentado" : "Valor Consolidado"} value={isQtyReport ? formatNumber(kpis.totalValue) : formatCurrency(kpis.totalValue)} icon={isQtyReport ? Package : DollarSign} variationType="neutral" variation={isQtyReport ? "soma das quantidades" : "soma do gráfico"} />
-            {kpis.alertCount > 0 && (
-              <SummaryCard title="Alertas" value={String(kpis.alertCount)} icon={AlertTriangle} variationType="negative" variation={tipo === 'estoque' ? 'abaixo do mínimo' : 'vencidos'} />
-            )}
+          {/* KPI Summary — contextual per report type */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {buildKpis(tipo, resultado).map((kpi, i) => (
+              <SummaryCard key={i} {...kpi} loading={loading} />
+            ))}
           </div>
 
           {/* Filters */}
           <Card>
             <CardContent className="pt-5 pb-4">
+              {/* Period shortcuts */}
+              {tipo !== 'dre' && (
+                <div className="flex flex-wrap gap-1 mb-3">
+                  {[
+                    { label: 'Hoje', fn: () => { const d = new Date().toISOString().slice(0, 10); setDataInicio(d); setDataFim(d); } },
+                    { label: 'Este mês', fn: () => { const n = new Date(); setDataInicio(`${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-01`); setDataFim(new Date(n.getFullYear(), n.getMonth() + 1, 0).toISOString().slice(0, 10)); } },
+                    { label: 'Mês anterior', fn: () => { const n = new Date(); const m = n.getMonth() === 0 ? 11 : n.getMonth() - 1; const y = n.getMonth() === 0 ? n.getFullYear() - 1 : n.getFullYear(); setDataInicio(`${y}-${String(m + 1).padStart(2, '0')}-01`); setDataFim(new Date(y, m + 1, 0).toISOString().slice(0, 10)); } },
+                    { label: 'Este ano', fn: () => { const y = new Date().getFullYear(); setDataInicio(`${y}-01-01`); setDataFim(`${y}-12-31`); } },
+                  ].map(({ label, fn }) => (
+                    <button key={label} type="button" onClick={fn} className="text-xs px-2 py-0.5 rounded border border-border bg-muted/50 hover:bg-muted transition-colors">
+                      {label}
+                    </button>
+                  ))}
+                  {(dataInicio || dataFim) && (
+                    <button type="button" onClick={() => { setDataInicio(''); setDataFim(''); }} className="text-xs px-2 py-0.5 rounded text-muted-foreground hover:text-foreground transition-colors">
+                      ✕ Limpar
+                    </button>
+                  )}
+                </div>
+              )}
+
               <div className="flex flex-wrap items-end gap-4">
                 <div className="space-y-1.5">
                   <Label className="text-xs">Data inicial</Label>
@@ -321,12 +537,8 @@ export default function Relatorios() {
                   <Label className="text-xs">Data final</Label>
                   <Input type="date" value={dataFim} onChange={(e) => setDataFim(e.target.value)} className="h-9 w-[160px]" />
                 </div>
-                <div className="flex flex-wrap gap-2 ml-auto">
+                <div className="ml-auto">
                   <Button variant="outline" size="sm" onClick={loadData} className="gap-1.5"><RefreshCcw className="h-3.5 w-3.5" />Atualizar</Button>
-                  <Button variant="outline" size="sm" onClick={() => setPreviewOpen(true)} disabled={!resultado.rows.length} className="gap-1.5"><Eye className="h-3.5 w-3.5" />Visualizar</Button>
-                  <Button variant="outline" size="sm" onClick={handleExportPdf} className="gap-1.5"><FileText className="h-3.5 w-3.5" />PDF</Button>
-                  <Button variant="outline" size="sm" onClick={handleExportXlsx} disabled={!resultado.rows.length} className="gap-1.5"><FileSpreadsheet className="h-3.5 w-3.5" />Excel</Button>
-                  <Button size="sm" onClick={handleExportCsv} className="gap-1.5"><Download className="h-3.5 w-3.5" />CSV</Button>
                 </div>
               </div>
 
@@ -431,9 +643,17 @@ export default function Relatorios() {
           {/* Report + Chart */}
           <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
             <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base">{resultado.title || 'Relatório'}</CardTitle>
-                <CardDescription>{resultado.subtitle}</CardDescription>
+              <CardHeader className="pb-3 flex flex-row items-start gap-2">
+                <div className="min-w-0 flex-1">
+                  <CardTitle className="text-base">{resultado.title || 'Relatório'}</CardTitle>
+                  <CardDescription>{resultado.subtitle}</CardDescription>
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  <Button variant="ghost" size="sm" onClick={() => setPreviewOpen(true)} disabled={!resultado.rows.length} className="gap-1.5 text-xs h-8"><Eye className="h-3.5 w-3.5" />Visualizar</Button>
+                  <Button variant="ghost" size="sm" onClick={handleExportPdf} className="gap-1.5 text-xs h-8"><FileText className="h-3.5 w-3.5" />PDF</Button>
+                  <Button variant="ghost" size="sm" onClick={handleExportXlsx} disabled={!resultado.rows.length} className="gap-1.5 text-xs h-8"><FileSpreadsheet className="h-3.5 w-3.5" />Excel</Button>
+                  <Button variant="ghost" size="sm" onClick={handleExportCsv} className="gap-1.5 text-xs h-8"><Download className="h-3.5 w-3.5" />CSV</Button>
+                </div>
               </CardHeader>
               <CardContent className="p-0">
                 {isDreReport ? (
@@ -583,7 +803,7 @@ export default function Relatorios() {
                 {resultado.totals.resultado != null && <span className={`font-semibold ${resultado.totals.resultado >= 0 ? 'text-success' : 'text-destructive'}`}>Resultado: {formatCurrency(resultado.totals.resultado)}</span>}
               </div>
             )}
-            {!resultado.totals && kpis.totalValue > 0 && <span className="font-semibold text-foreground">Valor consolidado: {formatCurrency(kpis.totalValue)}</span>}
+            {!resultado.totals && (resultado.chartData ?? []).reduce((s, c) => s + c.value, 0) > 0 && <span className="font-semibold text-foreground">Valor consolidado: {formatCurrency((resultado.chartData ?? []).reduce((s, c) => s + c.value, 0))}</span>}
           </div>
         </div>
       </PreviewModal>
