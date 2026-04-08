@@ -156,9 +156,8 @@ export const navSections: NavSection[] = [
       {
         title: 'Documentos fiscais',
         items: [
-          { title: 'Notas de Entrada', path: '/fiscal?tipo=entrada' },
-          { title: 'Notas de Saída', path: '/fiscal?tipo=saida' },
-          { title: 'Consultar NF-e', path: '/fiscal?view=consulta', keywords: ['sefaz', 'chave', 'nfe'] },
+          { title: 'Notas de Entrada', path: '/fiscal?tipo=entrada', keywords: ['recebimento', 'fornecedor', 'compra', 'xml', 'chave', 'nfe'] },
+          { title: 'Notas de Saída', path: '/fiscal?tipo=saida', keywords: ['faturamento', 'cliente', 'pedido', 'emissao', 'sefaz', 'nfe'] },
         ],
       },
     ],

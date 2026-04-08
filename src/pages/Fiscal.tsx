@@ -304,7 +304,6 @@ const Fiscal = () => {
   };
 
   const tipoParam = searchParams.get("tipo");
-  const viewParam = searchParams.get("view");
   const filteredData = useMemo(() => {
     const query = consultaSearch.trim().toLowerCase();
     return data.filter((n) => {
@@ -312,12 +311,12 @@ const Fiscal = () => {
       if (tipoFilters.length > 0 && !tipoFilters.includes(n.tipo)) return false;
       if (modeloFilters.length > 0 && !modeloFilters.includes(n.modelo_documento || "55")) return false;
       if (statusFilters.length > 0 && !statusFilters.includes(n.status)) return false;
-      if (viewParam !== "consulta" || !query) return true;
+      if (!query) return true;
       const parceiro = n.tipo === "entrada" ? n.fornecedores?.nome_razao_social : n.clientes?.nome_razao_social;
       const haystack = [n.numero, n.serie, n.chave_acesso, parceiro, n.ordens_venda?.numero].filter(Boolean).join(" ").toLowerCase();
       return haystack.includes(query);
     });
-  }, [consultaSearch, data, tipoParam, viewParam, modeloFilters, statusFilters, tipoFilters]);
+  }, [consultaSearch, data, tipoParam, modeloFilters, statusFilters, tipoFilters]);
 
   const fiscalActiveFilters = useMemo(() => {
     const chips: FilterChip[] = [];
@@ -337,9 +336,8 @@ const Fiscal = () => {
   const modeloOptions: MultiSelectOption[] = Object.entries(modeloLabels).map(([v, l]) => ({ label: l, value: v }));
   const statusOptions: MultiSelectOption[] = [{ label: "Pendente", value: "pendente" }, { label: "Confirmada", value: "confirmada" }, { label: "Cancelada", value: "cancelada" }];
 
-  const fiscalSubtitle = viewParam === "consulta"
-    ? "Consulta rápida de documentos fiscais e chaves de acesso"
-    : tipoParam === "entrada" ? "Notas fiscais de entrada e documentos de recebimento"
+  const fiscalSubtitle = tipoParam === "entrada"
+    ? "Notas fiscais de entrada e documentos de recebimento"
     : tipoParam === "saida" ? "Notas fiscais de saída e faturamento"
     : "Notas fiscais, faturas e documentos";
 
@@ -369,8 +367,8 @@ const Fiscal = () => {
         </>}
       >
         <AdvancedFilterBar
-          searchValue={viewParam === "consulta" ? consultaSearch : ""}
-          onSearchChange={viewParam === "consulta" ? setConsultaSearch : undefined}
+          searchValue={consultaSearch}
+          onSearchChange={setConsultaSearch}
           searchPlaceholder="Buscar por número, chave ou parceiro..."
           activeFilters={fiscalActiveFilters}
           onRemoveFilter={handleRemoveFiscalFilter}
