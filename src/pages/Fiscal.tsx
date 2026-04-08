@@ -3,7 +3,6 @@ import { useSearchParams } from "react-router-dom";
 import { AppLayout } from "@/components/AppLayout";
 import { ModulePage } from "@/components/ModulePage";
 import { DataTable } from "@/components/DataTable";
-import { StatusBadge } from "@/components/StatusBadge";
 import { FormModal } from "@/components/FormModal";
 import { AdvancedFilterBar } from "@/components/AdvancedFilterBar";
 import type { FilterChip } from "@/components/AdvancedFilterBar";
@@ -22,6 +21,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { FileText, DollarSign, CheckCircle, Clock } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { parseNFeXml, type NFeData } from "@/lib/nfeXmlParser";
 import { DanfeViewer } from "@/components/DanfeViewer";
 import { DevolucaoDialog } from "@/components/fiscal/DevolucaoDialog";
@@ -334,31 +334,130 @@ const Fiscal = () => {
 
   const tipoOptions: MultiSelectOption[] = [{ label: "Entrada", value: "entrada" }, { label: "Saída", value: "saida" }];
   const modeloOptions: MultiSelectOption[] = Object.entries(modeloLabels).map(([v, l]) => ({ label: l, value: v }));
-  const statusOptions: MultiSelectOption[] = [{ label: "Pendente", value: "pendente" }, { label: "Confirmada", value: "confirmada" }, { label: "Cancelada", value: "cancelada" }];
+  const statusOptions: MultiSelectOption[] = [
+    { label: "Pendente", value: "pendente" },
+    { label: "Importada", value: "importada" },
+    { label: "Confirmada", value: "confirmada" },
+    { label: "Cancelada", value: "cancelada" },
+  ];
 
-  const fiscalSubtitle = tipoParam === "entrada"
-    ? "Notas fiscais de entrada e documentos de recebimento"
-    : tipoParam === "saida" ? "Notas fiscais de saída e faturamento"
-    : "Notas fiscais, faturas e documentos";
+  const tipoConfig = tipoParam === "entrada"
+    ? { title: "Notas de Entrada", subtitle: "Central de conferência e recebimento fiscal", addLabel: "Nova NF de Entrada", moduleKey: "notas-entrada", parceiroLabel: "Fornecedor" }
+    : tipoParam === "saida"
+    ? { title: "Notas de Saída", subtitle: "Notas fiscais de saída e faturamento", addLabel: "Nova NF de Saída", moduleKey: "notas-saida", parceiroLabel: "Cliente" }
+    : { title: "Fiscal", subtitle: "Notas fiscais, faturas e documentos", addLabel: "Nova NF", moduleKey: "notas-fiscais", parceiroLabel: "Parceiro" };
+
+  const fiscalStatusMap: Record<string, { label: string; className: string }> = {
+    pendente:  { label: "Pendente",   className: "bg-warning/10 text-warning border-warning/20" },
+    confirmada:{ label: "Confirmada", className: "bg-success/10 text-success border-success/20" },
+    cancelada: { label: "Cancelada",  className: "bg-destructive/10 text-destructive border-destructive/20" },
+    importada: { label: "Importada",  className: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-800" },
+  };
+
+  const renderFiscalStatus = (n: NotaFiscal) => {
+    const cfg = fiscalStatusMap[n.status] ?? { label: n.status, className: "bg-muted text-muted-foreground border-muted" };
+    return (
+      <Badge variant="outline" className={`text-xs font-medium ${cfg.className}`}>
+        {cfg.label}
+      </Badge>
+    );
+  };
+
+  const parceiroLabel = tipoConfig.parceiroLabel;
 
   const columns = [
-    { key: "tipo", label: "Tipo", render: (n: NotaFiscal) => n.tipo === "entrada" ? "Entrada" : "Saída" },
-    { key: "modelo", label: "Modelo", render: (n: NotaFiscal) => <span className="text-xs font-mono font-medium">{modeloLabels[n.modelo_documento || '55'] || n.modelo_documento}</span> },
-    { key: "numero", label: "Número", render: (n: NotaFiscal) => <span className="font-mono text-xs font-medium text-primary">{n.numero}</span> },
-    { key: "parceiro", label: "Parceiro", render: (n: NotaFiscal) => n.tipo === "entrada" ? n.fornecedores?.nome_razao_social || "—" : n.clientes?.nome_razao_social || "—" },
-    { key: "ov", label: "Pedido", render: (n: NotaFiscal) => n.ordens_venda?.numero ? <span className="font-mono text-xs">{n.ordens_venda.numero}</span> : "—" },
-    { key: "data_emissao", label: "Emissão", render: (n: NotaFiscal) => formatDate(n.data_emissao) },
-    { key: "valor_total", label: "Total", render: (n: NotaFiscal) => <span className="font-semibold font-mono">{formatCurrency(Number(n.valor_total))}</span> },
-    { key: "operacao", label: "Operação", render: (n: NotaFiscal) => {
-      if ((n.tipo_operacao || "normal") === "devolucao") return <span className="text-xs text-warning font-medium">Devolução</span>;
-      return <span className="text-xs text-muted-foreground">Normal</span>;
-    }},
-    { key: "status", label: "Status", render: (n: NotaFiscal) => <StatusBadge status={n.status} /> },
+    {
+      key: "numero",
+      label: "Nº Nota",
+      render: (n: NotaFiscal) => (
+        <span className="font-mono text-sm font-bold text-primary">{n.numero}</span>
+      ),
+    },
+    {
+      key: "parceiro",
+      label: parceiroLabel,
+      render: (n: NotaFiscal) => (
+        <span className="font-medium">
+          {n.tipo === "entrada" ? n.fornecedores?.nome_razao_social || "—" : n.clientes?.nome_razao_social || "—"}
+        </span>
+      ),
+    },
+    {
+      key: "data_emissao",
+      label: "Emissão",
+      sortable: true,
+      render: (n: NotaFiscal) => formatDate(n.data_emissao),
+    },
+    {
+      key: "status",
+      label: "Status",
+      render: renderFiscalStatus,
+    },
+    {
+      key: "valor_total",
+      label: "Total",
+      sortable: true,
+      render: (n: NotaFiscal) => (
+        <span className="font-semibold font-mono">{formatCurrency(Number(n.valor_total))}</span>
+      ),
+    },
+    {
+      key: "tipo",
+      label: "Tipo",
+      hidden: !!tipoParam,
+      render: (n: NotaFiscal) => n.tipo === "entrada" ? "Entrada" : "Saída",
+    },
+    {
+      key: "serie",
+      label: "Série",
+      hidden: true,
+      render: (n: NotaFiscal) => (
+        <span className="font-mono text-xs text-muted-foreground">{n.serie || "1"}</span>
+      ),
+    },
+    {
+      key: "modelo",
+      label: "Modelo",
+      hidden: true,
+      render: (n: NotaFiscal) => (
+        <span className="text-xs font-mono font-medium">{modeloLabels[n.modelo_documento || "55"] || n.modelo_documento}</span>
+      ),
+    },
+    {
+      key: "operacao",
+      label: "Operação",
+      hidden: true,
+      render: (n: NotaFiscal) => {
+        if ((n.tipo_operacao || "normal") === "devolucao")
+          return <span className="text-xs text-warning font-medium">Devolução</span>;
+        return <span className="text-xs text-muted-foreground">Normal</span>;
+      },
+    },
+    {
+      key: "chave_acesso",
+      label: "Chave de Acesso",
+      hidden: true,
+      render: (n: NotaFiscal) =>
+        n.chave_acesso
+          ? <span className="font-mono text-xs text-muted-foreground">
+              {n.chave_acesso.length > 12 ? `${n.chave_acesso.slice(0, 8)}…${n.chave_acesso.slice(-4)}` : n.chave_acesso}
+            </span>
+          : <span className="text-muted-foreground">—</span>,
+    },
+    {
+      key: "ov",
+      label: "Pedido Vinc.",
+      hidden: true,
+      render: (n: NotaFiscal) =>
+        n.ordens_venda?.numero
+          ? <span className="font-mono text-xs">{n.ordens_venda.numero}</span>
+          : <span className="text-muted-foreground">—</span>,
+    },
   ];
 
   return (
     <AppLayout>
-      <ModulePage title="Fiscal" subtitle={fiscalSubtitle} addLabel="Nova NF" onAdd={openCreate}
+      <ModulePage title={tipoConfig.title} subtitle={tipoConfig.subtitle} addLabel={tipoConfig.addLabel} onAdd={openCreate}
         headerActions={<>
           <input ref={xmlInputRef} type="file" accept=".xml" className="hidden" onChange={handleXmlImport} />
           <Button variant="outline" size="sm" className="gap-1.5" onClick={() => xmlInputRef.current?.click()}>
@@ -387,7 +486,15 @@ const Fiscal = () => {
           <SummaryCard title="Confirmadas" value={String(kpis.confirmadas)} icon={CheckCircle} variationType="positive" variation="processadas" />
         </div>
 
-        <DataTable columns={columns} data={filteredData} loading={loading} onView={openView} onEdit={openEdit} />
+        <DataTable
+          columns={columns}
+          data={filteredData}
+          loading={loading}
+          moduleKey={tipoConfig.moduleKey}
+          showColumnToggle={true}
+          onView={openView}
+          onEdit={openEdit}
+        />
       </ModulePage>
 
       {/* Form Modal - Create */}
