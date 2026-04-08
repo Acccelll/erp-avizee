@@ -23,7 +23,8 @@ import { MultiSelect, type MultiSelectOption } from "@/components/ui/MultiSelect
 import { toast } from "sonner";
 import { formatCurrency } from "@/lib/format";
 import { supabase } from "@/integrations/supabase/client";
-import { DollarSign, Clock, AlertTriangle, CheckCircle, CalendarClock, Download, List, CalendarDays } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { DollarSign, Clock, AlertTriangle, CheckCircle, CalendarClock, Download, List, CalendarDays, CreditCard } from "lucide-react";
 import { FinanceiroCalendar } from "@/components/financeiro/FinanceiroCalendar";
 import { BaixaParcialDialog } from "@/components/financeiro/BaixaParcialDialog";
 import { BaixaLoteModal } from "@/components/financeiro/BaixaLoteModal";
@@ -189,30 +190,35 @@ const Financeiro = () => {
       if (tipoFilters.length > 0 && !tipoFilters.includes(l.tipo)) return false;
       if (bancoFilters.length > 0 && !bancoFilters.includes(l.conta_bancaria_id || "")) return false;
       if (query) {
-        const haystack = [l.descricao, l.clientes?.nome_razao_social, l.fornecedores?.nome_razao_social].filter(Boolean).join(" ").toLowerCase();
+        const haystack = [
+          l.descricao, l.clientes?.nome_razao_social, l.fornecedores?.nome_razao_social,
+          l.forma_pagamento, l.banco, l.contas_bancarias?.descricao, l.contas_bancarias?.bancos?.nome,
+        ].filter(Boolean).join(" ").toLowerCase();
         if (!haystack.includes(query)) return false;
       }
       return true;
     });
   }, [data, statusFilters, tipoFilters, bancoFilters, searchTerm, hoje, period]);
 
+  const hojeStr = useMemo(() => hoje.toISOString().split("T")[0], [hoje]);
+
   const kpis = useMemo(() => {
-    const hojeStr = hoje.toISOString().split("T")[0];
-    let aVencer = 0, venceHoje = 0, vencido = 0, pagoNoPeriodo = 0;
-    let totalAVencer = 0, totalVencido = 0, totalPago = 0;
+    let aVencer = 0, venceHoje = 0, vencido = 0, pagoNoPeriodo = 0, parcialCount = 0;
+    let totalAVencer = 0, totalVencido = 0, totalPago = 0, totalParcial = 0;
 
     filteredData.forEach(l => {
       const val = Number(l.valor || 0);
       const es = getLancamentoStatus(l);
       if (es === "pago") { pagoNoPeriodo++; totalPago += val; }
       else if (es === "vencido") { vencido++; totalVencido += val; }
+      else if (es === "parcial") { parcialCount++; totalParcial += Number(l.saldo_restante ?? val); }
       else if (es === "aberto") {
         if (l.data_vencimento === hojeStr) venceHoje++;
         aVencer++; totalAVencer += val;
       }
     });
-    return { aVencer, venceHoje, vencido, pagoNoPeriodo, totalAVencer, totalVencido, totalPago };
-  }, [filteredData, hoje]);
+    return { aVencer, venceHoje, vencido, pagoNoPeriodo, parcialCount, totalAVencer, totalVencido, totalPago, totalParcial };
+  }, [filteredData, hoje, hojeStr]);
 
   const handleEstorno = async () => {
     if (!estornoTarget) return;
@@ -225,26 +231,123 @@ const Financeiro = () => {
   const selectedForBaixa = useMemo(() => data.filter(l => selectedIds.includes(l.id)), [data, selectedIds]);
 
   const columns = [
-    { key: "tipo", label: "Tipo", render: (l: Lancamento) => (
-      <Badge variant="outline" className={l.tipo === "receber" ? "border-success/40 text-success bg-success/5" : "border-destructive/40 text-destructive bg-destructive/5"}>
-        {l.tipo === "receber" ? "Receber" : "Pagar"}
-      </Badge>
-    )},
-    { key: "descricao", label: "Descrição", sortable: true },
-    { key: "parceiro", label: "Parceiro", render: (l: Lancamento) => l.tipo === "receber" ? l.clientes?.nome_razao_social || "—" : l.fornecedores?.nome_razao_social || "—" },
-    { key: "valor", label: "Valor", sortable: true, render: (l: Lancamento) => <span className="font-semibold mono">{formatCurrency(Number(l.valor))}</span> },
-    { key: "data_vencimento", label: "Vencimento", sortable: true, render: (l: Lancamento) => {
-      const d = new Date(l.data_vencimento);
-      const isOverdue = getLancamentoStatus(l) === "vencido";
-      const isToday = l.data_vencimento === hoje.toISOString().split("T")[0];
-      return <span className={isOverdue ? "text-destructive font-semibold" : isToday ? "text-warning font-semibold" : ""}>{d.toLocaleDateString("pt-BR")}</span>;
-    }},
-    { key: "conta_bancaria", label: "Banco/Conta", render: (l: Lancamento) => {
-      if (!l.contas_bancarias) return <span className="text-muted-foreground text-xs">—</span>;
-      return <span className="text-xs">{l.contas_bancarias.bancos?.nome} - {l.contas_bancarias.descricao}</span>;
-    }},
-    { key: "forma_pagamento", label: "Forma", render: (l: Lancamento) => l.forma_pagamento || "—" },
-    { key: "status", label: "Status", sortable: true, render: (l: Lancamento) => <StatusBadge status={getLancamentoStatus(l)} /> },
+    {
+      key: "tipo", label: "Tipo", sortable: true,
+      render: (l: Lancamento) => (
+        <Badge variant="outline" className={l.tipo === "receber" ? "border-success/40 text-success bg-success/5 whitespace-nowrap" : "border-destructive/40 text-destructive bg-destructive/5 whitespace-nowrap"}>
+          {l.tipo === "receber" ? "Receber" : "Pagar"}
+        </Badge>
+      ),
+    },
+    {
+      key: "parceiro", label: "Pessoa", sortable: true,
+      render: (l: Lancamento) => {
+        const nome = l.tipo === "receber" ? l.clientes?.nome_razao_social : l.fornecedores?.nome_razao_social;
+        if (!nome) return <span className="text-muted-foreground text-xs">—</span>;
+        return <span className="font-medium text-sm">{nome}</span>;
+      },
+    },
+    {
+      key: "descricao", label: "Descrição", sortable: true,
+      render: (l: Lancamento) => (
+        <div className="space-y-0.5">
+          <span className="text-sm">{l.descricao}</span>
+          {l.parcela_numero > 0 && (
+            <span className="text-[10px] text-muted-foreground font-mono block">
+              Parcela {l.parcela_numero}/{l.parcela_total}
+            </span>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: "data_vencimento", label: "Vencimento", sortable: true,
+      render: (l: Lancamento) => {
+        const es = getLancamentoStatus(l);
+        const isOverdue = es === "vencido";
+        const isToday = l.data_vencimento === hojeStr;
+        const [y, m, d] = l.data_vencimento.split("-").map(Number);
+        const venc = new Date(y, m - 1, d);
+        const diasAtraso = isOverdue
+          ? Math.floor((hoje.getTime() - venc.getTime()) / (1000 * 60 * 60 * 24))
+          : 0;
+        return (
+          <div className="space-y-0.5">
+            <span className={cn("text-sm", isOverdue ? "text-destructive font-semibold" : isToday ? "text-warning font-semibold" : "")}>
+              {venc.toLocaleDateString("pt-BR")}
+            </span>
+            {isOverdue && diasAtraso > 0 && (
+              <span className="text-[10px] text-destructive font-medium block">{diasAtraso}d em atraso</span>
+            )}
+            {isToday && !isOverdue && (
+              <span className="text-[10px] text-warning font-medium block">Vence hoje</span>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      key: "valor", label: "Valor Total", sortable: true,
+      render: (l: Lancamento) => (
+        <span className="font-semibold font-mono text-sm">{formatCurrency(Number(l.valor))}</span>
+      ),
+    },
+    {
+      key: "saldo_restante", label: "Saldo em Aberto",
+      render: (l: Lancamento) => {
+        const es = getLancamentoStatus(l);
+        if (es === "pago" || es === "cancelado") return <span className="text-muted-foreground text-xs">—</span>;
+        const saldo = l.saldo_restante != null ? Number(l.saldo_restante) : Number(l.valor);
+        if (saldo <= 0) return <span className="text-success text-xs font-mono font-semibold">Quitado</span>;
+        return (
+          <span className={cn("font-mono text-sm font-semibold", es === "vencido" ? "text-destructive" : es === "parcial" ? "text-warning" : "")}>
+            {formatCurrency(saldo)}
+          </span>
+        );
+      },
+    },
+    {
+      key: "status", label: "Status", sortable: true,
+      render: (l: Lancamento) => <StatusBadge status={getLancamentoStatus(l)} />,
+    },
+    {
+      key: "origem", label: "Origem", hidden: true,
+      render: (l: Lancamento) => {
+        if (l.nota_fiscal_id) return <Badge variant="outline" className="text-xs border-primary/30 text-primary bg-primary/5 whitespace-nowrap">NF Fiscal</Badge>;
+        if (l.documento_pai_id) return <Badge variant="outline" className="text-xs whitespace-nowrap">Parcelamento</Badge>;
+        return <Badge variant="outline" className="text-xs text-muted-foreground whitespace-nowrap">Manual</Badge>;
+      },
+    },
+    {
+      key: "forma_pagamento", label: "Forma Pgto", hidden: true,
+      render: (l: Lancamento) => l.forma_pagamento
+        ? <span className="text-xs">{l.forma_pagamento}</span>
+        : <span className="text-muted-foreground text-xs">—</span>,
+    },
+    {
+      key: "conta_bancaria", label: "Banco/Conta", hidden: true,
+      render: (l: Lancamento) => {
+        if (!l.contas_bancarias) return <span className="text-muted-foreground text-xs">—</span>;
+        return <span className="text-xs">{l.contas_bancarias.bancos?.nome} - {l.contas_bancarias.descricao}</span>;
+      },
+    },
+    {
+      key: "acoes_rapidas", label: "Ações", sortable: false,
+      render: (l: Lancamento) => {
+        const es = getLancamentoStatus(l);
+        const canBaixa = es !== "pago" && es !== "cancelado";
+        if (!canBaixa) return null;
+        return (
+          <Button
+            size="sm" variant="outline"
+            className="h-7 text-xs gap-1 border-primary/30 text-primary hover:bg-primary/5 whitespace-nowrap"
+            onClick={(e) => { e.stopPropagation(); setBaixaParcialTarget(l); setBaixaParcialOpen(true); }}
+          >
+            <CreditCard className="h-3 w-3" /> Baixar
+          </Button>
+        );
+      },
+    },
   ];
 
   const finActiveFilters = useMemo(() => {
@@ -284,16 +387,17 @@ const Financeiro = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4 mb-6">
           <SummaryCard title="A Vencer" value={kpis.aVencer.toString()} subtitle={formatCurrency(kpis.totalAVencer)} icon={CalendarClock} variant="info" onClick={() => setStatusFilters(["aberto"])} />
           <SummaryCard title="Vence Hoje" value={kpis.venceHoje.toString()} icon={Clock} variant="warning" />
           <SummaryCard title="Vencidos" value={kpis.vencido.toString()} subtitle={formatCurrency(kpis.totalVencido)} icon={AlertTriangle} variant="danger" onClick={() => setStatusFilters(["vencido"])} />
+          <SummaryCard title="Parcialmente Baixados" value={kpis.parcialCount.toString()} subtitle={formatCurrency(kpis.totalParcial)} icon={DollarSign} variant="info" onClick={() => setStatusFilters(["parcial"])} />
           <SummaryCard title="Pagos" value={kpis.pagoNoPeriodo.toString()} subtitle={formatCurrency(kpis.totalPago)} icon={CheckCircle} variant="success" onClick={() => setStatusFilters(["pago"])} />
         </div>
 
         <AdvancedFilterBar
           searchValue={searchTerm} onSearchChange={setSearchTerm}
-          searchPlaceholder="Buscar por descrição ou parceiro..."
+          searchPlaceholder="Buscar por descrição, pessoa, banco ou forma de pagamento..."
           activeFilters={finActiveFilters} onRemoveFilter={handleRemoveFilter}
           onClearAll={() => { setTipoFilters([]); setStatusFilters([]); setBancoFilters([]); }}
           count={filteredData.length}
@@ -315,6 +419,7 @@ const Financeiro = () => {
           <FinanceiroCalendar data={filteredData as any} />
         ) : (
           <DataTable columns={columns} data={filteredData} loading={loading}
+            moduleKey="financeiro-lancamentos" showColumnToggle={true}
             selectable selectedIds={selectedIds} onSelectionChange={setSelectedIds}
             onView={(l) => { setSelected(l); setDrawerOpen(true); }} />
         )}
