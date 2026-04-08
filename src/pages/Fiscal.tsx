@@ -341,25 +341,11 @@ const Fiscal = () => {
     { label: "Cancelada", value: "cancelada" },
   ];
 
-  const fiscalTitle = tipoParam === "entrada"
-    ? "Notas de Entrada"
-    : tipoParam === "saida" ? "Notas de Saída"
-    : "Fiscal";
-
-  const fiscalSubtitle = tipoParam === "entrada"
-    ? "Central de conferência e recebimento fiscal"
-    : tipoParam === "saida" ? "Notas fiscais de saída e faturamento"
-    : "Notas fiscais, faturas e documentos";
-
-  const fiscalAddLabel = tipoParam === "entrada"
-    ? "Nova NF de Entrada"
-    : tipoParam === "saida" ? "Nova NF de Saída"
-    : "Nova NF";
-
-  const fiscalModuleKey = tipoParam === "entrada"
-    ? "notas-entrada"
-    : tipoParam === "saida" ? "notas-saida"
-    : "notas-fiscais";
+  const tipoConfig = tipoParam === "entrada"
+    ? { title: "Notas de Entrada", subtitle: "Central de conferência e recebimento fiscal", addLabel: "Nova NF de Entrada", moduleKey: "notas-entrada", parceiroLabel: "Fornecedor" }
+    : tipoParam === "saida"
+    ? { title: "Notas de Saída", subtitle: "Notas fiscais de saída e faturamento", addLabel: "Nova NF de Saída", moduleKey: "notas-saida", parceiroLabel: "Cliente" }
+    : { title: "Fiscal", subtitle: "Notas fiscais, faturas e documentos", addLabel: "Nova NF", moduleKey: "notas-fiscais", parceiroLabel: "Parceiro" };
 
   const fiscalStatusMap: Record<string, { label: string; className: string }> = {
     pendente:  { label: "Pendente",   className: "bg-warning/10 text-warning border-warning/20" },
@@ -377,7 +363,7 @@ const Fiscal = () => {
     );
   };
 
-  const parceiroLabel = tipoParam === "entrada" ? "Fornecedor" : tipoParam === "saida" ? "Cliente" : "Parceiro";
+  const parceiroLabel = tipoConfig.parceiroLabel;
 
   const columns = [
     {
@@ -453,7 +439,9 @@ const Fiscal = () => {
       hidden: true,
       render: (n: NotaFiscal) =>
         n.chave_acesso
-          ? <span className="font-mono text-xs text-muted-foreground">{n.chave_acesso.slice(0, 8)}…{n.chave_acesso.slice(-4)}</span>
+          ? <span className="font-mono text-xs text-muted-foreground">
+              {n.chave_acesso.length > 12 ? `${n.chave_acesso.slice(0, 8)}…${n.chave_acesso.slice(-4)}` : n.chave_acesso}
+            </span>
           : <span className="text-muted-foreground">—</span>,
     },
     {
@@ -469,7 +457,7 @@ const Fiscal = () => {
 
   return (
     <AppLayout>
-      <ModulePage title={fiscalTitle} subtitle={fiscalSubtitle} addLabel={fiscalAddLabel} onAdd={openCreate}
+      <ModulePage title={tipoConfig.title} subtitle={tipoConfig.subtitle} addLabel={tipoConfig.addLabel} onAdd={openCreate}
         headerActions={<>
           <input ref={xmlInputRef} type="file" accept=".xml" className="hidden" onChange={handleXmlImport} />
           <Button variant="outline" size="sm" className="gap-1.5" onClick={() => xmlInputRef.current?.click()}>
@@ -502,7 +490,7 @@ const Fiscal = () => {
           columns={columns}
           data={filteredData}
           loading={loading}
-          moduleKey={fiscalModuleKey}
+          moduleKey={tipoConfig.moduleKey}
           showColumnToggle={true}
           onView={openView}
           onEdit={openEdit}
