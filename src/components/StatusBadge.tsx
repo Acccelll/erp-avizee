@@ -25,6 +25,8 @@ const statusConfig: Record<string, { classes: string; icon: typeof Clock; label:
   cancelado:       { classes: 'bg-destructive/10 text-destructive border-destructive/20', icon: XCircle, label: 'Cancelado' },
   cancelada:       { classes: 'bg-destructive/10 text-destructive border-destructive/20', icon: XCircle, label: 'Cancelada' },
   rejeitado:       { classes: 'bg-destructive/10 text-destructive border-destructive/20', icon: XCircle, label: 'Rejeitado' },
+  rejeitada:       { classes: 'bg-destructive/10 text-destructive border-destructive/20', icon: XCircle, label: 'Rejeitada' },
+  aguardando_aprovacao: { classes: 'bg-warning/10 text-warning border-warning/20', icon: Clock, label: 'Aguardando Aprovação' },
   expirado:        { classes: 'bg-destructive/10 text-destructive border-destructive/20', icon: AlarmClock, label: 'Expirado' },
   vencido:         { classes: 'bg-destructive/10 text-destructive border-destructive/20', icon: AlarmClock, label: 'Vencido' },
   bloqueado:       { classes: 'bg-destructive/10 text-destructive border-destructive/20', icon: Ban, label: 'Bloqueado' },
