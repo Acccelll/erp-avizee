@@ -33,6 +33,7 @@ interface Pedido {
 
 const TERMINAL_STATUSES_PEDIDO = ["entregue", "faturado", "cancelada"];
 const PRAZO_ALERTA_DIAS = 3;
+const DIAS_ABERTO_ALERTA = 30;
 
 function getPrazoStatus(dataPrazo: string | null, statusOp: string): "atrasado" | "proximo" | "ok" | "sem_prazo" {
   if (!dataPrazo) return "sem_prazo";
@@ -298,7 +299,7 @@ const Pedidos = () => {
       key: "dias", label: "Dias em Aberto", hidden: true,
       render: (p: Pedido) => {
         const dias = daysSince(p.data_emissao);
-        return <span className={`font-mono text-xs ${dias > 30 ? "text-destructive font-bold" : "text-muted-foreground"}`}>{dias}d</span>;
+        return <span className={`font-mono text-xs ${dias > DIAS_ABERTO_ALERTA ? "text-destructive font-bold" : "text-muted-foreground"}`}>{dias}d</span>;
       },
     },
     {
@@ -325,7 +326,7 @@ const Pedidos = () => {
           <SummaryCard title="Total de Pedidos" value={formatNumber(kpis.total)} icon={FileText} variationType="neutral" variation="registros" />
           <SummaryCard title="Valor Total" value={formatCurrency(kpis.totalValue)} icon={DollarSign} variationType="neutral" variation="acumulado" />
           <SummaryCard title="Em Andamento" value={formatNumber(kpis.emAndamento)} icon={Truck} variationType="positive" variation="separação / transporte" />
-          <SummaryCard title="Atrasados" value={formatNumber(kpis.atrasados)} icon={AlertTriangle} variationType={kpis.atrasados > 0 ? "negative" : "neutral"} variation="fora do prazo de despacho" />
+          <SummaryCard title="Atrasados" value={formatNumber(kpis.atrasados)} icon={AlertTriangle} variationType={kpis.atrasados > 0 ? "negative" as const : "neutral" as const} variation="fora do prazo de despacho" />
         </div>
 
         <AdvancedFilterBar
