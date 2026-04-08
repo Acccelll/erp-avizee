@@ -13,7 +13,7 @@ import { MultiSelect } from "@/components/ui/MultiSelect";
 import { DataTable } from '@/components/DataTable';
 import { PreviewModal } from '@/components/ui/PreviewModal';
 import { cn } from '@/lib/utils';
-import { Download, RefreshCcw, Hash, FileText, Eye, FileSpreadsheet, Layers, PieChart as PieChartIcon, LineChart } from 'lucide-react';
+import { Download, RefreshCcw, Hash, FileText, Eye, FileSpreadsheet, Layers, PieChart as PieChartIcon, LineChart, BarChart3 } from 'lucide-react';
 import { ResponsiveContainer, BarChart, XAxis, YAxis, Tooltip, Bar, PieChart, Pie, Cell, Legend, LineChart as RechartsLineChart, Line } from 'recharts';
 import { carregarRelatorio, exportarCsv, exportarXlsx, formatCellValue, type RelatorioResultado, type TipoRelatorio } from '@/services/relatorios.service';
 import { reportConfigs, reportCategoryMeta, type ReportCategory } from '@/config/relatoriosConfig';
@@ -171,7 +171,7 @@ export default function Relatorios() {
     setLoading(true);
     setErrorLoading(null);
     try {
-      const filtros = selectedReport === 'dre'
+      const filtros = tipo === 'dre'
         ? { ...getDreDateRange(), clienteId: undefined, fornecedorId: undefined, grupoProdutoId: undefined }
         : {
           dataInicio,
