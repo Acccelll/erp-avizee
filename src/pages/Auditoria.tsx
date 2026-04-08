@@ -327,7 +327,9 @@ export default function Auditoria() {
     supabase
       .from("profiles")
       .select("id, nome, email, cargo")
-      .then(({ data }) => setProfiles(data || []));
+      .then(({ data, error }) => {
+        if (!error) setProfiles(data || []);
+      });
   }, []);
 
   // Load logs with period filter applied server-side
@@ -370,7 +372,7 @@ export default function Auditoria() {
   }, [logs]);
 
   const usuariosNosPeriodo = useMemo(() => {
-    const ids = new Set(logs.map((l) => l.usuario_id).filter(Boolean) as string[]);
+    const ids = new Set(logs.map((l) => l.usuario_id).filter((id): id is string => id !== null));
     return profiles.filter((p) => ids.has(p.id));
   }, [logs, profiles]);
 
@@ -400,7 +402,7 @@ export default function Auditoria() {
       )
         return false;
       if (!query) return true;
-      const profile = getProfile(l.usuario_id);
+      const profile = profileMap.get(l.usuario_id ?? "");
       const searchable = [
         l.tabela,
         l.acao,
