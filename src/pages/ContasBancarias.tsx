@@ -1,15 +1,20 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { AppLayout } from "@/components/AppLayout";
 import { ModulePage } from "@/components/ModulePage";
 import { DataTable } from "@/components/DataTable";
 import { FormModal } from "@/components/FormModal";
 import { ContaBancariaDrawer } from "@/components/financeiro/ContaBancariaDrawer";
-import { SummaryCard } from "@/components/SummaryCard";
+import { AdvancedFilterBar } from "@/components/AdvancedFilterBar";
+import type { FilterChip } from "@/components/AdvancedFilterBar";
+import { StatCard } from "@/components/StatCard";
+import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { MultiSelect, type MultiSelectOption } from "@/components/ui/MultiSelect";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   AlertDialog,
@@ -24,7 +29,10 @@ import {
 import { toast } from "sonner";
 import { formatCurrency } from "@/lib/format";
 import { supabase } from "@/integrations/supabase/client";
-import { Wallet, Landmark, AlertTriangle, ShieldAlert } from "lucide-react";
+import {
+  Wallet, Landmark, AlertTriangle, ShieldAlert,
+  CheckCircle, Ban, Building2,
+} from "lucide-react";
 
 interface Banco { id: string; nome: string; tipo: string; ativo: boolean; }
 interface ContaBancaria {
@@ -37,6 +45,18 @@ interface InUseCounts {
   lancamentos: number;
   baixas: number;
   caixaMovs: number;
+}
+
+const tipoContaLabel: Record<string, string> = {
+  corrente: "Conta Corrente",
+  poupanca: "Poupança",
+  investimento: "Investimento",
+  caixa: "Caixa",
+};
+
+function getTipoLabel(tipo: string | undefined) {
+  if (!tipo) return "—";
+  return tipoContaLabel[tipo.toLowerCase()] ?? tipo;
 }
 
 const ContasBancarias = () => {
@@ -52,11 +72,16 @@ const ContasBancarias = () => {
   const [inUseCounts, setInUseCounts] = useState<InUseCounts>({ lancamentos: 0, baixas: 0, caixaMovs: 0 });
   const [confirmInactivate, setConfirmInactivate] = useState(false);
 
+  // Filter state
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilters, setStatusFilters] = useState<string[]>([]);
+  const [tipoFilters, setTipoFilters] = useState<string[]>([]);
+
   const fetchData = async () => {
     setLoading(true);
     const [{ data: b }, { data: c }] = await Promise.all([
       supabase.from("bancos").select("*").eq("ativo", true).order("nome"),
-      supabase.from("contas_bancarias").select("*, bancos(nome, tipo)").eq("ativo", true).order("created_at", { ascending: false }),
+      supabase.from("contas_bancarias").select("*, bancos(nome, tipo)").order("created_at", { ascending: false }),
     ]);
     setBancos(b || []);
     setContas(c || []);
@@ -65,7 +90,61 @@ const ContasBancarias = () => {
 
   useEffect(() => { fetchData(); }, []);
 
-  const saldoTotal = contas.reduce((s, c) => s + Number(c.saldo_atual || 0), 0);
+  // Derived summaries
+  const contasAtivas = useMemo(() => contas.filter((c) => c.ativo), [contas]);
+  const saldoTotal = useMemo(
+    () => contasAtivas.reduce((s, c) => s + Number(c.saldo_atual || 0), 0),
+    [contasAtivas],
+  );
+
+  // Filter options derived from loaded banks
+  const tipoOptions = useMemo<MultiSelectOption[]>(() => {
+    const tipos = new Set(bancos.map((b) => b.tipo).filter(Boolean));
+    return Array.from(tipos).map((t) => ({ value: t, label: getTipoLabel(t) }));
+  }, [bancos]);
+
+  const statusOptions: MultiSelectOption[] = [
+    { label: "Ativa", value: "ativo" },
+    { label: "Inativa", value: "inativo" },
+  ];
+
+  // Client-side filtered data
+  const filteredData = useMemo(() => {
+    const q = searchTerm.toLowerCase().trim();
+    return contas.filter((c) => {
+      if (statusFilters.length > 0) {
+        if (!statusFilters.includes(c.ativo ? "ativo" : "inativo")) return false;
+      }
+      if (tipoFilters.length > 0) {
+        if (!tipoFilters.includes(c.bancos?.tipo || "")) return false;
+      }
+      if (!q) return true;
+      return (
+        c.descricao.toLowerCase().includes(q) ||
+        (c.bancos?.nome || "").toLowerCase().includes(q) ||
+        (c.agencia || "").toLowerCase().includes(q) ||
+        (c.conta || "").toLowerCase().includes(q) ||
+        (c.titular || "").toLowerCase().includes(q)
+      );
+    });
+  }, [contas, searchTerm, statusFilters, tipoFilters]);
+
+  // Active filter chips for the filter bar
+  const activeFilterChips = useMemo<FilterChip[]>(() => {
+    const chips: FilterChip[] = [];
+    statusFilters.forEach((v) =>
+      chips.push({ key: "status", label: "Status", value: v, displayValue: v === "ativo" ? "Ativa" : "Inativa" }),
+    );
+    tipoFilters.forEach((v) =>
+      chips.push({ key: "tipo", label: "Tipo", value: v, displayValue: getTipoLabel(v) }),
+    );
+    return chips;
+  }, [statusFilters, tipoFilters]);
+
+  const handleRemoveFilter = (key: string, value?: string) => {
+    if (key === "status") setStatusFilters((prev) => prev.filter((v) => v !== value));
+    if (key === "tipo") setTipoFilters((prev) => prev.filter((v) => v !== value));
+  };
 
   const openCreate = () => {
     setMode("create");
@@ -158,41 +237,127 @@ const ContasBancarias = () => {
   const inUse = inUseCounts.lancamentos > 0 || inUseCounts.baixas > 0 || inUseCounts.caixaMovs > 0;
 
   const columns = [
-    { key: "banco", label: "Banco", render: (c: ContaBancaria) => c.bancos?.nome || "—" },
-    { key: "descricao", label: "Descrição" },
-    { key: "agencia", label: "Agência", render: (c: ContaBancaria) => c.agencia || "—" },
-    { key: "conta", label: "Conta", render: (c: ContaBancaria) => c.conta || "—" },
-    { key: "titular", label: "Titular", render: (c: ContaBancaria) => c.titular || "—" },
-    { key: "saldo", label: "Saldo", render: (c: ContaBancaria) => (
-      <span className={`font-semibold mono ${Number(c.saldo_atual || 0) >= 0 ? "text-success" : "text-destructive"}`}>
-        {formatCurrency(Number(c.saldo_atual || 0))}
-      </span>
-    )},
+    {
+      key: "descricao", label: "Conta Bancária", sortable: true,
+      render: (c: ContaBancaria) => (
+        <div className="flex items-center gap-2">
+          <Landmark className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
+          <div>
+            <p className="font-medium leading-tight">{c.descricao}</p>
+            {c.bancos?.nome && <p className="text-xs text-muted-foreground">{c.bancos.nome}</p>}
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: "banco", label: "Banco", sortable: true, hidden: true,
+      render: (c: ContaBancaria) => <span className="text-sm">{c.bancos?.nome || "—"}</span>,
+    },
+    {
+      key: "tipo", label: "Tipo de Conta",
+      render: (c: ContaBancaria) => (
+        <span className="text-xs font-medium">{getTipoLabel(c.bancos?.tipo)}</span>
+      ),
+    },
+    {
+      key: "agencia_conta", label: "Ag / Conta",
+      render: (c: ContaBancaria) => (
+        <span className="font-mono text-xs">
+          {c.agencia ? `${c.agencia} / ${c.conta || "—"}` : (c.conta || "—")}
+        </span>
+      ),
+    },
+    {
+      key: "titular", label: "Titular", hidden: true,
+      render: (c: ContaBancaria) => c.titular
+        ? <span className="text-sm">{c.titular}</span>
+        : <span className="text-xs text-muted-foreground">—</span>,
+    },
+    {
+      key: "saldo", label: "Saldo Atual", sortable: true,
+      render: (c: ContaBancaria) => (
+        <span className={`font-semibold font-mono text-sm ${Number(c.saldo_atual || 0) >= 0 ? "text-success" : "text-destructive"}`}>
+          {formatCurrency(Number(c.saldo_atual || 0))}
+        </span>
+      ),
+    },
+    {
+      key: "ativo", label: "Status",
+      render: (c: ContaBancaria) => (
+        <StatusBadge status={c.ativo ? "ativo" : "inativo"} />
+      ),
+    },
+    {
+      key: "uso", label: "Uso Operacional", hidden: true,
+      render: (c: ContaBancaria) => (
+        <Badge variant="outline" className="text-xs text-muted-foreground gap-1">
+          {c.ativo ? <CheckCircle className="w-3 h-3 text-success" /> : <Ban className="w-3 h-3" />}
+          {c.ativo ? "Disponível" : "Inativa"}
+        </Badge>
+      ),
+    },
   ];
 
   return (
     <AppLayout>
-      <ModulePage title="Contas Bancárias" subtitle="Bancos e contas financeiras" addLabel="Nova Conta" onAdd={openCreate} count={contas.length}>
-        {/* Summary cards per bank */}
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
-          <SummaryCard title="Saldo Total" value={formatCurrency(saldoTotal)} icon={Wallet} variant={saldoTotal >= 0 ? "success" : "danger"} />
-          {contas.slice(0, 3).map(c => (
-            <div key={c.id} className="rounded-xl border bg-card p-4 space-y-1">
-              <div className="flex items-center gap-2">
-                <Landmark className="w-4 h-4 text-muted-foreground" />
-                <p className="text-xs text-muted-foreground font-medium">{c.bancos?.nome}</p>
-              </div>
-              <p className="text-sm font-medium">{c.descricao}</p>
-              <p className={`text-lg font-bold mono ${Number(c.saldo_atual || 0) >= 0 ? "text-success" : "text-destructive"}`}>
-                {formatCurrency(Number(c.saldo_atual || 0))}
-              </p>
-              {c.agencia && <p className="text-xs text-muted-foreground">Ag: {c.agencia} | CC: {c.conta}</p>}
-            </div>
-          ))}
-        </div>
+      <ModulePage
+        title="Contas Bancárias"
+        subtitle="Central de consulta e gestão das contas financeiras da empresa"
+        addLabel="Nova Conta"
+        onAdd={openCreate}
+        summaryCards={
+          <>
+            <StatCard title="Total de Contas" value={String(contas.length)} icon={Building2} />
+            <StatCard title="Ativas" value={String(contasAtivas.length)} icon={CheckCircle} iconColor="text-success" />
+            <StatCard title="Inativas" value={String(contas.length - contasAtivas.length)} icon={Ban} />
+            <StatCard
+              title="Saldo Total"
+              value={formatCurrency(saldoTotal)}
+              icon={Wallet}
+              iconColor={saldoTotal >= 0 ? "text-success" : "text-destructive"}
+            />
+          </>
+        }
+      >
+        <AdvancedFilterBar
+          searchValue={searchTerm}
+          onSearchChange={setSearchTerm}
+          searchPlaceholder="Buscar por nome, banco, agência, conta ou titular..."
+          activeFilters={activeFilterChips}
+          onRemoveFilter={handleRemoveFilter}
+          onClearAll={() => { setStatusFilters([]); setTipoFilters([]); }}
+          count={filteredData.length}
+        >
+          <MultiSelect
+            options={statusOptions}
+            selected={statusFilters}
+            onChange={setStatusFilters}
+            placeholder="Status"
+            className="w-[130px]"
+          />
+          {tipoOptions.length > 0 && (
+            <MultiSelect
+              options={tipoOptions}
+              selected={tipoFilters}
+              onChange={setTipoFilters}
+              placeholder="Tipo"
+              className="w-[130px]"
+            />
+          )}
+        </AdvancedFilterBar>
 
-        <DataTable columns={columns} data={contas} loading={loading}
-          onView={(c) => { setSelected(c); setDrawerOpen(true); }} />
+        <DataTable
+          columns={columns}
+          data={filteredData}
+          loading={loading}
+          moduleKey="contas-bancarias"
+          showColumnToggle={true}
+          onView={(c) => { setSelected(c); setDrawerOpen(true); }}
+          onEdit={openEdit}
+          onDelete={handleDelete}
+          emptyTitle="Nenhuma conta bancária encontrada"
+          emptyDescription="Cadastre uma nova conta ou ajuste os filtros de busca."
+        />
       </ModulePage>
 
       <FormModal
