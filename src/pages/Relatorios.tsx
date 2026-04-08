@@ -13,46 +13,15 @@ import { MultiSelect } from "@/components/ui/MultiSelect";
 import { DataTable } from '@/components/DataTable';
 import { PreviewModal } from '@/components/ui/PreviewModal';
 import { cn } from '@/lib/utils';
-import { BarChart3, Package, Wallet, ShoppingCart, TrendingUp, Truck, Download, RefreshCcw, Hash, AlertTriangle, DollarSign, FileText, Eye, ArrowLeftRight, FileSpreadsheet, CalendarClock, Receipt, Layers, Building2, Boxes, Landmark, PieChart as PieChartIcon, LineChart } from 'lucide-react';
+import { BarChart3, Package, Wallet, ShoppingCart, TrendingUp, Truck, Download, RefreshCcw, Hash, AlertTriangle, DollarSign, FileText, Eye, ArrowLeftRight, FileSpreadsheet, Receipt, Layers, Building2, Boxes, Landmark, PieChart as PieChartIcon, LineChart } from 'lucide-react';
 import { ResponsiveContainer, BarChart, XAxis, YAxis, Tooltip, Bar, PieChart, Pie, Cell, Legend, LineChart as RechartsLineChart, Line } from 'recharts';
 import { carregarRelatorio, exportarCsv, exportarXlsx, formatCellValue, type RelatorioResultado, type TipoRelatorio } from '@/services/relatorios.service';
 import { formatCurrency, formatNumber, formatDate } from '@/lib/format';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { QUICK_PERIODS, REPORTS_META, type ReportCategory } from './relatoriosConfig';
 
-type ReportCategory = 'comercial' | 'financeiro' | 'estoque_suprimentos' | 'fiscal_faturamento';
-type ChartMode = 'bar' | 'pie' | 'line' | 'auto';
-
-interface ReportMeta {
-  type: TipoRelatorio;
-  title: string;
-  description: string;
-  icon: typeof Package;
-  category: ReportCategory;
-  priority?: boolean;
-  chartMode?: ChartMode;
-}
-
-const reportCards: ReportMeta[] = [
-  { type: 'vendas', title: 'Vendas', description: 'Ordens por período e faturamento', icon: ShoppingCart, category: 'comercial', chartMode: 'line' },
-  { type: 'vendas_cliente', title: 'Vendas/Cliente', description: 'Ranking de clientes por volume', icon: ShoppingCart, category: 'comercial', chartMode: 'bar' },
-  { type: 'curva_abc', title: 'Curva ABC', description: 'Classificação de produtos por faturamento', icon: TrendingUp, category: 'comercial', chartMode: 'pie' },
-  { type: 'margem_produtos', title: 'Margem', description: 'Análise de margem por produto', icon: DollarSign, category: 'comercial', chartMode: 'bar' },
-
-  { type: 'financeiro', title: 'Financeiro', description: 'Contas a pagar e receber', icon: Wallet, category: 'financeiro', priority: true, chartMode: 'pie' },
-  { type: 'fluxo_caixa', title: 'Fluxo de Caixa', description: 'Entradas, saídas e saldo', icon: TrendingUp, category: 'financeiro', priority: true, chartMode: 'line' },
-  { type: 'aging', title: 'Aging', description: 'Vencidos por faixa de dias', icon: CalendarClock, category: 'financeiro', chartMode: 'bar' },
-  { type: 'dre', title: 'DRE', description: 'Demonstrativo de resultado', icon: BarChart3, category: 'financeiro', priority: true, chartMode: 'bar' },
-
-  { type: 'estoque', title: 'Estoque', description: 'Posição atual, custo e alertas', icon: Package, category: 'estoque_suprimentos', chartMode: 'pie' },
-  { type: 'estoque_minimo', title: 'Estoque Mínimo', description: 'Produtos abaixo do estoque mínimo', icon: AlertTriangle, category: 'estoque_suprimentos', priority: true, chartMode: 'bar' },
-  { type: 'movimentos_estoque', title: 'Movimentos de Estoque', description: 'Entradas, saídas e ajustes por período', icon: ArrowLeftRight, category: 'estoque_suprimentos', chartMode: 'line' },
-  { type: 'compras_fornecedor', title: 'Compras/Fornecedor', description: 'Ranking de fornecedores por volume', icon: Truck, category: 'estoque_suprimentos', chartMode: 'bar' },
-  { type: 'compras', title: 'Compras', description: 'Consolidado por fornecedor', icon: Truck, category: 'estoque_suprimentos', chartMode: 'bar' },
-
-  { type: 'faturamento', title: 'Faturamento', description: 'NFs de saída confirmadas com impostos e receita líquida', icon: Receipt, category: 'fiscal_faturamento', priority: true, chartMode: 'line' },
-  { type: 'divergencias', title: 'Divergências', description: 'Pedidos sem NF, NF sem financeiro', icon: AlertTriangle, category: 'fiscal_faturamento', priority: true, chartMode: 'bar' },
-];
+const reportCards = Object.values(REPORTS_META);
 
 const categoryMeta: Record<ReportCategory, { title: string; icon: typeof Building2 }> = {
   comercial: { title: 'Comercial', icon: Building2 },
@@ -167,7 +136,6 @@ export default function Relatorios() {
   const [errorLoading, setErrorLoading] = useState<string | null>(null);
   const [resultado, setResultado] = useState<RelatorioResultado>({ title: '', subtitle: '', rows: [] });
   const [previewOpen, setPreviewOpen] = useState(false);
-  const selectedReport = tipo;
 
   useEffect(() => {
     Promise.all([
@@ -208,7 +176,7 @@ export default function Relatorios() {
     setLoading(true);
     setErrorLoading(null);
     try {
-      const filtros = selectedReport === 'dre'
+      const filtros = tipo === 'dre'
         ? { ...getDreDateRange(), clienteId: undefined, fornecedorId: undefined, grupoProdutoId: undefined }
         : {
           dataInicio,
@@ -260,22 +228,25 @@ export default function Relatorios() {
   const kpiCards = useMemo(() => {
     const rows = sortedRows;
     const totals = resultado.totals || {};
+    const getTopShare = (count: number, field: string) => {
+      const total = rows.reduce((s, r) => s + Number(r[field] || 0), 0);
+      if (!total) return 0;
+      return rows.slice(0, count).reduce((s, r) => s + Number(r[field] || 0), 0) / total * 100;
+    };
 
     if (tipo === 'financeiro') {
-      const total = rows.reduce((s, r) => s + Number(r.valor || 0), 0);
-      const vencido = rows.filter((r) => String(r.status).toLowerCase() === 'vencido').reduce((s, r) => s + Number(r.valor || 0), 0);
-      const pago = rows.filter((r) => String(r.status).toLowerCase() === 'pago').reduce((s, r) => s + Number(r.valor || 0), 0);
       return [
-        { title: 'Total', value: formatCurrency(total), icon: Wallet, variation: 'carteira no período' },
-        { title: 'Vencido', value: formatCurrency(vencido), icon: AlertTriangle, variation: 'requer ação' },
-        { title: 'Pago', value: formatCurrency(pago), icon: DollarSign, variation: 'liquidado' },
-        { title: 'Em aberto', value: formatNumber(rows.filter((r) => String(r.status).toLowerCase() === 'aberto').length), icon: Hash, variation: 'títulos' },
+        { title: 'Em aberto', value: formatCurrency(Number(totals.totalAberto || 0)), icon: Wallet, variation: 'carteira em aberto' },
+        { title: 'Vencido', value: formatCurrency(Number(totals.vencido || 0)), icon: AlertTriangle, variation: 'requer ação imediata' },
+        { title: 'Pago', value: formatCurrency(Number(totals.totalPago || 0)), icon: DollarSign, variation: 'já liquidado' },
+        { title: 'A pagar / receber', value: `${formatCurrency(Number(totals.totalPagar || 0))} / ${formatCurrency(Number(totals.totalReceber || 0))}`, icon: Hash, variation: 'saldo por tipo' },
       ];
     }
 
     if (tipo === 'estoque_minimo') {
       return [
         { title: 'Itens críticos', value: formatNumber(rows.length), icon: AlertTriangle, variation: 'abaixo do mínimo' },
+        { title: 'Itens zerados', value: formatNumber(rows.filter((r) => Number(r.estoqueAtual || 0) <= 0).length), icon: Package, variation: 'ruptura imediata' },
         { title: 'Qtd em déficit', value: formatNumber(rows.reduce((s, r) => s + Number(r.deficit || 0), 0)), icon: Boxes, variation: 'unidades' },
         { title: 'Custo de reposição', value: formatCurrency(Number(totals.custoTotal || 0)), icon: DollarSign, variation: 'estimado' },
       ];
@@ -287,6 +258,7 @@ export default function Relatorios() {
         { title: 'Bruto', value: formatCurrency(Number(totals.totalBruto || 0)), icon: DollarSign, variation: 'faturamento bruto' },
         { title: 'Impostos', value: formatCurrency(Number(totals.totalImpostos || 0)), icon: Landmark, variation: 'retenções' },
         { title: 'Líquido', value: formatCurrency(Number(totals.totalLiquido || 0)), icon: Wallet, variation: 'resultado líquido' },
+        { title: 'Ticket médio', value: formatCurrency(rows.length ? Number(totals.totalLiquido || 0) / rows.length : 0), icon: Hash, variation: 'líquido por NF' },
       ];
     }
 
@@ -294,7 +266,8 @@ export default function Relatorios() {
       return [
         { title: 'Entradas', value: formatCurrency(Number(totals.totalEntradas || 0)), icon: TrendingUp, variation: 'período' },
         { title: 'Saídas', value: formatCurrency(Number(totals.totalSaidas || 0)), icon: ArrowLeftRight, variation: 'período' },
-        { title: 'Saldo', value: formatCurrency(Number(totals.saldoFinal || 0)), icon: Wallet, variation: 'posição final' },
+        { title: 'Saldo período', value: formatCurrency(Number(totals.saldoPeriodo || 0)), icon: Wallet, variation: 'entradas - saídas' },
+        { title: 'Saldo acumulado', value: formatCurrency(Number(totals.saldoFinal || 0)), icon: Wallet, variation: 'posição cronológica final' },
       ];
     }
 
@@ -304,6 +277,34 @@ export default function Relatorios() {
         { title: 'Total vendido', value: formatCurrency(totalVendido), icon: DollarSign, variation: 'ordens no período' },
         { title: 'Pedidos', value: formatNumber(rows.length), icon: ShoppingCart, variation: 'quantidade' },
         { title: 'Ticket médio', value: formatCurrency(rows.length ? totalVendido / rows.length : 0), icon: Hash, variation: 'por pedido' },
+        { title: 'Aguardando faturamento', value: formatNumber(rows.filter((r) => String(r.statusFaturamento || '').toLowerCase() === 'aguardando').length), icon: AlertTriangle, variation: 'pipeline comercial' },
+      ];
+    }
+    if (tipo === 'vendas_cliente') {
+      const total = rows.reduce((s, r) => s + Number(r.valorTotal || 0), 0);
+      return [
+        { title: 'Total vendido', value: formatCurrency(total), icon: DollarSign, variation: 'somatório do ranking' },
+        { title: 'Clientes atendidos', value: formatNumber(rows.length), icon: ShoppingCart, variation: 'no período' },
+        { title: 'Top 5', value: `${getTopShare(5, 'valorTotal').toFixed(1)}%`, icon: BarChart3, variation: 'concentração de receita' },
+        { title: 'Top 10', value: `${getTopShare(10, 'valorTotal').toFixed(1)}%`, icon: TrendingUp, variation: 'concentração ampliada' },
+      ];
+    }
+    if (tipo === 'compras_fornecedor') {
+      const total = rows.reduce((s, r) => s + Number(r.valorTotal || 0), 0);
+      return [
+        { title: 'Total comprado', value: formatCurrency(total), icon: DollarSign, variation: 'somatório do ranking' },
+        { title: 'Fornecedores ativos', value: formatNumber(rows.length), icon: Truck, variation: 'no período' },
+        { title: 'Ticket médio', value: formatCurrency(rows.length ? total / rows.length : 0), icon: Hash, variation: 'por fornecedor' },
+        { title: 'Top 5', value: `${getTopShare(5, 'valorTotal').toFixed(1)}%`, icon: BarChart3, variation: 'concentração de compras' },
+      ];
+    }
+    if (tipo === 'margem_produtos') {
+      const margens = rows.map((r) => Number(r.margem || 0));
+      return [
+        { title: 'Média de margem', value: `${formatNumber(Number(totals.mediaMargemPct || 0))}%`, icon: TrendingUp, variation: 'potencial de rentabilidade' },
+        { title: 'Margem negativa', value: formatNumber(rows.filter((r) => Number(r.margem || 0) < 0).length), icon: AlertTriangle, variation: 'itens críticos' },
+        { title: 'Maior margem', value: `${formatNumber(Math.max(...margens, 0))}%`, icon: DollarSign, variation: 'melhor item' },
+        { title: 'Menor margem', value: `${formatNumber(Math.min(...margens, 0))}%`, icon: ArrowLeftRight, variation: 'pior item' },
       ];
     }
 
@@ -324,20 +325,25 @@ export default function Relatorios() {
 
   const columns = useMemo(() => {
     if (!sortedRows.length) return [];
-    return Object.keys(sortedRows[0]).map((key) => ({
+    const orderedKeys = REPORTS_META[tipo].defaultColumns.filter((key) => key in sortedRows[0]);
+    const fallbackKeys = Object.keys(sortedRows[0]).filter((key) => !orderedKeys.includes(key));
+    return [...orderedKeys, ...fallbackKeys].map((key) => ({
       key,
       label: key.replace(/([A-Z])/g, ' $1').replace(/^./, (char) => char.toUpperCase()),
       render: (item: Record<string, unknown>): React.ReactNode => {
         const raw = item[key];
         if ((key.toLowerCase().includes('status') || key.toLowerCase().includes('situacao') || key === 'faixa' || key === 'classe') && typeof raw === 'string') {
           const normalized = raw.toLowerCase();
-          const isCritical = ['vencido', 'abaixo do mínimo', 'pendente', 'nf s/ financeiro', 'pedido s/ nf', 'c'].some((t) => normalized.includes(t));
+          const isCritical = ['vencido', 'abaixo do mínimo', 'ruptura', 'zerado', 'pendente', 'nf s/ financeiro', 'pedido s/ nf', 'c', 'negativa'].some((t) => normalized.includes(t));
           return <Badge variant={isCritical ? 'destructive' : 'secondary'}>{raw}</Badge>;
+        }
+        if (key === 'criticidade' && typeof raw === 'string') {
+          return <Badge variant={raw.toLowerCase().includes('alta') || raw.toLowerCase().includes('ruptura') ? 'destructive' : 'secondary'}>{raw}</Badge>;
         }
         return formatCellValue(raw, key, isQtyReport) as React.ReactNode;
       },
     }));
-  }, [sortedRows, isQtyReport]);
+  }, [sortedRows, isQtyReport, tipo]);
 
   const handleSelectTipo = (nextTipo: TipoRelatorio) => {
     setFiltroClienteIds([]);
@@ -354,7 +360,7 @@ export default function Relatorios() {
     });
   };
 
-  const applyQuickPeriod = (period: 'hoje' | '7d' | '30d' | 'mes') => {
+  const applyQuickPeriod = (period: 'hoje' | '7d' | '15d' | '30d' | 'mes' | 'mes_anterior') => {
     const now = new Date();
     const end = now.toISOString().slice(0, 10);
     if (period === 'hoje') {
@@ -369,11 +375,25 @@ export default function Relatorios() {
       setDataFim(end);
       return;
     }
+    if (period === '15d') {
+      const start = new Date(now);
+      start.setDate(now.getDate() - 15);
+      setDataInicio(start.toISOString().slice(0, 10));
+      setDataFim(end);
+      return;
+    }
     if (period === '30d') {
       const start = new Date(now);
       start.setDate(now.getDate() - 30);
       setDataInicio(start.toISOString().slice(0, 10));
       setDataFim(end);
+      return;
+    }
+    if (period === 'mes_anterior') {
+      const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const last = new Date(now.getFullYear(), now.getMonth(), 0);
+      setDataInicio(start.toISOString().slice(0, 10));
+      setDataFim(last.toISOString().slice(0, 10));
       return;
     }
     const start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
@@ -413,12 +433,25 @@ export default function Relatorios() {
   }, []);
 
   const selectedMeta = reportCards.find((r) => r.type === tipo);
-  const prioritized = reportCards.filter((r) => r.priority);
+  const prioritized = reportCards.filter((r) => (r.priority || 0) > 0).sort((a, b) => (b.priority || 0) - (a.priority || 0)).slice(0, 6);
   const showEmptyData = !loading && !errorLoading && sortedRows.length === 0;
 
   const chartMode = selectedMeta?.chartMode || 'auto';
   const usePie = chartMode === 'pie' || (chartMode === 'auto' && (resultado.chartData || []).length <= 4);
   const useLine = chartMode === 'line';
+  const tableFooter = useMemo(() => {
+    if (!sortedRows.length) return null;
+    if (tipo === 'estoque') {
+      return <div className="text-xs font-medium">Qtd total: {formatNumber(Number(resultado.totals?.totalQtd || 0))} • Custo total: {formatCurrency(Number(resultado.totals?.totalCusto || 0))} • Valor potencial: {formatCurrency(Number(resultado.totals?.totalVenda || 0))}</div>;
+    }
+    if (tipo === 'financeiro') {
+      return <div className="text-xs font-medium">Em aberto: {formatCurrency(Number(resultado.totals?.totalAberto || 0))} • Pago: {formatCurrency(Number(resultado.totals?.totalPago || 0))} • Vencido: {formatCurrency(Number(resultado.totals?.vencido || 0))}</div>;
+    }
+    if (tipo === 'fluxo_caixa') {
+      return <div className="text-xs font-medium">Entradas: {formatCurrency(Number(resultado.totals?.totalEntradas || 0))} • Saídas: {formatCurrency(Number(resultado.totals?.totalSaidas || 0))} • Saldo acumulado: {formatCurrency(Number(resultado.totals?.saldoFinal || 0))}</div>;
+    }
+    return null;
+  }, [tipo, sortedRows.length, resultado.totals]);
 
   return (
     <AppLayout>
@@ -476,9 +509,18 @@ export default function Relatorios() {
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base">Execução e análise — {selectedMeta?.title || 'Relatório'}</CardTitle>
-              <CardDescription>Após selecionar o relatório, ajuste filtros, analise KPIs, veja o gráfico e exporte os dados.</CardDescription>
+              <CardDescription>{selectedMeta?.objective || 'Após selecionar o relatório, ajuste filtros, analise KPIs, veja o gráfico e exporte os dados.'}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
+              {selectedMeta && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="outline">Contexto: {categoryMeta[selectedMeta.category].title}</Badge>
+                  <Badge variant="secondary">Gráfico: {selectedMeta.chartMode}</Badge>
+                  {selectedMeta.drilldowns.map((item) => (
+                    <Badge key={item} variant="outline" className="text-[11px]">Drill-down: {item}</Badge>
+                  ))}
+                </div>
+              )}
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
                 {kpiCards.map((kpi) => (
                   <SummaryCard key={kpi.title} title={kpi.title} value={kpi.value} icon={kpi.icon} variationType="neutral" variation={kpi.variation} />
@@ -498,11 +540,12 @@ export default function Relatorios() {
                     </div>
                     <div className="space-y-1.5">
                       <Label className="text-xs">Períodos rápidos</Label>
-                      <div className="flex gap-2">
-                        <Button size="sm" variant="outline" onClick={() => applyQuickPeriod('hoje')}>Hoje</Button>
-                        <Button size="sm" variant="outline" onClick={() => applyQuickPeriod('7d')}>7 dias</Button>
-                        <Button size="sm" variant="outline" onClick={() => applyQuickPeriod('30d')}>30 dias</Button>
-                        <Button size="sm" variant="outline" onClick={() => applyQuickPeriod('mes')}>Mês atual</Button>
+                      <div className="flex gap-2 flex-wrap">
+                        {QUICK_PERIODS.map((period) => (
+                          <Button key={period.id} size="sm" variant="outline" onClick={() => applyQuickPeriod(period.id)}>
+                            {period.label}
+                          </Button>
+                        ))}
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-2 ml-auto">
@@ -515,28 +558,28 @@ export default function Relatorios() {
                   </div>
 
                   <div className="flex flex-wrap gap-3 items-end">
-                    {['vendas', 'faturamento', 'aging', 'curva_abc', 'vendas_cliente'].includes(selectedReport || '') && (
+                    {selectedMeta?.supportedFilters.includes('cliente') && (
                       <div className="space-y-1">
                         <Label className="text-xs">Clientes</Label>
                         <MultiSelect options={clientes.map((c) => ({ label: c.nome_razao_social, value: c.id }))} selected={filtroClienteIds} onChange={setFiltroClienteIds} placeholder="Todos os clientes" className="w-[250px]" />
                       </div>
                     )}
 
-                    {['compras', 'compras_fornecedor'].includes(selectedReport || '') && (
+                    {selectedMeta?.supportedFilters.includes('fornecedor') && (
                       <div className="space-y-1">
                         <Label className="text-xs">Fornecedores</Label>
                         <MultiSelect options={fornecedores.map((f) => ({ label: f.nome_razao_social, value: f.id }))} selected={filtroFornecedorIds} onChange={setFiltroFornecedorIds} placeholder="Todos os fornecedores" className="w-[250px]" />
                       </div>
                     )}
 
-                    {['estoque', 'estoque_minimo', 'movimentos_estoque', 'margem_produtos', 'curva_abc'].includes(selectedReport || '') && (
+                    {selectedMeta?.supportedFilters.includes('grupo') && (
                       <div className="space-y-1">
                         <Label className="text-xs">Grupos de Produto</Label>
                         <MultiSelect options={grupos.map((g) => ({ label: g.nome, value: g.id }))} selected={filtroGrupoIds} onChange={setFiltroGrupoIds} placeholder="Todos os grupos" className="w-[220px]" />
                       </div>
                     )}
 
-                    {['financeiro', 'aging', 'fluxo_caixa', 'vendas', 'faturamento', 'divergencias', 'estoque', 'estoque_minimo'].includes(selectedReport || '') && (
+                    {selectedMeta?.supportedFilters.includes('status') && (
                       <div className="space-y-1">
                         <Label className="text-xs">Status</Label>
                         <Select value={statusFiltro} onValueChange={setStatusFiltro}>
@@ -565,7 +608,7 @@ export default function Relatorios() {
                       </Select>
                     </div>
 
-                    {['financeiro', 'aging'].includes(selectedReport || '') && (
+                    {selectedMeta?.supportedFilters.includes('tipos_financeiros') && (
                       <div className="space-y-1">
                         <Label className="text-xs">Tipos</Label>
                         <MultiSelect
@@ -579,7 +622,7 @@ export default function Relatorios() {
                     )}
                   </div>
 
-                  {selectedReport === 'dre' && (
+                  {tipo === 'dre' && (
                     <div className="flex flex-wrap gap-3 items-end mt-3 pt-3 border-t">
                       <div className="space-y-1">
                         <Label className="text-xs font-medium">Competência</Label>
@@ -644,9 +687,10 @@ export default function Relatorios() {
                         columns={columns}
                         data={sortedRows}
                         loading={loading}
+                        footer={tableFooter}
                         moduleKey={`relatorios-${tipo}`}
                         emptyTitle="Sem dados para o filtro aplicado"
-                        emptyDescription="Ajuste período e filtros contextuais para encontrar registros relevantes."
+                        emptyDescription={`Nenhum registro encontrado em ${selectedMeta?.title}. Ajuste período, filtros contextuais ou visão de status para leitura operacional.`}
                       />
                     )}
 

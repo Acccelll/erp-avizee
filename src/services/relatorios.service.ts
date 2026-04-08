@@ -1,7 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { downloadTextFile } from "@/lib/utils";
 import { formatCurrency, formatDate, formatNumber } from "@/lib/format";
-import { Tables } from "@/integrations/supabase/types";
 import { getEffectiveFiscalId } from "@/lib/fiscalUtils";
 
 export type TipoRelatorio = "estoque" | "movimentos_estoque" | "financeiro" | "fluxo_caixa" | "vendas" | "compras" | "aging" | "dre" | "curva_abc" | "margem_produtos" | "estoque_minimo" | "vendas_cliente" | "compras_fornecedor" | "divergencias" | "faturamento";
@@ -14,6 +13,8 @@ export interface FiltroRelatorio {
   grupoProdutoIds?: string[];
   tiposFinanceiros?: string[];
 }
+
+const toStatus = (value?: string | null) => (value || "").toLowerCase();
 
 export interface RelatorioResultado<T = Record<string, unknown>> {
   title: string;
@@ -44,7 +45,7 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
     case "estoque": {
       let query = supabase
         .from("produtos")
-        .select("codigo_interno, nome, unidade_medida, estoque_atual, estoque_minimo, preco_custo, preco_venda")
+        .select("id, codigo_interno, nome, unidade_medida, estoque_atual, estoque_minimo, preco_custo, preco_venda, grupos_produto(nome)")
         .eq("ativo", true)
         .order("nome");
       if (filtros.grupoProdutoIds) query = query.in('grupo_id', filtros.grupoProdutoIds);
@@ -58,7 +59,9 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
         const venda = Number(item.preco_venda || 0);
         return {
           codigo: item.codigo_interno || "-",
+          produtoId: item.id,
           produto: item.nome,
+          grupo: item.grupos_produto?.nome || "Sem grupo",
           unidade: item.unidade_medida || "UN",
           estoqueAtual: qty,
           estoqueMinimo: Number(item.estoque_minimo || 0),
@@ -66,7 +69,7 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
           vendaUnit: venda,
           totalCusto: qty * custo,
           totalVenda: qty * venda,
-          situacao: qty <= Number(item.estoque_minimo || 0) ? "Abaixo do mínimo" : "OK",
+          situacao: qty <= 0 ? "Zerado" : qty <= Number(item.estoque_minimo || 0) ? "Abaixo do mínimo" : "OK",
         };
       });
 
@@ -93,7 +96,7 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
     case "movimentos_estoque": {
       let query = supabase
         .from("estoque_movimentos")
-        .select("tipo, quantidade, saldo_anterior, saldo_atual, documento_tipo, motivo, created_at, produtos(nome, codigo_interno)")
+        .select("id, tipo, quantidade, saldo_anterior, saldo_atual, documento_tipo, motivo, documento_id, created_at, usuario_id, produtos(id, nome, codigo_interno)")
         .order("created_at", { ascending: false });
 
       query = withDateRange(query, "created_at", filtros);
@@ -105,21 +108,26 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
       if (error) throw error;
 
       const rows = (data || []).map((item: any) => ({
+        id: item.id,
         data: item.created_at,
+        produtoId: item.produtos?.id,
         produto: item.produtos?.nome || "-",
         codigo: item.produtos?.codigo_interno || "-",
         tipo: item.tipo,
+        origem: item.documento_tipo || "-",
+        documentoId: item.documento_id || null,
         quantidade: Number(item.quantidade || 0),
         saldoAnterior: Number(item.saldo_anterior || 0),
-        saldoAtual: Number(item.saldo_atual || 0),
+        saldoPosterior: Number(item.saldo_atual || 0),
         documento: item.documento_tipo || "-",
+        usuario: item.usuario_id || "-",
         motivo: item.motivo || "-",
       }));
 
       const entradas = rows.filter((r) => r.tipo === "entrada").reduce((s, r) => s + r.quantidade, 0);
       const saidas = rows.filter((r) => r.tipo === "saida").reduce((s, r) => s + r.quantidade, 0);
       const ajustes = rows.filter((r) => r.tipo === "ajuste").reduce((s, r) => s + r.quantidade, 0);
-      const saldoFinal = rows.length > 0 ? rows[0].saldoAtual : 0;
+      const saldoFinal = rows.length > 0 ? rows[0].saldoPosterior : 0;
 
       return {
         title: "Movimentos de estoque",
@@ -143,7 +151,7 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
     case "financeiro": {
       let query = supabase
         .from("financeiro_lancamentos")
-        .select("tipo, descricao, valor, status, data_vencimento, data_pagamento, banco, forma_pagamento")
+        .select("id, tipo, descricao, valor, valor_pago, saldo_restante, status, data_vencimento, data_pagamento, banco, forma_pagamento, conta_contabil_id, clientes(id, nome_razao_social), fornecedores(id, nome_razao_social), notas_fiscais(id, numero)")
         .eq("ativo", true)
         .order("data_vencimento", { ascending: true });
 
@@ -153,31 +161,48 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
       if (error) throw error;
 
       const rows = (data || []).map((item: any) => ({
+        id: item.id,
         tipo: item.tipo,
+        parceiroId: item.tipo === "receber" ? item.clientes?.id : item.fornecedores?.id,
+        parceiro: item.tipo === "receber" ? item.clientes?.nome_razao_social || "-" : item.fornecedores?.nome_razao_social || "-",
+        origem: item.notas_fiscais?.numero ? "Nota Fiscal" : "Manual",
+        lancamentoId: item.id,
+        documento: item.notas_fiscais?.numero || "-",
         descricao: item.descricao || "-",
-        valor: Number(item.valor || 0),
+        valorOriginal: Number(item.valor || 0),
+        valorPago: Number(item.valor_pago || 0),
+        valorAberto: Number((item.saldo_restante ?? item.valor) || 0),
         status: item.status || "-",
         vencimento: item.data_vencimento,
         pagamento: item.data_pagamento,
+        atrasoDias: item.status === "pago" ? 0 : Math.max(0, Math.floor((new Date().setHours(0, 0, 0, 0) - new Date(item.data_vencimento).setHours(0, 0, 0, 0)) / (1000 * 60 * 60 * 24))),
         banco: item.banco || "-",
         formaPagamento: item.forma_pagamento || "-",
+        contaContabil: item.conta_contabil_id || "-",
       }));
+
+      const totalAberto = rows.reduce((s, r) => s + r.valorAberto, 0);
+      const totalPago = rows.reduce((s, r) => s + r.valorPago, 0);
+      const vencido = rows.filter((r) => toStatus(r.status) === "vencido").reduce((s, r) => s + r.valorAberto, 0);
+      const totalPagar = rows.filter((r) => r.tipo === "pagar").reduce((s, r) => s + r.valorAberto, 0);
+      const totalReceber = rows.filter((r) => r.tipo === "receber").reduce((s, r) => s + r.valorAberto, 0);
 
       return {
         title: "Contas a pagar e receber",
         subtitle: "Títulos financeiros por tipo, status e vencimento.",
         rows,
         chartData: [
-          { name: "Receber", value: rows.filter((row) => row.tipo === "receber").reduce((sum, row) => sum + row.valor, 0) },
-          { name: "Pagar", value: rows.filter((row) => row.tipo === "pagar").reduce((sum, row) => sum + row.valor, 0) },
+          { name: "Receber", value: totalReceber },
+          { name: "Pagar", value: totalPagar },
         ],
+        totals: { totalAberto, totalPago, vencido, totalPagar, totalReceber },
       };
     }
 
     case "fluxo_caixa": {
       let query = supabase
         .from("financeiro_lancamentos")
-        .select("tipo, descricao, valor, status, data_vencimento, data_pagamento")
+        .select("id, tipo, descricao, valor, status, data_vencimento, data_pagamento, banco, clientes(id, nome_razao_social), fornecedores(id, nome_razao_social), notas_fiscais(numero)")
         .eq("ativo", true)
         .order("data_vencimento", { ascending: true });
 
@@ -191,19 +216,27 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
         saldo += item.tipo === "receber" ? valor : -valor;
 
         return {
+          id: item.id,
           data: item.data_pagamento || item.data_vencimento,
+          parceiroId: item.tipo === "receber" ? item.clientes?.id : item.fornecedores?.id,
+          parceiro: item.tipo === "receber" ? item.clientes?.nome_razao_social || "-" : item.fornecedores?.nome_razao_social || "-",
           descricao: item.descricao || "-",
           tipo: item.tipo,
+          origem: item.notas_fiscais?.numero ? "Nota Fiscal" : "Financeiro",
+          previstoRealizado: item.data_pagamento ? "Realizado" : "Previsto",
           status: item.status || "-",
+          banco: item.banco || "-",
           entrada: item.tipo === "receber" ? valor : 0,
           saida: item.tipo === "pagar" ? valor : 0,
-          saldo,
+          saldoAcumulado: saldo,
         };
       });
 
       const totalEntradas = rows.reduce((s, r) => s + r.entrada, 0);
       const totalSaidas = rows.reduce((s, r) => s + r.saida, 0);
-      const saldoFinal = rows.length > 0 ? rows[rows.length - 1].saldo : 0;
+      const saldoFinal = rows.length > 0 ? rows[rows.length - 1].saldoAcumulado : 0;
+      const previstoReceber = rows.filter((r) => r.tipo === "receber" && r.previstoRealizado === "Previsto").reduce((s, r) => s + r.entrada, 0);
+      const previstoPagar = rows.filter((r) => r.tipo === "pagar" && r.previstoRealizado === "Previsto").reduce((s, r) => s + r.saida, 0);
 
       return {
         title: "Fluxo de caixa",
@@ -211,12 +244,15 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
         rows,
         chartData: rows.slice(0, 12).map((row: any) => ({
           name: row.data ? formatDate(row.data) : "-",
-          value: row.saldo,
+          value: row.saldoAcumulado,
         })),
         totals: {
           totalEntradas,
           totalSaidas,
           saldoFinal,
+          saldoPeriodo: totalEntradas - totalSaidas,
+          previstoReceber,
+          previstoPagar,
         },
       };
     }
@@ -224,7 +260,7 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
     case "vendas": {
       let query = supabase
         .from("ordens_venda")
-        .select("numero, data_emissao, valor_total, status, status_faturamento, clientes(nome_razao_social)")
+        .select("id, numero, data_emissao, data_prazo_cliente, valor_total, status, status_faturamento, clientes(id, nome_razao_social)")
         .eq("ativo", true)
         .order("data_emissao", { ascending: false });
 
@@ -234,12 +270,16 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
       if (error) throw error;
 
       const rows = (data || []).map((item: any) => ({
+        id: item.id,
         numero: item.numero,
+        clienteId: item.clientes?.id,
         cliente: item.clientes?.nome_razao_social || "-",
         emissao: item.data_emissao,
         valor: Number(item.valor_total || 0),
-        status: item.status || "-",
-        faturamento: item.status_faturamento || "-",
+        statusComercial: item.status || "-",
+        statusFaturamento: item.status_faturamento || "-",
+        prazo: item.data_prazo_cliente || "-",
+        situacaoOperacional: item.status_faturamento === "total" ? "Concluído" : item.status_faturamento === "parcial" ? "Parcial" : "Pendente",
       }));
 
       return {
@@ -247,9 +287,9 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
         subtitle: "Ordens de venda emitidas com status comercial e faturamento.",
         rows,
         chartData: [
-          { name: "Aguardando", value: rows.filter((row) => row.faturamento === "aguardando").reduce((sum, row) => sum + row.valor, 0) },
-          { name: "Parcial", value: rows.filter((row) => row.faturamento === "parcial").reduce((sum, row) => sum + row.valor, 0) },
-          { name: "Total", value: rows.filter((row) => row.faturamento === "total").reduce((sum, row) => sum + row.valor, 0) },
+          { name: "Aguardando", value: rows.filter((row) => row.statusFaturamento === "aguardando").reduce((sum, row) => sum + row.valor, 0) },
+          { name: "Parcial", value: rows.filter((row) => row.statusFaturamento === "parcial").reduce((sum, row) => sum + row.valor, 0) },
+          { name: "Total", value: rows.filter((row) => row.statusFaturamento === "total").reduce((sum, row) => sum + row.valor, 0) },
         ],
       };
     }
@@ -285,6 +325,7 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
         const ov = nf.ordens_venda as { numero: string } | null;
 
         return {
+          notaId: nf.id,
           data: nf.data_emissao,
           nf: `${nf.numero}/${nf.serie || '1'}`,
           modelo: modeloLabels[nf.modelo_documento || '55'] || nf.modelo_documento || 'NF-e',
@@ -293,19 +334,20 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
           frete: Number(nf.frete_valor || 0),
           desconto: Number(nf.desconto_valor || 0),
           impostos: totalImpostos,
-          valorTotal,
-          receitaLiquida: valorTotal - totalImpostos,
+          valorBruto: valorTotal,
+          valorLiquido: valorTotal - totalImpostos,
+          status: nf.status,
         };
       });
 
-      const totalBruto = rows.reduce((s, r) => s + r.valorTotal, 0);
+      const totalBruto = rows.reduce((s, r) => s + r.valorBruto, 0);
       const totalImpostos = rows.reduce((s, r) => s + r.impostos, 0);
-      const totalLiquido = rows.reduce((s, r) => s + r.receitaLiquida, 0);
+      const totalLiquido = rows.reduce((s, r) => s + r.valorLiquido, 0);
 
       const byMonth = new Map<string, number>();
       rows.forEach(r => {
         const m = r.data.slice(0, 7);
-        byMonth.set(m, (byMonth.get(m) || 0) + r.valorTotal);
+        byMonth.set(m, (byMonth.get(m) || 0) + r.valorBruto);
       });
 
       return {
@@ -325,7 +367,7 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
     case "compras": {
       let query = supabase
         .from("compras")
-        .select("numero, data_compra, data_entrega_prevista, data_entrega_real, valor_total, status, fornecedores(nome_razao_social)")
+        .select("id, numero, data_compra, data_entrega_prevista, data_entrega_real, valor_total, status, fornecedores(id, nome_razao_social)")
         .eq("ativo", true)
         .order("data_compra", { ascending: false });
 
@@ -335,13 +377,16 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
       if (error) throw error;
 
       const rows = (data || []).map((item: any) => ({
+        id: item.id,
         numero: item.numero,
+        fornecedorId: item.fornecedores?.id,
         fornecedor: item.fornecedores?.nome_razao_social || "-",
         compra: item.data_compra,
         prevista: item.data_entrega_prevista,
         entrega: item.data_entrega_real,
         valor: Number(item.valor_total || 0),
         status: item.status || "-",
+        atrasoDias: item.data_entrega_real || !item.data_entrega_prevista ? 0 : Math.max(0, Math.floor((new Date().setHours(0, 0, 0, 0) - new Date(item.data_entrega_prevista).setHours(0, 0, 0, 0)) / (1000 * 60 * 60 * 24))),
       }));
 
       return {
@@ -561,7 +606,7 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
     case "margem_produtos": {
       let query = supabase
         .from("produtos")
-        .select("codigo_interno, nome, preco_custo, preco_venda, estoque_atual, unidade_medida")
+        .select("codigo_interno, nome, preco_custo, preco_venda, estoque_atual, unidade_medida, estoque_minimo, grupos_produto(nome)")
         .eq("ativo", true)
         .order("nome");
       if (filtros.grupoProdutoIds) query = query.in('grupo_id', filtros.grupoProdutoIds);
@@ -577,6 +622,7 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
         return {
           codigo: item.codigo_interno || "-",
           produto: item.nome,
+          grupo: item.grupos_produto?.nome || "Sem grupo",
           unidade: item.unidade_medida || "UN",
           custUnit: custo,
           vendaUnit: venda,
@@ -584,6 +630,7 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
           margem: Number(margem.toFixed(1)),
           markup: Number(markup.toFixed(1)),
           estoque: Number(item.estoque_atual || 0),
+          estoqueMinimo: Number(item.estoque_minimo || 0),
         };
       });
 
@@ -606,7 +653,7 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
     case "estoque_minimo": {
       const { data, error } = await supabase
         .from("produtos")
-        .select("codigo_interno, nome, unidade_medida, estoque_atual, estoque_minimo, preco_custo")
+        .select("id, codigo_interno, nome, unidade_medida, estoque_atual, estoque_minimo, preco_custo, grupos_produto(nome)")
         .eq("ativo", true)
         .order("nome");
       if (error) throw error;
@@ -615,11 +662,14 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
         .filter((p: any) => Number(p.estoque_atual || 0) <= Number(p.estoque_minimo || 0) && Number(p.estoque_minimo || 0) > 0)
         .map((p: any) => ({
           codigo: p.codigo_interno || "-",
+          produtoId: p.id,
           produto: p.nome,
+          grupo: p.grupos_produto?.nome || "Sem grupo",
           unidade: p.unidade_medida || "UN",
           estoqueAtual: Number(p.estoque_atual || 0),
           estoqueMinimo: Number(p.estoque_minimo || 0),
           deficit: Number(p.estoque_minimo || 0) - Number(p.estoque_atual || 0),
+          criticidade: Number(p.estoque_atual || 0) <= 0 ? "Ruptura" : "Crítico",
           custoReposicao: (Number(p.estoque_minimo || 0) - Number(p.estoque_atual || 0)) * Number(p.preco_custo || 0),
         }));
 
@@ -657,7 +707,10 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
       const rows = Array.from(map.values()).sort((a, b) => b.total - a.total).map((r, i) => ({
         posicao: i + 1, cliente: r.cliente, cnpj: r.cnpj, pedidos: r.qtd, valorTotal: r.total,
         ticketMedio: r.qtd > 0 ? r.total / r.qtd : 0,
+        participacao: 0,
       }));
+      const totalGeral = rows.reduce((s, r) => s + r.valorTotal, 0);
+      rows.forEach((r) => { r.participacao = totalGeral > 0 ? (r.valorTotal / totalGeral) * 100 : 0; });
 
       return {
         title: "Vendas por Cliente",
@@ -691,7 +744,10 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
       const rows = Array.from(map.values()).sort((a, b) => b.total - a.total).map((r, i) => ({
         posicao: i + 1, fornecedor: r.fornecedor, cnpj: r.cnpj, pedidos: r.qtd, valorTotal: r.total,
         ticketMedio: r.qtd > 0 ? r.total / r.qtd : 0,
+        participacao: 0,
       }));
+      const totalGeral = rows.reduce((s, r) => s + r.valorTotal, 0);
+      rows.forEach((r) => { r.participacao = totalGeral > 0 ? (r.valorTotal / totalGeral) * 100 : 0; });
 
       return {
         title: "Compras por Fornecedor",
@@ -735,7 +791,10 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
           tipo: "Pedido s/ NF",
           referencia: pc.numero,
           parceiro: fornecedor?.nome_razao_social || "-",
+          data: null,
           valor: Number(pc.valor_total || 0),
+          origem: "Compras",
+          criticidade: "Alta",
           status: pc.status,
           observacao: "Pedido de compra sem nota fiscal vinculada",
         });
@@ -746,7 +805,10 @@ export async function carregarRelatorio(tipo: TipoRelatorio, filtros: FiltroRela
           tipo: "NF s/ Financeiro",
           referencia: nf.numero,
           parceiro: "-",
+          data: nf.data_emissao,
           valor: Number(nf.valor_total || 0),
+          origem: "Faturamento",
+          criticidade: "Alta",
           status: nf.tipo,
           observacao: "Nota fiscal com flag financeiro mas sem lançamento",
         });

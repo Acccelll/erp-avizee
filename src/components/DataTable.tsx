@@ -72,6 +72,7 @@ interface DataTableProps<T> {
   onBatchDelete?: (ids: string[]) => void;
   onBatchStatusChange?: (ids: string[], status: string) => void;
   renderInlineDetails?: (item: T) => React.ReactNode;
+  footer?: React.ReactNode;
 }
 
 type SortDirection = 'asc' | 'desc' | null;
@@ -97,6 +98,7 @@ export function DataTable<T extends Record<string, any>>({
   onBatchDelete,
   onBatchStatusChange,
   renderInlineDetails,
+  footer,
 }: DataTableProps<T>) {
   const isMobile = useIsMobile();
   const { user } = useAuth();
@@ -517,6 +519,7 @@ export function DataTable<T extends Record<string, any>>({
                 </tbody>
               </table>
             </div>
+            {footer ? <div className="border-t bg-muted/20 px-4 py-2">{footer}</div> : null}
 
             <div className="flex items-center justify-between border-t px-4 py-3">
               <span className="text-xs text-muted-foreground">
