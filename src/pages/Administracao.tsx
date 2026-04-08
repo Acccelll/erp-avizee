@@ -242,14 +242,14 @@ export default function Administracao() {
 
   const validateFiscalSection = (): Record<string, string> => {
     const errors: Record<string, string> = {};
-    if (!/^[1-9]\d{3}$/.test(config.fiscal.cfopPadraoVenda)) {
-      errors.cfopPadraoVenda = 'CFOP deve ter 4 dígitos numéricos (ex.: 5102).';
+    if (!/^\d{4}$/.test(config.fiscal.cfopPadraoVenda)) {
+      errors.cfopPadraoVenda = 'CFOP deve ter exatamente 4 dígitos numéricos (ex.: 5102).';
     }
-    if (!/^[1-9]\d{3}$/.test(config.fiscal.cfopPadraoCompra)) {
-      errors.cfopPadraoCompra = 'CFOP deve ter 4 dígitos numéricos (ex.: 1102).';
+    if (!/^\d{4}$/.test(config.fiscal.cfopPadraoCompra)) {
+      errors.cfopPadraoCompra = 'CFOP deve ter exatamente 4 dígitos numéricos (ex.: 1102).';
     }
     if (!/^\d{2,3}$/.test(config.fiscal.cstPadrao)) {
-      errors.cstPadrao = 'CST deve ter 2 ou 3 dígitos numéricos (ex.: 000).';
+      errors.cstPadrao = 'CST deve ter 2 ou 3 dígitos numéricos (ex.: 00 para PIS/COFINS, 000 para ICMS).';
     }
     if (!/^\d{8}$/.test(config.fiscal.ncmPadrao)) {
       errors.ncmPadrao = 'NCM deve ter exatamente 8 dígitos numéricos (ex.: 00000000).';
