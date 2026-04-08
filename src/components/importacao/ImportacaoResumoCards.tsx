@@ -1,14 +1,28 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CheckCircle2, FileText, XCircle, AlertCircle } from "lucide-react";
+import { FileText, XCircle, AlertCircle, PackageCheck, ClipboardList } from "lucide-react";
+import { formatNumber } from "@/lib/format";
 
 interface ImportacaoResumoCardsProps {
   totalBatches: number;
   totalErrors: number;
   totalProcessed: number;
   totalPending: number;
+  totalRegistrosImportados?: number;
+  totalRegistrosRejeitados?: number;
+  totalPendenciasConferencia?: number;
+  totalConcluidosComAlertas?: number;
 }
 
-export function ImportacaoResumoCards({ totalBatches, totalErrors, totalProcessed, totalPending }: ImportacaoResumoCardsProps) {
+export function ImportacaoResumoCards({
+  totalBatches,
+  totalErrors,
+  totalProcessed,
+  totalPending,
+  totalRegistrosImportados = 0,
+  totalRegistrosRejeitados = 0,
+  totalPendenciasConferencia = 0,
+  totalConcluidosComAlertas = 0,
+}: ImportacaoResumoCardsProps) {
   const cards = [
     {
       title: "Total de Lotes",
@@ -16,32 +30,32 @@ export function ImportacaoResumoCards({ totalBatches, totalErrors, totalProcesse
       description: "Lotes registrados no sistema",
       icon: FileText,
       color: "text-blue-500",
-      bg: "bg-blue-50"
+      bg: "bg-blue-50",
     },
     {
-      title: "Concluídos",
-      value: totalProcessed,
-      description: "Lotes importados com sucesso",
-      icon: CheckCircle2,
+      title: "Registros Importados",
+      value: formatNumber(totalRegistrosImportados),
+      description: `${totalProcessed} lote(s) concluído(s)`,
+      icon: PackageCheck,
       color: "text-emerald-500",
-      bg: "bg-emerald-50"
+      bg: "bg-emerald-50",
     },
     {
-      title: "Erros",
-      value: totalErrors,
-      description: "Registros com falhas críticas",
+      title: "Inconsistências",
+      value: formatNumber(totalRegistrosRejeitados > 0 ? totalRegistrosRejeitados : totalErrors),
+      description: "Registros com falhas detectadas",
       icon: XCircle,
       color: "text-rose-500",
-      bg: "bg-rose-50"
+      bg: "bg-rose-50",
     },
     {
-      title: "Pendentes/Validando",
-      value: totalPending,
-      description: "Lotes aguardando conferência",
-      icon: AlertCircle,
-      color: "text-amber-500",
-      bg: "bg-amber-50"
-    }
+      title: "Pendentes de Conferência",
+      value: totalPendenciasConferencia > 0 ? totalPendenciasConferencia : totalPending,
+      description: "Lotes aguardando revisão",
+      icon: totalConcluidosComAlertas > 0 ? AlertCircle : ClipboardList,
+      color: totalPendenciasConferencia > 0 || totalConcluidosComAlertas > 0 ? "text-amber-500" : "text-slate-400",
+      bg: totalPendenciasConferencia > 0 || totalConcluidosComAlertas > 0 ? "bg-amber-50" : "bg-slate-50",
+    },
   ];
 
   return (

@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { AppLayout } from "@/components/AppLayout";
 import { ImportacaoResumoCards } from "@/components/importacao/ImportacaoResumoCards";
-import { ImportacaoTipoCard } from "@/components/importacao/ImportacaoTipoCard";
+import { ImportacaoTipoCard, CardImportStatus } from "@/components/importacao/ImportacaoTipoCard";
+import { ImportacaoGrupoSection } from "@/components/importacao/ImportacaoGrupoSection";
 import { ImportacaoLotesTable, ImportacaoLote } from "@/components/importacao/ImportacaoLotesTable";
 import { UploadPlanilhaCard } from "@/components/importacao/UploadPlanilhaCard";
 import { MapeamentoColunasForm } from "@/components/importacao/MapeamentoColunasForm";
@@ -15,7 +16,7 @@ import { ReconciliacaoDetalhe } from "@/components/importacao/ReconciliacaoDetal
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Filter, RefreshCw, Database, ArrowRight, ArrowLeft, CheckCircle2, ChevronRight, FileUp } from "lucide-react";
+import { Search, Filter, RefreshCw, Database, ArrowRight, ArrowLeft, CheckCircle2, ChevronRight, FileUp, ClipboardCheck, ArrowRightCircle } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import {
@@ -44,7 +45,9 @@ import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
 import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
 import { ImportSource, ImportType } from "@/hooks/importacao/types";
-import { AlertTriangle, Info } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 export default function MigracaoDados() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -101,6 +104,97 @@ export default function MigracaoDados() {
     const matchesStatus = statusFilter === "todos" || lote.status === statusFilter;
     return matchesSearch && matchesType && matchesStatus;
   });
+
+  // Compute per-type card status and summary from lotes data
+  const cardInfoMap = useMemo(() => {
+    const getCardInfo = (tipoImportacao: string): {
+      cardStatus: CardImportStatus;
+      summary: {
+        lastDate?: string;
+        totalBatches?: number;
+        pendingCount?: number;
+        nextAction?: string;
+      };
+    } => {
+      const typeLotes = lotes.filter(l => l.tipo_importacao === tipoImportacao);
+      if (typeLotes.length === 0) {
+        return { cardStatus: "nunca_importado", summary: { totalBatches: 0, nextAction: "Iniciar importação" } };
+      }
+      const sorted = [...typeLotes].sort((a, b) => new Date(b.criado_em).getTime() - new Date(a.criado_em).getTime());
+      const latest = sorted[0];
+      const pendingCount = typeLotes.filter(l => l.status === 'validado' || l.status === 'parcial').length;
+      const lastDate = format(new Date(latest.criado_em), "dd/MM/yyyy", { locale: ptBR });
+
+      let cardStatus: CardImportStatus;
+      let nextAction: string;
+
+      if (typeLotes.some(l => l.status === 'processando')) {
+        cardStatus = "processando";
+        nextAction = "Aguardando processamento";
+      } else if (pendingCount > 0) {
+        cardStatus = "pendente_conferencia";
+        nextAction = "Conferir e confirmar lote pendente";
+      } else if (latest.status === 'concluido' && (latest.total_erros || 0) > 0) {
+        cardStatus = "concluido_com_alertas";
+        nextAction = "Revisar alertas do lote concluído";
+      } else if (latest.status === 'concluido') {
+        cardStatus = "concluido";
+        nextAction = "Verificar reconciliação";
+      } else if ((latest.total_erros || 0) > 0) {
+        cardStatus = "erro_recente";
+        nextAction = "Revisar erros e reimportar";
+      } else {
+        cardStatus = "pronto";
+        nextAction = "Pronto para nova importação";
+      }
+
+      return {
+        cardStatus,
+        summary: { lastDate, totalBatches: typeLotes.length, pendingCount, nextAction },
+      };
+    };
+
+    return {
+      produtos: getCardInfo("produtos"),
+      clientes: getCardInfo("clientes"),
+      fornecedores: getCardInfo("fornecedores"),
+      estoque_inicial: getCardInfo("estoque_inicial"),
+      financeiro: getCardInfo("financeiro_aberto"),
+      faturamento: getCardInfo("faturamento"),
+      compras_xml: getCardInfo("compras_xml"),
+    };
+  }, [lotes]);
+
+  // Aggregate KPI metrics
+  const kpiMetrics = useMemo(() => {
+    const totalRegistrosImportados = lotes.reduce((acc, l) => acc + (l.total_importados || 0), 0);
+    const totalRegistrosRejeitados = lotes.reduce((acc, l) => acc + (l.total_erros || 0), 0);
+    const totalPendenciasConferencia = lotes.filter(l => l.status === 'validado' || l.status === 'parcial').length;
+    const totalConcluidosComAlertas = lotes.filter(l => l.status === 'concluido' && (l.total_erros || 0) > 0).length;
+    return { totalRegistrosImportados, totalRegistrosRejeitados, totalPendenciasConferencia, totalConcluidosComAlertas };
+  }, [lotes]);
+
+  // Compute next recommended migration step for the alert banner
+  const nextMigrationStep = useMemo(() => {
+    const baseTypes = ["produtos", "clientes", "fornecedores"];
+    const allBaseDone = baseTypes.every(t =>
+      lotes.some(l => l.tipo_importacao === t && l.status === 'concluido')
+    );
+    if (!lotes.some(l => l.tipo_importacao === 'produtos' && l.status === 'concluido')) {
+      return "Inicie pelos Cadastros-base: importe Produtos, Clientes e Fornecedores primeiro.";
+    }
+    if (!allBaseDone) {
+      return "Conclua os Cadastros-base (Produtos, Clientes, Fornecedores) antes de avançar.";
+    }
+    const hasPendingConferencia = lotes.some(l => l.status === 'validado' || l.status === 'parcial');
+    if (hasPendingConferencia) {
+      return "Existem lotes pendentes de conferência. Revise antes de prosseguir com novas cargas.";
+    }
+    if (!lotes.some(l => l.tipo_importacao === 'estoque_inicial' && l.status === 'concluido')) {
+      return "Cadastros concluídos. Próximo passo recomendado: Estoque Inicial e Financeiro em Aberto.";
+    }
+    return "Migração em andamento. Verifique a aba de Conferência & Reconciliação para acompanhar o progresso.";
+  }, [lotes]);
 
   const handleRefresh = () => {
     refreshLotes();
@@ -218,11 +312,19 @@ export default function MigracaoDados() {
         {/* Aviso de Segurança */}
         <Alert className="bg-amber-50 border-amber-200">
           <AlertTriangle className="h-4 w-4 text-amber-600" />
-          <AlertTitle className="text-amber-800 font-bold">Atenção - Módulo de Carga Inicial</AlertTitle>
-          <AlertDescription className="text-amber-700 text-xs">
-            Esta área é destinada exclusivamente para a migração de dados de sistemas legados.
-            A importação de dados pode causar duplicidade se os SKUs ou CPFs/CNPJs não forem conferidos previamente.
-            <strong> Valide os dados no ambiente de staging antes de confirmar a carga definitiva.</strong>
+          <AlertTitle className="text-amber-800 font-bold">Atenção — Módulo de Carga Inicial Controlada</AlertTitle>
+          <AlertDescription className="text-amber-700 text-xs space-y-1">
+            <p>
+              Esta área é destinada exclusivamente para a migração de dados de sistemas legados.
+              A importação pode causar duplicidade se SKUs, CPFs ou CNPJs não forem conferidos previamente.
+              <strong> Valide os dados no ambiente de staging antes de confirmar a carga definitiva.</strong>
+            </p>
+            {lotes.length > 0 && (
+              <p className="flex items-center gap-1.5 pt-1">
+                <ArrowRightCircle className="h-3.5 w-3.5 shrink-0" />
+                <span><strong>Próximo passo recomendado:</strong> {nextMigrationStep}</span>
+              </p>
+            )}
           </AlertDescription>
         </Alert>
 
@@ -232,6 +334,10 @@ export default function MigracaoDados() {
           totalProcessed={lotes.filter(l => l.status === 'concluido').length}
           totalErrors={lotes.reduce((acc, curr) => acc + (curr.total_erros || 0), 0)}
           totalPending={lotes.filter(l => ['validado', 'parcial', 'processando'].includes(l.status)).length}
+          totalRegistrosImportados={kpiMetrics.totalRegistrosImportados}
+          totalRegistrosRejeitados={kpiMetrics.totalRegistrosRejeitados}
+          totalPendenciasConferencia={kpiMetrics.totalPendenciasConferencia}
+          totalConcluidosComAlertas={kpiMetrics.totalConcluidosComAlertas}
         />
 
         {/* Tabs */}
@@ -242,12 +348,38 @@ export default function MigracaoDados() {
             <TabsTrigger value="reconciliacao">Conferência & Reconciliação</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="overview" className="mt-0">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+          <TabsContent value="overview" className="mt-0 space-y-8">
+            {/* Fluxo orientativo */}
+            <div className="flex items-center gap-2 flex-wrap text-xs text-muted-foreground bg-muted/30 rounded-md px-4 py-2 border">
+              <span className="font-semibold text-foreground">Fluxo recomendado:</span>
+              {[
+                "Cadastros-base",
+                "Saldos iniciais",
+                "Histórico / documentos",
+                "Conferência & Reconciliação",
+                "Confirmação de carga",
+              ].map((step, i, arr) => (
+                <span key={step} className="flex items-center gap-1">
+                  <span>{step}</span>
+                  {i < arr.length - 1 && <ChevronRight className="h-3 w-3 shrink-0" />}
+                </span>
+              ))}
+            </div>
+
+            {/* Grupo 1 — Cadastros-base */}
+            <ImportacaoGrupoSection
+              order={1}
+              title="Cadastros-base"
+              description="— importe primeiro"
+              colorClass="bg-blue-100 text-blue-700"
+            >
               <ImportacaoTipoCard
                 type="produtos"
                 title="Produtos"
                 description="Importação de SKUs, descrições, preços e NCM via Excel."
+                criticidade="estrutural"
+                cardStatus={cardInfoMap.produtos.cardStatus}
+                summary={cardInfoMap.produtos.summary}
                 onImport={() => handleOpenImport("produtos")}
                 onViewBatches={() => { setTypeFilter("produtos"); setActiveTab("lotes"); }}
               />
@@ -255,6 +387,9 @@ export default function MigracaoDados() {
                 type="clientes"
                 title="Clientes"
                 description="Carga de base de clientes com CPF/CNPJ e contatos."
+                criticidade="cadastral"
+                cardStatus={cardInfoMap.clientes.cardStatus}
+                summary={cardInfoMap.clientes.summary}
                 onImport={() => handleOpenImport("clientes")}
                 onViewBatches={() => { setTypeFilter("clientes"); setActiveTab("lotes"); }}
               />
@@ -262,38 +397,75 @@ export default function MigracaoDados() {
                 type="fornecedores"
                 title="Fornecedores"
                 description="Cadastro de fornecedores legados para compras e fiscal."
+                criticidade="cadastral"
+                cardStatus={cardInfoMap.fornecedores.cardStatus}
+                summary={cardInfoMap.fornecedores.summary}
                 onImport={() => handleOpenImport("fornecedores")}
                 onViewBatches={() => { setTypeFilter("fornecedores"); setActiveTab("lotes"); }}
               />
+            </ImportacaoGrupoSection>
+
+            {/* Grupo 2 — Posição inicial / saldos */}
+            <ImportacaoGrupoSection
+              order={2}
+              title="Posição inicial / Saldos"
+              description="— recomendado após cadastros-base"
+              colorClass="bg-orange-100 text-orange-700"
+            >
               <ImportacaoTipoCard
                 type="estoque_inicial"
                 title="Estoque Inicial"
                 description="Carga de saldos iniciais de inventário por depósito."
+                criticidade="operacional"
+                dependencies={["Produtos"]}
+                cardStatus={cardInfoMap.estoque_inicial.cardStatus}
+                summary={cardInfoMap.estoque_inicial.summary}
                 onImport={() => handleOpenImport("estoque_inicial")}
                 onViewBatches={() => { setTypeFilter("estoque_inicial"); setActiveTab("lotes"); }}
-              />
-              <ImportacaoTipoCard
-                type="faturamento"
-                title="Faturamento Histórico"
-                description="Importação de histórico de vendas de sistemas legados."
-                onImport={() => handleOpenImport("faturamento")}
-                onViewBatches={() => { setTypeFilter("faturamento"); setActiveTab("lotes"); }}
               />
               <ImportacaoTipoCard
                 type="financeiro"
                 title="Financeiro em Aberto"
                 description="Carga de contas a pagar e receber pendentes."
+                criticidade="financeiro"
+                dependencies={["Clientes", "Fornecedores"]}
+                cardStatus={cardInfoMap.financeiro.cardStatus}
+                summary={cardInfoMap.financeiro.summary}
                 onImport={() => handleOpenImport("financeiro")}
-                onViewBatches={() => { setTypeFilter("financeiro"); setActiveTab("lotes"); }}
+                onViewBatches={() => { setTypeFilter("financeiro_aberto"); setActiveTab("lotes"); }}
+              />
+            </ImportacaoGrupoSection>
+
+            {/* Grupo 3 — Histórico / documentos */}
+            <ImportacaoGrupoSection
+              order={3}
+              title="Histórico / Documentos"
+              description="— recomendado após cadastros e saldos"
+              colorClass="bg-purple-100 text-purple-700"
+            >
+              <ImportacaoTipoCard
+                type="faturamento"
+                title="Faturamento Histórico"
+                description="Importação de histórico de vendas de sistemas legados."
+                criticidade="historico"
+                dependencies={["Produtos", "Clientes"]}
+                cardStatus={cardInfoMap.faturamento.cardStatus}
+                summary={cardInfoMap.faturamento.summary}
+                onImport={() => handleOpenImport("faturamento")}
+                onViewBatches={() => { setTypeFilter("faturamento"); setActiveTab("lotes"); }}
               />
               <ImportacaoTipoCard
                 type="compras_xml"
                 title="Compras por XML"
                 description="Processamento em lote de arquivos XML de notas de compra."
+                criticidade="fiscal"
+                dependencies={["Produtos", "Fornecedores"]}
+                cardStatus={cardInfoMap.compras_xml.cardStatus}
+                summary={cardInfoMap.compras_xml.summary}
                 onImport={() => handleOpenImport("compras_xml")}
                 onViewBatches={() => { setTypeFilter("compras_xml"); setActiveTab("lotes"); }}
               />
-            </div>
+            </ImportacaoGrupoSection>
           </TabsContent>
 
           <TabsContent value="lotes" className="mt-0 space-y-4">
@@ -371,19 +543,67 @@ export default function MigracaoDados() {
           </TabsContent>
 
           <TabsContent value="reconciliacao" className="mt-0 space-y-6">
-            <div className="bg-muted/30 p-4 rounded-lg border border-dashed text-center mb-6">
-              <h3 className="text-sm font-semibold text-muted-foreground mb-1 italic">
-                Painel de Reconciliação de Carga
-              </h3>
-              <p className="text-[11px] text-muted-foreground max-w-lg mx-auto">
-                Utilize este painel para conferir os totais migrados por categoria e identificar inconsistências em massa.
-              </p>
+            {/* Header da seção */}
+            <div className="flex items-start gap-3 bg-card p-4 rounded-lg border">
+              <div className="p-2 bg-primary/10 rounded-lg shrink-0">
+                <ClipboardCheck className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold">Conferência & Reconciliação de Carga</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Parte central do fluxo de migração. Confira os totais migrados por categoria,
+                  identifique inconsistências, revise lotes pendentes e confirme ou descarte cargas antes
+                  de consolidar os dados no sistema operacional.
+                </p>
+              </div>
             </div>
 
-            <ReconciliacaoIndicadores lotes={lotes} />
+            {/* Indicadores por categoria */}
+            <div>
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+                Registros por categoria
+              </h4>
+              <ReconciliacaoIndicadores lotes={lotes} />
+            </div>
 
-            <div className="space-y-4 pt-4">
-              <h4 className="text-sm font-bold tracking-tight">Últimos Lotes para Conferência</h4>
+            {/* Lotes pendentes de conferência */}
+            {kpiMetrics.totalPendenciasConferencia > 0 && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <h4 className="text-sm font-bold tracking-tight">
+                    Lotes pendentes de conferência
+                  </h4>
+                  <span className="inline-flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full bg-amber-100 text-amber-700 text-[10px] font-bold">
+                    {kpiMetrics.totalPendenciasConferencia}
+                  </span>
+                </div>
+                <ImportacaoLotesTable
+                  lotes={lotes.filter(l => l.status === 'validado' || l.status === 'parcial')}
+                  isLoading={loadingLotes}
+                  onView={handleViewLote}
+                  onImport={(id) => {
+                    const lote = lotes.find(l => l.id === id);
+                    if (lote) {
+                      if (lote.tipo_importacao === 'estoque_inicial') setActiveImportSource("estoque");
+                      else if (lote.tipo_importacao === 'compras_xml') setActiveImportSource("xml");
+                      else if (lote.tipo_importacao === 'faturamento') setActiveImportSource("faturamento");
+                      else if (lote.tipo_importacao === 'financeiro_aberto') setActiveImportSource("financeiro");
+                      else {
+                        setActiveImportSource("cadastros");
+                        setImportType(lote.tipo_importacao as ImportType);
+                      }
+                    }
+                    setCurrentLoteId(id);
+                    setStep(4);
+                    setIsImportModalOpen(true);
+                  }}
+                />
+              </div>
+            )}
+
+            {/* Últimos lotes para conferência */}
+            <div className="space-y-3">
+              <h4 className="text-sm font-bold tracking-tight">Histórico recente de lotes</h4>
               <ImportacaoLotesTable
                 lotes={lotes.slice(0, 10)}
                 isLoading={loadingLotes}
