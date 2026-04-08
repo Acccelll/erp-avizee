@@ -47,6 +47,25 @@ const NATUREZA_STYLES: Record<string, string> = {
 };
 
 // ---------------------------------------------------------------------------
+// Shared utility: build a depth map from a flat list of hierarchical accounts
+// ---------------------------------------------------------------------------
+function buildDepthMap(data: ContaContabil[]): Map<string, number> {
+  const map = new Map<string, number>();
+  const calc = (id: string, visited = new Set<string>()): number => {
+    if (map.has(id)) return map.get(id)!;
+    if (visited.has(id)) return 0;
+    visited.add(id);
+    const conta = data.find(c => c.id === id);
+    if (!conta || !conta.conta_pai_id) { map.set(id, 0); return 0; }
+    const d = 1 + calc(conta.conta_pai_id, visited);
+    map.set(id, d);
+    return d;
+  };
+  data.forEach(c => calc(c.id));
+  return map;
+}
+
+// ---------------------------------------------------------------------------
 // Tree View Component
 // ---------------------------------------------------------------------------
 const TREE_INDENT_PER_LEVEL = 20;
@@ -78,21 +97,7 @@ function ContasTreeView({ data, loading, onView, onEdit }: TreeViewProps) {
   }, [data]);
 
   // depth map
-  const depthMap = useMemo(() => {
-    const map = new Map<string, number>();
-    const calc = (id: string, visited = new Set<string>()): number => {
-      if (map.has(id)) return map.get(id)!;
-      if (visited.has(id)) return 0;
-      visited.add(id);
-      const conta = data.find(c => c.id === id);
-      if (!conta || !conta.conta_pai_id) { map.set(id, 0); return 0; }
-      const d = 1 + calc(conta.conta_pai_id, visited);
-      map.set(id, d);
-      return d;
-    };
-    data.forEach(c => calc(c.id));
-    return map;
-  }, [data]);
+  const depthMap = useMemo(() => buildDepthMap(data), [data]);
 
   const roots = useMemo(
     () => [...data].sort((a, b) => a.codigo.localeCompare(b.codigo)).filter(c => !c.conta_pai_id),
@@ -318,21 +323,7 @@ const ContasContabeis = () => {
   };
 
   // Depth map (used only in Lista view columns)
-  const depthMap = useMemo(() => {
-    const map = new Map<string, number>();
-    const calcDepth = (id: string, visited = new Set<string>()): number => {
-      if (map.has(id)) return map.get(id)!;
-      if (visited.has(id)) return 0;
-      visited.add(id);
-      const conta = data.find(c => c.id === id);
-      if (!conta || !conta.conta_pai_id) { map.set(id, 0); return 0; }
-      const d = 1 + calcDepth(conta.conta_pai_id, visited);
-      map.set(id, d);
-      return d;
-    };
-    data.forEach(c => calcDepth(c.id));
-    return map;
-  }, [data]);
+  const depthMap = useMemo(() => buildDepthMap(data), [data]);
 
   const getDepth = (conta: ContaContabil) => depthMap.get(conta.id) ?? 0;
 
