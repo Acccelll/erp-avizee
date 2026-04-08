@@ -1,13 +1,18 @@
 import { Badge } from '@/components/ui/badge';
 import {
   FileEdit, Clock, CheckCircle, Cog, CheckCheck,
-  AlertTriangle, XCircle, AlarmClock, Ban, Send, FileSearch,
+  AlertTriangle, XCircle, AlarmClock, Ban, Send, FileSearch, GitMerge,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const statusConfig: Record<string, { classes: string; icon: typeof Clock; label: string }> = {
   rascunho:        { classes: 'bg-muted text-muted-foreground border-muted', icon: FileEdit, label: 'Rascunho' },
   pendente:        { classes: 'bg-warning/10 text-warning border-warning/20', icon: Clock, label: 'Pendente' },
+  // Conciliation-specific statuses
+  conciliado:      { classes: 'bg-success/10 text-success border-success/20', icon: CheckCheck, label: 'Conciliado' },
+  divergente:      { classes: 'bg-warning/10 text-warning border-warning/20', icon: AlertTriangle, label: 'Divergente' },
+  sem_correspondencia: { classes: 'bg-destructive/10 text-destructive border-destructive/20', icon: XCircle, label: 'Sem Correspondência' },
+  conciliado_manual: { classes: 'bg-primary/10 text-primary border-primary/20', icon: GitMerge, label: 'Manual' },
   aberto:          { classes: 'bg-warning/10 text-warning border-warning/20', icon: Clock, label: 'Aberto' },
   aberta:          { classes: 'bg-warning/10 text-warning border-warning/20', icon: Clock, label: 'Aberta' },
   em_analise:      { classes: 'bg-info/10 text-info border-info/20', icon: FileSearch, label: 'Em Análise' },
