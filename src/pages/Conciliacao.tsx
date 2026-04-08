@@ -308,9 +308,14 @@ export default function Conciliacao() {
       if (statusConcFilters.length > 0 && !statusConcFilters.includes(l.statusConciliacao)) return false;
       if (tipoFilters.length > 0 && !tipoFilters.includes(l.tipo)) return false;
       if (origemFilters.length > 0) {
-        if (origemFilters.includes("nf") && !l.nota_fiscal_id) return false;
-        if (origemFilters.includes("parcela") && !l.documento_pai_id) return false;
-        if (origemFilters.includes("manual") && (l.nota_fiscal_id || l.documento_pai_id)) return false;
+        const isNF = !!l.nota_fiscal_id;
+        const isParcela = !!l.documento_pai_id;
+        const isManual = !isNF && !isParcela;
+        const matchesOrigem =
+          (origemFilters.includes("nf") && isNF) ||
+          (origemFilters.includes("parcela") && isParcela) ||
+          (origemFilters.includes("manual") && isManual);
+        if (!matchesOrigem) return false;
       }
       return true;
     });
