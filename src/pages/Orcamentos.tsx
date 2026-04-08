@@ -7,31 +7,69 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { SummaryCard } from "@/components/SummaryCard";
 import { AdvancedFilterBar } from "@/components/AdvancedFilterBar";
 import type { FilterChip } from "@/components/AdvancedFilterBar";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Copy, ArrowRightCircle, CheckCircle, FileText, DollarSign, Clock, BarChart3, Link2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { ArrowRightCircle, CheckCircle, FileText, DollarSign, Clock, BarChart3, AlertTriangle } from "lucide-react";
 import { useSupabaseCrud } from "@/hooks/useSupabaseCrud";
 import { useRelationalNavigation } from "@/contexts/RelationalNavigationContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MultiSelect, type MultiSelectOption } from "@/components/ui/MultiSelect";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { formatCurrency, formatDate } from "@/lib/format";
+import { formatCurrency, formatDate, calculateDaysBetween } from "@/lib/format";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { Send } from "lucide-react";
 import { sendForApproval, approveOrcamento, convertToPedido } from "@/services/orcamentos.service";
+import { statusOrcamento } from "@/lib/statusSchema";
 
 interface Orcamento {
   id: string; numero: string; cliente_id: string; data_orcamento: string;
   validade: string; valor_total: number; observacoes: string; status: string;
   quantidade_total: number; peso_total: number;
+  pagamento: string; prazo_pagamento: string; prazo_entrega: string;
   ativo: boolean; clientes?: { nome_razao_social: string };
 }
 
-import { statusOrcamento, statusToOptions, getStatusLabel } from "@/lib/statusSchema";
+const TERMINAL_STATUSES = ["convertido", "cancelado", "rejeitado"];
+const PROXIMA_VENCER_DIAS = 7;
+
+function getValidadeStatus(validade: string | null, status: string): "vencida" | "proxima" | "vigente" | "sem_validade" {
+  if (!validade) return "sem_validade";
+  if (TERMINAL_STATUSES.includes(status)) return "vigente";
+  const daysLeft = calculateDaysBetween(new Date(), validade);
+  if (daysLeft < 0) return "vencida";
+  if (daysLeft <= PROXIMA_VENCER_DIAS) return "proxima";
+  return "vigente";
+}
+
+function ValidadeBadge({ validade, status }: { validade: string | null; status: string }) {
+  if (!validade) return <span className="text-muted-foreground">—</span>;
+  const vs = getValidadeStatus(validade, status);
+  const daysLeft = calculateDaysBetween(new Date(), validade);
+  if (vs === "vencida") {
+    return (
+      <span className="inline-flex flex-col items-start gap-0.5">
+        <span className="text-xs text-destructive font-medium">{formatDate(validade)}</span>
+        <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 bg-destructive/10 text-destructive border-destructive/20 gap-1">
+          <AlertTriangle className="h-2.5 w-2.5" />Vencida
+        </Badge>
+      </span>
+    );
+  }
+  if (vs === "proxima") {
+    return (
+      <span className="inline-flex flex-col items-start gap-0.5">
+        <span className="text-xs text-amber-600 font-medium">{formatDate(validade)}</span>
+        <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 bg-amber-50 text-amber-600 border-amber-200 gap-1">
+          <Clock className="h-2.5 w-2.5" />{daysLeft}d restantes
+        </Badge>
+      </span>
+    );
+  }
+  return <span className="text-xs">{formatDate(validade)}</span>;
+}
 
 const statusLabels: Record<string, string> = Object.fromEntries(
   Object.entries(statusOrcamento).map(([k, v]) => [k, v.label])
@@ -47,6 +85,9 @@ const Orcamentos = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilters, setStatusFilters] = useState<string[]>([]);
   const [clienteFilters, setClienteFilters] = useState<string[]>([]);
+  const [validadeFilters, setValidadeFilters] = useState<string[]>([]);
+  const [dataInicio, setDataInicio] = useState("");
+  const [dataFim, setDataFim] = useState("");
   const [clientesList, setClientesList] = useState<any[]>([]);
   const { isAdmin } = useIsAdmin();
 
@@ -143,24 +184,78 @@ const Orcamentos = () => {
       if (statusFilters.length > 0 && !statusFilters.includes(orc.status)) return false;
       if (clienteFilters.length > 0 && !clienteFilters.includes(orc.cliente_id || "")) return false;
 
+      if (validadeFilters.length > 0) {
+        const vs = getValidadeStatus(orc.validade, orc.status);
+        if (!validadeFilters.includes(vs)) return false;
+      }
+
+      if (dataInicio) {
+        const emissao = orc.data_orcamento;
+        if (!emissao || emissao < dataInicio) return false;
+      }
+      if (dataFim) {
+        const emissao = orc.data_orcamento;
+        if (!emissao || emissao > dataFim) return false;
+      }
+
       if (!query) return true;
       return [orc.numero, orc.clientes?.nome_razao_social, orc.observacoes].filter(Boolean).join(" ").toLowerCase().includes(query);
     });
-  }, [data, searchTerm, statusFilters, clienteFilters]);
+  }, [data, searchTerm, statusFilters, clienteFilters, validadeFilters, dataInicio, dataFim]);
 
   const columns = [
-    { key: "numero", label: "Nº", sortable: true, render: (o: Orcamento) => <span className="font-mono text-xs font-medium text-primary">{o.numero}</span> },
-    { key: "cliente", label: "Cliente", render: (o: Orcamento) => o.clientes?.nome_razao_social || "—" },
-    { key: "data_orcamento", label: "Data", sortable: true, render: (o: Orcamento) => formatDate(o.data_orcamento) },
-    { key: "validade", label: "Validade", render: (o: Orcamento) => o.validade ? formatDate(o.validade) : "—" },
-    { key: "valor_total", label: "Total", sortable: true, render: (o: Orcamento) => <span className="font-semibold font-mono">{formatCurrency(Number(o.valor_total || 0))}</span> },
-    { key: "status", label: "Status", sortable: true, render: (o: Orcamento) => <StatusBadge status={o.status} label={statusLabels[o.status]} /> },
     {
-      key: "acoes_comercial", label: "Ações", sortable: false, render: (o: Orcamento) => (
+      key: "numero", label: "Nº Cotação", sortable: true,
+      render: (o: Orcamento) => <span className="font-mono text-xs font-semibold text-primary">{o.numero}</span>,
+    },
+    {
+      key: "cliente", label: "Cliente",
+      render: (o: Orcamento) => (
+        <span className="font-medium text-sm">{o.clientes?.nome_razao_social || "—"}</span>
+      ),
+    },
+    {
+      key: "data_orcamento", label: "Emissão", sortable: true,
+      render: (o: Orcamento) => <span className="text-xs">{formatDate(o.data_orcamento)}</span>,
+    },
+    {
+      key: "validade", label: "Validade",
+      render: (o: Orcamento) => <ValidadeBadge validade={o.validade} status={o.status} />,
+    },
+    {
+      key: "valor_total", label: "Total", sortable: true,
+      render: (o: Orcamento) => <span className="font-semibold font-mono text-sm">{formatCurrency(Number(o.valor_total || 0))}</span>,
+    },
+    {
+      key: "status", label: "Status", sortable: true,
+      render: (o: Orcamento) => {
+        const vs = getValidadeStatus(o.validade, o.status);
+        const effectiveStatus = vs === "vencida" && o.status === "enviado" ? "expirado" : o.status;
+        return <StatusBadge status={effectiveStatus} label={statusLabels[effectiveStatus] ?? statusLabels[o.status]} />;
+      },
+    },
+    {
+      key: "pagamento", label: "Pagamento", hidden: true,
+      render: (o: Orcamento) => {
+        const parts = [o.pagamento, o.prazo_pagamento].filter(Boolean);
+        return <span className="text-xs text-muted-foreground">{parts.length > 0 ? parts.join(" · ") : "—"}</span>;
+      },
+    },
+    {
+      key: "prazo_entrega", label: "Prazo Entrega", hidden: true,
+      render: (o: Orcamento) => <span className="text-xs text-muted-foreground">{o.prazo_entrega || "—"}</span>,
+    },
+    {
+      key: "peso_total", label: "Peso Total", hidden: true,
+      render: (o: Orcamento) => <span className="text-xs text-muted-foreground">{o.peso_total ? `${o.peso_total} kg` : "—"}</span>,
+    },
+    {
+      key: "acoes_comercial", label: "Ações", sortable: false,
+      render: (o: Orcamento) => (
         <div className="flex items-center gap-1">
           {o.status === "rascunho" && (
             <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={(e) => { e.stopPropagation(); handleSendForApproval(o); }}>
-              <Send className="w-3 h-3" /> Enviar p/ Aprovação
+              <Send className="w-3 h-3" /> Enviar
             </Button>
           )}
           {o.status === "confirmado" && (
@@ -180,6 +275,12 @@ const Orcamentos = () => {
 
   const convertingOrc = data.find(o => o.id === convertingId);
 
+  const validadeOptions: MultiSelectOption[] = [
+    { label: "Vencidas", value: "vencida" },
+    { label: `Próximas a vencer (≤${PROXIMA_VENCER_DIAS}d)`, value: "proxima" },
+    { label: "Vigentes", value: "vigente" },
+  ];
+
   const orcActiveFilters = useMemo(() => {
     const chips: FilterChip[] = [];
     statusFilters.forEach(f => {
@@ -189,12 +290,21 @@ const Orcamentos = () => {
       const cli = clientesList.find(x => x.id === f);
       chips.push({ key: "cliente", label: "Cliente", value: [f], displayValue: cli?.nome_razao_social || f });
     });
+    validadeFilters.forEach(f => {
+      const opt = validadeOptions.find(x => x.value === f);
+      chips.push({ key: "validade", label: "Validade", value: [f], displayValue: opt?.label || f });
+    });
+    if (dataInicio) chips.push({ key: "dataInicio", label: "Emissão desde", value: [dataInicio], displayValue: formatDate(dataInicio) });
+    if (dataFim) chips.push({ key: "dataFim", label: "Emissão até", value: [dataFim], displayValue: formatDate(dataFim) });
     return chips;
-  }, [statusFilters, clienteFilters, clientesList]);
+  }, [statusFilters, clienteFilters, validadeFilters, dataInicio, dataFim, clientesList]);
 
   const handleRemoveOrcFilter = (key: string, value?: string) => {
     if (key === "status") setStatusFilters(prev => prev.filter(v => v !== value));
     if (key === "cliente") setClienteFilters(prev => prev.filter(v => v !== value));
+    if (key === "validade") setValidadeFilters(prev => prev.filter(v => v !== value));
+    if (key === "dataInicio") setDataInicio("");
+    if (key === "dataFim") setDataFim("");
   };
 
   const statusOptions: MultiSelectOption[] = Object.entries(statusLabels).map(([k, v]) => ({
@@ -209,14 +319,14 @@ const Orcamentos = () => {
     <AppLayout>
       <ModulePage
         title="Cotações"
-        subtitle="Criação e emissão de propostas comerciais"
+        subtitle="Central de consulta e acompanhamento do funil comercial"
         addLabel="Nova Cotação"
         onAdd={() => navigate("/cotacoes/novo")}
       >
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <SummaryCard title="Total de Cotações" value={String(kpis.total)} icon={FileText} variationType="neutral" variation="registros" />
           <SummaryCard title="Valor Total" value={formatCurrency(kpis.totalValue)} icon={DollarSign} variationType="neutral" variation="acumulado" />
-          <SummaryCard title="Aprovadas" value={String(kpis.approved)} icon={Clock} variationType="positive" variation="aguardando geração de pedido" />
+          <SummaryCard title="Aprovadas" value={String(kpis.approved)} icon={CheckCircle} variationType="positive" variation="aguardando geração de pedido" />
           <SummaryCard title="Taxa de Conversão" value={`${kpis.conversionRate}%`} icon={BarChart3} variationType="positive" variation="cotações → Pedido" />
         </div>
 
@@ -226,7 +336,7 @@ const Orcamentos = () => {
           searchPlaceholder="Buscar por número da cotação ou cliente..."
           activeFilters={orcActiveFilters}
           onRemoveFilter={handleRemoveOrcFilter}
-          onClearAll={() => { setStatusFilters([]); setClienteFilters([]); }}
+          onClearAll={() => { setStatusFilters([]); setClienteFilters([]); setValidadeFilters([]); setDataInicio(""); setDataFim(""); }}
           count={filteredData.length}
         >
           <MultiSelect
@@ -237,16 +347,46 @@ const Orcamentos = () => {
             className="w-[200px]"
           />
           <MultiSelect
+            options={validadeOptions}
+            selected={validadeFilters}
+            onChange={setValidadeFilters}
+            placeholder="Validade"
+            className="w-[200px]"
+          />
+          <MultiSelect
             options={clienteOptions}
             selected={clienteFilters}
             onChange={setClienteFilters}
             placeholder="Clientes"
             className="w-[250px]"
           />
+          <div className="flex items-center gap-2">
+            <Input
+              type="date"
+              value={dataInicio}
+              onChange={(e) => setDataInicio(e.target.value)}
+              className="h-9 w-[140px] text-xs"
+              title="Emissão desde"
+            />
+            <span className="text-xs text-muted-foreground">até</span>
+            <Input
+              type="date"
+              value={dataFim}
+              onChange={(e) => setDataFim(e.target.value)}
+              className="h-9 w-[140px] text-xs"
+              title="Emissão até"
+            />
+          </div>
         </AdvancedFilterBar>
 
-        <DataTable columns={columns} data={filteredData} loading={loading}
+        <DataTable
+          columns={columns}
+          data={filteredData}
+          loading={loading}
+          moduleKey="cotacoes"
+          showColumnToggle={true}
           onView={(o) => pushView("orcamento", o.id)}
+          onEdit={(o) => navigate(`/cotacoes/${o.id}`)}
         />
       </ModulePage>
 
