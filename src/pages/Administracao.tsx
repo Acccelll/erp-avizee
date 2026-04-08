@@ -106,6 +106,8 @@ export default function Administracao() {
   const [fiscalErrors, setFiscalErrors] = useState<Record<string, string>>({});
   const [fiscalLastSaved, setFiscalLastSaved] = useState<{ at: string | null; by: string | null }>({ at: null, by: null });
 
+  const [financeiroLastSaved, setFinanceiroLastSaved] = useState<{ at: string | null; by: string | null }>({ at: null, by: null });
+
   useEffect(() => {
     const tab = searchParams.get('tab');
     if (tab && tab !== activeSection) setActiveSection(tab);
@@ -127,6 +129,8 @@ export default function Administracao() {
         const { _updatedAt: emailUpdatedAt, _updatedBy: emailUpdatedBy, ...emailData } = emailRaw;
         const fiscalRaw = (appConfig.fiscal as any) || {};
         const { _updatedAt: fiscalUpdatedAt, _updatedByName: fiscalUpdatedByName, ...fiscalData } = fiscalRaw;
+        const financeiroRaw = (appConfig.financeiro as any) || {};
+        const { _updatedAt: financeiroUpdatedAt, _updatedByName: financeiroUpdatedByName, ...financeiroData } = financeiroRaw;
         const merged = {
           ...defaultConfig,
           geral: {
@@ -155,7 +159,7 @@ export default function Administracao() {
           usuarios: { ...defaultConfig.usuarios, ...((appConfig.usuarios as any) || {}) },
           email: { ...defaultConfig.email, ...emailData },
           fiscal: { ...defaultConfig.fiscal, ...fiscalData },
-          financeiro: { ...defaultConfig.financeiro, ...((appConfig.financeiro as any) || {}) },
+          financeiro: { ...defaultConfig.financeiro, ...financeiroData },
         };
         if (mounted) {
           setEmpresaConfigId(empresa?.id || null);
@@ -164,6 +168,7 @@ export default function Administracao() {
           setConfig(merged);
           setEmailLastSaved({ at: emailUpdatedAt || null, by: emailUpdatedBy || null });
           setFiscalLastSaved({ at: fiscalUpdatedAt || null, by: fiscalUpdatedByName || null });
+          setFinanceiroLastSaved({ at: financeiroUpdatedAt || null, by: financeiroUpdatedByName || null });
         }
       } catch {
         console.error('[admin] Erro ao carregar configurações do Supabase');
@@ -346,11 +351,12 @@ export default function Administracao() {
         { chave: 'usuarios', valor: config.usuarios as any, descricao: 'Parâmetros de usuários' },
         { chave: 'email', valor: { ...config.email, _updatedAt: now, _updatedBy: user?.id ?? null } as any, descricao: 'Parâmetros de envio e remetente' },
         { chave: 'fiscal', valor: { ...config.fiscal, _updatedAt: now, _updatedBy: user?.id ?? null, _updatedByName: profile?.nome ?? user?.email ?? null } as any, descricao: 'Parâmetros fiscais' },
-        { chave: 'financeiro', valor: config.financeiro as any, descricao: 'Parâmetros financeiros' },
+        { chave: 'financeiro', valor: { ...config.financeiro, _updatedAt: now, _updatedBy: user?.id ?? null, _updatedByName: profile?.nome ?? user?.email ?? null } as any, descricao: 'Parâmetros financeiros' },
       ];
       await supabase.from('app_configuracoes').upsert(appRows, { onConflict: 'chave' });
       setEmailLastSaved({ at: now, by: user?.id ?? null });
       setFiscalLastSaved({ at: now, by: profile?.nome ?? user?.email ?? null });
+      setFinanceiroLastSaved({ at: now, by: profile?.nome ?? user?.email ?? null });
       toast.success('Configurações salvas com sucesso.');
     } catch (error: unknown) {
       console.error('[admin] Erro ao salvar:', error);
@@ -1073,6 +1079,160 @@ export default function Administracao() {
     </div>
   );
 
+  const renderFinanceiro = () => (
+    <div className="space-y-6">
+      {/* Bloco 1 — Padrões de títulos */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-start gap-3">
+            <Wallet className="mt-0.5 h-5 w-5 text-muted-foreground shrink-0" />
+            <div>
+              <CardTitle>Padrões de títulos</CardTitle>
+              <CardDescription>
+                Valores base utilizados como ponto de partida na geração de títulos, lançamentos e baixas financeiras. Podem ser complementados por parametrizações específicas por documento ou operação.
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="grid gap-4 md:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label>Condição de pagamento padrão</Label>
+            <Input
+              value={config.financeiro.condicaoPadrao}
+              onChange={(e) => updateSection('financeiro', { condicaoPadrao: e.target.value })}
+              placeholder="Ex.: 30 dias"
+            />
+            <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+              <Info className="h-3 w-3" />Sugerida como condição inicial na geração de títulos a pagar e a receber.
+            </p>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Forma de pagamento padrão</Label>
+            <Input
+              value={config.financeiro.formaPagamentoPadrao}
+              onChange={(e) => updateSection('financeiro', { formaPagamentoPadrao: e.target.value })}
+              placeholder="Ex.: Boleto"
+            />
+            <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+              <Info className="h-3 w-3" />Aplicada como preenchimento inicial em lançamentos e baixas financeiras.
+            </p>
+          </div>
+          <div className="space-y-1.5 md:col-span-2">
+            <Label>Banco / conta padrão</Label>
+            <Input
+              value={config.financeiro.bancoPadrao}
+              onChange={(e) => updateSection('financeiro', { bancoPadrao: e.target.value })}
+              placeholder="Ex.: Inter — Conta Corrente"
+            />
+            <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+              <Info className="h-3 w-3" />Conta financeira sugerida para operações de pagamento e recebimento. Futuramente selecionável a partir do cadastro de contas bancárias.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Bloco 2 — Regras operacionais financeiras */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-start gap-3">
+            <CheckCircle2 className="mt-0.5 h-5 w-5 text-muted-foreground shrink-0" />
+            <div>
+              <CardTitle>Regras operacionais financeiras</CardTitle>
+              <CardDescription>
+                Define como o ERP se comporta em operações financeiras. Diferente dos padrões acima, estas opções controlam fluxos e permissões globais do sistema.
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-start justify-between rounded-lg border p-4 gap-4">
+            <div className="space-y-1">
+              <p className="font-medium text-sm">Permitir baixa parcial por padrão</p>
+              <p className="text-sm text-muted-foreground">
+                Quando ativo, o sistema permite registrar baixas parciais em contas a pagar e a receber por padrão. A regra é global e se aplica a todos os usuários do sistema.
+              </p>
+            </div>
+            <Switch
+              checked={config.financeiro.permitirBaixaParcial}
+              onCheckedChange={(checked) => updateSection('financeiro', { permitirBaixaParcial: checked })}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Bloco 3 — Contexto de aplicação */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-start gap-3">
+            <Globe className="mt-0.5 h-5 w-5 text-muted-foreground shrink-0" />
+            <div>
+              <CardTitle>Contexto de aplicação</CardTitle>
+              <CardDescription>
+                Padrões financeiros globais usados como base em títulos, baixas e lançamentos gerados pelo sistema.
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Esta configuração impacta</p>
+            <ul className="grid gap-1 sm:grid-cols-2">
+              {[
+                'Geração de títulos a pagar e a receber',
+                'Baixas financeiras manuais e automáticas',
+                'Lançamentos financeiros de contas a pagar',
+                'Lançamentos financeiros de contas a receber',
+                'Integrações oriundas de compras e vendas',
+                'Documentos com geração financeira automática',
+              ].map((item) => (
+                <li key={item} className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <span className="h-1.5 w-1.5 rounded-full bg-primary shrink-0" />
+                  {item}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <Separator />
+          <p className="text-xs text-muted-foreground">
+            Esses valores servem como configuração inicial e podem futuramente ser complementados por parametrizações específicas por tipo de operação, empresa ou filial.
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* Bloco 4 — Governança e uso no sistema */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-start gap-3">
+            <Calendar className="mt-0.5 h-5 w-5 text-muted-foreground shrink-0" />
+            <div>
+              <CardTitle>Governança e uso no sistema</CardTitle>
+              <CardDescription>Rastreabilidade desta configuração e visibilidade do seu alcance nos fluxos financeiros do ERP.</CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="rounded-md border bg-muted/30 p-3 space-y-0.5">
+              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Última atualização</p>
+              <p className="text-sm font-medium">
+                {financeiroLastSaved.at
+                  ? new Date(financeiroLastSaved.at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
+                  : '—'}
+              </p>
+            </div>
+            <div className="rounded-md border bg-muted/30 p-3 space-y-0.5">
+              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Alterado por</p>
+              <p className="text-sm font-medium">{financeiroLastSaved.by ?? '—'}</p>
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Alterações nesta seção impactam o comportamento padrão de títulos futuros, baixas financeiras e integrações com os módulos de compras, vendas e fiscal. Revise com atenção antes de salvar.
+          </p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+
   const renderContent = () => {
     switch (activeSection) {
       case 'empresa':
@@ -1088,23 +1248,7 @@ export default function Administracao() {
         return renderFiscal();
 
       case 'financeiro':
-        return (
-          <Card>
-            <CardHeader>
-              <CardTitle>Padrões financeiros</CardTitle>
-              <CardDescription>Condições padrão para títulos e baixas.</CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2"><Label>Condição padrão</Label><Input value={config.financeiro.condicaoPadrao} onChange={(e) => updateSection('financeiro', { condicaoPadrao: e.target.value })} /></div>
-              <div className="space-y-2"><Label>Forma de pagamento padrão</Label><Input value={config.financeiro.formaPagamentoPadrao} onChange={(e) => updateSection('financeiro', { formaPagamentoPadrao: e.target.value })} /></div>
-              <div className="space-y-2"><Label>Banco padrão</Label><Input value={config.financeiro.bancoPadrao} onChange={(e) => updateSection('financeiro', { bancoPadrao: e.target.value })} /></div>
-              <div className="flex items-center justify-between rounded-lg border p-4 md:col-span-2">
-                <div><p className="font-medium">Permitir baixa parcial</p><p className="text-sm text-muted-foreground">Autoriza baixas parciais em contas a pagar ou receber.</p></div>
-                <Switch checked={config.financeiro.permitirBaixaParcial} onCheckedChange={(checked) => updateSection('financeiro', { permitirBaixaParcial: checked })} />
-              </div>
-            </CardContent>
-          </Card>
-        );
+        return renderFinanceiro();
 
       case 'auditoria':
         return (
