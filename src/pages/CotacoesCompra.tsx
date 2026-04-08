@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AppLayout } from "@/components/AppLayout";
 import { ModulePage } from "@/components/ModulePage";
@@ -7,6 +7,8 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { SummaryCard } from "@/components/SummaryCard";
 import { FormModal } from "@/components/FormModal";
 import { ViewDrawerV2, ViewField, ViewSection } from "@/components/ViewDrawerV2";
+import { AdvancedFilterBar } from "@/components/AdvancedFilterBar";
+import type { FilterChip } from "@/components/AdvancedFilterBar";
 import { RelationalLink } from "@/components/ui/RelationalLink";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
@@ -14,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { MultiSelect, type MultiSelectOption } from "@/components/ui/MultiSelect";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { AutocompleteSearch } from "@/components/ui/AutocompleteSearch";
@@ -47,6 +50,13 @@ interface CotacaoItem {
   quantidade: number;
   unidade: string;
   produtos?: { nome: string; codigo_interno: string; sku: string };
+}
+
+interface CotacaoSummary {
+  itens_count: number;
+  fornecedores_count: number;
+  vencedor_nome: string | null;
+  tem_vencedor: boolean;
 }
 
 interface Proposta {
@@ -136,11 +146,104 @@ export default function CotacoesCompra() {
 
   // KPIs
   const kpis = useMemo(() => {
-    const abertas = data.filter((c) => c.status === "aberta").length;
-    const emAnalise = data.filter((c) => c.status === "em_analise").length;
-    const finalizadas = data.filter((c) => c.status === "finalizada" || c.status === "convertida").length;
-    return { total: data.length, abertas, emAnalise, finalizadas };
+    const emCotacao = data.filter((c) => c.status === "aberta" || c.status === "em_analise").length;
+    const aguardandoAprovacao = data.filter((c) => c.status === "aguardando_aprovacao").length;
+    const convertidas = data.filter((c) => c.status === "convertida").length;
+    return { total: data.length, emCotacao, aguardandoAprovacao, convertidas };
   }, [data]);
+
+  // Search & filter state
+  const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [statusFilters, setStatusFilters] = useState<string[]>([]);
+
+  // Debounce search
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchTerm), 300);
+    return () => clearTimeout(t);
+  }, [searchTerm]);
+
+  // Per-row enrichment: items count, supplier count, winner
+  const [summaries, setSummaries] = useState<Record<string, CotacaoSummary>>({});
+
+  // Stable string key derived from the loaded IDs — avoids re-firing when the
+  // array reference changes but the actual data hasn't (the `?? []` fallback in
+  // useSupabaseCrud creates a new [] reference on every render while loading,
+  // which would otherwise cause an infinite update loop via setSummaries).
+  const enrichmentKey = useMemo(() => data.map((c) => c.id).join(","), [data]);
+
+  useEffect(() => {
+    if (!enrichmentKey) return;
+    const ids = enrichmentKey.split(",");
+    Promise.all([
+      supabase
+        .from("cotacoes_compra_itens")
+        .select("cotacao_compra_id")
+        .in("cotacao_compra_id", ids),
+      supabase
+        .from("cotacoes_compra_propostas")
+        .select("cotacao_compra_id, fornecedor_id, selecionado, fornecedores(nome_razao_social)")
+        .in("cotacao_compra_id", ids),
+    ]).then(([{ data: itens }, { data: propostas }]) => {
+      const map: Record<string, CotacaoSummary> = {};
+      for (const id of ids) {
+        const cItens = (itens || []).filter((i: any) => i.cotacao_compra_id === id);
+        const cPropostas = (propostas || []).filter((p: any) => p.cotacao_compra_id === id);
+        const fornUniq = new Set(cPropostas.map((p: any) => p.fornecedor_id)).size;
+        const selecionadas = cPropostas.filter((p: any) => p.selecionado);
+        const vencIds = [...new Set(selecionadas.map((p: any) => p.fornecedor_id))];
+        const vencNome =
+          vencIds.length === 1
+            ? ((cPropostas.find(
+                (p: any) => p.fornecedor_id === vencIds[0] && p.selecionado
+              ) as any)?.fornecedores?.nome_razao_social ?? null)
+            : vencIds.length > 1
+            ? `${vencIds.length} fornecedores`
+            : null;
+        map[id] = {
+          itens_count: cItens.length,
+          fornecedores_count: fornUniq,
+          vencedor_nome: vencNome,
+          tem_vencedor: selecionadas.length > 0,
+        };
+      }
+      setSummaries(map);
+    }).catch(() => { /* silent – enrichment is best-effort */ });
+  }, [enrichmentKey]);
+
+  // Filtered data (search + status)
+  const filteredData = useMemo(() => {
+    return data.filter((c) => {
+      if (statusFilters.length > 0 && !statusFilters.includes(c.status)) return false;
+      if (debouncedSearch) {
+        const q = debouncedSearch.toLowerCase();
+        if (
+          !c.numero.toLowerCase().includes(q) &&
+          !(c.observacoes || "").toLowerCase().includes(q)
+        )
+          return false;
+      }
+      return true;
+    });
+  }, [data, statusFilters, debouncedSearch]);
+
+  // Active filter chips
+  const activeFilters = useMemo<FilterChip[]>(() => {
+    return statusFilters.map((s) => ({
+      key: "status",
+      label: "Status",
+      value: [s],
+      displayValue: statusLabels[s] || s,
+    }));
+  }, [statusFilters]);
+
+  const handleRemoveFilter = (key: string, value?: string) => {
+    if (key === "status") setStatusFilters((prev) => prev.filter((v) => v !== value));
+  };
+
+  const statusOptions: MultiSelectOption[] = Object.entries(statusLabels).map(
+    ([value, label]) => ({ value, label })
+  );
 
   // Drawer summary stats
   const drawerStats = useMemo(() => {
@@ -496,17 +599,77 @@ export default function CotacoesCompra() {
   }));
 
   const columns = [
-    { key: "numero", label: "Nº", render: (c: CotacaoCompra) => <span className="font-mono text-xs font-medium text-primary">{c.numero}</span> },
-    { key: "data_cotacao", label: "Data", render: (c: CotacaoCompra) => new Date(c.data_cotacao).toLocaleDateString("pt-BR") },
-    { key: "data_validade", label: "Validade", render: (c: CotacaoCompra) => c.data_validade ? new Date(c.data_validade).toLocaleDateString("pt-BR") : "—" },
-    { key: "status", label: "Status", render: (c: CotacaoCompra) => <StatusBadge status={c.status} label={statusLabels[c.status] || c.status} /> },
+    {
+      key: "numero",
+      label: "Cotação",
+      render: (c: CotacaoCompra) => (
+        <div>
+          <span className="font-mono text-xs font-semibold text-primary">{c.numero}</span>
+          <p className="text-[10px] text-muted-foreground mt-0.5">
+            {new Date(c.data_cotacao).toLocaleDateString("pt-BR")}
+          </p>
+        </div>
+      ),
+    },
+    {
+      key: "itens",
+      label: "Itens",
+      render: (c: CotacaoCompra) => {
+        const s = summaries[c.id];
+        if (!s) return <span className="text-muted-foreground/40 text-xs font-mono">—</span>;
+        return (
+          <span className="font-mono text-sm font-semibold">
+            {s.itens_count}
+          </span>
+        );
+      },
+    },
+    {
+      key: "fornecedores",
+      label: "Fornecedores",
+      render: (c: CotacaoCompra) => {
+        const s = summaries[c.id];
+        if (!s) return <span className="text-muted-foreground/40 text-xs">—</span>;
+        if (s.fornecedores_count === 0) {
+          return <span className="text-xs text-muted-foreground italic">Sem propostas</span>;
+        }
+        return (
+          <div>
+            <span className="text-sm font-mono font-semibold">{s.fornecedores_count}</span>
+            {s.vencedor_nome ? (
+              <p className="text-[10px] text-emerald-600 dark:text-emerald-400 flex items-center gap-0.5 mt-0.5">
+                <Trophy className="h-2.5 w-2.5 shrink-0" />
+                <span className="truncate max-w-[110px]">{s.vencedor_nome}</span>
+              </p>
+            ) : (
+              <p className="text-[10px] text-muted-foreground mt-0.5">Sem vencedor</p>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      key: "status",
+      label: "Status",
+      render: (c: CotacaoCompra) => (
+        <StatusBadge status={c.status} label={statusLabels[c.status] || c.status} />
+      ),
+    },
+    {
+      key: "data_validade",
+      label: "Validade",
+      render: (c: CotacaoCompra) =>
+        c.data_validade
+          ? new Date(c.data_validade).toLocaleDateString("pt-BR")
+          : "—",
+    },
   ];
 
   return (
     <AppLayout>
       <ModulePage
         title="Cotações de Compra"
-        subtitle="Compare propostas de fornecedores e selecione as melhores condições."
+        subtitle="Central de consulta e negociação de compra — propostas, comparação e aprovação."
         addLabel="Nova Cotação de Compra"
         onAdd={openCreate}
         count={data.length}
@@ -514,12 +677,39 @@ export default function CotacoesCompra() {
         {/* KPIs */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <SummaryCard title="Total" value={formatNumber(kpis.total)} icon={ShoppingCart} variationType="neutral" variation="cotações" />
-          <SummaryCard title="Abertas" value={formatNumber(kpis.abertas)} icon={Clock} variationType={kpis.abertas > 0 ? "negative" : "positive"} variation="aguardando propostas" />
-          <SummaryCard title="Em Análise" value={formatNumber(kpis.emAnalise)} icon={FileSearch} variationType="neutral" variation="comparando" />
-          <SummaryCard title="Finalizadas" value={formatNumber(kpis.finalizadas)} icon={CheckCircle2} variationType="positive" variation="concluídas" />
+          <SummaryCard title="Em Cotação" value={formatNumber(kpis.emCotacao)} icon={Clock} variationType={kpis.emCotacao > 0 ? "negative" : "positive"} variation="abertas ou em análise" />
+          <SummaryCard title="Aguardando Aprovação" value={formatNumber(kpis.aguardandoAprovacao)} icon={FileSearch} variationType={kpis.aguardandoAprovacao > 0 ? "negative" : "positive"} variation="pendentes de decisão" />
+          <SummaryCard title="Convertidas" value={formatNumber(kpis.convertidas)} icon={CheckCircle2} variationType="positive" variation="viraram pedidos" />
         </div>
 
-        <DataTable columns={columns} data={data} loading={loading} onView={openView} />
+        {/* Search + Filters */}
+        <AdvancedFilterBar
+          searchValue={searchTerm}
+          onSearchChange={setSearchTerm}
+          searchPlaceholder="Buscar por número ou observações..."
+          activeFilters={activeFilters}
+          onRemoveFilter={handleRemoveFilter}
+          onClearAll={() => setStatusFilters([])}
+          count={filteredData.length}
+        >
+          <MultiSelect
+            options={statusOptions}
+            selected={statusFilters}
+            onChange={setStatusFilters}
+            placeholder="Status"
+            className="w-[180px]"
+          />
+        </AdvancedFilterBar>
+
+        <DataTable
+          columns={columns}
+          data={filteredData}
+          loading={loading}
+          moduleKey="cotacoes_compra"
+          showColumnToggle={true}
+          onView={openView}
+          onEdit={openEdit}
+        />
       </ModulePage>
 
       {/* Create/Edit Modal */}
