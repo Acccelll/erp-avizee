@@ -166,9 +166,15 @@ export default function CotacoesCompra() {
   // Per-row enrichment: items count, supplier count, winner
   const [summaries, setSummaries] = useState<Record<string, CotacaoSummary>>({});
 
+  // Stable string key derived from the loaded IDs — avoids re-firing when the
+  // array reference changes but the actual data hasn't (the `?? []` fallback in
+  // useSupabaseCrud creates a new [] reference on every render while loading,
+  // which would otherwise cause an infinite update loop via setSummaries).
+  const enrichmentKey = useMemo(() => data.map((c) => c.id).join(","), [data]);
+
   useEffect(() => {
-    if (data.length === 0) { setSummaries({}); return; }
-    const ids = data.map((c) => c.id);
+    if (!enrichmentKey) return;
+    const ids = enrichmentKey.split(",");
     Promise.all([
       supabase
         .from("cotacoes_compra_itens")
@@ -202,8 +208,8 @@ export default function CotacoesCompra() {
         };
       }
       setSummaries(map);
-    });
-  }, [data]);
+    }).catch(() => { /* silent – enrichment is best-effort */ });
+  }, [enrichmentKey]);
 
   // Filtered data (search + status)
   const filteredData = useMemo(() => {
