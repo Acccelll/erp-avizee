@@ -26,7 +26,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Tables } from "@/integrations/supabase/types";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { TemplateConfig } from "@/types/orcamento";
-import { calcularRentabilidade, type InternalCostCandidate } from "@/lib/orcamentoRentabilidade";
+import { calcularRentabilidade, type InternalCostCandidate, getOrigemCustoAnalise } from "@/lib/orcamentoRentabilidade";
 import { getOrcamentoInternalAccess } from "@/lib/orcamentoInternalAccess";
 
 interface ClienteSnapshot {
@@ -113,19 +113,8 @@ export default function OrcamentoForm() {
   const productCostMap = useMemo(() => {
     const map = new Map<string, InternalCostCandidate>();
     for (const product of produtos) {
-      const fornecedores = product.produtos_fornecedores || [];
-      const lastPurchase = [...fornecedores]
-        .filter((row) => row.preco_compra && Number(row.preco_compra) > 0)
-        .sort((a, b) => {
-          const dateA = a.ultima_compra ? new Date(a.ultima_compra).getTime() : 0;
-          const dateB = b.ultima_compra ? new Date(b.ultima_compra).getTime() : 0;
-          return dateB - dateA;
-        })[0];
-
       map.set(product.id, {
         productCost: product.preco_custo,
-        lastPurchaseCost: lastPurchase?.preco_compra ?? null,
-        avgCost: null,
       });
     }
     return map;
@@ -142,9 +131,30 @@ export default function OrcamentoForm() {
     },
     (item) => ({
       ...(productCostMap.get(item.produto_id) || {}),
-      manualCost: item.custo_manual_unitario ?? null,
     }),
   ), [items, desconto, freteValor, impostoSt, impostoIpi, outrasDespesas, productCostMap]);
+
+  const updateItemSimulation = useCallback((itemIndex: number, payload: { custo_simulado?: number | null; usa_custo_simulado?: boolean; origem_custo_analise?: "cadastro_produto" | "simulado" }) => {
+    setItems((prev) => prev.map((item, index) => {
+      if (index !== itemIndex) return item;
+      const next = { ...item, ...payload };
+      if ((next.custo_simulado ?? null) == null) {
+        next.usa_custo_simulado = false;
+      }
+      next.origem_custo_analise = getOrigemCustoAnalise(next);
+      return next;
+    }));
+  }, []);
+
+  const clearItemSimulation = useCallback((itemIndex: number) => {
+    setItems((prev) => prev.map((item, index) => index === itemIndex
+      ? { ...item, custo_simulado: null, usa_custo_simulado: false, origem_custo_analise: "cadastro_produto" }
+      : item));
+  }, []);
+
+  const clearAllSimulations = useCallback(() => {
+    setItems((prev) => prev.map((item) => ({ ...item, custo_simulado: null, usa_custo_simulado: false, origem_custo_analise: "cadastro_produto" })));
+  }, []);
 
   useEffect(() => {
     if (!supabase) {
@@ -697,6 +707,9 @@ export default function OrcamentoForm() {
           <OrcamentoInternalAnalysisPanel
             analysis={internalAnalysis}
             access={internalAccess}
+            onUpdateSimulation={updateItemSimulation}
+            onClearSimulation={clearItemSimulation}
+            onClearAllSimulations={clearAllSimulations}
           />
 
           <OrcamentoTotaisCard

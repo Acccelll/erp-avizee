@@ -10,6 +10,9 @@ import type { MarginStatus, RentabilidadeAnalise, InternalCostSource } from "@/l
 interface Props {
   analysis: RentabilidadeAnalise;
   access: OrcamentoInternalAccess;
+  onUpdateSimulation: (itemIndex: number, payload: { custo_simulado?: number | null; usa_custo_simulado?: boolean; origem_custo_analise?: "cadastro_produto" | "simulado" }) => void;
+  onClearSimulation: (itemIndex: number) => void;
+  onClearAllSimulations: () => void;
 }
 
 const MARGIN_LABEL: Record<MarginStatus, string> = {
@@ -34,7 +37,7 @@ function marginClass(status: MarginStatus) {
   return "bg-red-100 text-red-700";
 }
 
-export function OrcamentoInternalAnalysisPanel({ analysis, access }: Props) {
+export function OrcamentoInternalAnalysisPanel({ analysis, access, onUpdateSimulation, onClearSimulation, onClearAllSimulations }: Props) {
   const [open, setOpen] = useState(false);
   const topAlerts = useMemo(() => analysis.alerts.slice(0, 4), [analysis.alerts]);
 
@@ -54,6 +57,7 @@ export function OrcamentoInternalAnalysisPanel({ analysis, access }: Props) {
           {open ? "Ocultar" : "Exibir"}
         </Button>
       </div>
+      <p className="text-xs text-muted-foreground">Simulação interna. Este valor não altera o cadastro do produto.</p>
 
       {!!topAlerts.length && (
         <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs space-y-1">
@@ -85,7 +89,9 @@ export function OrcamentoInternalAnalysisPanel({ analysis, access }: Props) {
               <thead>
                 <tr className="border-b bg-muted/40 text-muted-foreground">
                   <th className="text-left p-2">Item</th>
-                  {access.canViewInternalCosts && <th className="text-right p-2">Custo base</th>}
+                  {access.canViewInternalCosts && <th className="text-right p-2">Custo padrão</th>}
+                  {access.canViewInternalCosts && <th className="text-right p-2">Custo simulado</th>}
+                  {access.canViewInternalCosts && <th className="text-left p-2">Usar simulado</th>}
                   {access.canViewInternalCosts && <th className="text-right p-2">Custo final</th>}
                   <th className="text-right p-2">Venda líquida un.</th>
                   <th className="text-right p-2">Lucro un.</th>
@@ -100,8 +106,34 @@ export function OrcamentoInternalAnalysisPanel({ analysis, access }: Props) {
                     <td className="p-2">
                       <p className="font-medium">{item.descricao}</p>
                       <p className="text-muted-foreground">{item.quantidade} un. · {COST_SOURCE_LABEL[item.custoSource]}</p>
+                      {item.usaCustoSimulado && <Badge className="mt-1 bg-blue-100 text-blue-700 hover:bg-blue-100">Simulado</Badge>}
                     </td>
-                    {access.canViewInternalCosts && <td className="p-2 text-right">{item.custoBaseUnitario == null ? "—" : formatCurrency(item.custoBaseUnitario)}</td>}
+                    {access.canViewInternalCosts && <td className="p-2 text-right">{item.custoPadraoUnitario == null ? "Custo padrão indisponível" : formatCurrency(item.custoPadraoUnitario)}</td>}
+                    {access.canViewInternalCosts && (
+                      <td className="p-2 text-right">
+                        <input
+                          className="h-8 w-28 rounded-md border px-2 text-right"
+                          type="number"
+                          min={0}
+                          disabled={!access.canEditInternalCostBasis}
+                          value={item.custoSimuladoUnitario ?? ""}
+                          onChange={(e) => onUpdateSimulation(item.itemIndex, { custo_simulado: e.target.value === "" ? null : Math.max(0, Number(e.target.value)) })}
+                        />
+                      </td>
+                    )}
+                    {access.canViewInternalCosts && (
+                      <td className="p-2">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            disabled={!access.canEditInternalCostBasis || item.custoSimuladoUnitario == null}
+                            checked={item.usaCustoSimulado}
+                            onChange={(e) => onUpdateSimulation(item.itemIndex, { usa_custo_simulado: e.target.checked, origem_custo_analise: e.target.checked ? "simulado" : "cadastro_produto" })}
+                          />
+                          <Button variant="ghost" size="sm" disabled={!access.canEditInternalCostBasis} onClick={() => onClearSimulation(item.itemIndex)}>Voltar ao padrão</Button>
+                        </div>
+                      </td>
+                    )}
                     {access.canViewInternalCosts && <td className="p-2 text-right">{item.custoFinalUnitario == null ? "—" : formatCurrency(item.custoFinalUnitario)}</td>}
                     <td className="p-2 text-right">{formatCurrency(item.vendaLiquidaUnitaria)}</td>
                     <td className="p-2 text-right">{item.lucroUnitario == null ? "—" : formatCurrency(item.lucroUnitario)}</td>
@@ -119,6 +151,9 @@ export function OrcamentoInternalAnalysisPanel({ analysis, access }: Props) {
 
           <div className="rounded-lg border bg-background p-3 text-xs">
             <p className="font-medium mb-1 flex items-center gap-1.5"><ShieldAlert className="h-3.5 w-3.5" />Resumo interno da cotação</p>
+            <div className="mb-2">
+              <Button size="sm" variant="outline" disabled={!access.canEditInternalCostBasis} onClick={onClearAllSimulations}>Limpar todas as simulações</Button>
+            </div>
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-1.5 text-muted-foreground">
               <p>Frete: <span className="text-foreground">{formatCurrency(analysis.resumo.frete)}</span></p>
               <p>Impostos: <span className="text-foreground">{formatCurrency(analysis.resumo.impostos)}</span></p>

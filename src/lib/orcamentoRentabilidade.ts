@@ -19,9 +19,6 @@ export const DEFAULT_MARGIN_THRESHOLDS: MarginThresholds = {
 
 export interface InternalCostCandidate {
   productCost?: number | null;
-  lastPurchaseCost?: number | null;
-  avgCost?: number | null;
-  manualCost?: number | null;
 }
 
 export interface RentabilidadeContext {
@@ -43,6 +40,9 @@ export interface RentabilidadeItem {
   vendaLiquidaUnitaria: number;
   vendaTotalLiquida: number;
   custoBaseUnitario: number | null;
+  custoPadraoUnitario: number | null;
+  custoSimuladoUnitario: number | null;
+  usaCustoSimulado: boolean;
   custoSource: InternalCostSource;
   freteRateadoUnitario: number;
   impostoRateadoUnitario: number;
@@ -78,12 +78,23 @@ const round2 = (value: number) => Math.round((value + Number.EPSILON) * 100) / 1
 
 const safeNumber = (value: number | null | undefined) => (Number.isFinite(Number(value)) ? Number(value) : 0);
 
-export function resolveCostSource(candidate: InternalCostCandidate): { cost: number | null; source: InternalCostSource } {
-  if (candidate.manualCost != null && candidate.manualCost > 0) return { cost: candidate.manualCost, source: "custo_manual_cotacao" };
-  if (candidate.lastPurchaseCost != null && candidate.lastPurchaseCost > 0) return { cost: candidate.lastPurchaseCost, source: "ultimo_custo_compra" };
-  if (candidate.avgCost != null && candidate.avgCost > 0) return { cost: candidate.avgCost, source: "custo_medio" };
-  if (candidate.productCost != null && candidate.productCost > 0) return { cost: candidate.productCost, source: "custo_produto" };
-  return { cost: null, source: "indisponivel" };
+export function getCustoBaseAnalise(item: OrcamentoItem, candidate: InternalCostCandidate): { custoBasePadrao: number | null; custoBaseAnalise: number | null; source: InternalCostSource } {
+  const custoPadrao = candidate.productCost != null && candidate.productCost > 0 ? candidate.productCost : null;
+  const usaSimulado = Boolean(item.usa_custo_simulado) && (item.custo_simulado ?? null) != null && Number(item.custo_simulado) >= 0;
+
+  if (usaSimulado) {
+    return { custoBasePadrao: custoPadrao, custoBaseAnalise: Number(item.custo_simulado), source: "custo_manual_cotacao" };
+  }
+
+  if (custoPadrao != null) {
+    return { custoBasePadrao: custoPadrao, custoBaseAnalise: custoPadrao, source: "custo_produto" };
+  }
+
+  return { custoBasePadrao: null, custoBaseAnalise: null, source: "indisponivel" };
+}
+
+export function getOrigemCustoAnalise(item: OrcamentoItem): "cadastro_produto" | "simulado" {
+  return item.usa_custo_simulado && (item.custo_simulado ?? null) != null ? "simulado" : "cadastro_produto";
 }
 
 function getMarginStatus(margin: number | null, thresholds: MarginThresholds): MarginStatus {
@@ -100,14 +111,16 @@ export function calcularRentabilidade(
   getCostCandidate: (item: OrcamentoItem) => InternalCostCandidate,
   thresholds: MarginThresholds = DEFAULT_MARGIN_THRESHOLDS,
 ): RentabilidadeAnalise {
-  const validItems = items.filter((item) => item.produto_id);
-  const totalBrutoItens = validItems.reduce((sum, item) => sum + safeNumber(item.quantidade) * safeNumber(item.valor_unitario), 0);
+  const validItems = items
+    .map((item, originalIndex) => ({ item, originalIndex }))
+    .filter(({ item }) => item.produto_id);
+  const totalBrutoItens = validItems.reduce((sum, { item }) => sum + safeNumber(item.quantidade) * safeNumber(item.valor_unitario), 0);
   const descontoGlobal = Math.max(0, safeNumber(context.descontoGlobal));
   const frete = Math.max(0, safeNumber(context.frete));
   const impostos = Math.max(0, safeNumber(context.impostoSt) + safeNumber(context.impostoIpi));
   const outrosCustos = Math.max(0, safeNumber(context.outrasDespesas));
 
-  const analysisItems = validItems.map((item, idx): RentabilidadeItem => {
+  const analysisItems = validItems.map(({ item, originalIndex }): RentabilidadeItem => {
     const quantidade = safeNumber(item.quantidade);
     const precoVendaUnitario = safeNumber(item.valor_unitario);
     const descontoPercentual = safeNumber(item.desconto_percentual);
@@ -122,10 +135,10 @@ export function calcularRentabilidade(
     const impostoRateadoUnitario = quantidade > 0 ? round2((impostos * percentualRateio) / quantidade) : 0;
     const outrosCustosRateadosUnitario = quantidade > 0 ? round2((outrosCustos * percentualRateio) / quantidade) : 0;
 
-    const { cost: custoBaseUnitario, source } = resolveCostSource(getCostCandidate(item));
-    const custoFinalUnitario = custoBaseUnitario == null
+    const { custoBaseAnalise, custoBasePadrao, source } = getCustoBaseAnalise(item, getCostCandidate(item));
+    const custoFinalUnitario = custoBaseAnalise == null
       ? null
-      : round2(custoBaseUnitario + freteRateadoUnitario + impostoRateadoUnitario + outrosCustosRateadosUnitario);
+      : round2(custoBaseAnalise + freteRateadoUnitario + impostoRateadoUnitario + outrosCustosRateadosUnitario);
 
     const lucroUnitario = custoFinalUnitario == null ? null : round2(vendaLiquidaUnitaria - custoFinalUnitario);
     const lucroTotal = lucroUnitario == null ? null : round2(lucroUnitario * quantidade);
@@ -137,10 +150,10 @@ export function calcularRentabilidade(
     if (lucroUnitario != null && lucroUnitario < 0) alerts.push("Item com lucro negativo");
     if (margemPercentual != null && margemPercentual < thresholds.minimum) alerts.push("Margem abaixo da mínima");
     if (descontoPercentual > 0 && margemPercentual != null && margemPercentual < thresholds.attention) alerts.push("Desconto comprometeu a margem");
-    if (custoBaseUnitario != null && custoFinalUnitario != null && custoFinalUnitario > custoBaseUnitario) alerts.push("Frete/impostos reduziram a rentabilidade");
+    if (custoBaseAnalise != null && custoFinalUnitario != null && custoFinalUnitario > custoBaseAnalise) alerts.push("Frete/impostos reduziram a rentabilidade");
 
     return {
-      itemIndex: idx,
+      itemIndex: originalIndex,
       produtoId: item.produto_id,
       descricao: item.descricao_snapshot || "Item sem descrição",
       quantidade,
@@ -149,7 +162,10 @@ export function calcularRentabilidade(
       descontoRateadoUnitario: round2(descontoItemUnitario + descontoGlobalRateadoUnitario),
       vendaLiquidaUnitaria,
       vendaTotalLiquida: round2(vendaLiquidaUnitaria * quantidade),
-      custoBaseUnitario,
+      custoBaseUnitario: custoBaseAnalise,
+      custoPadraoUnitario: custoBasePadrao,
+      custoSimuladoUnitario: item.custo_simulado ?? null,
+      usaCustoSimulado: Boolean(item.usa_custo_simulado),
       custoSource: source,
       freteRateadoUnitario,
       impostoRateadoUnitario,
