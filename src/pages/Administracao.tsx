@@ -1,6 +1,6 @@
-import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Building2, Calendar, Check, Globe, Image, Info, Loader2, Mail, MapPin, Phone, Receipt, Shield, Upload, Users, Wallet } from 'lucide-react';
+import { Building2, Calendar, Globe, Image, Info, Loader2, Mail, MapPin, Phone, Receipt, Shield, Upload, Users, Wallet } from 'lucide-react';
 import { AppLayout } from '@/components/AppLayout';
 import { ModulePage } from '@/components/ModulePage';
 import { Button } from '@/components/ui/button';
@@ -16,36 +16,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { MaskedInput } from '@/components/ui/MaskedInput';
 import { useAuth } from '@/contexts/AuthContext';
-import type { Database } from '@/integrations/supabase/types';
-import { ERP_RESOURCES } from '@/lib/permissions';
-
-type AppRole = Database['public']['Enums']['app_role'];
-const ALL_ROLES: AppRole[] = ['admin', 'vendedor', 'financeiro', 'estoquista'];
-
-const ROLE_LABELS: Record<AppRole, string> = {
-  admin: 'Administrador',
-  vendedor: 'Vendedor',
-  financeiro: 'Financeiro',
-  estoquista: 'Estoquista',
-};
-
-const ROLE_COLORS: Record<AppRole, string> = {
-  admin: 'bg-destructive/10 text-destructive border-destructive/30',
-  vendedor: 'bg-primary/10 text-primary border-primary/30',
-  financeiro: 'bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-700',
-  estoquista: 'bg-emerald-100 text-emerald-700 border-emerald-300 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-700',
-};
-
-const ADMIN_UI_ACTIONS = ['visualizar', 'editar'] as const;
-
-type UiAction = (typeof ADMIN_UI_ACTIONS)[number];
-
-const roleCatalog: Record<AppRole, { label: string; defaultPermissions: string[] }> = {
-  admin: { label: 'Administrador', defaultPermissions: ERP_RESOURCES.flatMap((resource) => [`${resource}:visualizar`, `${resource}:editar`]) },
-  vendedor: { label: 'Vendedor', defaultPermissions: ['dashboard:visualizar', 'clientes:visualizar', 'clientes:editar', 'orcamentos:visualizar', 'orcamentos:editar', 'pedidos:visualizar', 'pedidos:editar', 'logistica:visualizar', 'relatorios:visualizar'] },
-  financeiro: { label: 'Financeiro', defaultPermissions: ['dashboard:visualizar', 'financeiro:visualizar', 'financeiro:editar', 'compras:visualizar', 'faturamento_fiscal:visualizar', 'relatorios:visualizar'] },
-  estoquista: { label: 'Estoquista', defaultPermissions: ['dashboard:visualizar', 'produtos:visualizar', 'estoque:visualizar', 'estoque:editar', 'compras:visualizar', 'logistica:visualizar', 'logistica:editar'] },
-};
+import { UsuariosTab } from '@/components/usuarios/UsuariosTab';
 
 const defaultConfig = {
   geral: {
@@ -111,18 +82,6 @@ const sideNavItems: SideNavItem[] = [
   { key: 'auditoria', label: 'Auditoria', icon: Shield },
 ];
 
-// ── User management types ──
-interface UserWithRoles {
-  id: string;
-  nome: string;
-  email: string | null;
-  cargo: string | null;
-  ativo: boolean;
-  created_at: string;
-  role_padrao: AppRole;
-  extra_permissions: string[];
-}
-
 export default function Administracao() {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -136,16 +95,6 @@ export default function Administracao() {
   const [empresaCreatedAt, setEmpresaCreatedAt] = useState<string | null>(null);
   const [logoUploading, setLogoUploading] = useState(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
-
-  // ── Users state ──
-  const [users, setUsers] = useState<UserWithRoles[]>([]);
-  const [usersLoading, setUsersLoading] = useState(false);
-  const [roleUpdating, setRoleUpdating] = useState<string | null>(null);
-
-  const permissionOptions = useMemo(() =>
-    ERP_RESOURCES.flatMap((resource) => ADMIN_UI_ACTIONS.map((action) => ({ key: `${resource}:${action}`, label: `${resource.replaceAll('_', ' ')} · ${action}` }))),
-    [],
-  );
 
   useEffect(() => {
     const tab = searchParams.get('tab');
@@ -210,92 +159,6 @@ export default function Administracao() {
     loadConfig();
     return () => { mounted = false; };
   }, []);
-
-  // ── Load users when tab = usuarios ──
-  const loadUsers = useCallback(async () => {
-    setUsersLoading(true);
-    try {
-      const [{ data: profiles }, { data: roles }, { data: userPermissions }] = await Promise.all([
-        supabase.from('profiles').select('id, nome, email, cargo, ativo, created_at, role_padrao'),
-        supabase.from('user_roles').select('user_id, role'),
-        supabase.from('user_permissions' as any).select('user_id, permission_key, ativo').eq('ativo', true),
-      ]);
-      const roleMap = new Map<string, AppRole[]>();
-      (roles || []).forEach((r: { user_id: string; role: string }) => {
-        const existing = roleMap.get(r.user_id) || [];
-        existing.push(r.role as AppRole);
-        roleMap.set(r.user_id, existing);
-      });
-      const permissionMap = new Map<string, string[]>();
-      ((userPermissions || []) as Array<{ user_id: string; permission_key: string }>).forEach((row) => {
-        const existing = permissionMap.get(row.user_id) || [];
-        existing.push(row.permission_key);
-        permissionMap.set(row.user_id, existing);
-      });
-      const merged: UserWithRoles[] = (profiles || []).map((p: { id: string; nome: string; email: string | null; cargo: string | null; ativo: boolean; created_at: string; role_padrao: AppRole | null }) => ({
-        ...p,
-        role_padrao: p.role_padrao || (roleMap.get(p.id)?.[0] || 'vendedor'),
-        extra_permissions: permissionMap.get(p.id) || [],
-      }));
-      merged.sort((a, b) => a.nome.localeCompare(b.nome));
-      setUsers(merged);
-    } catch (err) {
-      console.error('[admin] Erro ao carregar usuários:', err);
-      toast.error('Erro ao carregar lista de usuários.');
-    } finally {
-      setUsersLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (activeSection === 'usuarios') loadUsers();
-  }, [activeSection, loadUsers]);
-
-  // ── Roles e permissões ──
-  const setDefaultRole = async (userId: string, role: AppRole) => {
-    setRoleUpdating(`${userId}-default`);
-    try {
-      await supabase.from('profiles').update({ role_padrao: role }).eq('id', userId);
-      await supabase.from('permission_audit' as any).insert({
-        user_id: (await supabase.auth.getUser()).data.user?.id,
-        target_user_id: userId,
-        role_padrao: role,
-        alteracao: { tipo: 'role_padrao', role },
-      });
-      setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, role_padrao: role } : u));
-      toast.success(`Role padrão atualizado para ${ROLE_LABELS[role]}.`);
-    } catch (err) {
-      console.error('[admin] Erro ao alterar role padrão:', err);
-      toast.error('Erro ao alterar role padrão.');
-    } finally {
-      setRoleUpdating(null);
-    }
-  };
-
-  const toggleExtraPermission = async (userId: string, permissionKey: string, currentlyHas: boolean) => {
-    setRoleUpdating(`${userId}-${permissionKey}`);
-    try {
-      if (currentlyHas) {
-        await supabase.from('user_permissions' as any).upsert({ user_id: userId, permission_key: permissionKey, ativo: false, updated_by: (await supabase.auth.getUser()).data.user?.id }, { onConflict: 'user_id,permission_key' });
-      } else {
-        await supabase.from('user_permissions' as any).upsert({ user_id: userId, permission_key: permissionKey, ativo: true, created_by: (await supabase.auth.getUser()).data.user?.id, updated_by: (await supabase.auth.getUser()).data.user?.id }, { onConflict: 'user_id,permission_key' });
-      }
-      await supabase.from('permission_audit' as any).insert({
-        user_id: (await supabase.auth.getUser()).data.user?.id,
-        target_user_id: userId,
-        alteracao: { tipo: 'user_permission', permissionKey, ativo: !currentlyHas },
-      });
-      setUsers((prev) => prev.map((u) => u.id === userId ? {
-        ...u,
-        extra_permissions: currentlyHas ? u.extra_permissions.filter((p) => p !== permissionKey) : [...u.extra_permissions, permissionKey],
-      } : u));
-    } catch (err) {
-      console.error('[admin] Erro ao alterar permissão complementar:', err);
-      toast.error('Erro ao alterar permissão complementar.');
-    } finally {
-      setRoleUpdating(null);
-    }
-  };
 
   const updateSection = <T extends keyof typeof defaultConfig>(section: T, values: Partial<(typeof defaultConfig)[T]>) => {
     setConfig((current) => ({ ...current, [section]: { ...current[section], ...values } }));
@@ -401,92 +264,6 @@ export default function Administracao() {
       </AppLayout>
     );
   }
-
-  const renderUsuarios = () => {
-    if (usersLoading) {
-      return (
-        <Card>
-          <CardContent className="flex items-center justify-center py-12">
-            <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Carregando usuários...
-          </CardContent>
-        </Card>
-      );
-    }
-
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Usuários cadastrados ({users.length})</CardTitle>
-          <CardDescription>Cada usuário possui role padrão obrigatório e permissões complementares gerenciadas pelo administrador.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {users.map((u) => {
-              const defaultRolePermissions = roleCatalog[u.role_padrao]?.defaultPermissions || [];
-              return (
-              <div key={u.id} className="space-y-3 rounded-lg border p-4">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium truncate">{u.nome}</p>
-                    <p className="text-sm text-muted-foreground truncate">{u.email}</p>
-                    {u.cargo && <p className="text-xs text-muted-foreground">Cargo: {u.cargo}</p>}
-                    <p className="text-xs text-muted-foreground">Status: {u.ativo ? 'Ativo' : 'Inativo'}</p>
-                  </div>
-                  <div className="w-full sm:w-64">
-                    <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">Role padrão</Label>
-                    <Select value={u.role_padrao} onValueChange={(value) => setDefaultRole(u.id, value as AppRole)}>
-                      <SelectTrigger className="h-9 mt-1">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {ALL_ROLES.map((role) => <SelectItem key={role} value={role}>{ROLE_LABELS[role]}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                <div className="rounded-md border bg-muted/30 p-3">
-                  <p className="text-xs font-semibold mb-2">Permissões do role padrão ({roleCatalog[u.role_padrao].label})</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {defaultRolePermissions.map((perm) => (
-                      <span key={perm} className="inline-flex rounded-full border px-2 py-0.5 text-[11px] text-muted-foreground">{perm}</span>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <p className="text-xs font-semibold">Permissões complementares por usuário</p>
-                  <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-                    {permissionOptions.map((perm) => {
-                      const has = u.extra_permissions.includes(perm.key);
-                      const isUpdating = roleUpdating === `${u.id}-${perm.key}`;
-                      return (
-                        <button
-                          key={perm.key}
-                          type="button"
-                          onClick={() => toggleExtraPermission(u.id, perm.key, has)}
-                          disabled={isUpdating}
-                          className={cn('flex items-center justify-between rounded-md border px-2.5 py-2 text-left text-xs', has ? 'border-primary/40 bg-primary/5 text-primary' : 'text-muted-foreground')}
-                        >
-                          <span>{perm.label}</span>
-                          {has && <Check className="h-3.5 w-3.5" />}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            )})}
-            {users.length === 0 && (
-              <p className="text-center text-sm text-muted-foreground py-8">
-                Nenhum usuário encontrado.
-              </p>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-    );
-  };
 
   const renderEmpresa = () => {
     const isValidHex = (hex: string) => /^#[0-9A-Fa-f]{6}$/.test(hex);
@@ -780,7 +557,7 @@ export default function Administracao() {
         return renderEmpresa();
 
       case 'usuarios':
-        return renderUsuarios();
+        return <UsuariosTab />;
 
       case 'email':
         return (
