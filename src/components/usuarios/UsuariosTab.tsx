@@ -1140,7 +1140,7 @@ export function UsuariosTab() {
           </TabsList>
 
           {activeTab === 'usuarios' && (
-            <Button onClick={openCreate} className="gap-2 sm:self-auto">
+            <Button onClick={openCreate} className="gap-2">
               <UserPlus className="h-4 w-4" />
               Novo usuário
             </Button>
