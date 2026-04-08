@@ -15,6 +15,6 @@ export function getOrcamentoInternalAccess(roles: AppRole[]): OrcamentoInternalA
   return {
     canViewInternalMargin: canView,
     canViewInternalCosts: canView,
-    canEditInternalCostBasis: hasRole("admin"),
+    canEditInternalCostBasis: canView,
   };
 }
