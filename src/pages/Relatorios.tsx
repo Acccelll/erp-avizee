@@ -164,6 +164,164 @@ function buildPdf(resultado: RelatorioResultado, dataInicio: string, dataFim: st
   });
 }
 
+function getToday(): [string, string] {
+  const d = new Date().toISOString().slice(0, 10);
+  return [d, d];
+}
+
+function getCurrentMonth(): [string, string] {
+  const n = new Date();
+  const start = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-01`;
+  const end = new Date(n.getFullYear(), n.getMonth() + 1, 0).toISOString().slice(0, 10);
+  return [start, end];
+}
+
+function getPreviousMonth(): [string, string] {
+  const n = new Date();
+  const m = n.getMonth() === 0 ? 11 : n.getMonth() - 1;
+  const y = n.getMonth() === 0 ? n.getFullYear() - 1 : n.getFullYear();
+  const start = `${y}-${String(m + 1).padStart(2, '0')}-01`;
+  const end = new Date(y, m + 1, 0).toISOString().slice(0, 10);
+  return [start, end];
+}
+
+function getCurrentYear(): [string, string] {
+  const y = new Date().getFullYear();
+  return [`${y}-01-01`, `${y}-12-31`];
+}
+
+function buildKpis(tipoRel: TipoRelatorio, res: RelatorioResultado): SummaryCardProps[] {
+  const rows = res.rows as Record<string, unknown>[];
+  const totals = res.totals || {};
+  const chartData = res.chartData || [];
+
+  switch (tipoRel) {
+    case 'estoque': {
+      const alertas = rows.filter((r) => r.situacao !== 'OK').length;
+      return [
+        { title: 'Total de Itens', value: formatNumber(rows.length), icon: Package },
+        { title: 'Valor em Estoque', value: formatCurrency(totals.totalCusto ?? 0), icon: DollarSign, variant: 'info' },
+        { title: 'Abaixo do Mínimo', value: String(alertas), icon: AlertTriangle, variant: alertas > 0 ? 'danger' : 'default', variationType: alertas > 0 ? 'negative' : 'neutral', variation: alertas > 0 ? 'reposição necessária' : 'estoque OK' },
+      ];
+    }
+    case 'estoque_minimo':
+      return [
+        { title: 'Itens Críticos', value: formatNumber(rows.length), icon: AlertTriangle, variant: rows.length > 0 ? 'danger' : 'default', variationType: rows.length > 0 ? 'negative' : 'neutral', variation: 'abaixo do mínimo' },
+        { title: 'Custo de Reposição', value: formatCurrency(totals.custoTotal ?? 0), icon: DollarSign, variant: 'warning' },
+      ];
+    case 'movimentos_estoque':
+      return [
+        { title: 'Movimentos', value: formatNumber(rows.length), icon: ArrowLeftRight },
+        { title: 'Entradas', value: formatNumber(totals.totalEntradas ?? 0), icon: TrendingUp, variant: 'success' },
+        { title: 'Saídas', value: formatNumber(totals.totalSaidas ?? 0), icon: Package, variant: 'warning' },
+      ];
+    case 'financeiro': {
+      const receber = chartData.find((c) => c.name === 'Receber')?.value ?? 0;
+      const pagar = chartData.find((c) => c.name === 'Pagar')?.value ?? 0;
+      const vencidos = rows.filter((r) => r.status === 'vencido').length;
+      return [
+        { title: 'A Receber', value: formatCurrency(receber), icon: TrendingUp, variant: 'success' },
+        { title: 'A Pagar', value: formatCurrency(pagar), icon: Wallet, variant: 'danger' },
+        { title: 'Vencidos', value: String(vencidos), icon: AlertTriangle, variant: vencidos > 0 ? 'danger' : 'default', variationType: vencidos > 0 ? 'negative' : 'neutral', variation: vencidos > 0 ? 'títulos vencidos' : 'sem vencidos' },
+      ];
+    }
+    case 'fluxo_caixa': {
+      const sf = totals.saldoFinal ?? 0;
+      return [
+        { title: 'Total Entradas', value: formatCurrency(totals.totalEntradas ?? 0), icon: TrendingUp, variant: 'success' },
+        { title: 'Total Saídas', value: formatCurrency(totals.totalSaidas ?? 0), icon: Wallet, variant: 'danger' },
+        { title: 'Saldo Final', value: formatCurrency(sf), icon: DollarSign, variant: sf >= 0 ? 'success' : 'danger', variationType: sf >= 0 ? 'positive' : 'negative', variation: sf >= 0 ? 'saldo positivo' : 'saldo negativo' },
+      ];
+    }
+    case 'vendas': {
+      const totalVendas = rows.reduce((s, r) => s + Number(r.valor ?? 0), 0);
+      const ticket = rows.length > 0 ? totalVendas / rows.length : 0;
+      return [
+        { title: 'Pedidos', value: formatNumber(rows.length), icon: ShoppingCart },
+        { title: 'Valor Total', value: formatCurrency(totalVendas), icon: DollarSign, variant: 'info' },
+        { title: 'Ticket Médio', value: formatCurrency(ticket), icon: TrendingUp },
+      ];
+    }
+    case 'faturamento':
+      return [
+        { title: 'NFs Emitidas', value: formatNumber(rows.length), icon: Receipt },
+        { title: 'Receita Bruta', value: formatCurrency(totals.totalBruto ?? 0), icon: DollarSign, variant: 'info' },
+        { title: 'Receita Líquida', value: formatCurrency(totals.totalLiquido ?? 0), icon: TrendingUp, variant: 'success' },
+        { title: 'Impostos', value: formatCurrency(totals.totalImpostos ?? 0), icon: FileText, variant: 'warning' },
+      ];
+    case 'vendas_cliente': {
+      const totalVC = rows.reduce((s, r) => s + Number(r.valorTotal ?? 0), 0);
+      const ticketVC = rows.length > 0 ? totalVC / rows.length : 0;
+      return [
+        { title: 'Clientes', value: formatNumber(rows.length), icon: ShoppingCart },
+        { title: 'Volume Total', value: formatCurrency(totalVC), icon: DollarSign, variant: 'info' },
+        { title: 'Ticket Médio', value: formatCurrency(ticketVC), icon: TrendingUp },
+      ];
+    }
+    case 'compras': {
+      const totalCompras = rows.reduce((s, r) => s + Number(r.valor ?? 0), 0);
+      return [
+        { title: 'Pedidos', value: formatNumber(rows.length), icon: Truck },
+        { title: 'Valor Total', value: formatCurrency(totalCompras), icon: DollarSign, variant: 'info' },
+      ];
+    }
+    case 'compras_fornecedor': {
+      const totalCF = rows.reduce((s, r) => s + Number(r.valorTotal ?? 0), 0);
+      const ticketCF = rows.length > 0 ? totalCF / rows.length : 0;
+      return [
+        { title: 'Fornecedores', value: formatNumber(rows.length), icon: Truck },
+        { title: 'Volume Total', value: formatCurrency(totalCF), icon: DollarSign, variant: 'info' },
+        { title: 'Ticket Médio', value: formatCurrency(ticketCF), icon: TrendingUp },
+      ];
+    }
+    case 'aging': {
+      const vencidosAging = rows.filter((r) => r.faixa !== 'A vencer').length;
+      const critico = rows.filter((r) => r.faixa === '90+ dias').reduce((s, r) => s + Number(r.valor ?? 0), 0);
+      return [
+        { title: 'Títulos Vencidos', value: formatNumber(vencidosAging), icon: CalendarClock, variant: vencidosAging > 0 ? 'danger' : 'default' },
+        { title: 'Valor Total', value: formatCurrency(totals.totalValor ?? 0), icon: DollarSign, variant: 'warning' },
+        { title: 'Crítico (90+ dias)', value: formatCurrency(critico), icon: AlertTriangle, variant: critico > 0 ? 'danger' : 'default' },
+      ];
+    }
+    case 'dre': {
+      const rb = totals.receitaBruta ?? 0;
+      const rl = totals.receitaLiquida ?? 0;
+      const resul = totals.resultado ?? 0;
+      return [
+        { title: 'Receita Bruta', value: formatCurrency(rb), icon: TrendingUp, variant: 'info' },
+        { title: 'Receita Líquida', value: formatCurrency(rl), icon: DollarSign, variant: rl >= 0 ? 'success' : 'danger' },
+        { title: 'Resultado', value: formatCurrency(resul), icon: BarChart3, variant: resul >= 0 ? 'success' : 'danger', variationType: resul >= 0 ? 'positive' : 'negative', variation: resul >= 0 ? 'lucro' : 'prejuízo' },
+      ];
+    }
+    case 'curva_abc': {
+      const classA = rows.filter((r) => r.classe === 'A').length;
+      return [
+        { title: 'Produtos', value: formatNumber(rows.length), icon: Package },
+        { title: 'Faturamento Total', value: formatCurrency(totals.grandTotal ?? 0), icon: DollarSign, variant: 'info' },
+        { title: 'Classe A', value: formatNumber(classA), icon: TrendingUp, variant: 'success', variation: 'itens estratégicos' },
+      ];
+    }
+    case 'margem_produtos': {
+      const media = totals.mediaMargemPct ?? 0;
+      return [
+        { title: 'Produtos', value: formatNumber(rows.length), icon: Package },
+        { title: 'Margem Média', value: `${media}%`, icon: TrendingUp, variant: media > 0 ? 'success' : 'danger' },
+      ];
+    }
+    case 'divergencias': {
+      const pedSemNf = rows.filter((r) => r.tipo === 'Pedido s/ NF').length;
+      const nfSemFin = rows.filter((r) => r.tipo === 'NF s/ Financeiro').length;
+      return [
+        { title: 'Total Divergências', value: formatNumber(rows.length), icon: AlertTriangle, variant: rows.length > 0 ? 'danger' : 'default' },
+        { title: 'Pedidos s/ NF', value: formatNumber(pedSemNf), icon: FileText, variant: pedSemNf > 0 ? 'warning' : 'default' },
+        { title: 'NF s/ Financeiro', value: formatNumber(nfSemFin), icon: Wallet, variant: nfSemFin > 0 ? 'warning' : 'default' },
+      ];
+    }
+    default:
+      return [{ title: 'Registros', value: formatNumber(rows.length), icon: Hash }];
+  }
+}
+
 export default function Relatorios() {
   const [searchParams, setSearchParams] = useSearchParams();
   const tipoInicial = (searchParams.get('tipo') as TipoRelatorio) || 'estoque';
@@ -229,138 +387,6 @@ export default function Relatorios() {
   const isQtyReport = resultado._isQuantityReport === true;
   const isDreReport = resultado._isDreReport === true;
 
-  function buildKpis(tipoRel: TipoRelatorio, res: RelatorioResultado): SummaryCardProps[] {
-    const rows = res.rows as Record<string, unknown>[];
-    const totals = res.totals || {};
-    const chartData = res.chartData || [];
-
-    switch (tipoRel) {
-      case 'estoque': {
-        const alertas = rows.filter((r) => r.situacao !== 'OK').length;
-        return [
-          { title: 'Total de Itens', value: formatNumber(rows.length), icon: Package },
-          { title: 'Valor em Estoque', value: formatCurrency(totals.totalCusto ?? 0), icon: DollarSign, variant: 'info' },
-          { title: 'Abaixo do Mínimo', value: String(alertas), icon: AlertTriangle, variant: alertas > 0 ? 'danger' : 'default', variationType: alertas > 0 ? 'negative' : 'neutral', variation: alertas > 0 ? 'reposição necessária' : 'estoque OK' },
-        ];
-      }
-      case 'estoque_minimo':
-        return [
-          { title: 'Itens Críticos', value: formatNumber(rows.length), icon: AlertTriangle, variant: rows.length > 0 ? 'danger' : 'default', variationType: rows.length > 0 ? 'negative' : 'neutral', variation: 'abaixo do mínimo' },
-          { title: 'Custo de Reposição', value: formatCurrency(totals.custoTotal ?? 0), icon: DollarSign, variant: 'warning' },
-        ];
-      case 'movimentos_estoque':
-        return [
-          { title: 'Movimentos', value: formatNumber(rows.length), icon: ArrowLeftRight },
-          { title: 'Entradas', value: formatNumber(totals.totalEntradas ?? 0), icon: TrendingUp, variant: 'success' },
-          { title: 'Saídas', value: formatNumber(totals.totalSaidas ?? 0), icon: Package, variant: 'warning' },
-        ];
-      case 'financeiro': {
-        const receber = chartData.find((c) => c.name === 'Receber')?.value ?? 0;
-        const pagar = chartData.find((c) => c.name === 'Pagar')?.value ?? 0;
-        const vencidos = rows.filter((r) => r.status === 'vencido').length;
-        return [
-          { title: 'A Receber', value: formatCurrency(receber), icon: TrendingUp, variant: 'success' },
-          { title: 'A Pagar', value: formatCurrency(pagar), icon: Wallet, variant: 'danger' },
-          { title: 'Vencidos', value: String(vencidos), icon: AlertTriangle, variant: vencidos > 0 ? 'danger' : 'default', variationType: vencidos > 0 ? 'negative' : 'neutral', variation: vencidos > 0 ? 'títulos vencidos' : 'sem vencidos' },
-        ];
-      }
-      case 'fluxo_caixa': {
-        const sf = totals.saldoFinal ?? 0;
-        return [
-          { title: 'Total Entradas', value: formatCurrency(totals.totalEntradas ?? 0), icon: TrendingUp, variant: 'success' },
-          { title: 'Total Saídas', value: formatCurrency(totals.totalSaidas ?? 0), icon: Wallet, variant: 'danger' },
-          { title: 'Saldo Final', value: formatCurrency(sf), icon: DollarSign, variant: sf >= 0 ? 'success' : 'danger', variationType: sf >= 0 ? 'positive' : 'negative', variation: sf >= 0 ? 'saldo positivo' : 'saldo negativo' },
-        ];
-      }
-      case 'vendas': {
-        const totalVendas = rows.reduce((s, r) => s + Number(r.valor ?? 0), 0);
-        const ticket = rows.length > 0 ? totalVendas / rows.length : 0;
-        return [
-          { title: 'Pedidos', value: formatNumber(rows.length), icon: ShoppingCart },
-          { title: 'Valor Total', value: formatCurrency(totalVendas), icon: DollarSign, variant: 'info' },
-          { title: 'Ticket Médio', value: formatCurrency(ticket), icon: TrendingUp },
-        ];
-      }
-      case 'faturamento':
-        return [
-          { title: 'NFs Emitidas', value: formatNumber(rows.length), icon: Receipt },
-          { title: 'Receita Bruta', value: formatCurrency(totals.totalBruto ?? 0), icon: DollarSign, variant: 'info' },
-          { title: 'Receita Líquida', value: formatCurrency(totals.totalLiquido ?? 0), icon: TrendingUp, variant: 'success' },
-          { title: 'Impostos', value: formatCurrency(totals.totalImpostos ?? 0), icon: FileText, variant: 'warning' },
-        ];
-      case 'vendas_cliente': {
-        const totalVC = rows.reduce((s, r) => s + Number(r.valorTotal ?? 0), 0);
-        const ticketVC = rows.length > 0 ? totalVC / rows.length : 0;
-        return [
-          { title: 'Clientes', value: formatNumber(rows.length), icon: ShoppingCart },
-          { title: 'Volume Total', value: formatCurrency(totalVC), icon: DollarSign, variant: 'info' },
-          { title: 'Ticket Médio', value: formatCurrency(ticketVC), icon: TrendingUp },
-        ];
-      }
-      case 'compras': {
-        const totalCompras = rows.reduce((s, r) => s + Number(r.valor ?? 0), 0);
-        return [
-          { title: 'Pedidos', value: formatNumber(rows.length), icon: Truck },
-          { title: 'Valor Total', value: formatCurrency(totalCompras), icon: DollarSign, variant: 'info' },
-        ];
-      }
-      case 'compras_fornecedor': {
-        const totalCF = rows.reduce((s, r) => s + Number(r.valorTotal ?? 0), 0);
-        const ticketCF = rows.length > 0 ? totalCF / rows.length : 0;
-        return [
-          { title: 'Fornecedores', value: formatNumber(rows.length), icon: Truck },
-          { title: 'Volume Total', value: formatCurrency(totalCF), icon: DollarSign, variant: 'info' },
-          { title: 'Ticket Médio', value: formatCurrency(ticketCF), icon: TrendingUp },
-        ];
-      }
-      case 'aging': {
-        const vencidosAging = rows.filter((r) => r.faixa !== 'A vencer').length;
-        const critico = rows.filter((r) => r.faixa === '90+ dias').reduce((s, r) => s + Number(r.valor ?? 0), 0);
-        return [
-          { title: 'Títulos Vencidos', value: formatNumber(vencidosAging), icon: CalendarClock, variant: vencidosAging > 0 ? 'danger' : 'default' },
-          { title: 'Valor Total', value: formatCurrency(totals.totalValor ?? 0), icon: DollarSign, variant: 'warning' },
-          { title: 'Crítico (90+ dias)', value: formatCurrency(critico), icon: AlertTriangle, variant: critico > 0 ? 'danger' : 'default' },
-        ];
-      }
-      case 'dre': {
-        const rb = totals.receitaBruta ?? 0;
-        const rl = totals.receitaLiquida ?? 0;
-        const resul = totals.resultado ?? 0;
-        return [
-          { title: 'Receita Bruta', value: formatCurrency(rb), icon: TrendingUp, variant: 'info' },
-          { title: 'Receita Líquida', value: formatCurrency(rl), icon: DollarSign, variant: rl >= 0 ? 'success' : 'danger' },
-          { title: 'Resultado', value: formatCurrency(resul), icon: BarChart3, variant: resul >= 0 ? 'success' : 'danger', variationType: resul >= 0 ? 'positive' : 'negative', variation: resul >= 0 ? 'lucro' : 'prejuízo' },
-        ];
-      }
-      case 'curva_abc': {
-        const classA = rows.filter((r) => r.classe === 'A').length;
-        return [
-          { title: 'Produtos', value: formatNumber(rows.length), icon: Package },
-          { title: 'Faturamento Total', value: formatCurrency(totals.grandTotal ?? 0), icon: DollarSign, variant: 'info' },
-          { title: 'Classe A', value: formatNumber(classA), icon: TrendingUp, variant: 'success', variation: 'itens estratégicos' },
-        ];
-      }
-      case 'margem_produtos': {
-        const media = totals.mediaMargemPct ?? 0;
-        return [
-          { title: 'Produtos', value: formatNumber(rows.length), icon: Package },
-          { title: 'Margem Média', value: `${media}%`, icon: TrendingUp, variant: media > 0 ? 'success' : 'danger' },
-        ];
-      }
-      case 'divergencias': {
-        const pedSemNf = rows.filter((r) => r.tipo === 'Pedido s/ NF').length;
-        const nfSemFin = rows.filter((r) => r.tipo === 'NF s/ Financeiro').length;
-        return [
-          { title: 'Total Divergências', value: formatNumber(rows.length), icon: AlertTriangle, variant: rows.length > 0 ? 'danger' : 'default' },
-          { title: 'Pedidos s/ NF', value: formatNumber(pedSemNf), icon: FileText, variant: pedSemNf > 0 ? 'warning' : 'default' },
-          { title: 'NF s/ Financeiro', value: formatNumber(nfSemFin), icon: Wallet, variant: nfSemFin > 0 ? 'warning' : 'default' },
-        ];
-      }
-      default:
-        return [{ title: 'Registros', value: formatNumber(rows.length), icon: Hash }];
-    }
-  }
-
   const columns = useMemo(() => {
     if (!resultado.rows.length) return [];
     return Object.keys(resultado.rows[0]).map((key) => ({
@@ -380,7 +406,7 @@ export default function Relatorios() {
             C: 'bg-muted text-muted-foreground border-muted',
           };
           return (
-            <Badge variant="outline" className={`text-xs font-semibold ${classColors[value] ?? 'bg-muted text-muted-foreground'}`}>
+            <Badge variant="outline" className={`text-xs font-semibold ${classColors[value] ?? 'bg-muted text-muted-foreground border-muted'}`}>
               {value}
             </Badge>
           );
@@ -511,10 +537,10 @@ export default function Relatorios() {
               {tipo !== 'dre' && (
                 <div className="flex flex-wrap gap-1 mb-3">
                   {[
-                    { label: 'Hoje', fn: () => { const d = new Date().toISOString().slice(0, 10); setDataInicio(d); setDataFim(d); } },
-                    { label: 'Este mês', fn: () => { const n = new Date(); setDataInicio(`${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-01`); setDataFim(new Date(n.getFullYear(), n.getMonth() + 1, 0).toISOString().slice(0, 10)); } },
-                    { label: 'Mês anterior', fn: () => { const n = new Date(); const m = n.getMonth() === 0 ? 11 : n.getMonth() - 1; const y = n.getMonth() === 0 ? n.getFullYear() - 1 : n.getFullYear(); setDataInicio(`${y}-${String(m + 1).padStart(2, '0')}-01`); setDataFim(new Date(y, m + 1, 0).toISOString().slice(0, 10)); } },
-                    { label: 'Este ano', fn: () => { const y = new Date().getFullYear(); setDataInicio(`${y}-01-01`); setDataFim(`${y}-12-31`); } },
+                    { label: 'Hoje', fn: () => { const [s, e] = getToday(); setDataInicio(s); setDataFim(e); } },
+                    { label: 'Este mês', fn: () => { const [s, e] = getCurrentMonth(); setDataInicio(s); setDataFim(e); } },
+                    { label: 'Mês anterior', fn: () => { const [s, e] = getPreviousMonth(); setDataInicio(s); setDataFim(e); } },
+                    { label: 'Este ano', fn: () => { const [s, e] = getCurrentYear(); setDataInicio(s); setDataFim(e); } },
                   ].map(({ label, fn }) => (
                     <button key={label} type="button" onClick={fn} className="text-xs px-2 py-0.5 rounded border border-border bg-muted/50 hover:bg-muted transition-colors">
                       {label}
@@ -803,7 +829,7 @@ export default function Relatorios() {
                 {resultado.totals.resultado != null && <span className={`font-semibold ${resultado.totals.resultado >= 0 ? 'text-success' : 'text-destructive'}`}>Resultado: {formatCurrency(resultado.totals.resultado)}</span>}
               </div>
             )}
-            {!resultado.totals && (resultado.chartData ?? []).reduce((s, c) => s + c.value, 0) > 0 && <span className="font-semibold text-foreground">Valor consolidado: {formatCurrency((resultado.chartData ?? []).reduce((s, c) => s + c.value, 0))}</span>}
+            {!resultado.totals && (() => { const total = (resultado.chartData ?? []).reduce((s, c) => s + c.value, 0); return total > 0 ? <span className="font-semibold text-foreground">Valor consolidado: {formatCurrency(total)}</span> : null; })()}
           </div>
         </div>
       </PreviewModal>
