@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AutocompleteSearch } from "@/components/ui/AutocompleteSearch";
 import { OrcamentoItemsGrid, type OrcamentoItem } from "@/components/Orcamento/OrcamentoItemsGrid";
-import { OrcamentoInternalAnalysisPanel } from "@/components/Orcamento/OrcamentoInternalAnalysisPanel";
+import { OrcamentoInternalAnalysisPanel, type RentabilidadeScenarioConfig } from "@/components/Orcamento/OrcamentoInternalAnalysisPanel";
 import { OrcamentoTotaisCard } from "@/components/Orcamento/OrcamentoTotaisCard";
 import { OrcamentoCondicoesCard } from "@/components/Orcamento/OrcamentoCondicoesCard";
 import { FreteCorreiosCard } from "@/components/Orcamento/FreteCorreiosCard";
@@ -99,7 +99,15 @@ export default function OrcamentoForm() {
   const [simPagamento, setSimPagamento] = useState('');
   const [mailModalOpen, setMailModalOpen] = useState(false);
   const [emailTemplate, setEmailTemplate] = useState('Olá, segue orçamento atualizado para sua análise.');
-  const [scenarioConfig, setScenarioConfig] = useState<RentabilidadeScenarioConfig>({});
+  const [scenarioConfig, setScenarioConfig] = useState<RentabilidadeScenarioConfig>({
+    freteSimulado: 0,
+    impostosSimulados: 0,
+    outrosCustosSimulados: 0,
+    descontoGlobalSimulado: 0,
+    reajusteGlobalPrecoPercent: 0,
+    reajusteGlobalCustoPercent: 0,
+    nomeCenario: "",
+  });
 
   const draftKey = useMemo(() => `orcamento:draft:${id || 'novo'}:${user?.id || 'anon'}`, [id, user?.id]);
 
@@ -132,7 +140,7 @@ export default function OrcamentoForm() {
     return map;
   }, [produtos]);
 
-  const internalAnalysis = useMemo(() => calcularRentabilidade(
+  const baseAnalysis = useMemo(() => calcularRentabilidade(
     items,
     {
       descontoGlobal: desconto,
@@ -146,6 +154,42 @@ export default function OrcamentoForm() {
       manualCost: item.custo_manual_unitario ?? null,
     }),
   ), [items, desconto, freteValor, impostoSt, impostoIpi, outrasDespesas, productCostMap]);
+
+  const scenarioItems = useMemo(() => items.map((item) => {
+    const useScenarioItem = Boolean(item.usar_cenario);
+    const priceAdjusted = item.valor_unitario * (1 + (scenarioConfig.reajusteGlobalPrecoPercent || 0) / 100);
+    return {
+      ...item,
+      valor_unitario: useScenarioItem && item.preco_simulado_unitario != null ? item.preco_simulado_unitario : priceAdjusted,
+      desconto_percentual: useScenarioItem && item.desconto_simulado_percentual != null
+        ? item.desconto_simulado_percentual
+        : (item.desconto_percentual || 0),
+      frete_rateado_simulado_unitario: useScenarioItem ? item.frete_rateado_simulado_unitario : null,
+      imposto_rateado_simulado_unitario: useScenarioItem ? item.imposto_rateado_simulado_unitario : null,
+      outros_custos_simulados_unitario: useScenarioItem ? item.outros_custos_simulados_unitario : null,
+    };
+  }), [items, scenarioConfig.reajusteGlobalPrecoPercent]);
+
+  const scenarioAnalysis = useMemo(() => calcularRentabilidade(
+    scenarioItems,
+    {
+      descontoGlobal: scenarioConfig.descontoGlobalSimulado || desconto,
+      frete: scenarioConfig.freteSimulado || freteValor,
+      impostoSt: (scenarioConfig.impostosSimulados || (impostoSt + impostoIpi)),
+      impostoIpi: 0,
+      outrasDespesas: scenarioConfig.outrosCustosSimulados || outrasDespesas,
+    },
+    (item) => {
+      const baseCandidate = productCostMap.get(item.produto_id) || {};
+      const costFactor = 1 + (scenarioConfig.reajusteGlobalCustoPercent || 0) / 100;
+      return {
+        productCost: baseCandidate.productCost != null ? baseCandidate.productCost * costFactor : null,
+        lastPurchaseCost: baseCandidate.lastPurchaseCost != null ? baseCandidate.lastPurchaseCost * costFactor : null,
+        avgCost: baseCandidate.avgCost != null ? baseCandidate.avgCost * costFactor : null,
+        manualCost: item.usar_cenario && item.custo_simulado != null ? item.custo_simulado : item.custo_manual_unitario ?? null,
+      };
+    },
+  ), [scenarioItems, scenarioConfig, desconto, freteValor, impostoSt, impostoIpi, outrasDespesas, productCostMap]);
 
   useEffect(() => {
     if (!supabase) {
@@ -696,7 +740,12 @@ export default function OrcamentoForm() {
           />
 
           <OrcamentoInternalAnalysisPanel
-            analysis={internalAnalysis}
+            baseAnalysis={baseAnalysis}
+            scenarioAnalysis={scenarioAnalysis}
+            items={items}
+            onItemsChange={setItems}
+            scenarioConfig={scenarioConfig}
+            onScenarioConfigChange={setScenarioConfig}
             access={internalAccess}
           />
 

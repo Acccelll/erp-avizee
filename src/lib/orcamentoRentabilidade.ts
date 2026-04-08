@@ -118,9 +118,19 @@ export function calcularRentabilidade(
     const descontoGlobalRateadoUnitario = quantidade > 0 ? (descontoGlobal * percentualRateio) / quantidade : 0;
     const vendaLiquidaUnitaria = round2(Math.max(0, vendaAposDescontoItemUnitario - descontoGlobalRateadoUnitario));
 
-    const freteRateadoUnitario = quantidade > 0 ? round2((frete * percentualRateio) / quantidade) : 0;
-    const impostoRateadoUnitario = quantidade > 0 ? round2((impostos * percentualRateio) / quantidade) : 0;
-    const outrosCustosRateadosUnitario = quantidade > 0 ? round2((outrosCustos * percentualRateio) / quantidade) : 0;
+    const freteRateadoCalculado = quantidade > 0 ? round2((frete * percentualRateio) / quantidade) : 0;
+    const impostoRateadoCalculado = quantidade > 0 ? round2((impostos * percentualRateio) / quantidade) : 0;
+    const outrosCustosRateadosCalculado = quantidade > 0 ? round2((outrosCustos * percentualRateio) / quantidade) : 0;
+
+    const freteRateadoUnitario = item.frete_rateado_simulado_unitario != null
+      ? round2(Math.max(0, safeNumber(item.frete_rateado_simulado_unitario)))
+      : freteRateadoCalculado;
+    const impostoRateadoUnitario = item.imposto_rateado_simulado_unitario != null
+      ? round2(Math.max(0, safeNumber(item.imposto_rateado_simulado_unitario)))
+      : impostoRateadoCalculado;
+    const outrosCustosRateadosUnitario = item.outros_custos_simulados_unitario != null
+      ? round2(Math.max(0, safeNumber(item.outros_custos_simulados_unitario)))
+      : outrosCustosRateadosCalculado;
 
     const { cost: custoBaseUnitario, source } = resolveCostSource(getCostCandidate(item));
     const custoFinalUnitario = custoBaseUnitario == null
