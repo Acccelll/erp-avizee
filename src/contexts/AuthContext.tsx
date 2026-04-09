@@ -14,6 +14,8 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
+  /** True once the initial roles + permissions fetches for the current user have settled (success or error). */
+  permissionsLoaded: boolean;
   profile: { nome: string; email: string; cargo: string; avatar_url: string } | null;
   roles: AppRole[];
   extraPermissions: PermissionKey[];
@@ -26,6 +28,7 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   session: null,
   loading: true,
+  permissionsLoaded: false,
   profile: null,
   roles: [],
   extraPermissions: [],
@@ -40,6 +43,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [permissionsLoaded, setPermissionsLoaded] = useState(false);
   const [profile, setProfile] = useState<{ nome: string; email: string; cargo: string; avatar_url: string } | null>(null);
   const [roles, setRoles] = useState<AppRole[]>([]);
   const [extraPermissions, setExtraPermissions] = useState<PermissionKey[]>([]);
@@ -69,13 +73,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (session?.user) {
         setTimeout(() => {
           fetchProfile(session.user.id);
-          fetchRoles(session.user.id);
-          fetchExtraPermissions(session.user.id);
+          fetchPermissions(session.user.id);
         }, 0);
       } else {
         setProfile(null);
         setRoles([]);
         setExtraPermissions([]);
+        setPermissionsLoaded(false);
       }
       setLoading(false);
     });
@@ -86,8 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(session?.user ?? null);
         if (session?.user) {
           fetchProfile(session.user.id);
-          fetchRoles(session.user.id);
-          fetchExtraPermissions(session.user.id);
+          fetchPermissions(session.user.id);
         }
       })
       .catch((err) => {
@@ -144,6 +147,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const fetchPermissions = async (userId: string) => {
+    setPermissionsLoaded(false);
+    await Promise.all([fetchRoles(userId), fetchExtraPermissions(userId)]);
+    setPermissionsLoaded(true);
+  };
+
   const hasRole = (role: AppRole) => roles.includes(role);
   const mergedPermissions = useMemo(() => buildPermissionSet(roles, extraPermissions), [roles, extraPermissions]);
 
@@ -161,10 +170,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProfile(null);
     setRoles([]);
     setExtraPermissions([]);
+    setPermissionsLoaded(false);
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, profile, roles, extraPermissions, hasRole, can, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, permissionsLoaded, profile, roles, extraPermissions, hasRole, can, signOut }}>
       {children}
     </AuthContext.Provider>
   );

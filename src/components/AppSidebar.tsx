@@ -28,7 +28,7 @@ export function AppSidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMo
   const navigate = useNavigate();
   const currentRoute = `${location.pathname}${location.search}`;
   const { isAdmin } = useIsAdmin();
-  const { roles, can } = useAuth();
+  const { roles, can, permissionsLoaded } = useAuth();
   const socialPermissions = useMemo(() => getSocialPermissionFlags(roles), [roles]);
   const alerts = useSidebarAlerts();
   const secondsSinceSync = alerts.lastUpdatedAt
@@ -77,9 +77,11 @@ export function AppSidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMo
       social: ['dashboard'],
     };
 
-    // When no recognized roles are present (e.g. roles still loading, unrecognized
-    // enum values after a migration, or genuinely role-less user) fall back to
-    // showing every section so the navigation is never completely empty.
+    // Only fall back to showing all sections when permissions have been confirmed
+    // loaded for the current user and no roles exist (e.g. a genuinely role-less
+    // legacy user). While fetches are still in-flight (permissionsLoaded=false) or
+    // after a fetch error, keep the normal access check so restricted sections
+    // are not exposed during the bootstrap window.
     // This is safe because individual pages and Supabase RLS enforce their own
     // access controls — the sidebar only exposes navigation links, not data.
     const hasRecognizedRoles = roles.length > 0;
@@ -87,12 +89,12 @@ export function AppSidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMo
     return withoutAdmin
       .filter((s) => socialPermissions.canViewModule || s.key !== 'social')
       .filter((s) => {
-        if (!hasRecognizedRoles) return true;
+        if (permissionsLoaded && !hasRecognizedRoles) return true;
         const resources = sectionResourcesMap[s.key];
         if (!resources || resources.length === 0) return true;
         return resources.some((resource) => can(resource as any, 'visualizar'));
       });
-  }, [isAdmin, socialPermissions.canViewModule, can, roles]);
+  }, [isAdmin, socialPermissions.canViewModule, can, roles, permissionsLoaded]);
 
   const isItemActive = (targetPath: string) => {
     const [targetBase, targetQuery] = targetPath.split('?');
