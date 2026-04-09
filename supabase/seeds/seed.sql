@@ -1473,7 +1473,9 @@ ON CONFLICT (id) DO NOTHING;
 -- ============================================================
 -- USUÁRIO ADMINISTRADOR
 -- Garante que administrativo@avizee.com.br existe com role admin.
--- Senha padrão: Avizee@2026!  (altere em produção)
+--
+-- ⚠️  SEGURANÇA: Senha padrão 'Avizee@2026!' — altere via
+--     Supabase Dashboard (Authentication → Users) após o seed.
 -- ============================================================
 DO $$
 DECLARE

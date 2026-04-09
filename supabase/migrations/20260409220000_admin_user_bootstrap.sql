@@ -5,8 +5,11 @@
 -- (caso não exista) com senha padrão, e garante que ele tenha
 -- a role 'admin' em user_roles e role_padrao = 'admin' no perfil.
 --
--- Senha padrão: Avizee@2026!
--- (altere imediatamente em produção via dashboard do Supabase)
+-- ⚠️  SEGURANÇA: A senha padrão abaixo ('Avizee@2026!') deve ser
+--     alterada IMEDIATAMENTE após o primeiro deploy via:
+--     Supabase Dashboard → Authentication → Users → Reset Password
+--     ou via supabase.auth.admin.updateUserById().
+--     NUNCA deixe a senha padrão ativa em produção.
 -- ============================================================
 
 DO $$
@@ -55,8 +58,8 @@ BEGIN
       '',
       false
     );
-    -- O trigger on_auth_user_created criará o perfil
-    -- e atribuirá a role 'vendedor' automaticamente.
+    -- O trigger on_auth_user_created criará o perfil com role_padrao
+    -- padrão ('vendedor'). O bloco abaixo sobrescreve para 'admin'.
   END IF;
 
   -- Garante que o perfil existe e tem role_padrao = 'admin'
