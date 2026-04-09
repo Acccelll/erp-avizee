@@ -17,6 +17,8 @@ import {
   FileDown,
   ListFilter,
   ChevronsDownUp,
+  MoreVertical,
+  Pencil,
   ChevronsUpDown as ExpandIcon,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
@@ -27,6 +29,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useAuth } from '@/contexts/AuthContext';
@@ -41,6 +44,10 @@ export interface Column<T> {
   render?: (item: T) => React.ReactNode;
   sortable?: boolean;
   hidden?: boolean;
+  /** Mark as primary field shown in mobile card title */
+  mobilePrimary?: boolean;
+  /** Mark as secondary/detail field shown in mobile card body */
+  mobileCard?: boolean;
 }
 
 type FilterOperator = 'contains' | 'equals' | 'gt' | 'between';
@@ -85,6 +92,7 @@ export function DataTable<T extends Record<string, any>>({
   moduleKey,
   onRowClick,
   onView,
+  onEdit,
   onDelete,
   loading,
   pageSize = 25,
@@ -359,6 +367,107 @@ export function DataTable<T extends Record<string, any>>({
     </div>
   );
 
+  // Mobile card action menu
+  const renderMobileActions = (item: T) => {
+    const hasMenu = onView || onEdit || onDelete;
+    if (!hasMenu) return null;
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" aria-label="Ações" onClick={(e) => e.stopPropagation()}>
+            <MoreVertical className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-44">
+          {onView && (
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onView(item); }}>
+              <Eye className="mr-2 h-4 w-4" /> Visualizar
+            </DropdownMenuItem>
+          )}
+          {onEdit && (
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(item); }}>
+              <Pencil className="mr-2 h-4 w-4" /> Editar
+            </DropdownMenuItem>
+          )}
+          {onDelete && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className="text-destructive focus:text-destructive"
+                onClick={(e) => { e.stopPropagation(); setDeleteItem(item); }}
+              >
+                <Trash2 className="mr-2 h-4 w-4" /> Excluir
+              </DropdownMenuItem>
+            </>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+  };
+
+  // Mobile card layout
+  const renderMobileCards = () => {
+    // Determine which columns to show in cards
+    const primaryCol = visibleColumns.find((c) => c.mobilePrimary) ?? visibleColumns[0];
+    const cardCols = visibleColumns.filter((c) => c.mobileCard && c.key !== primaryCol?.key);
+    // Fallback: if no mobileCard columns tagged, show first 3 non-primary visible columns
+    const fallbackCols = visibleColumns.filter((c) => c.key !== primaryCol?.key).slice(0, 3);
+    const detailCols = cardCols.length > 0 ? cardCols : fallbackCols;
+
+    return (
+      <div className="space-y-2">
+        {pagedData.map((item, idx) => (
+          <div
+            key={item.id || idx}
+            className={cn(
+              'relative rounded-xl border bg-card px-4 py-3 transition-colors active:bg-muted/50',
+              selectable && selectedIds.includes(item.id) && 'border-primary bg-primary/5',
+              (onRowClick || onView) && 'cursor-pointer',
+            )}
+            onClick={() => { onRowClick?.(item); }}
+            onDoubleClick={onView ? () => onView(item) : undefined}
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0 flex-1 space-y-1.5">
+                {/* Primary field */}
+                {primaryCol && (
+                  <div className="font-medium text-sm leading-snug">
+                    {primaryCol.render ? primaryCol.render(item) : item[primaryCol.key]}
+                  </div>
+                )}
+                {/* Detail fields */}
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  {detailCols.map((col) => (
+                    <div key={col.key} className="flex items-baseline gap-1 min-w-0">
+                      <span className="shrink-0 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                        {col.label}:
+                      </span>
+                      <span className="text-xs">
+                        {col.render ? col.render(item) : item[col.key] ?? '—'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              {/* Actions */}
+              <div className="flex shrink-0 items-center gap-1">
+                {selectable && (
+                  <Checkbox
+                    checked={selectedIds.includes(item.id)}
+                    onCheckedChange={() => toggleSelect(item.id)}
+                    onClick={(e) => e.stopPropagation()}
+                    aria-label="Selecionar item"
+                  />
+                )}
+                {renderMobileActions(item)}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   const SortIcon = ({ colKey }: { colKey: string }) => {
     if (sortKey !== colKey) return <ChevronsUpDown className="h-3.5 w-3.5 text-muted-foreground/50" />;
     return sortDir === 'asc' ? <ChevronUp className="h-3.5 w-3.5 text-primary" /> : <ChevronDown className="h-3.5 w-3.5 text-primary" />;
@@ -370,7 +479,8 @@ export function DataTable<T extends Record<string, any>>({
 
   return (
     <>
-      <div className="mb-2 flex flex-wrap items-center gap-2 justify-between">
+      {/* Toolbar — desktop only */}
+      <div className="mb-2 hidden flex-wrap items-center gap-2 justify-between md:flex">
         <div className="flex flex-wrap items-center gap-2">
           <Popover>
             <PopoverTrigger asChild>
@@ -435,7 +545,7 @@ export function DataTable<T extends Record<string, any>>({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {showColumnToggle && !isMobile && (
+          {showColumnToggle && (
             <Popover>
               <PopoverTrigger asChild>
                 <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs"><Columns3 className="h-3.5 w-3.5" />Colunas</Button>
@@ -481,63 +591,102 @@ export function DataTable<T extends Record<string, any>>({
         </div>
       )}
 
-      <div className="data-table">
-        {loading ? (
-          <TableSkeleton rows={6} cols={Math.max(visibleColumns.length, 4)} />
+      {/* Mobile: card list */}
+      {isMobile ? (
+        loading ? (
+          <div className="space-y-2">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="h-20 rounded-xl border bg-card animate-pulse" />
+            ))}
+          </div>
         ) : sortedData.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 px-4 text-center"><div className="rounded-full bg-muted p-4 mb-4"><PackageOpen className="h-8 w-8 text-muted-foreground" /></div><h3 className="text-base font-semibold text-foreground mb-1">{emptyTitle}</h3><p className="text-sm text-muted-foreground max-w-sm">{emptyDescription}</p></div>
+          <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
+            <div className="rounded-full bg-muted p-4 mb-4"><PackageOpen className="h-8 w-8 text-muted-foreground" /></div>
+            <h3 className="text-base font-semibold text-foreground mb-1">{emptyTitle}</h3>
+            <p className="text-sm text-muted-foreground max-w-sm">{emptyDescription}</p>
+          </div>
         ) : (
           <>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b bg-muted/50">
-                    {hasActions && <th className="w-12 px-2 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Ações</th>}
-                    {selectable && <th className="w-10 px-3 py-3"><Checkbox checked={pagedData.length > 0 && pagedData.every((item) => selectedIds.includes(item.id))} onCheckedChange={toggleSelectAll} /></th>}
-                    {visibleColumns.map((col) => (
-                      <th key={col.key} className={cn('px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground', col.sortable !== false && 'cursor-pointer')} onClick={() => col.sortable !== false && handleSort(col.key)}>
-                        <div className="flex items-center gap-1.5">{col.label}{col.sortable !== false && <SortIcon colKey={col.key} />}</div>
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {pagedData.map((item, idx) => (
-                    <>
-                      <tr key={item.id || idx} onClick={() => onRowClick?.(item)} onDoubleClick={onView ? () => onView(item) : undefined} className={cn('border-b transition-colors last:border-b-0 hover:bg-muted/30', selectable && selectedIds.includes(item.id) && 'bg-primary/5')}>
-                        {hasActions && <td className="w-12 px-2 py-3">{renderActions(item)}</td>}
-                        {selectable && <td className="w-10 px-3 py-3"><Checkbox checked={selectedIds.includes(item.id)} onCheckedChange={() => toggleSelect(item.id)} onClick={(e) => e.stopPropagation()} /></td>}
-                        {visibleColumns.map((col) => <td key={col.key} className="px-4 py-3 text-sm whitespace-nowrap">{col.render ? col.render(item) : item[col.key]}</td>)}
-                      </tr>
-                      {renderInlineDetails && expandedRows.has(item.id) && (
-                        <tr key={`detail-${item.id || idx}`} className="border-b bg-muted/20"><td colSpan={visibleColumns.length + (hasActions ? 1 : 0) + (selectable ? 1 : 0)} className="px-4 py-3">{renderInlineDetails(item)}</td></tr>
-                      )}
-                    </>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="flex items-center justify-between border-t px-4 py-3">
+            {renderMobileCards()}
+            <div className="mt-3 flex items-center justify-between px-1 py-2">
               <span className="text-xs text-muted-foreground">
                 {viewMode === 'infinite'
-                  ? `${Math.min(visibleCount, sortedData.length)} de ${sortedData.length} registros`
-                  : `${currentPage * pageSize + 1}–${Math.min((currentPage + 1) * pageSize, sortedData.length)} de ${sortedData.length}`}
+                  ? `${Math.min(visibleCount, sortedData.length)} de ${sortedData.length}`
+                  : `${currentPage * pageSize + 1}\u2013${Math.min((currentPage + 1) * pageSize, sortedData.length)} de ${sortedData.length}`}
               </span>
               {viewMode === 'infinite' ? (
-                <div className="flex gap-1">
-                  <Button variant="ghost" size="sm" disabled={visibleCount >= sortedData.length} onClick={() => setVisibleCount((v) => v + pageSize)}><ChevronsDownUp className="h-4 w-4 mr-1" />Carregar mais</Button>
-                </div>
+                <Button variant="ghost" size="sm" disabled={visibleCount >= sortedData.length} onClick={() => setVisibleCount((v) => v + pageSize)}>
+                  <ChevronsDownUp className="h-4 w-4 mr-1" />Carregar mais
+                </Button>
               ) : (
                 <div className="flex gap-1">
-                  <Button variant="ghost" size="icon" className="h-8 w-8" disabled={currentPage === 0} onClick={() => setCurrentPage((p) => p - 1)}><ChevronLeft className="h-4 w-4" /></Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8" disabled={currentPage >= totalPages - 1} onClick={() => setCurrentPage((p) => p + 1)}><ChevronRight className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="icon" className="h-9 w-9" disabled={currentPage === 0} onClick={() => setCurrentPage((p) => p - 1)}><ChevronLeft className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="icon" className="h-9 w-9" disabled={currentPage >= totalPages - 1} onClick={() => setCurrentPage((p) => p + 1)}><ChevronRight className="h-4 w-4" /></Button>
                 </div>
               )}
             </div>
           </>
-        )}
-      </div>
+        )
+      ) : (
+        /* Desktop: full table */
+        <div className="data-table">
+          {loading ? (
+            <TableSkeleton rows={6} cols={Math.max(visibleColumns.length, 4)} />
+          ) : sortedData.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 px-4 text-center"><div className="rounded-full bg-muted p-4 mb-4"><PackageOpen className="h-8 w-8 text-muted-foreground" /></div><h3 className="text-base font-semibold text-foreground mb-1">{emptyTitle}</h3><p className="text-sm text-muted-foreground max-w-sm">{emptyDescription}</p></div>
+          ) : (
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b bg-muted/50">
+                      {hasActions && <th className="w-12 px-2 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Ações</th>}
+                      {selectable && <th className="w-10 px-3 py-3"><Checkbox checked={pagedData.length > 0 && pagedData.every((item) => selectedIds.includes(item.id))} onCheckedChange={toggleSelectAll} /></th>}
+                      {visibleColumns.map((col) => (
+                        <th key={col.key} className={cn('px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground', col.sortable !== false && 'cursor-pointer')} onClick={() => col.sortable !== false && handleSort(col.key)}>
+                          <div className="flex items-center gap-1.5">{col.label}{col.sortable !== false && <SortIcon colKey={col.key} />}</div>
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pagedData.map((item, idx) => (
+                      <>
+                        <tr key={item.id || idx} onClick={() => onRowClick?.(item)} onDoubleClick={onView ? () => onView(item) : undefined} className={cn('border-b transition-colors last:border-b-0 hover:bg-muted/30', selectable && selectedIds.includes(item.id) && 'bg-primary/5')}>
+                          {hasActions && <td className="w-12 px-2 py-3">{renderActions(item)}</td>}
+                          {selectable && <td className="w-10 px-3 py-3"><Checkbox checked={selectedIds.includes(item.id)} onCheckedChange={() => toggleSelect(item.id)} onClick={(e) => e.stopPropagation()} /></td>}
+                          {visibleColumns.map((col) => <td key={col.key} className="px-4 py-3 text-sm whitespace-nowrap">{col.render ? col.render(item) : item[col.key]}</td>)}
+                        </tr>
+                        {renderInlineDetails && expandedRows.has(item.id) && (
+                          <tr key={`detail-${item.id || idx}`} className="border-b bg-muted/20"><td colSpan={visibleColumns.length + (hasActions ? 1 : 0) + (selectable ? 1 : 0)} className="px-4 py-3">{renderInlineDetails(item)}</td></tr>
+                        )}
+                      </>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="flex items-center justify-between border-t px-4 py-3">
+                <span className="text-xs text-muted-foreground">
+                  {viewMode === 'infinite'
+                    ? `${Math.min(visibleCount, sortedData.length)} de ${sortedData.length} registros`
+                    : `${currentPage * pageSize + 1}\u2013${Math.min((currentPage + 1) * pageSize, sortedData.length)} de ${sortedData.length}`}
+                </span>
+                {viewMode === 'infinite' ? (
+                  <div className="flex gap-1">
+                    <Button variant="ghost" size="sm" disabled={visibleCount >= sortedData.length} onClick={() => setVisibleCount((v) => v + pageSize)}><ChevronsDownUp className="h-4 w-4 mr-1" />Carregar mais</Button>
+                  </div>
+                ) : (
+                  <div className="flex gap-1">
+                    <Button variant="ghost" size="icon" className="h-8 w-8" disabled={currentPage === 0} onClick={() => setCurrentPage((p) => p - 1)}><ChevronLeft className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" disabled={currentPage >= totalPages - 1} onClick={() => setCurrentPage((p) => p + 1)}><ChevronRight className="h-4 w-4" /></Button>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       <ConfirmDialog
         open={!!deleteItem}
