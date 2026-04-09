@@ -3,9 +3,9 @@ import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
 
-const FALLBACK_SUPABASE_URL = "https://vhwhxvsfkossbrfbeawa.supabase.co";
+const FALLBACK_SUPABASE_URL = "https://pybdhgjytswncqvznhkw.supabase.co";
 const FALLBACK_SUPABASE_PUBLISHABLE_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZod2h4dnNma29zc2JyZmJlYXdhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyNjU1NjcsImV4cCI6MjA4ODg0MTU2N30.ks5n6-eNNNYJXJp4o7y3hYXRmOsyU9L_jdlOy5iKkMU";
+  "sb_publishable_wMhY7gZHuvK0bgQY7wuyLg_EajCcT6Q";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
