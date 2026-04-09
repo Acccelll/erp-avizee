@@ -19,6 +19,23 @@ interface ClienteSnapshot {
   codigo: string;
 }
 
+interface EmpresaSnapshot {
+  razao_social?: string;
+  nome_fantasia?: string;
+  cnpj?: string;
+  inscricao_estadual?: string;
+  logo_url?: string;
+  logradouro?: string;
+  numero?: string;
+  bairro?: string;
+  cidade?: string;
+  uf?: string;
+  cep?: string;
+  telefone?: string;
+  email?: string;
+  site?: string;
+}
+
 interface Props {
   numero: string;
   data: string;
@@ -39,13 +56,14 @@ interface Props {
   freteTipo: string;
   modalidade: string;
   observacoes: string;
+  empresa?: EmpresaSnapshot;
 }
 
 export const OrcamentoPdfTemplate = forwardRef<HTMLDivElement, Props>(({
   numero, data, cliente, items, totalProdutos, desconto,
   impostoSt, impostoIpi, freteValor, outrasDespesas, valorTotal,
   quantidadeTotal, pesoTotal, pagamento, prazoPagamento,
-  prazoEntrega, freteTipo, modalidade, observacoes
+  prazoEntrega, freteTipo, modalidade, observacoes, empresa
 }, ref) => {
   const formatDate = (d: string) => {
     if (!d) return "";
@@ -72,13 +90,15 @@ export const OrcamentoPdfTemplate = forwardRef<HTMLDivElement, Props>(({
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", borderBottom: "2px solid #690500", paddingBottom: "8px", marginBottom: "12px" }}>
         <div>
-          <img src="/images/logoavizee.png" alt="AviZee" style={{ height: "36px", marginBottom: "4px" }} />
-          <div style={{ fontSize: "9px", color: "#666", marginTop: "2px" }}>AVIZEE EQUIPAMENTOS LTDA</div>
+          <img src={empresa?.logo_url || "/images/logoavizee.png"} alt={empresa?.nome_fantasia || "AviZee"} style={{ height: "36px", marginBottom: "4px" }} />
+          <div style={{ fontSize: "9px", color: "#666", marginTop: "2px" }}>{empresa?.razao_social || "AVIZEE EQUIPAMENTOS LTDA"}</div>
           <div style={{ fontSize: "8px", color: "#888", lineHeight: 1.5 }}>
-            Diogo Antonio Feijó, 111 - João Aranha<br />
-            Fone: (19) 99898-2930<br />
-            PAULÍNIA - SP CEP: 13.145-706<br />
-            CNPJ: 53.078.538/0001-85
+            {[empresa?.logradouro, empresa?.numero ? `${empresa.numero}` : null, empresa?.bairro].filter(Boolean).join(", ") || "Diogo Antonio Feijó, 111 - João Aranha"}<br />
+            {empresa?.telefone ? `Fone: ${empresa.telefone}` : "Fone: (19) 99898-2930"}<br />
+            {[empresa?.cidade, empresa?.uf].filter(Boolean).join(" - ")}{empresa?.cep ? ` CEP: ${empresa.cep}` : " CEP: 13.145-706"}<br />
+            {empresa?.cnpj ? `CNPJ: ${empresa.cnpj}` : "CNPJ: 53.078.538/0001-85"}
+            {empresa?.email ? <><br />{empresa.email}</> : null}
+            {empresa?.site ? <><br />{empresa.site}</> : null}
           </div>
         </div>
         <div style={{ textAlign: "right" }}>

@@ -99,6 +99,7 @@ export default function OrcamentoForm() {
   const [simPagamento, setSimPagamento] = useState('');
   const [mailModalOpen, setMailModalOpen] = useState(false);
   const [emailTemplate, setEmailTemplate] = useState('Olá, segue orçamento atualizado para sua análise.');
+  const [empresaConfig, setEmpresaConfig] = useState<Record<string, string> | null>(null);
   const [scenarioConfig, setScenarioConfig] = useState<RentabilidadeScenarioConfig>({
     freteSimulado: 0,
     impostosSimulados: 0,
@@ -546,6 +547,12 @@ export default function OrcamentoForm() {
       });
   }, [user?.id]);
 
+  useEffect(() => {
+    supabase.from('empresa_config').select('*').limit(1).single().then(({ data }) => {
+      if (data) setEmpresaConfig(data as any);
+    });
+  }, []);
+
   const clienteOptions = clientes.map((c: any) => ({
     id: c.id,
     label: c.nome_razao_social,
@@ -895,6 +902,7 @@ export default function OrcamentoForm() {
               quantidadeTotal={quantidadeTotal} pesoTotal={pesoTotal} pagamento={pagamento}
               prazoPagamento={prazoPagamento} prazoEntrega={prazoEntrega} freteTipo={freteTipo}
               modalidade={modalidade} observacoes={`${observacoes}\nTemplate: ${layoutTemplate}`}
+              empresa={empresaConfig || undefined}
             />
           </div>
         </DialogContent>
