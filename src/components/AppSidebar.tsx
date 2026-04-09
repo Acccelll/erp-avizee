@@ -62,26 +62,37 @@ export function AppSidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMo
   // Filter out admin-only sections for non-admin users
   const visibleSections = useMemo(() => {
     const withoutAdmin = isAdmin ? navSections : navSections.filter((s) => s.key !== 'administracao');
-    const sectionResourceMap: Record<string, string> = {
-      cadastros: 'produtos',
-      comercial: 'pedidos',
-      compras: 'compras',
-      estoque: 'estoque',
-      financeiro: 'financeiro',
-      fiscal: 'faturamento_fiscal',
-      relatorios: 'relatorios',
-      administracao: 'administracao',
-      social: 'dashboard',
+
+    // Map each section to ALL resources it provides access to.
+    // A section is visible when the user can visualizar ANY of its resources.
+    const sectionResourcesMap: Record<string, string[]> = {
+      cadastros: ['produtos', 'clientes', 'fornecedores', 'transportadoras', 'formas_pagamento'],
+      comercial: ['orcamentos', 'pedidos'],
+      compras: ['compras'],
+      estoque: ['estoque', 'logistica'],
+      financeiro: ['financeiro'],
+      fiscal: ['faturamento_fiscal'],
+      relatorios: ['relatorios'],
+      administracao: ['administracao'],
+      social: ['dashboard'],
     };
+
+    // When no recognized roles are present (e.g. roles still loading, unrecognized
+    // enum values after a migration, or genuinely role-less user) fall back to
+    // showing every section so the navigation is never completely empty.
+    // This is safe because individual pages and Supabase RLS enforce their own
+    // access controls — the sidebar only exposes navigation links, not data.
+    const hasRecognizedRoles = roles.length > 0;
 
     return withoutAdmin
       .filter((s) => socialPermissions.canViewModule || s.key !== 'social')
       .filter((s) => {
-        const resource = sectionResourceMap[s.key] as any;
-        if (!resource) return true;
-        return can(resource, 'visualizar');
+        if (!hasRecognizedRoles) return true;
+        const resources = sectionResourcesMap[s.key];
+        if (!resources || resources.length === 0) return true;
+        return resources.some((resource) => can(resource as any, 'visualizar'));
       });
-  }, [isAdmin, socialPermissions.canViewModule, can]);
+  }, [isAdmin, socialPermissions.canViewModule, can, roles]);
 
   const isItemActive = (targetPath: string) => {
     const [targetBase, targetQuery] = targetPath.split('?');
