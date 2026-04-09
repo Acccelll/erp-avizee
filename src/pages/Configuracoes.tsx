@@ -30,13 +30,13 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
-interface SideNavItem {
+interface TabNavItem {
   key: string;
   label: string;
   icon: typeof User;
 }
 
-const sideNavItems: SideNavItem[] = [
+const tabNavItems: TabNavItem[] = [
   { key: 'perfil', label: 'Meu Perfil', icon: User },
   { key: 'empresa', label: 'Empresa', icon: Building2 },
   { key: 'aparencia', label: 'Aparência', icon: Palette },
@@ -1018,33 +1018,33 @@ export default function Configuracoes() {
   return (
     <AppLayout>
       <ModulePage title="Configurações" subtitle="Preferências pessoais da sua conta.">
-        <div className="grid gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
-          {/* Side navigation */}
-          <nav className="space-y-1">
-            {sideNavItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = activeSection === item.key;
-              return (
-                <button
-                  key={item.key}
-                  onClick={() => setActiveSection(item.key)}
-                  className={cn(
-                    'flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors text-left',
-                    isActive
-                      ? 'bg-primary/10 text-primary'
-                      : 'text-muted-foreground hover:bg-accent hover:text-foreground'
-                  )}
-                >
-                  <Icon className="h-4 w-4 shrink-0" />
-                  {item.label}
-                </button>
-              );
-            })}
-          </nav>
-
-          {/* Content */}
-          <div>{renderContent()}</div>
+        {/* Horizontal tab navigation */}
+        <div role="tablist" aria-label="Seções de Configurações" className="flex gap-0 border-b overflow-x-auto mb-6 -mt-1">
+          {tabNavItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = activeSection === item.key;
+            return (
+              <button
+                key={item.key}
+                role="tab"
+                aria-selected={isActive}
+                onClick={() => setActiveSection(item.key)}
+                className={cn(
+                  'flex shrink-0 items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px',
+                  isActive
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground/30'
+                )}
+              >
+                <Icon className="h-4 w-4 shrink-0" />
+                {item.label}
+              </button>
+            );
+          })}
         </div>
+
+        {/* Section content */}
+        <div>{renderContent()}</div>
       </ModulePage>
     </AppLayout>
   );
