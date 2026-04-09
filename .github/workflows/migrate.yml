@@ -24,6 +24,8 @@ jobs:
           version: latest
 
       - name: Push migrations
+        env:
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
-          supabase link --project-ref pybdhgjytswncqvznhkw
-          supabase db push --linked
+          supabase link --project-ref pybdhgjytswncqvznhkw --password "$SUPABASE_DB_PASSWORD"
+          supabase db push --linked --password "$SUPABASE_DB_PASSWORD"
