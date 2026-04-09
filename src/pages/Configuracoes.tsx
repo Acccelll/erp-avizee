@@ -985,11 +985,7 @@ export default function Configuracoes() {
                     </Button>
                     {!canSubmit && (currentPassword || newPassword || confirmPassword) && (
                       <p className="text-xs text-muted-foreground">
-                        {!currentPassword
-                          ? 'Informe a senha atual para continuar.'
-                          : !allCriteriaMet
-                          ? 'Preencha todos os critérios acima.'
-                          : null}
+                        {!currentPassword ? 'Informe a senha atual para continuar.' : 'Preencha todos os critérios acima.'}
                       </p>
                     )}
                   </div>
