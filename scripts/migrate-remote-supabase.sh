@@ -8,7 +8,7 @@ set -euo pipefail
 #   SUPABASE_PROJECT_REF (default: pybdhgjytswncqvznhkw)
 #   APPLY_SEED=true|false (default: false)
 
-PROJECT_REF="${SUPABASE_PROJECT_REF:-pybdhgjytswncqvznhkw}"
+PROJECT_REF="${SUPABASE_PROJECT_REF:-}"
 APPLY_SEED="${APPLY_SEED:-false}"
 
 if ! command -v codex >/dev/null 2>&1 && [ -x /opt/codex/bin/codex ]; then
