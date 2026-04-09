@@ -28,7 +28,7 @@ export function AppSidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMo
   const navigate = useNavigate();
   const currentRoute = `${location.pathname}${location.search}`;
   const { isAdmin } = useIsAdmin();
-  const { roles, can } = useAuth();
+  const { roles, extraPermissions, can } = useAuth();
   const socialPermissions = useMemo(() => getSocialPermissionFlags(roles), [roles]);
   const alerts = useSidebarAlerts();
   const secondsSinceSync = alerts.lastUpdatedAt
@@ -74,14 +74,19 @@ export function AppSidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMo
       social: 'dashboard',
     };
 
+    const hasExplicitPermissions = roles.length > 0 || extraPermissions.length > 0;
+
     return withoutAdmin
       .filter((s) => socialPermissions.canViewModule || s.key !== 'social')
       .filter((s) => {
+        // Backward compatibility: some users may not have role/permission rows yet.
+        // In this scenario, keep the navigation visible instead of hiding the entire menu.
+        if (!hasExplicitPermissions) return true;
         const resource = sectionResourceMap[s.key] as any;
         if (!resource) return true;
         return can(resource, 'visualizar');
       });
-  }, [isAdmin, socialPermissions.canViewModule, can]);
+  }, [isAdmin, socialPermissions.canViewModule, roles.length, extraPermissions.length, can]);
 
   const isItemActive = (targetPath: string) => {
     const [targetBase, targetQuery] = targetPath.split('?');
