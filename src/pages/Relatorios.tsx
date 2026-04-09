@@ -165,8 +165,8 @@ export default function Relatorios() {
   }, []);
 
   useEffect(() => {
-    supabase.from('empresa_config').select('razao_social, cnpj, nome_fantasia').limit(1).single().then(({ data }) => {
-      if (data) setEmpresaConfig(data as { razao_social?: string; cnpj?: string; nome_fantasia?: string });
+    supabase.from('empresa_config').select('razao_social, cnpj, nome_fantasia').limit(1).single().then(({ data, error }) => {
+      if (!error && data) setEmpresaConfig(data as { razao_social?: string; cnpj?: string; nome_fantasia?: string });
     });
   }, []);
 
