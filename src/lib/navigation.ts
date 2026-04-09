@@ -38,6 +38,9 @@ export interface NavSection {
   key: string;
   title: string;
   icon: LucideIcon;
+  /** When set, the section behaves as a direct link (no expand/collapse). */
+  directPath?: string;
+  /** Sub-groups with leaf items. Leave empty (or omit) for direct-path sections. */
   items: NavSubgroup[];
 }
 
@@ -167,28 +170,16 @@ export const navSections: NavSection[] = [
     key: 'social',
     title: 'Social',
     icon: Share2,
-    items: [
-      {
-        title: 'Redes sociais',
-        items: [
-          { title: 'Dashboard Social', path: '/social', keywords: ['instagram', 'linkedin', 'engajamento', 'seguidores'] },
-        ],
-      },
-    ],
+    directPath: '/social',
+    items: [],
   },
 
   {
     key: 'relatorios',
     title: 'Relatórios',
     icon: BarChart3,
-    items: [
-      {
-        title: 'Relatórios',
-        items: [
-          { title: 'Relatórios', path: '/relatorios', keywords: ['estoque', 'financeiro', 'vendas', 'compras', 'fluxo', 'movimentos'] },
-        ],
-      },
-    ],
+    directPath: '/relatorios',
+    items: [],
   },
   {
     key: 'administracao',
@@ -200,7 +191,7 @@ export const navSections: NavSection[] = [
         items: [
           { title: 'Empresa', path: '/administracao?tab=empresa' },
           { title: 'Usuários e Permissões', path: '/administracao?tab=usuarios' },
-          { title: 'E-mails', path: '/administracao?tab=email' },
+          { title: 'E-mail', path: '/administracao?tab=email' },
           { title: 'Parâmetros Fiscais', path: '/administracao?tab=fiscal' },
           { title: 'Parâmetros Financeiros', path: '/administracao?tab=financeiro' },
           { title: 'Migração de Dados', path: '/migracao-dados', keywords: ['importacao', 'excel', 'csv', 'carga'] },
@@ -296,15 +287,19 @@ export type FlatNavItem = NavLeafItem & { section: string; subgroup: string };
 
 export const flatNavItems: FlatNavItem[] = [
   { ...dashboardItem, section: '', subgroup: '' },
-  ...navSections.flatMap((section) =>
-    section.items.flatMap((group) =>
+  ...navSections.flatMap((section) => {
+    // Direct-path sections contribute a single synthetic leaf item
+    if (section.directPath) {
+      return [{ title: section.title, path: section.directPath, section: section.title, subgroup: '' }];
+    }
+    return section.items.flatMap((group) =>
       group.items.map((item) => ({
         ...item,
         section: section.title,
         subgroup: group.title,
       })),
-    ),
-  ),
+    );
+  }),
 ];
 
 export function isPathActive(currentPath: string, targetPath: string) {
@@ -330,6 +325,11 @@ export function getRouteLabel(pathname: string) {
 export function getNavSectionKey(currentRoute: string) {
   if (currentRoute === '/' || currentRoute.startsWith('/?')) return 'inicio';
   const pathname = currentRoute.split('?')[0];
+  // Check direct-path sections first
+  const directSection = navSections.find(
+    (entry) => entry.directPath && (pathname === entry.directPath || pathname.startsWith(`${entry.directPath}/`)),
+  );
+  if (directSection) return directSection.key;
   const section = navSections.find((entry) =>
     entry.items.some((group) =>
       group.items.some((item) => pathname === item.path.split('?')[0] || pathname.startsWith(`${item.path.split('?')[0]}/`)),
