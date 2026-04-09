@@ -89,6 +89,28 @@ function getFontLabel(scale: number): string {
   return 'Máximo';
 }
 
+function getPasswordStrength(pwd: string): { label: string; level: 0 | 1 | 2 | 3; bar: string } {
+  if (!pwd) return { label: '', level: 0, bar: '' };
+  let score = 0;
+  if (pwd.length >= 8) score++;
+  if (pwd.length >= 12) score++;
+  if (/[A-Z]/.test(pwd) && /[a-z]/.test(pwd)) score++;
+  if (/\d/.test(pwd)) score++;
+  if (/[^A-Za-z0-9]/.test(pwd)) score++;
+  if (score <= 2) return { label: 'Fraca', level: 1, bar: 'bg-destructive' };
+  if (score <= 3) return { label: 'Média', level: 2, bar: 'bg-yellow-500' };
+  return { label: 'Forte', level: 3, bar: 'bg-emerald-500' };
+}
+
+function getPasswordCriteria(pwd: string, confirm: string) {
+  return [
+    { key: 'length', label: 'Mínimo 8 caracteres', met: pwd.length >= 8 },
+    { key: 'case', label: 'Letras maiúsculas e minúsculas', met: /[A-Z]/.test(pwd) && /[a-z]/.test(pwd) },
+    { key: 'digit', label: 'Ao menos um número', met: /\d/.test(pwd) },
+    { key: 'match', label: 'Confirmação idêntica', met: !!confirm && confirm === pwd },
+  ] as const;
+}
+
 export default function Configuracoes() {
   const { user, profile, roles } = useAuth();
   const { theme, setTheme } = useTheme();
@@ -167,16 +189,13 @@ export default function Configuracoes() {
 
   const handleChangePassword = async () => {
     const criteria = getPasswordCriteria(newPassword, confirmPassword);
+    const [lengthOk, caseOk, digitOk, matchOk] = criteria.map((c) => c.met);
     const errors: { current?: string; new?: string; confirm?: string } = {};
     if (!currentPassword) errors.current = 'Informe a senha atual';
-    const failedLength = !criteria.find((c) => c.key === 'length')!.met;
-    const failedCase = !criteria.find((c) => c.key === 'case')!.met;
-    const failedDigit = !criteria.find((c) => c.key === 'digit')!.met;
-    const failedMatch = !criteria.find((c) => c.key === 'match')!.met;
-    if (!newPassword || failedLength) errors.new = 'A senha deve ter pelo menos 8 caracteres';
-    else if (failedCase) errors.new = 'Use letras maiúsculas e minúsculas';
-    else if (failedDigit) errors.new = 'Inclua ao menos um número';
-    if (newPassword && confirmPassword && failedMatch) errors.confirm = 'As senhas não coincidem';
+    if (!newPassword || !lengthOk) errors.new = 'A senha deve ter pelo menos 8 caracteres';
+    else if (!caseOk) errors.new = 'Use letras maiúsculas e minúsculas';
+    else if (!digitOk) errors.new = 'Inclua ao menos um número';
+    if (newPassword && confirmPassword && !matchOk) errors.confirm = 'As senhas não coincidem';
     if (Object.keys(errors).length > 0) {
       setPasswordErrors(errors);
       return;
@@ -184,6 +203,9 @@ export default function Configuracoes() {
     setPasswordErrors({});
     setChangingPassword(true);
     try {
+      // Supabase doesn't expose a verify-only endpoint; re-authenticating with the
+      // current password is the standard pattern to confirm the user knows their
+      // existing credentials before allowing a password update.
       const { error: signInError } = await supabase.auth.signInWithPassword({
         email: user!.email!,
         password: currentPassword,
@@ -248,26 +270,6 @@ export default function Configuracoes() {
     );
     toast.success('Aparência restaurada ao padrão.');
   };
-
-  const getPasswordStrength = (pwd: string): { label: string; level: 0 | 1 | 2 | 3; bar: string } => {
-    if (!pwd) return { label: '', level: 0, bar: '' };
-    let score = 0;
-    if (pwd.length >= 8) score++;
-    if (pwd.length >= 12) score++;
-    if (/[A-Z]/.test(pwd) && /[a-z]/.test(pwd)) score++;
-    if (/\d/.test(pwd)) score++;
-    if (/[^A-Za-z0-9]/.test(pwd)) score++;
-    if (score <= 2) return { label: 'Fraca', level: 1, bar: 'bg-destructive' };
-    if (score <= 3) return { label: 'Média', level: 2, bar: 'bg-yellow-500' };
-    return { label: 'Forte', level: 3, bar: 'bg-emerald-500' };
-  };
-
-  const getPasswordCriteria = (pwd: string, confirm: string) => [
-    { key: 'length', label: 'Mínimo 8 caracteres', met: pwd.length >= 8 },
-    { key: 'case', label: 'Letras maiúsculas e minúsculas', met: /[A-Z]/.test(pwd) && /[a-z]/.test(pwd) },
-    { key: 'digit', label: 'Ao menos um número', met: /\d/.test(pwd) },
-    { key: 'match', label: 'Confirmação idêntica', met: !!confirm && confirm === pwd },
-  ];
 
   const renderContent = () => {
     switch (activeSection) {
@@ -844,7 +846,6 @@ export default function Configuracoes() {
                       type="button"
                       onClick={() => setShowCurrentPwd((v) => !v)}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                      tabIndex={-1}
                       aria-label={showCurrentPwd ? 'Ocultar senha' : 'Mostrar senha'}
                     >
                       {showCurrentPwd ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -880,7 +881,6 @@ export default function Configuracoes() {
                       type="button"
                       onClick={() => setShowNewPwd((v) => !v)}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                      tabIndex={-1}
                       aria-label={showNewPwd ? 'Ocultar senha' : 'Mostrar senha'}
                     >
                       {showNewPwd ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -942,7 +942,6 @@ export default function Configuracoes() {
                       type="button"
                       onClick={() => setShowConfirmPwd((v) => !v)}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                      tabIndex={-1}
                       aria-label={showConfirmPwd ? 'Ocultar senha' : 'Mostrar senha'}
                     >
                       {showConfirmPwd ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
