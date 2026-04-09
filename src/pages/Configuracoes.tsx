@@ -166,12 +166,17 @@ export default function Configuracoes() {
   };
 
   const handleChangePassword = async () => {
+    const criteria = getPasswordCriteria(newPassword, confirmPassword);
     const errors: { current?: string; new?: string; confirm?: string } = {};
     if (!currentPassword) errors.current = 'Informe a senha atual';
-    if (!newPassword || newPassword.length < 8) errors.new = 'A senha deve ter pelo menos 8 caracteres';
-    else if (!/[A-Z]/.test(newPassword) || !/[a-z]/.test(newPassword)) errors.new = 'Use letras maiúsculas e minúsculas';
-    else if (!/\d/.test(newPassword)) errors.new = 'Inclua ao menos um número';
-    if (newPassword && confirmPassword && newPassword !== confirmPassword) errors.confirm = 'As senhas não coincidem';
+    const failedLength = !criteria.find((c) => c.key === 'length')!.met;
+    const failedCase = !criteria.find((c) => c.key === 'case')!.met;
+    const failedDigit = !criteria.find((c) => c.key === 'digit')!.met;
+    const failedMatch = !criteria.find((c) => c.key === 'match')!.met;
+    if (!newPassword || failedLength) errors.new = 'A senha deve ter pelo menos 8 caracteres';
+    else if (failedCase) errors.new = 'Use letras maiúsculas e minúsculas';
+    else if (failedDigit) errors.new = 'Inclua ao menos um número';
+    if (newPassword && confirmPassword && failedMatch) errors.confirm = 'As senhas não coincidem';
     if (Object.keys(errors).length > 0) {
       setPasswordErrors(errors);
       return;
@@ -256,6 +261,13 @@ export default function Configuracoes() {
     if (score <= 3) return { label: 'Média', level: 2, bar: 'bg-yellow-500' };
     return { label: 'Forte', level: 3, bar: 'bg-emerald-500' };
   };
+
+  const getPasswordCriteria = (pwd: string, confirm: string) => [
+    { key: 'length', label: 'Mínimo 8 caracteres', met: pwd.length >= 8 },
+    { key: 'case', label: 'Letras maiúsculas e minúsculas', met: /[A-Z]/.test(pwd) && /[a-z]/.test(pwd) },
+    { key: 'digit', label: 'Ao menos um número', met: /\d/.test(pwd) },
+    { key: 'match', label: 'Confirmação idêntica', met: !!confirm && confirm === pwd },
+  ];
 
   const renderContent = () => {
     switch (activeSection) {
@@ -717,11 +729,8 @@ export default function Configuracoes() {
 
       case 'seguranca': {
         const pwdStrength = getPasswordStrength(newPassword);
-        const allCriteriaMet =
-          newPassword.length >= 8 &&
-          /[A-Z]/.test(newPassword) && /[a-z]/.test(newPassword) &&
-          /\d/.test(newPassword) &&
-          !!confirmPassword && confirmPassword === newPassword;
+        const pwdCriteria = getPasswordCriteria(newPassword, confirmPassword);
+        const allCriteriaMet = pwdCriteria.every((c) => c.met);
         const canSubmit = !!currentPassword && allCriteriaMet;
 
         return (
@@ -951,13 +960,8 @@ export default function Configuracoes() {
                 {(newPassword || confirmPassword) && (
                   <div className="rounded-lg border bg-muted/30 p-4 space-y-2 max-w-sm">
                     <p className="text-xs font-medium text-foreground mb-1">Critérios da senha</p>
-                    {[
-                      { label: 'Mínimo 8 caracteres', met: newPassword.length >= 8 },
-                      { label: 'Letras maiúsculas e minúsculas', met: /[A-Z]/.test(newPassword) && /[a-z]/.test(newPassword) },
-                      { label: 'Ao menos um número', met: /\d/.test(newPassword) },
-                      { label: 'Confirmação idêntica', met: !!confirmPassword && confirmPassword === newPassword },
-                    ].map(({ label, met }) => (
-                      <div key={label} className={cn('flex items-center gap-2 text-xs', met ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground')}>
+                    {pwdCriteria.map(({ key, label, met }) => (
+                      <div key={key} className={cn('flex items-center gap-2 text-xs', met ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground')}>
                         <Check className={cn('h-3.5 w-3.5 shrink-0', met ? 'opacity-100' : 'opacity-30')} />
                         {label}
                       </div>
