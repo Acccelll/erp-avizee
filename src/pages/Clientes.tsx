@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MultiSelect, type MultiSelectOption } from "@/components/ui/MultiSelect";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { MaskedInput } from "@/components/ui/MaskedInput";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -418,11 +419,17 @@ const Clientes = () => {
             </div>
           )}
 
-          {/* ── BLOCO 1: IDENTIFICAÇÃO ─────────────────────────── */}
-          <div className="flex items-center gap-2 pt-1 pb-3 border-b mb-4">
-            <User2 className="w-4 h-4 text-primary/70" />
-            <h3 className="font-semibold text-sm">Identificação</h3>
-          </div>
+          <Tabs defaultValue="dados-gerais" className="w-full">
+            <TabsList className="mb-4 w-full justify-start overflow-x-auto">
+              <TabsTrigger value="dados-gerais" className="gap-1.5"><User2 className="h-3.5 w-3.5" />Dados Gerais</TabsTrigger>
+              <TabsTrigger value="contatos" className="gap-1.5"><Phone className="h-3.5 w-3.5" />Contatos</TabsTrigger>
+              <TabsTrigger value="endereco" className="gap-1.5"><MapPin className="h-3.5 w-3.5" />Endereço</TabsTrigger>
+              <TabsTrigger value="comercial" className="gap-1.5"><CreditCard className="h-3.5 w-3.5" />Comercial</TabsTrigger>
+              <TabsTrigger value="observacoes" className="gap-1.5"><FileText className="h-3.5 w-3.5" />Obs.</TabsTrigger>
+            </TabsList>
+
+            {/* ── TAB: DADOS GERAIS ─────────────────────────── */}
+            <TabsContent value="dados-gerais" className="space-y-4 mt-0">
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
             <div className="space-y-1.5">
               <Label>Tipo de Pessoa</Label>
@@ -529,12 +536,10 @@ const Clientes = () => {
               <Input value={form.nome_fantasia} onChange={(e) => updateForm({ nome_fantasia: e.target.value })} placeholder="Nome comercial (opcional)" />
             </div>
           </div>
+            </TabsContent>
 
-          {/* ── BLOCO 2: CONTATO ──────────────────────────────── */}
-          <div className="flex items-center gap-2 pt-4 pb-3 border-t border-b mb-4">
-            <Phone className="w-4 h-4 text-primary/70" />
-            <h3 className="font-semibold text-sm">Contato</h3>
-          </div>
+            {/* ── TAB: CONTATOS ─────────────────────────────── */}
+            <TabsContent value="contatos" className="space-y-4 mt-0">
           <div className="mb-6 space-y-4">
             <div>
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Referência de atendimento</p>
@@ -577,219 +582,10 @@ const Clientes = () => {
               </div>
             </div>
           </div>
+            </TabsContent>
 
-          {/* ── BLOCO 3: CONDIÇÕES COMERCIAIS ─────────────────── */}
-          <div className="flex items-center gap-2 pt-4 pb-1 border-t">
-            <CreditCard className="w-4 h-4 text-primary/70" />
-            <h3 className="font-semibold text-sm">Condições Comerciais</h3>
-          </div>
-          <p className="text-xs text-muted-foreground mb-3">
-            Condições aplicadas por padrão em cotações e pedidos. Podem ser sobrescritas individualmente por operação.
-          </p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-3">
-            <div className="col-span-2 space-y-1.5">
-              <div className="flex items-center gap-1">
-                <Label>Forma de Pagamento Padrão</Label>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Info className="h-3 w-3 text-muted-foreground cursor-help" />
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-[220px] text-xs">
-                    Forma de pagamento pré-selecionada ao criar pedidos para este cliente.
-                  </TooltipContent>
-                </Tooltip>
-              </div>
-              <Select
-                value={form.forma_pagamento_padrao || "nenhuma"}
-                onValueChange={(v) => updateForm({ forma_pagamento_padrao: v === "nenhuma" ? "" : v })}
-              >
-                <SelectTrigger><SelectValue placeholder="Não definida" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="nenhuma">Não definida</SelectItem>
-                  {formasPagamento.map((fp) => <SelectItem key={fp.id} value={fp.descricao}>{fp.descricao}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <div className="flex items-center gap-1">
-                <Label>Prazo Padrão (dias)</Label>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Info className="h-3 w-3 text-muted-foreground cursor-help" />
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-[220px] text-xs">
-                    Prazo padrão em dias para pagamento. Aplicado automaticamente em novas operações.
-                  </TooltipContent>
-                </Tooltip>
-              </div>
-              <Input
-                type="number"
-                min={0}
-                max={MAX_PAYMENT_DAYS}
-                value={form.prazo_padrao}
-                onChange={(e) => updateForm({ prazo_padrao: Number(e.target.value) })}
-                className={formErrors.prazo_padrao ? "border-destructive" : ""}
-              />
-              {formErrors.prazo_padrao && <p className="text-xs text-destructive">{formErrors.prazo_padrao}</p>}
-            </div>
-            <div className="space-y-1.5">
-              <div className="flex items-center gap-1">
-                <Label>Prazo Preferencial (dias)</Label>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Info className="h-3 w-3 text-muted-foreground cursor-help" />
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-[220px] text-xs">
-                    Prazo alternativo negociado com o cliente. Diferente do prazo padrão — usado quando há condição especial acordada.
-                  </TooltipContent>
-                </Tooltip>
-              </div>
-              <Input
-                type="number"
-                min={0}
-                max={MAX_PAYMENT_DAYS}
-                value={form.prazo_preferencial}
-                onChange={(e) => updateForm({ prazo_preferencial: Number(e.target.value) })}
-              />
-            </div>
-          </div>
-          <div className="mb-6">
-            <div className="rounded-md border bg-muted/20 px-4 py-3 space-y-1.5">
-              <div className="flex items-center gap-1">
-                <Label>Limite de Crédito (R$)</Label>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Info className="h-3 w-3 text-muted-foreground cursor-help" />
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-[220px] text-xs">
-                    Valor máximo de crédito disponível para este cliente. Impacta a análise de risco no financeiro.
-                  </TooltipContent>
-                </Tooltip>
-              </div>
-              <Input
-                type="number"
-                step="0.01"
-                min={0}
-                placeholder="0,00"
-                value={form.limite_credito}
-                onChange={(e) => updateForm({ limite_credito: Number(e.target.value) })}
-                className={`max-w-xs ${formErrors.limite_credito ? "border-destructive" : ""}`}
-              />
-              {formErrors.limite_credito && <p className="text-xs text-destructive">{formErrors.limite_credito}</p>}
-            </div>
-          </div>
-
-          {/* ── BLOCO 4: GRUPO ECONÔMICO ──────────────────────── */}
-          <div className="flex items-center gap-2 pt-4 pb-1 border-t">
-            <Building2 className="w-4 h-4 text-primary/70" />
-            <h3 className="font-semibold text-sm">Grupo Econômico</h3>
-          </div>
-          <p className="text-xs text-muted-foreground mb-3">
-            Vincule o cliente a um grupo econômico para consolidar dados de vendas, crédito e relacionamento.
-          </p>
-          <div className="grid grid-cols-2 gap-4 mb-3">
-            <div className="space-y-1.5">
-              <Label>Grupo Econômico</Label>
-              <Select
-                value={form.grupo_economico_id || "nenhum"}
-                onValueChange={(v) => updateForm({ grupo_economico_id: v === "nenhum" ? "" : v })}
-              >
-                <SelectTrigger><SelectValue placeholder="Nenhum" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="nenhum">Nenhum</SelectItem>
-                  {grupos.map((g) => <SelectItem key={g.id} value={g.id}>{g.nome}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <div className="flex items-center gap-1">
-                <Label>Tipo de Relação</Label>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Info className="h-3 w-3 text-muted-foreground cursor-help" />
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-[240px] text-xs space-y-1">
-                    <p><strong>Matriz:</strong> empresa controladora do grupo.</p>
-                    <p><strong>Filial:</strong> empresa controlada pela matriz.</p>
-                    <p><strong>Coligada:</strong> empresa com participação societária no grupo.</p>
-                    <p><strong>Independente:</strong> sem vínculo hierárquico.</p>
-                  </TooltipContent>
-                </Tooltip>
-              </div>
-              <Select
-                value={form.tipo_relacao_grupo}
-                onValueChange={(v) => updateForm({ tipo_relacao_grupo: v })}
-              >
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {relacaoOptions.map((r) => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          {form.grupo_economico_id ? (
-            <div className="mb-6 flex items-center gap-2 bg-muted/30 rounded-md px-3 py-2 text-xs text-muted-foreground border">
-              <Building2 className="h-3.5 w-3.5 shrink-0 text-primary/60" />
-              <span>
-                <strong className="text-foreground">{grupos.find(g => g.id === form.grupo_economico_id)?.nome}</strong>
-                {" — "}{relacaoLabel[form.tipo_relacao_grupo] || form.tipo_relacao_grupo}
-              </span>
-            </div>
-          ) : <div className="mb-6" />}
-
-          {/* ── BLOCO 5: LOGÍSTICA ────────────────────────────── */}
-          <div className="flex items-center gap-2 pt-4 pb-3 border-t mb-4">
-            <Truck className="w-4 h-4 text-primary/70" />
-            <h3 className="font-semibold text-sm">Logística</h3>
-            {mode === "edit" && !loadingTransportadoras && modalTransportadoras.length > 0 && (
-              <span className="ml-auto text-[10px] text-muted-foreground uppercase tracking-wider">apenas leitura</span>
-            )}
-          </div>
-          <div className="mb-6">
-            {mode === "create" ? (
-              <div className="flex items-start gap-2 bg-muted/30 rounded-lg px-3 py-2.5 border border-dashed text-xs text-muted-foreground">
-                <Truck className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                <span>
-                  Transportadoras preferenciais, modalidades de entrega e observações logísticas são gerenciadas após o cadastro, na aba <strong className="text-foreground">Logística</strong> do registro do cliente.
-                </span>
-              </div>
-            ) : loadingTransportadoras ? (
-              <div className="h-[60px] rounded-lg bg-muted/30 animate-pulse" />
-            ) : modalTransportadoras.length === 0 ? (
-              <div className="flex items-start gap-2 bg-muted/30 rounded-lg px-3 py-2.5 border border-dashed text-xs text-muted-foreground">
-                <Truck className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                <span>
-                  Nenhuma transportadora vinculada ainda. Para definir transportadoras preferenciais, acesse a aba <strong className="text-foreground">Logística</strong> no painel do cliente.
-                </span>
-              </div>
-            ) : (
-              <div className="space-y-0.5">
-                {modalTransportadoras.slice(0, 4).map((ct) => (
-                  <div key={ct.id} className="flex items-center justify-between py-1.5 px-2 rounded-md hover:bg-muted/30 transition-colors border-b last:border-b-0">
-                    <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                      {ct.prioridade === 1 && <Star className="h-3 w-3 text-amber-500 shrink-0" />}
-                      <span className="text-xs font-medium text-foreground truncate">{ct.transportadora_nome}</span>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0 ml-2 text-xs text-muted-foreground">
-                      {ct.modalidade && <span className="capitalize">{ct.modalidade}</span>}
-                      {ct.prazo_medio && <span className="font-mono">{ct.prazo_medio} dias</span>}
-                    </div>
-                  </div>
-                ))}
-                {modalTransportadoras.length > 4 && (
-                  <p className="text-[10px] text-muted-foreground text-center pt-1">
-                    +{modalTransportadoras.length - 4} transportadora(s) vinculada(s)
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* ── BLOCO 6: ENDEREÇO ─────────────────────────────── */}
-          <div className="flex items-center gap-2 pt-4 pb-1 border-t">
-            <MapPin className="w-4 h-4 text-primary/70" />
-            <h3 className="font-semibold text-sm">Endereço</h3>
-          </div>
+            {/* ── TAB: ENDEREÇO ─────────────────────────────── */}
+            <TabsContent value="endereco" className="space-y-4 mt-0">
           <p className="text-xs text-muted-foreground mb-3">
             Informe o CEP para preenchimento automático do logradouro, bairro, cidade e UF.
           </p>
@@ -866,12 +662,217 @@ const Clientes = () => {
               <Input value={form.caixa_postal} onChange={(e) => updateForm({ caixa_postal: e.target.value })} placeholder="Ex: CP 1234" />
             </div>
           </div>
+            </TabsContent>
 
-          {/* ── BLOCO 7: OBSERVAÇÕES ──────────────────────────── */}
-          <div className="flex items-center gap-2 pt-4 pb-1 border-t">
-            <FileText className="w-4 h-4 text-primary/70" />
-            <h3 className="font-semibold text-sm">Observações</h3>
+            {/* ── TAB: COMERCIAL ────────────────────────────── */}
+            <TabsContent value="comercial" className="space-y-4 mt-0">
+          <div className="flex items-center gap-2 pb-1">
+            <CreditCard className="w-4 h-4 text-primary/70" />
+            <h3 className="font-semibold text-sm">Condições Comerciais</h3>
           </div>
+          <p className="text-xs text-muted-foreground mb-3">
+            Condições aplicadas por padrão em orçamentos e pedidos. Podem ser sobrescritas individualmente por operação.
+          </p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-3">
+            <div className="col-span-2 space-y-1.5">
+              <div className="flex items-center gap-1">
+                <Label>Forma de Pagamento Padrão</Label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-[220px] text-xs">
+                    Forma de pagamento pré-selecionada ao criar pedidos para este cliente.
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              <Select
+                value={form.forma_pagamento_padrao || "nenhuma"}
+                onValueChange={(v) => updateForm({ forma_pagamento_padrao: v === "nenhuma" ? "" : v })}
+              >
+                <SelectTrigger><SelectValue placeholder="Não definida" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="nenhuma">Não definida</SelectItem>
+                  {formasPagamento.map((fp) => <SelectItem key={fp.id} value={fp.descricao}>{fp.descricao}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-1">
+                <Label>Prazo Padrão (dias)</Label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-[220px] text-xs">
+                    Prazo padrão em dias para pagamento. Aplicado automaticamente em novas operações.
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              <Input
+                type="number"
+                min={0}
+                max={MAX_PAYMENT_DAYS}
+                value={form.prazo_padrao}
+                onChange={(e) => updateForm({ prazo_padrao: Number(e.target.value) })}
+                className={formErrors.prazo_padrao ? "border-destructive" : ""}
+              />
+              {formErrors.prazo_padrao && <p className="text-xs text-destructive">{formErrors.prazo_padrao}</p>}
+            </div>
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-1">
+                <Label>Prazo Preferencial (dias)</Label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-[220px] text-xs">
+                    Prazo alternativo negociado com o cliente. Diferente do prazo padrão — usado quando há condição especial acordada.
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              <Input
+                type="number"
+                min={0}
+                max={MAX_PAYMENT_DAYS}
+                value={form.prazo_preferencial}
+                onChange={(e) => updateForm({ prazo_preferencial: Number(e.target.value) })}
+              />
+            </div>
+          </div>
+          <div className="mb-4">
+            <div className="rounded-md border bg-muted/20 px-4 py-3 space-y-1.5">
+              <div className="flex items-center gap-1">
+                <Label>Limite de Crédito (R$)</Label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-[220px] text-xs">
+                    Valor máximo de crédito disponível para este cliente. Impacta a análise de risco no financeiro.
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              <Input
+                type="number"
+                step="0.01"
+                min={0}
+                placeholder="0,00"
+                value={form.limite_credito}
+                onChange={(e) => updateForm({ limite_credito: Number(e.target.value) })}
+                className={`max-w-xs ${formErrors.limite_credito ? "border-destructive" : ""}`}
+              />
+              {formErrors.limite_credito && <p className="text-xs text-destructive">{formErrors.limite_credito}</p>}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 pt-3 pb-1 border-t">
+            <Building2 className="w-4 h-4 text-primary/70" />
+            <h3 className="font-semibold text-sm">Grupo Econômico</h3>
+          </div>
+          <p className="text-xs text-muted-foreground mb-3">
+            Vincule o cliente a um grupo econômico para consolidar dados de vendas, crédito e relacionamento.
+          </p>
+          <div className="grid grid-cols-2 gap-4 mb-3">
+            <div className="space-y-1.5">
+              <Label>Grupo Econômico</Label>
+              <Select
+                value={form.grupo_economico_id || "nenhum"}
+                onValueChange={(v) => updateForm({ grupo_economico_id: v === "nenhum" ? "" : v })}
+              >
+                <SelectTrigger><SelectValue placeholder="Nenhum" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="nenhum">Nenhum</SelectItem>
+                  {grupos.map((g) => <SelectItem key={g.id} value={g.id}>{g.nome}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-1">
+                <Label>Tipo de Relação</Label>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-[240px] text-xs space-y-1">
+                    <p><strong>Matriz:</strong> empresa controladora do grupo.</p>
+                    <p><strong>Filial:</strong> empresa controlada pela matriz.</p>
+                    <p><strong>Coligada:</strong> empresa com participação societária no grupo.</p>
+                    <p><strong>Independente:</strong> sem vínculo hierárquico.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              <Select
+                value={form.tipo_relacao_grupo}
+                onValueChange={(v) => updateForm({ tipo_relacao_grupo: v })}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {relacaoOptions.map((r) => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          {form.grupo_economico_id ? (
+            <div className="mb-4 flex items-center gap-2 bg-muted/30 rounded-md px-3 py-2 text-xs text-muted-foreground border">
+              <Building2 className="h-3.5 w-3.5 shrink-0 text-primary/60" />
+              <span>
+                <strong className="text-foreground">{grupos.find(g => g.id === form.grupo_economico_id)?.nome}</strong>
+                {" — "}{relacaoLabel[form.tipo_relacao_grupo] || form.tipo_relacao_grupo}
+              </span>
+            </div>
+          ) : <div className="mb-4" />}
+
+          <div className="flex items-center gap-2 pt-3 pb-3 border-t">
+            <Truck className="w-4 h-4 text-primary/70" />
+            <h3 className="font-semibold text-sm">Logística</h3>
+            {mode === "edit" && !loadingTransportadoras && modalTransportadoras.length > 0 && (
+              <span className="ml-auto text-[10px] text-muted-foreground uppercase tracking-wider">apenas leitura</span>
+            )}
+          </div>
+          <div className="mb-4">
+            {mode === "create" ? (
+              <div className="flex items-start gap-2 bg-muted/30 rounded-lg px-3 py-2.5 border border-dashed text-xs text-muted-foreground">
+                <Truck className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                <span>
+                  Transportadoras preferenciais, modalidades de entrega e observações logísticas são gerenciadas após o cadastro, na aba <strong className="text-foreground">Logística</strong> do registro do cliente.
+                </span>
+              </div>
+            ) : loadingTransportadoras ? (
+              <div className="h-[60px] rounded-lg bg-muted/30 animate-pulse" />
+            ) : modalTransportadoras.length === 0 ? (
+              <div className="flex items-start gap-2 bg-muted/30 rounded-lg px-3 py-2.5 border border-dashed text-xs text-muted-foreground">
+                <Truck className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                <span>
+                  Nenhuma transportadora vinculada ainda. Para definir transportadoras preferenciais, acesse a aba <strong className="text-foreground">Logística</strong> no painel do cliente.
+                </span>
+              </div>
+            ) : (
+              <div className="space-y-0.5">
+                {modalTransportadoras.slice(0, 4).map((ct) => (
+                  <div key={ct.id} className="flex items-center justify-between py-1.5 px-2 rounded-md hover:bg-muted/30 transition-colors border-b last:border-b-0">
+                    <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                      {ct.prioridade === 1 && <Star className="h-3 w-3 text-amber-500 shrink-0" />}
+                      <span className="text-xs font-medium text-foreground truncate">{ct.transportadora_nome}</span>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0 ml-2 text-xs text-muted-foreground">
+                      {ct.modalidade && <span className="capitalize">{ct.modalidade}</span>}
+                      {ct.prazo_medio && <span className="font-mono">{ct.prazo_medio} dias</span>}
+                    </div>
+                  </div>
+                ))}
+                {modalTransportadoras.length > 4 && (
+                  <p className="text-[10px] text-muted-foreground text-center pt-1">
+                    +{modalTransportadoras.length - 4} transportadora(s) vinculada(s)
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+            </TabsContent>
+
+            {/* ── TAB: OBSERVAÇÕES ──────────────────────────── */}
+            <TabsContent value="observacoes" className="space-y-4 mt-0">
           <p className="text-xs text-muted-foreground mb-3">
             Notas internas e contexto adicional sobre o cliente. Visível apenas internamente.
           </p>
@@ -885,6 +886,8 @@ const Clientes = () => {
             />
             <p className="text-xs text-muted-foreground mt-1 text-right">{(form.observacoes || "").length}/{MAX_OBSERVACOES_LENGTH}</p>
           </div>
+            </TabsContent>
+          </Tabs>
 
           {/* ── RODAPÉ ────────────────────────────────────────── */}
           <div className="flex justify-end gap-2 pt-4 border-t">
