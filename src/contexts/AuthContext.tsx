@@ -48,6 +48,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [roles, setRoles] = useState<AppRole[]>([]);
   const [extraPermissions, setExtraPermissions] = useState<PermissionKey[]>([]);
   const manualSignOut = useRef(false);
+  const permissionsFetchId = useRef(0);
 
   useEffect(() => {
     if (!supabase) {
@@ -148,9 +149,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const fetchPermissions = async (userId: string) => {
+    const fetchId = ++permissionsFetchId.current;
     setPermissionsLoaded(false);
-    await Promise.all([fetchRoles(userId), fetchExtraPermissions(userId)]);
-    setPermissionsLoaded(true);
+    try {
+      await Promise.all([fetchRoles(userId), fetchExtraPermissions(userId)]);
+    } finally {
+      if (fetchId === permissionsFetchId.current) {
+        setPermissionsLoaded(true);
+      }
+    }
   };
 
   const hasRole = (role: AppRole) => roles.includes(role);
