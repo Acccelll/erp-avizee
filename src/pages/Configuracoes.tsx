@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTheme } from 'next-themes';
-import { Building2, CalendarDays, Clock, Info, Loader2, Lock, Mail, MapPin, Moon, Palette, RotateCcw, Save, Settings, Shield, Sun, Truck, User } from 'lucide-react';
+import { AlertCircle, Building2, CalendarDays, Check, CheckCircle2, Clock, Eye, EyeOff, Info, Loader2, Lock, Mail, MapPin, Moon, Palette, RotateCcw, Save, Settings, Shield, ShieldCheck, Sun, Truck, User } from 'lucide-react';
 import { useAppConfig } from '@/hooks/useAppConfig';
 import { useUserPreference } from '@/hooks/useUserPreference';
 import { AppLayout } from '@/components/AppLayout';
@@ -89,6 +89,28 @@ function getFontLabel(scale: number): string {
   return 'Máximo';
 }
 
+function getPasswordStrength(pwd: string): { label: string; level: 0 | 1 | 2 | 3; bar: string } {
+  if (!pwd) return { label: '', level: 0, bar: '' };
+  let score = 0;
+  if (pwd.length >= 8) score++;
+  if (pwd.length >= 12) score++;
+  if (/[A-Z]/.test(pwd) && /[a-z]/.test(pwd)) score++;
+  if (/\d/.test(pwd)) score++;
+  if (/[^A-Za-z0-9]/.test(pwd)) score++;
+  if (score <= 2) return { label: 'Fraca', level: 1, bar: 'bg-destructive' };
+  if (score <= 3) return { label: 'Média', level: 2, bar: 'bg-yellow-500' };
+  return { label: 'Forte', level: 3, bar: 'bg-emerald-500' };
+}
+
+function getPasswordCriteria(pwd: string, confirm: string) {
+  return [
+    { key: 'length', label: 'Mínimo 8 caracteres', met: pwd.length >= 8 },
+    { key: 'case', label: 'Letras maiúsculas e minúsculas', met: /[A-Z]/.test(pwd) && /[a-z]/.test(pwd) },
+    { key: 'digit', label: 'Ao menos um número', met: /\d/.test(pwd) },
+    { key: 'match', label: 'Confirmação idêntica', met: !!confirm && confirm === pwd },
+  ] as const;
+}
+
 export default function Configuracoes() {
   const { user, profile, roles } = useAuth();
   const { theme, setTheme } = useTheme();
@@ -99,6 +121,13 @@ export default function Configuracoes() {
   const [savingProfile, setSavingProfile] = useState(false);
 
   const [newPassword, setNewPassword] = useState('');
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showCurrentPwd, setShowCurrentPwd] = useState(false);
+  const [showNewPwd, setShowNewPwd] = useState(false);
+  const [showConfirmPwd, setShowConfirmPwd] = useState(false);
+  const [passwordErrors, setPasswordErrors] = useState<{ current?: string; new?: string; confirm?: string }>({});
+  const [passwordChangedAt, setPasswordChangedAt] = useState<Date | null>(null);
   const [changingPassword, setChangingPassword] = useState(false);
 
   const [densidade, setDensidade] = useState('confortavel');
@@ -159,19 +188,43 @@ export default function Configuracoes() {
   };
 
   const handleChangePassword = async () => {
-    if (newPassword.length < 6) {
-      toast.error('A senha deve ter pelo menos 6 caracteres.');
+    const criteria = getPasswordCriteria(newPassword, confirmPassword);
+    const [lengthOk, caseOk, digitOk, matchOk] = criteria.map((c) => c.met);
+    const errors: { current?: string; new?: string; confirm?: string } = {};
+    if (!currentPassword) errors.current = 'Informe a senha atual';
+    if (!newPassword || !lengthOk) errors.new = 'A senha deve ter pelo menos 8 caracteres';
+    else if (!caseOk) errors.new = 'Use letras maiúsculas e minúsculas';
+    else if (!digitOk) errors.new = 'Inclua ao menos um número';
+    if (newPassword && confirmPassword && !matchOk) errors.confirm = 'As senhas não coincidem';
+    if (Object.keys(errors).length > 0) {
+      setPasswordErrors(errors);
       return;
     }
+    setPasswordErrors({});
     setChangingPassword(true);
     try {
+      // Supabase doesn't expose a verify-only endpoint; re-authenticating with the
+      // current password is the standard pattern to confirm the user knows their
+      // existing credentials before allowing a password update.
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: user!.email!,
+        password: currentPassword,
+      });
+      if (signInError) {
+        setPasswordErrors({ current: 'Senha atual incorreta' });
+        setChangingPassword(false);
+        return;
+      }
       const { error } = await supabase.auth.updateUser({ password: newPassword });
       if (error) throw error;
       toast.success('Senha alterada com sucesso!');
+      setCurrentPassword('');
       setNewPassword('');
+      setConfirmPassword('');
+      setPasswordChangedAt(new Date());
     } catch (err: unknown) {
       console.error('[perfil] password:', err);
-      toast.error('Erro ao alterar senha.');
+      toast.error('Erro ao alterar senha. Tente novamente.');
     }
     setChangingPassword(false);
   };
@@ -676,32 +729,286 @@ export default function Configuracoes() {
           </Card>
         );
 
-      case 'seguranca':
+      case 'seguranca': {
+        const pwdStrength = getPasswordStrength(newPassword);
+        const pwdCriteria = getPasswordCriteria(newPassword, confirmPassword);
+        const allCriteriaMet = pwdCriteria.every((c) => c.met);
+        const canSubmit = !!currentPassword && allCriteriaMet;
+
         return (
-          <Card>
-            <CardHeader>
-              <CardTitle>Segurança</CardTitle>
-              <CardDescription>Gerencie sua senha e opções de acesso.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2 max-w-sm">
-                <Label>Nova senha</Label>
-                <Input
-                  type="password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="Mínimo 6 caracteres"
-                />
+          <div className="space-y-6">
+            {/* ── Bloco 1: Dados de acesso ─────────────────────────── */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <ShieldCheck className="h-4 w-4 text-muted-foreground" />
+                  Dados de acesso
+                </CardTitle>
+                <CardDescription>
+                  Informações vinculadas à sua conta. O e-mail de acesso não pode ser alterado por aqui.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-1.5">
+                      <Mail className="h-3.5 w-3.5" />
+                      E-mail de acesso
+                    </Label>
+                    <div className="relative">
+                      <Input value={user?.email || ''} disabled className="bg-muted pr-9" />
+                      <Lock className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                    </div>
+                    <p className="text-xs text-muted-foreground">Identificador único da sua conta no sistema.</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-1.5">
+                      <Shield className="h-3.5 w-3.5" />
+                      Status da conta
+                    </Label>
+                    <div className="flex items-center gap-2 h-10 px-3 rounded-md border bg-muted text-sm text-muted-foreground">
+                      {user?.email_confirmed_at ? (
+                        <>
+                          <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
+                          <span>Ativa e verificada</span>
+                        </>
+                      ) : (
+                        <>
+                          <AlertCircle className="h-4 w-4 text-yellow-500 shrink-0" />
+                          <span>Aguardando verificação</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                {user?.last_sign_in_at && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground pt-1">
+                    <Clock className="h-4 w-4 shrink-0" />
+                    <span>
+                      Último acesso em{' '}
+                      {new Date(user.last_sign_in_at).toLocaleString('pt-BR', {
+                        day: '2-digit',
+                        month: 'short',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </span>
+                  </div>
+                )}
+                {passwordChangedAt && (
+                  <div className="flex items-center gap-2 text-sm text-emerald-600 dark:text-emerald-400 pt-1">
+                    <CheckCircle2 className="h-4 w-4 shrink-0" />
+                    <span>
+                      Senha alterada em{' '}
+                      {passwordChangedAt.toLocaleString('pt-BR', {
+                        day: '2-digit',
+                        month: 'short',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </span>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* ── Bloco 2: Alterar senha ────────────────────────────── */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Lock className="h-4 w-4 text-muted-foreground" />
+                  Alterar senha
+                </CardTitle>
+                <CardDescription>
+                  Proteja sua conta com uma senha segura. Você precisará informar a senha atual para confirmar a alteração.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-5">
+                {/* Current password */}
+                <div className="space-y-2 max-w-sm">
+                  <Label htmlFor="current-password">Senha atual</Label>
+                  <div className="relative">
+                    <Input
+                      id="current-password"
+                      type={showCurrentPwd ? 'text' : 'password'}
+                      value={currentPassword}
+                      onChange={(e) => {
+                        setCurrentPassword(e.target.value);
+                        setPasswordErrors((p) => ({ ...p, current: undefined }));
+                      }}
+                      placeholder="Sua senha atual"
+                      autoComplete="current-password"
+                      className={cn('pr-10', passwordErrors.current ? 'border-destructive focus-visible:ring-destructive' : '')}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowCurrentPwd((v) => !v)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                      aria-label={showCurrentPwd ? 'Ocultar senha' : 'Mostrar senha'}
+                    >
+                      {showCurrentPwd ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                  {passwordErrors.current && (
+                    <p className="flex items-center gap-1 text-xs text-destructive">
+                      <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                      {passwordErrors.current}
+                    </p>
+                  )}
+                </div>
+
+                <Separator />
+
+                {/* New password */}
+                <div className="space-y-2 max-w-sm">
+                  <Label htmlFor="new-password">Nova senha</Label>
+                  <div className="relative">
+                    <Input
+                      id="new-password"
+                      type={showNewPwd ? 'text' : 'password'}
+                      value={newPassword}
+                      onChange={(e) => {
+                        setNewPassword(e.target.value);
+                        setPasswordErrors((p) => ({ ...p, new: undefined }));
+                      }}
+                      placeholder="Mínimo 8 caracteres"
+                      autoComplete="new-password"
+                      className={cn('pr-10', passwordErrors.new ? 'border-destructive focus-visible:ring-destructive' : '')}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPwd((v) => !v)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                      aria-label={showNewPwd ? 'Ocultar senha' : 'Mostrar senha'}
+                    >
+                      {showNewPwd ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                  {passwordErrors.new && (
+                    <p className="flex items-center gap-1 text-xs text-destructive">
+                      <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                      {passwordErrors.new}
+                    </p>
+                  )}
+
+                  {/* Strength bar */}
+                  {newPassword && (
+                    <div className="space-y-1 pt-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground">Força da senha</span>
+                        <span className={cn(
+                          'text-xs font-medium',
+                          pwdStrength.level === 1 && 'text-destructive',
+                          pwdStrength.level === 2 && 'text-yellow-600 dark:text-yellow-400',
+                          pwdStrength.level === 3 && 'text-emerald-600 dark:text-emerald-400',
+                        )}>
+                          {pwdStrength.label}
+                        </span>
+                      </div>
+                      <div className="flex gap-1">
+                        {[1, 2, 3].map((seg) => (
+                          <div
+                            key={seg}
+                            className={cn(
+                              'h-1.5 flex-1 rounded-full transition-colors',
+                              pwdStrength.level >= seg ? pwdStrength.bar : 'bg-muted'
+                            )}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Confirm password */}
+                <div className="space-y-2 max-w-sm">
+                  <Label htmlFor="confirm-password">Confirmar nova senha</Label>
+                  <div className="relative">
+                    <Input
+                      id="confirm-password"
+                      type={showConfirmPwd ? 'text' : 'password'}
+                      value={confirmPassword}
+                      onChange={(e) => {
+                        setConfirmPassword(e.target.value);
+                        setPasswordErrors((p) => ({ ...p, confirm: undefined }));
+                      }}
+                      placeholder="Repita a nova senha"
+                      autoComplete="new-password"
+                      className={cn('pr-10', passwordErrors.confirm ? 'border-destructive focus-visible:ring-destructive' : '')}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPwd((v) => !v)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                      aria-label={showConfirmPwd ? 'Ocultar senha' : 'Mostrar senha'}
+                    >
+                      {showConfirmPwd ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                  {passwordErrors.confirm && (
+                    <p className="flex items-center gap-1 text-xs text-destructive">
+                      <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                      {passwordErrors.confirm}
+                    </p>
+                  )}
+                </div>
+
+                {/* Password criteria checklist */}
+                {(newPassword || confirmPassword) && (
+                  <div className="rounded-lg border bg-muted/30 p-4 space-y-2 max-w-sm">
+                    <p className="text-xs font-medium text-foreground mb-1">Critérios da senha</p>
+                    {pwdCriteria.map(({ key, label, met }) => (
+                      <div key={key} className={cn('flex items-center gap-2 text-xs', met ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground')}>
+                        <Check className={cn('h-3.5 w-3.5 shrink-0', met ? 'opacity-100' : 'opacity-30')} />
+                        {label}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Actions */}
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center gap-3">
+                    <Button
+                      onClick={handleChangePassword}
+                      disabled={changingPassword || !canSubmit}
+                      className="gap-2"
+                    >
+                      {changingPassword ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <ShieldCheck className="h-4 w-4" />
+                      )}
+                      {changingPassword ? 'Alterando...' : 'Alterar senha'}
+                    </Button>
+                    {!canSubmit && (currentPassword || newPassword || confirmPassword) && (
+                      <p className="text-xs text-muted-foreground">
+                        {!currentPassword ? 'Informe a senha atual para continuar.' : 'Preencha todos os critérios acima.'}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* ── Bloco 3: Orientações de segurança ────────────────── */}
+            <div className="flex items-start gap-3 rounded-lg border border-dashed bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
+              <Info className="mt-0.5 h-4 w-4 shrink-0" />
+              <div className="space-y-1">
+                <p className="font-medium text-foreground">Boas práticas de segurança</p>
+                <ul className="space-y-0.5 text-xs">
+                  <li>• Use uma senha única, diferente das usadas em outros serviços.</li>
+                  <li>• Evite senhas óbvias como datas de nascimento ou sequências simples.</li>
+                  <li>• Não compartilhe sua senha com outras pessoas.</li>
+                  <li>• Em caso de suspeita de acesso não autorizado, altere a senha imediatamente.</li>
+                </ul>
               </div>
-              <div className="flex justify-end">
-                <Button variant="outline" onClick={handleChangePassword} disabled={changingPassword || !newPassword} className="gap-2">
-                  {changingPassword ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lock className="h-4 w-4" />}
-                  Alterar Senha
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         );
+      }
 
       default:
         return null;
