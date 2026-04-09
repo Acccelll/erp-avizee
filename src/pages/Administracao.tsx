@@ -76,7 +76,7 @@ interface SideNavItem {
 const sideNavItems: SideNavItem[] = [
   { key: 'empresa', label: 'Empresa', icon: Building2 },
   { key: 'usuarios', label: 'Usuários e Permissões', icon: Users },
-  { key: 'email', label: 'E-mail', icon: Mail },
+  { key: 'email', label: 'E-mails', icon: Mail },
   { key: 'fiscal', label: 'Parâmetros Fiscais', icon: Receipt },
   { key: 'financeiro', label: 'Parâmetros Financeiros', icon: Wallet },
   { key: 'auditoria', label: 'Auditoria', icon: Shield },

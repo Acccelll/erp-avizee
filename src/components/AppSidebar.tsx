@@ -98,8 +98,14 @@ export function AppSidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMo
     [currentRoute, visibleSections],
   );
 
+  // Administração has its own local sidebar navigation; suppress global expansion
+  // to avoid dual-navigation while the user is inside the module.
+  const isInsideAdminModule = location.pathname === '/administracao' ||
+    location.pathname.startsWith('/administracao/');
+
   const isSectionOpen = (key: string) => {
     if (collapsed) return false;
+    if (key === 'administracao' && isInsideAdminModule) return false;
     if (key in manualSections) return manualSections[key];
     return activeSectionKeys.includes(key);
   };
@@ -190,6 +196,11 @@ export function AppSidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMo
                     type="button"
                     onClick={() => {
                       if (collapsed) { onToggleCollapsed(); return; }
+                      // Admin module has its own internal nav — act as a direct link
+                      if (section.key === 'administracao' && isInsideAdminModule) {
+                        handleNavClick('/administracao');
+                        return;
+                      }
                       setManualSections((c) => ({ ...c, [section.key]: !isOpen }));
                     }}
                     aria-expanded={!collapsed && isOpen}
@@ -211,7 +222,11 @@ export function AppSidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMo
                             {badgeMap[section.key]}
                           </span>
                         )}
-                        {isOpen ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
+                        {!(section.key === 'administracao' && isInsideAdminModule) && (
+                          isOpen
+                            ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                            : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                        )}
                       </>
                     )}
                     {collapsed && (badgeMap[section.key] ?? 0) > 0 && (
