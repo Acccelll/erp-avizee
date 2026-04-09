@@ -12,12 +12,12 @@ create extension if not exists pgcrypto;
 do $$
 begin
   if not exists (select 1 from pg_type where typname = 'app_role') then
-    create type public.app_role as enum ('admin', 'gestor', 'operacional', 'viewer');
+    create type public.app_role as enum ('admin', 'vendedor', 'financeiro', 'estoquista');
   end if;
 end $$;
 
 create table if not exists public.profiles (
-  id uuid primary key,
+  id uuid primary key references auth.users(id) on delete cascade,
   nome text,
   email text,
   ativo boolean not null default true,
@@ -33,7 +33,7 @@ create table if not exists public.user_roles (
   unique (user_id, role)
 );
 
-create or replace function public.has_role(_user_id uuid, _role public.app_role)
+create or replace function public.has_role(_role public.app_role, _user_id uuid)
 returns boolean
 language sql
 stable
@@ -52,7 +52,7 @@ $$;
 create table if not exists public.app_configuracoes (
   id uuid primary key default gen_random_uuid(),
   chave text not null unique,
-  valor text,
+  valor jsonb,
   updated_at timestamptz not null default now(),
   created_at timestamptz not null default now(),
   created_by uuid,
@@ -222,5 +222,4 @@ begin
   end loop;
 end $$;
 
-select pg_notify('pgrst', 'reload schema');
 notify pgrst, 'reload schema';
