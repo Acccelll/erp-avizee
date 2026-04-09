@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   Drawer,
   DrawerContent,
+  DrawerClose,
   DrawerHeader,
   DrawerTitle,
   DrawerDescription,
@@ -131,7 +132,18 @@ export function AdvancedFilterBar({
         <Drawer open={drawerOpen} onOpenChange={setDrawerOpen}>
           <DrawerContent className="max-h-[85vh]">
             <DrawerHeader className="text-left">
-              <DrawerTitle>Filtros</DrawerTitle>
+              <div className="flex items-center justify-between gap-2">
+                <DrawerTitle>Filtros</DrawerTitle>
+                <DrawerClose asChild>
+                  <button
+                    type="button"
+                    className="rounded-full p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                    aria-label="Fechar filtros"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </DrawerClose>
+              </div>
               <DrawerDescription>Refine os resultados por critérios específicos.</DrawerDescription>
             </DrawerHeader>
             <div className="overflow-y-auto px-4 pb-4">

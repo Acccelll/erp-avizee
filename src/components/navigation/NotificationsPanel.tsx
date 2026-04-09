@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Bell, CheckCircle2, AlertTriangle, Info, XCircle, Loader2 } from 'lucide-react';
+import { Bell, CheckCircle2, AlertTriangle, Info, XCircle, Loader2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -9,7 +9,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
+import { Drawer, DrawerClose, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
 import { supabase } from '@/integrations/supabase/client';
 import { useIsMobile } from '@/hooks/use-mobile';
 
@@ -183,7 +183,18 @@ export function NotificationsPanel() {
         <Drawer open={open} onOpenChange={setOpen}>
           <DrawerContent className="max-h-[78vh] rounded-t-[20px] md:hidden">
             <DrawerHeader className="text-left">
-              <DrawerTitle>Notificações</DrawerTitle>
+              <div className="flex items-center justify-between gap-2">
+                <DrawerTitle>Notificações</DrawerTitle>
+                <DrawerClose asChild>
+                  <button
+                    type="button"
+                    className="rounded-full p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                    aria-label="Fechar notificações"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </DrawerClose>
+              </div>
               <DrawerDescription>Alertas operacionais e eventos recentes.</DrawerDescription>
             </DrawerHeader>
             <div className="overflow-y-auto px-4 pb-10">
