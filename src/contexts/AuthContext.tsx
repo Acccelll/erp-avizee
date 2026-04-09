@@ -63,7 +63,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }, 5000);
 
+    // onAuthStateChange já emite INITIAL_SESSION no mount com a sessão
+    // existente (ou null). Usar apenas ele como fonte da verdade evita
+    // o double-fetch que ocorria ao combinar getSession() + onAuthStateChange,
+    // ambos disparando fetchProfile/fetchPermissions simultaneamente.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      clearTimeout(safetyTimeout);
+
       if (event === 'SIGNED_OUT' && !manualSignOut.current && user) {
         toast.error("Sua sessão expirou. Faça login novamente.");
       }
@@ -84,23 +90,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       setLoading(false);
     });
-
-    supabase.auth.getSession()
-      .then(({ data: { session } }) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        if (session?.user) {
-          fetchProfile(session.user.id);
-          fetchPermissions(session.user.id);
-        }
-      })
-      .catch((err) => {
-        console.error("[auth] Error getting session:", err);
-      })
-      .finally(() => {
-        clearTimeout(safetyTimeout);
-        setLoading(false);
-      });
 
     return () => {
       clearTimeout(safetyTimeout);
