@@ -1278,4 +1278,3 @@ CREATE POLICY "Admin/financeiro can manage fopag_itens" ON public.fopag_itens FO
 -- 40. Reload PostgREST schema cache
 -- ──────────────────────────────────────────────────────────
 SELECT pg_notify('pgrst', 'reload schema');
-NOTIFY pgrst, 'reload schema';
