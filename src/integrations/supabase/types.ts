@@ -2142,6 +2142,61 @@ export type Database = {
           },
         ]
       }
+      permission_audit: {
+        Row: {
+          alteracao: Json
+          created_at: string
+          id: string
+          role_padrao: Database["public"]["Enums"]["app_role"] | null
+          target_user_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          alteracao: Json
+          created_at?: string
+          id?: string
+          role_padrao?: Database["public"]["Enums"]["app_role"] | null
+          target_user_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          alteracao?: Json
+          created_at?: string
+          id?: string
+          role_padrao?: Database["public"]["Enums"]["app_role"] | null
+          target_user_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      permissions: {
+        Row: {
+          action: string
+          ativo: boolean
+          created_at: string
+          descricao: string | null
+          id: string
+          permission_key: string | null
+          resource: string
+        }
+        Insert: {
+          action: string
+          ativo?: boolean
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          resource: string
+        }
+        Update: {
+          action?: string
+          ativo?: boolean
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          resource?: string
+        }
+        Relationships: []
+      }
       precos_especiais: {
         Row: {
           ativo: boolean
@@ -2442,6 +2497,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      role_permissions: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          permission_key: string
+          role: Database["public"]["Enums"]["app_role"]
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          permission_key: string
+          role: Database["public"]["Enums"]["app_role"]
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          permission_key?: string
+          role?: Database["public"]["Enums"]["app_role"]
+        }
+        Relationships: []
       }
       remessas: {
         Row: {
@@ -2816,6 +2895,50 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      user_permissions: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          created_by: string | null
+          id: string
+          origem: string
+          permission_key: string
+          updated_at: string
+          updated_by: string | null
+          user_id: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          origem?: string
+          permission_key: string
+          updated_at?: string
+          updated_by?: string | null
+          user_id: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          origem?: string
+          permission_key?: string
+          updated_at?: string
+          updated_by?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_permissions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {

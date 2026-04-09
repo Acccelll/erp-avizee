@@ -132,7 +132,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const fetchExtraPermissions = async (userId: string) => {
     try {
       const { data, error } = await supabase
-        .from("user_permissions" as any)
+        .from("user_permissions")
         .select("permission_key, ativo")
         .eq("user_id", userId)
         .eq("ativo", true);

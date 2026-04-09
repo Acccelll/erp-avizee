@@ -240,7 +240,7 @@ const PedidosCompra = () => {
   } = useQuery({
     queryKey: ["pedidos_compra"],
     queryFn: async () => {
-      const { data, error } = await (supabase.from as any)("pedidos_compra")
+      const { data, error } = await supabase.from("pedidos_compra")
         .select("*, fornecedores(nome_razao_social, cpf_cnpj)")
         .eq("ativo", true)
         .order("id", { ascending: false });
@@ -388,7 +388,7 @@ const PedidosCompra = () => {
       observacoes: p.observacoes || "",
     });
 
-    const { data: itens, error } = await (supabase.from as any)("pedidos_compra_itens")
+    const { data: itens, error } = await supabase.from("pedidos_compra_itens")
       .select("*, produtos(nome, codigo_interno)")
       .eq("pedido_compra_id", p.id);
 
@@ -443,7 +443,7 @@ const PedidosCompra = () => {
     setDrawerOpen(true);
 
     const [itensResult, estResult] = await Promise.all([
-      (supabase.from as any)("pedidos_compra_itens")
+      supabase.from("pedidos_compra_itens")
         .select("*, produtos(nome, codigo_interno)")
         .eq("pedido_compra_id", p.id),
       supabase
@@ -504,7 +504,7 @@ const PedidosCompra = () => {
     try {
       if (mode === "create") {
         const numero = `PC-${String(Date.now()).slice(-6)}`;
-        const { data: newP, error } = await (supabase.from as any)("pedidos_compra")
+        const { data: newP, error } = await supabase.from("pedidos_compra")
           .insert({ numero, ...payload })
           .select()
           .single();
@@ -521,7 +521,7 @@ const PedidosCompra = () => {
 
         pedidoId = newP.id;
       } else if (selected) {
-        const { error } = await (supabase.from as any)("pedidos_compra")
+        const { error } = await supabase.from("pedidos_compra")
           .update(payload)
           .eq("id", selected.id);
 
@@ -535,7 +535,7 @@ const PedidosCompra = () => {
           return;
         }
 
-        await (supabase.from as any)("pedidos_compra_itens").delete().eq("pedido_compra_id", selected.id);
+        await supabase.from("pedidos_compra_itens").delete().eq("pedido_compra_id", selected.id);
       }
 
       if (items.length > 0 && pedidoId) {
@@ -550,11 +550,11 @@ const PedidosCompra = () => {
           }));
 
         if (itemsPayload.length > 0) {
-          const { error: itemsError } = await (supabase.from as any)("pedidos_compra_itens").insert(itemsPayload);
+          const { error: itemsError } = await supabase.from("pedidos_compra_itens").insert(itemsPayload);
 
           if (itemsError) {
             if (mode === "create" && pedidoId) {
-              const { error: rollbackError } = await (supabase.from as any)("pedidos_compra")
+              const { error: rollbackError } = await supabase.from("pedidos_compra")
                 .delete()
                 .eq("id", pedidoId);
 
@@ -588,7 +588,7 @@ const PedidosCompra = () => {
   };
 
   const darEntrada = async (p: PedidoCompra) => {
-    const { data: itens } = await (supabase.from as any)("pedidos_compra_itens")
+    const { data: itens } = await supabase.from("pedidos_compra_itens")
       .select("*, produtos(nome, codigo_interno, estoque_atual)")
       .eq("pedido_compra_id", p.id);
 
@@ -630,7 +630,7 @@ const PedidosCompra = () => {
       }
 
       const hoje = new Date().toISOString().split("T")[0];
-      await (supabase.from as any)("pedidos_compra")
+      await supabase.from("pedidos_compra")
         .update({ status: "recebido", data_entrega_real: hoje })
         .eq("id", p.id);
 
@@ -647,7 +647,7 @@ const PedidosCompra = () => {
 
   const marcarEnviado = async (p: PedidoCompra) => {
     try {
-      await (supabase.from as any)("pedidos_compra")
+      await supabase.from("pedidos_compra")
         .update({ status: "enviado_ao_fornecedor" })
         .eq("id", p.id);
 
@@ -661,7 +661,7 @@ const PedidosCompra = () => {
 
   const cancelarPedido = async (p: PedidoCompra) => {
     try {
-      await (supabase.from as any)("pedidos_compra")
+      await supabase.from("pedidos_compra")
         .update({ status: "cancelado" })
         .eq("id", p.id);
 
@@ -1779,7 +1779,7 @@ const PedidosCompra = () => {
                         className="h-8 w-8 text-destructive hover:text-destructive"
                         onClick={async () => {
                           setDrawerOpen(false);
-                          await (supabase.from as any)("pedidos_compra")
+                          await supabase.from("pedidos_compra")
                             .update({ ativo: false })
                             .eq("id", selected.id);
                           await refreshAll();

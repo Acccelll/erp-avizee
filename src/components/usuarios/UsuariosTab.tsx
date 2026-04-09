@@ -526,7 +526,7 @@ function UserFormModal({
         );
         if (toRemove.length > 0) {
           await supabase
-            .from('user_permissions' as any)
+            .from('user_permissions')
             .upsert(
               toRemove.map((p) => ({
                 user_id: user.id,
@@ -539,7 +539,7 @@ function UserFormModal({
         }
         if (toAdd.length > 0) {
           await supabase
-            .from('user_permissions' as any)
+            .from('user_permissions')
             .upsert(
               toAdd.map((p) => ({
                 user_id: user.id,
@@ -916,7 +916,7 @@ export function UsuariosTab() {
             .select('id, nome, email, cargo, ativo, created_at, updated_at, role_padrao'),
           supabase.from('user_roles').select('user_id, role'),
           supabase
-            .from('user_permissions' as any)
+            .from('user_permissions')
             .select('user_id, permission_key, ativo')
             .eq('ativo', true),
         ]);

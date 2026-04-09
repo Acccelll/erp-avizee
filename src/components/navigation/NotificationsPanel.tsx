@@ -64,7 +64,7 @@ export function NotificationsPanel() {
             .eq('ativo', true)
             .gt('estoque_minimo', 0),
           supabase
-            .from('pedidos_compra' as any)
+            .from('pedidos_compra')
             .select('id')
             .eq('ativo', true)
             .in('status', ['aprovado', 'enviado_ao_fornecedor', 'aguardando_recebimento', 'parcialmente_recebido'])
