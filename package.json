@@ -19,7 +19,8 @@
     "seed:data": "node scripts/check-seed-environment.js && ALLOW_SEED=true node scripts/dev-reset-seed.js --seed-only --confirm",
     "dev:reset": "node scripts/check-seed-environment.js && ALLOW_SEED=true node scripts/dev-reset-seed.js --confirm",
     "validate:rls": "npx tsx scripts/validate-rls.ts",
-    "prepare": "husky"
+    "prepare": "husky",
+    "supabase:migrate:remote": "./scripts/migrate-remote-supabase.sh"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
