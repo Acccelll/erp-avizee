@@ -351,7 +351,7 @@ export default function Configuracoes() {
                       onChange={(e) => {
                         const raw = e.target.value.replace(/\D/g, '').slice(0, 8);
                         setCepEmpresaLocal(raw);
-                        if (cepError) setCepError(null);
+                        if (cepError && raw.length === 8) setCepError(null);
                       }}
                       placeholder="Ex: 01001000"
                       maxLength={8}
@@ -370,13 +370,11 @@ export default function Configuracoes() {
                 </div>
 
                 <div className="flex items-center justify-between gap-4">
-                  {cepEmpresa ? (
+                  {cepEmpresa && (
                     <p className="text-xs text-muted-foreground">
                       Parâmetro ativo:{' '}
                       <code className="rounded bg-muted px-1.5 py-0.5 text-xs font-mono">{cepEmpresa}</code>
                     </p>
-                  ) : (
-                    <span />
                   )}
                   <Button
                     onClick={handleSaveCep}
