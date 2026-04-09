@@ -1019,13 +1019,15 @@ export default function Configuracoes() {
     <AppLayout>
       <ModulePage title="Configurações" subtitle="Preferências pessoais da sua conta.">
         {/* Horizontal tab navigation */}
-        <nav className="flex gap-0 border-b overflow-x-auto mb-6 -mt-1" aria-label="Seções de Configurações">
+        <div role="tablist" aria-label="Seções de Configurações" className="flex gap-0 border-b overflow-x-auto mb-6 -mt-1">
           {tabNavItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeSection === item.key;
             return (
               <button
                 key={item.key}
+                role="tab"
+                aria-selected={isActive}
                 onClick={() => setActiveSection(item.key)}
                 className={cn(
                   'flex shrink-0 items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px',
@@ -1033,14 +1035,13 @@ export default function Configuracoes() {
                     ? 'border-primary text-primary'
                     : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground/30'
                 )}
-                aria-current={isActive ? 'page' : undefined}
               >
                 <Icon className="h-4 w-4 shrink-0" />
                 {item.label}
               </button>
             );
           })}
-        </nav>
+        </div>
 
         {/* Section content */}
         <div>{renderContent()}</div>
