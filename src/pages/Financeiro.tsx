@@ -232,7 +232,8 @@ const Financeiro = () => {
 
   const columns = [
     {
-      key: "tipo", label: "Tipo", sortable: true,
+      key: "tipo",
+      mobileCard: true, label: "Tipo", sortable: true,
       render: (l: Lancamento) => (
         <Badge variant="outline" className={l.tipo === "receber" ? "border-success/40 text-success bg-success/5 whitespace-nowrap" : "border-destructive/40 text-destructive bg-destructive/5 whitespace-nowrap"}>
           {l.tipo === "receber" ? "Receber" : "Pagar"}
@@ -240,7 +241,8 @@ const Financeiro = () => {
       ),
     },
     {
-      key: "parceiro", label: "Pessoa", sortable: true,
+      key: "parceiro",
+      mobilePrimary: true, label: "Pessoa", sortable: true,
       render: (l: Lancamento) => {
         const nome = l.tipo === "receber" ? l.clientes?.nome_razao_social : l.fornecedores?.nome_razao_social;
         if (!nome) return <span className="text-muted-foreground text-xs">—</span>;
@@ -248,7 +250,8 @@ const Financeiro = () => {
       },
     },
     {
-      key: "descricao", label: "Descrição", sortable: true,
+      key: "descricao",
+      mobileCard: true, label: "Descrição", sortable: true,
       render: (l: Lancamento) => (
         <div className="space-y-0.5">
           <span className="text-sm">{l.descricao}</span>
@@ -261,7 +264,8 @@ const Financeiro = () => {
       ),
     },
     {
-      key: "data_vencimento", label: "Vencimento", sortable: true,
+      key: "data_vencimento",
+      mobileCard: true, label: "Vencimento", sortable: true,
       render: (l: Lancamento) => {
         const es = getLancamentoStatus(l);
         const isOverdue = es === "vencido";
@@ -287,7 +291,8 @@ const Financeiro = () => {
       },
     },
     {
-      key: "valor", label: "Valor Total", sortable: true,
+      key: "valor",
+      mobileCard: true, label: "Valor Total", sortable: true,
       render: (l: Lancamento) => (
         <span className="font-semibold font-mono text-sm">{formatCurrency(Number(l.valor))}</span>
       ),

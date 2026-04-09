@@ -201,7 +201,8 @@ const Fornecedores = () => {
 
   const columns = [
   {
-    key: "nome_razao_social", label: "Nome / Razão Social", sortable: true,
+    key: "nome_razao_social",
+      mobilePrimary: true, label: "Nome / Razão Social", sortable: true,
     render: (f: Fornecedor) => (
       <div>
         <p className="font-medium leading-tight">{f.nome_razao_social}</p>
@@ -212,7 +213,8 @@ const Fornecedores = () => {
     ),
   },
   {
-    key: "cpf_cnpj", label: "CPF / CNPJ",
+    key: "cpf_cnpj",
+      mobileCard: true, label: "CPF / CNPJ",
     render: (f: Fornecedor) => <span className="font-mono text-xs">{f.cpf_cnpj || "—"}</span>,
   },
   {
@@ -243,12 +245,14 @@ const Fornecedores = () => {
       : <span className="text-muted-foreground text-xs">—</span>,
   },
   {
-    key: "cidade", label: "Cidade", sortable: true,
+    key: "cidade",
+      mobileCard: true, label: "Cidade", sortable: true,
     render: (f: Fornecedor) => f.cidade
       ? <span className="text-xs">{f.cidade}{f.uf ? `/${f.uf}` : ""}</span>
       : <span className="text-muted-foreground text-xs">—</span>,
   },
-  { key: "ativo", label: "Status", render: (f: Fornecedor) => <StatusBadge status={f.ativo ? "Ativo" : "Inativo"} /> },
+  { key: "ativo",
+      mobileCard: true, label: "Status", render: (f: Fornecedor) => <StatusBadge status={f.ativo ? "Ativo" : "Inativo"} /> },
   ];
 
 

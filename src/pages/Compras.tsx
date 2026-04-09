@@ -175,11 +175,13 @@ const Compras = () => {
   const compActiveFilters = useMemo(() => {
     const chips: FilterChip[] = [];
     statusFilters.forEach(f => {
-      chips.push({ key: "status", label: "Status", value: [f], displayValue: statusLabels[f] || f });
+      chips.push({ key: "status",
+      mobileCard: true, label: "Status", value: [f], displayValue: statusLabels[f] || f });
     });
     fornecedorFilters.forEach(f => {
       const forn = fornecedoresCrud.data.find(x => x.id === f);
-      chips.push({ key: "fornecedor", label: "Fornecedor", value: [f], displayValue: forn?.nome_razao_social || f });
+      chips.push({ key: "fornecedor",
+      mobilePrimary: true, label: "Fornecedor", value: [f], displayValue: forn?.nome_razao_social || f });
     });
     return chips;
   }, [statusFilters, fornecedorFilters, fornecedoresCrud.data]);
@@ -198,10 +200,12 @@ const Compras = () => {
   }));
 
   const columns = [
-    { key: "numero", label: "Nº", render: (c: Compra) => <span className="font-mono text-xs font-medium text-primary">{c.numero}</span> },
+    { key: "numero",
+      mobileCard: true, label: "Nº", render: (c: Compra) => <span className="font-mono text-xs font-medium text-primary">{c.numero}</span> },
     { key: "fornecedor", label: "Fornecedor", render: (c: Compra) => (c as any).fornecedores?.nome_razao_social || "—" },
     { key: "data_compra", label: "Data", render: (c: Compra) => new Date(c.data_compra).toLocaleDateString("pt-BR") },
-    { key: "valor_total", label: "Total", render: (c: Compra) => <span className="font-semibold font-mono">{formatCurrency(Number(c.valor_total || 0))}</span> },
+    { key: "valor_total",
+      mobileCard: true, label: "Total", render: (c: Compra) => <span className="font-semibold font-mono">{formatCurrency(Number(c.valor_total || 0))}</span> },
     { key: "status", label: "Status", render: (c: Compra) => <StatusBadge status={c.status} label={statusLabels[c.status] || c.status} /> },
   ];
 

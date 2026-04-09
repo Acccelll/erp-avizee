@@ -223,14 +223,16 @@ const Pedidos = () => {
   const activeFilters = useMemo(() => {
     const chips: FilterChip[] = [];
     statusFilters.forEach(f => {
-      chips.push({ key: "status", label: "Status", value: [f], displayValue: statusOperacionalLabels[f] || f });
+      chips.push({ key: "status",
+      mobileCard: true, label: "Status", value: [f], displayValue: statusOperacionalLabels[f] || f });
     });
     faturamentoFilters.forEach(f => {
       chips.push({ key: "faturamento", label: "Faturamento", value: [f], displayValue: statusFaturamentoLabels[f] || f });
     });
     clienteFilters.forEach(f => {
       const cli = clientesList.find(x => x.id === f);
-      chips.push({ key: "cliente", label: "Cliente", value: [f], displayValue: cli?.nome_razao_social || f });
+      chips.push({ key: "cliente",
+      mobilePrimary: true, label: "Cliente", value: [f], displayValue: cli?.nome_razao_social || f });
     });
     prazoFilters.forEach(f => {
       const opt = prazoFilterOptions.find(x => x.value === f);
@@ -256,7 +258,8 @@ const Pedidos = () => {
 
   const columns = [
     {
-      key: "numero", label: "Nº Pedido", sortable: true,
+      key: "numero",
+      mobileCard: true, label: "Nº Pedido", sortable: true,
       render: (p: Pedido) => <span className="font-mono text-xs font-semibold text-primary">{p.numero}</span>,
     },
     {
@@ -284,7 +287,8 @@ const Pedidos = () => {
       ),
     },
     {
-      key: "valor_total", label: "Total", sortable: true,
+      key: "valor_total",
+      mobileCard: true, label: "Total", sortable: true,
       render: (p: Pedido) => <span className="font-semibold font-mono text-sm">{formatCurrency(Number(p.valor_total || 0))}</span>,
     },
     {

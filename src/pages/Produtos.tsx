@@ -291,6 +291,7 @@ const Produtos = () => {
     },
     {
       key: "nome",
+      mobilePrimary: true,
       label: "Produto",
       sortable: true,
       render: (p: Produto) => (
@@ -311,6 +312,7 @@ const Produtos = () => {
     },
     {
       key: "estoque_atual",
+      mobileCard: true,
       label: "Estoque",
       sortable: true,
       render: (p: Produto) => {
@@ -340,6 +342,7 @@ const Produtos = () => {
     },
     {
       key: "preco_venda",
+      mobileCard: true,
       label: "P. Venda",
       sortable: true,
       render: (p: Produto) => (
@@ -375,6 +378,7 @@ const Produtos = () => {
     },
     {
       key: "ativo",
+      mobileCard: true,
       label: "Status",
       render: (p: Produto) => <StatusBadge status={p.ativo !== false ? "ativo" : "inativo"} />,
     },
