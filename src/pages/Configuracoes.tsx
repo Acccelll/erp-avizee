@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTheme } from 'next-themes';
-import { Building2, CalendarDays, Clock, Info, Loader2, Lock, Mail, MapPin, Moon, Palette, Save, Settings, Shield, Sun, Truck, User } from 'lucide-react';
+import { Building2, CalendarDays, Clock, Info, Loader2, Lock, Mail, MapPin, Moon, Palette, RotateCcw, Save, Settings, Shield, Sun, Truck, User } from 'lucide-react';
 import { useAppConfig } from '@/hooks/useAppConfig';
 import { useUserPreference } from '@/hooks/useUserPreference';
 import { AppLayout } from '@/components/AppLayout';
@@ -14,6 +14,17 @@ import { Switch } from '@/components/ui/switch';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -60,6 +71,23 @@ const ROLE_LABELS: Record<string, string> = {
   financeiro: 'Financeiro',
   estoquista: 'Estoquista',
 };
+
+const APPEARANCE_DEFAULTS = {
+  theme: 'system',
+  densidade: 'confortavel',
+  fontScale: 16,
+  menuCompacto: true,
+  reduceMotion: false,
+  corPrimaria: '#6b0d0d',
+  corSecundaria: '#b85b2d',
+} as const;
+
+function getFontLabel(scale: number): string {
+  if (scale <= 16) return 'Padrão';
+  if (scale <= 18) return 'Médio';
+  if (scale <= 20) return 'Grande';
+  return 'Máximo';
+}
 
 export default function Configuracoes() {
   const { user, profile, roles } = useAuth();
@@ -162,6 +190,32 @@ export default function Configuracoes() {
       toast.error('Erro ao salvar parâmetro. Tente novamente.');
     }
     setSavingCep(false);
+  };
+
+  const handleResetAppearance = async () => {
+    setTheme(APPEARANCE_DEFAULTS.theme);
+    setDensidade(APPEARANCE_DEFAULTS.densidade);
+    setCorPrimaria(APPEARANCE_DEFAULTS.corPrimaria);
+    setCorSecundaria(APPEARANCE_DEFAULTS.corSecundaria);
+    await saveDensidadePref(APPEARANCE_DEFAULTS.densidade);
+    await saveFontScale(APPEARANCE_DEFAULTS.fontScale);
+    await saveMenuCompacto(APPEARANCE_DEFAULTS.menuCompacto);
+    await saveReduceMotion(APPEARANCE_DEFAULTS.reduceMotion);
+    document.documentElement.dataset.density = APPEARANCE_DEFAULTS.densidade === 'compacta' ? 'compact' : 'comfortable';
+    document.documentElement.style.setProperty('--base-font-size', `${APPEARANCE_DEFAULTS.fontScale}px`);
+    document.documentElement.classList.remove('reduce-motion');
+    const primaryHsl = hexToHslString(APPEARANCE_DEFAULTS.corPrimaria);
+    const secondaryHsl = hexToHslString(APPEARANCE_DEFAULTS.corSecundaria);
+    if (primaryHsl) document.documentElement.style.setProperty('--primary', primaryHsl);
+    if (secondaryHsl) document.documentElement.style.setProperty('--secondary', secondaryHsl);
+    await supabase.from('app_configuracoes').upsert(
+      [
+        { chave: 'theme_primary_color', valor: APPEARANCE_DEFAULTS.corPrimaria, updated_at: new Date().toISOString() },
+        { chave: 'theme_secondary_color', valor: APPEARANCE_DEFAULTS.corSecundaria, updated_at: new Date().toISOString() },
+      ] as any,
+      { onConflict: 'chave' }
+    );
+    toast.success('Aparência restaurada ao padrão.');
   };
 
   const renderContent = () => {
@@ -395,95 +449,208 @@ export default function Configuracoes() {
           <Card>
             <CardHeader>
               <CardTitle>Aparência</CardTitle>
-              <CardDescription>Personalize a interface do sistema ao seu gosto.</CardDescription>
+              <CardDescription>
+                Ajuste as preferências visuais da sua conta. Essas configurações afetam apenas a interface para o seu usuário.
+              </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label>Tema</Label>
-                  <Select value={theme || 'system'} onValueChange={(value) => setTheme(value)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="light">
-                        <span className="flex items-center gap-2"><Sun className="h-4 w-4" /> Claro</span>
-                      </SelectItem>
-                      <SelectItem value="dark">
-                        <span className="flex items-center gap-2"><Moon className="h-4 w-4" /> Escuro</span>
-                      </SelectItem>
-                      <SelectItem value="system">
-                        <span className="flex items-center gap-2"><Settings className="h-4 w-4" /> Sistema</span>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Densidade</Label>
-                  <Select value={densidade} onValueChange={async (value) => {
-                    setDensidade(value);
-                    await saveDensidadePref(value);
-                    document.documentElement.dataset.density = value === 'compacta' ? 'compact' : 'comfortable';
-                  }}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="confortavel">Confortável</SelectItem>
-                      <SelectItem value="compacta">Compacta</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label>Cor primária corporativa</Label>
-                  <Input type="color" value={corPrimaria} onChange={(e) => setCorPrimaria(e.target.value)} className="h-10 p-1" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Cor secundária corporativa</Label>
-                  <Input type="color" value={corSecundaria} onChange={(e) => setCorSecundaria(e.target.value)} className="h-10 p-1" />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Tamanho base da fonte ({fontScale}px)</Label>
-                <Input
-                  type="range"
-                  min={16}
-                  max={22}
-                  step={1}
-                  value={fontScale}
-                  onChange={async (e) => {
-                    const value = Number(e.target.value);
-                    await saveFontScale(value);
-                    document.documentElement.style.setProperty('--base-font-size', `${value}px`);
-                  }}
-                />
-              </div>
-              <div className="flex items-center justify-between rounded-lg border p-4">
+            <CardContent className="space-y-8">
+
+              {/* ── Bloco 1: Aparência geral ─────────────────────────────────── */}
+              <div className="space-y-4">
                 <div>
-                  <p className="font-medium">Menu compacto</p>
-                  <p className="text-sm text-muted-foreground">Sidebar mais enxuta para ganhar espaço na tela.</p>
+                  <h3 className="text-sm font-semibold text-foreground">Aparência geral</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">Tema de cores e espaçamento da interface.</p>
                 </div>
-                <Switch
-                  checked={menuCompacto}
-                  disabled={loadingMenuCompacto}
-                  onCheckedChange={async (checked) => {
-                    const ok = await saveMenuCompacto(checked);
-                    if (!ok) toast.error('Não foi possível salvar a preferência do menu.');
-                  }}
-                />
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>Tema</Label>
+                    <Select value={theme || 'system'} onValueChange={(value) => setTheme(value)}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="light">
+                          <span className="flex items-center gap-2"><Sun className="h-4 w-4" /> Claro</span>
+                        </SelectItem>
+                        <SelectItem value="dark">
+                          <span className="flex items-center gap-2"><Moon className="h-4 w-4" /> Escuro</span>
+                        </SelectItem>
+                        <SelectItem value="system">
+                          <span className="flex items-center gap-2"><Settings className="h-4 w-4" /> Sistema</span>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Densidade</Label>
+                    <Select value={densidade} onValueChange={async (value) => {
+                      setDensidade(value);
+                      await saveDensidadePref(value);
+                      document.documentElement.dataset.density = value === 'compacta' ? 'compact' : 'comfortable';
+                    }}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="confortavel">Confortável — mais respiro visual</SelectItem>
+                        <SelectItem value="compacta">Compacta — mais informação por tela</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
               </div>
-              <div className="flex items-center justify-between rounded-lg border p-4">
+
+              <Separator />
+
+              {/* ── Bloco 2: Leitura e navegação ─────────────────────────────── */}
+              <div className="space-y-4">
                 <div>
-                  <p className="font-medium">Reduzir animações</p>
-                  <p className="text-sm text-muted-foreground">Respeita usuários com sensibilidade a movimento.</p>
+                  <h3 className="text-sm font-semibold text-foreground">Leitura e navegação</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">Legibilidade do texto e comportamento do menu lateral.</p>
                 </div>
-                <Switch
-                  checked={reduceMotion}
-                  onCheckedChange={async (checked) => {
-                    await saveReduceMotion(checked);
-                    document.documentElement.classList.toggle('reduce-motion', checked);
-                  }}
-                />
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label>Tamanho da fonte</Label>
+                    <span className="text-sm text-muted-foreground tabular-nums">
+                      {getFontLabel(fontScale)} ({fontScale}px)
+                    </span>
+                  </div>
+                  <Input
+                    type="range"
+                    min={16}
+                    max={22}
+                    step={1}
+                    value={fontScale}
+                    aria-label={`Tamanho da fonte: ${getFontLabel(fontScale)} (${fontScale}px)`}
+                    onChange={async (e) => {
+                      const value = Number(e.target.value);
+                      await saveFontScale(value);
+                      document.documentElement.style.setProperty('--base-font-size', `${value}px`);
+                    }}
+                  />
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>Padrão</span>
+                    <span>Médio</span>
+                    <span>Grande</span>
+                    <span>Máximo</span>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between rounded-lg border p-4">
+                  <div>
+                    <p className="font-medium">Menu compacto</p>
+                    <p className="text-sm text-muted-foreground">
+                      Reduz a largura da barra lateral, exibindo apenas ícones. Aumenta a área útil de trabalho e a navegação permanece acessível.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={menuCompacto}
+                    disabled={loadingMenuCompacto}
+                    onCheckedChange={async (checked) => {
+                      const ok = await saveMenuCompacto(checked);
+                      if (!ok) toast.error('Não foi possível salvar a preferência do menu.');
+                    }}
+                  />
+                </div>
               </div>
-              <div className="flex justify-end">
+
+              <Separator />
+
+              {/* ── Bloco 3: Acessibilidade ──────────────────────────────────── */}
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-sm font-semibold text-foreground">Acessibilidade</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">Ajustes para reduzir desconforto visual durante o uso.</p>
+                </div>
+                <div className="flex items-center justify-between rounded-lg border p-4">
+                  <div>
+                    <p className="font-medium">Reduzir animações</p>
+                    <p className="text-sm text-muted-foreground">Minimiza transições e efeitos de movimento na interface.</p>
+                  </div>
+                  <Switch
+                    checked={reduceMotion}
+                    onCheckedChange={async (checked) => {
+                      await saveReduceMotion(checked);
+                      document.documentElement.classList.toggle('reduce-motion', checked);
+                    }}
+                  />
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* ── Bloco 4: Cores da interface ──────────────────────────────── */}
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-sm font-semibold text-foreground">Cores da interface</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Cor de destaque aplicada na interface desta conta. Não altera a identidade visual corporativa global.
+                  </p>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>Cor primária da interface</Label>
+                    <div className="flex items-center gap-3">
+                      <Input
+                        type="color"
+                        value={corPrimaria}
+                        onChange={(e) => setCorPrimaria(e.target.value)}
+                        className="h-10 w-16 p-1 cursor-pointer"
+                        aria-label="Selecionar cor primária da interface"
+                      />
+                      <span className="text-sm text-muted-foreground font-mono">{corPrimaria}</span>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Cor secundária da interface</Label>
+                    <div className="flex items-center gap-3">
+                      <Input
+                        type="color"
+                        value={corSecundaria}
+                        onChange={(e) => setCorSecundaria(e.target.value)}
+                        className="h-10 w-16 p-1 cursor-pointer"
+                        aria-label="Selecionar cor secundária da interface"
+                      />
+                      <span className="text-sm text-muted-foreground font-mono">{corSecundaria}</span>
+                    </div>
+                  </div>
+                </div>
+                {/* Preview */}
+                <div className="rounded-lg border p-4 space-y-2">
+                  <p className="text-xs text-muted-foreground font-medium">Pré-visualização</p>
+                  <div className="flex items-center gap-3">
+                    <div className="h-8 w-8 rounded-md border" style={{ backgroundColor: corPrimaria }} />
+                    <div className="h-8 w-8 rounded-md border" style={{ backgroundColor: corSecundaria }} />
+                    <div className="flex flex-col gap-1 flex-1">
+                      <div className="h-2 rounded-full w-3/4" style={{ backgroundColor: corPrimaria, opacity: 0.85 }} />
+                      <div className="h-2 rounded-full w-1/2" style={{ backgroundColor: corSecundaria, opacity: 0.65 }} />
+                    </div>
+                    <span className="text-xs text-muted-foreground">Primária · Secundária</span>
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* ── Ações ────────────────────────────────────────────────────── */}
+              <div className="flex items-center justify-between gap-3 pt-2">
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="outline" className="gap-2">
+                      <RotateCcw className="h-4 w-4" />
+                      Restaurar padrão
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Restaurar aparência padrão?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Isso vai redefinir tema, densidade, tamanho da fonte, menu compacto, animações e cores da interface para os valores originais do sistema. A alteração afeta apenas a sua conta.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleResetAppearance}>
+                        Restaurar padrão
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
                 <Button
                   className="gap-2"
                   onClick={async () => {
@@ -498,11 +665,11 @@ export default function Configuracoes() {
                     const secondary = hexToHslString(corSecundaria);
                     if (primary) document.documentElement.style.setProperty('--primary', primary);
                     if (secondary) document.documentElement.style.setProperty('--secondary', secondary);
-                    toast.success('Tema corporativo salvo com sucesso!');
+                    toast.success('Preferências de aparência salvas.');
                   }}
                 >
                   <Save className="h-4 w-4" />
-                  Salvar tema corporativo
+                  Salvar aparência
                 </Button>
               </div>
             </CardContent>
