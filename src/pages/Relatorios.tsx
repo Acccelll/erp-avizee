@@ -9,11 +9,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { MultiSelect } from "@/components/ui/MultiSelect";
 import { DataTable } from '@/components/DataTable';
 import { PreviewModal } from '@/components/ui/PreviewModal';
 import { cn } from '@/lib/utils';
-import { Download, RefreshCcw, Hash, FileText, Eye, FileSpreadsheet, Layers, PieChart as PieChartIcon, LineChart, BarChart3 } from 'lucide-react';
+import { ChevronLeft, Columns, Download, RefreshCcw, Hash, FileText, Eye, FileSpreadsheet, Layers, PieChart as PieChartIcon, LineChart, BarChart3 } from 'lucide-react';
 import { ResponsiveContainer, BarChart, XAxis, YAxis, Tooltip, Bar, PieChart, Pie, Cell, Legend, LineChart as RechartsLineChart, Line } from 'recharts';
 import { carregarRelatorio, exportarCsv, exportarXlsx, formatCellValue, type RelatorioResultado, type TipoRelatorio } from '@/services/relatorios.service';
 import { reportConfigs, reportCategoryMeta, type ReportCategory } from '@/config/relatoriosConfig';
@@ -34,12 +36,28 @@ const CHART_COLORS = [
   'hsl(262 83% 58%)',
 ];
 
-function buildPdf(resultado: RelatorioResultado, dataInicio: string, dataFim: string) {
+function buildPdf(resultado: RelatorioResultado, dataInicio: string, dataFim: string, empresa?: { razao_social?: string; cnpj?: string; nome_fantasia?: string } | null) {
   return import('jspdf').then(({ default: jsPDF }) => {
     const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
     const pageWidth = doc.internal.pageSize.getWidth();
     const margin = 14;
     let y = 20;
+
+    // Company header
+    if (empresa?.razao_social) {
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.text(empresa.razao_social, margin, y);
+      y += 4;
+      if (empresa.cnpj) {
+        doc.setFont('helvetica', 'normal');
+        doc.text(`CNPJ: ${empresa.cnpj}`, margin, y);
+        y += 4;
+      }
+      doc.setDrawColor(200, 200, 200);
+      doc.line(margin, y, pageWidth - margin, y);
+      y += 6;
+    }
 
     doc.setFontSize(16);
     doc.setFont('helvetica', 'bold');
@@ -131,6 +149,8 @@ export default function Relatorios() {
   const [errorLoading, setErrorLoading] = useState<string | null>(null);
   const [resultado, setResultado] = useState<RelatorioResultado>({ title: '', subtitle: '', rows: [] });
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [hiddenColumns, setHiddenColumns] = useState<string[]>([]);
+  const [empresaConfig, setEmpresaConfig] = useState<{ razao_social?: string; cnpj?: string; nome_fantasia?: string } | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -141,6 +161,12 @@ export default function Relatorios() {
       setClientes(c || []);
       setFornecedores(f || []);
       setGrupos(g || []);
+    });
+  }, []);
+
+  useEffect(() => {
+    supabase.from('empresa_config').select('razao_social, cnpj, nome_fantasia').limit(1).single().then(({ data, error }) => {
+      if (!error && data) setEmpresaConfig(data as { razao_social?: string; cnpj?: string; nome_fantasia?: string });
     });
   }, []);
 
@@ -292,6 +318,8 @@ export default function Relatorios() {
     }));
   }, [sortedRows, isQtyReport, tipo]);
 
+  const visibleColumns = useMemo(() => columns.filter((col) => !hiddenColumns.includes(col.key)), [columns, hiddenColumns]);
+
   const handleSelectTipo = (nextTipo: TipoRelatorio) => {
     setFiltroClienteIds([]);
     setFiltroFornecedorIds([]);
@@ -299,6 +327,7 @@ export default function Relatorios() {
     setFiltroTipos([]);
     setStatusFiltro('todos');
     setAgrupamento('padrao');
+    setHiddenColumns([]);
     setTipo(nextTipo);
     setSearchParams((current) => {
       const next = new URLSearchParams(current);
@@ -343,7 +372,7 @@ export default function Relatorios() {
     if (resultado && resultado.rows.length > 200) {
       toast.warning(`Este relatório tem ${resultado.rows.length} registros. O PDF mostrará apenas os primeiros 200. Use "Exportar Excel" para exportar tudo.`, { duration: 8000 });
     }
-    const doc = await buildPdf(resultado, dataInicio, dataFim);
+    const doc = await buildPdf(resultado, dataInicio, dataFim, empresaConfig);
     doc.save(`${resultado.title || 'relatorio'}.pdf`);
     toast.success('PDF gerado com sucesso!');
   };
@@ -379,10 +408,11 @@ export default function Relatorios() {
     <AppLayout>
       <ModulePage title="Relatórios" subtitle="Análises gerenciais, exportações e visão consolidada por módulo.">
         <div className="space-y-6">
+          {!tipo && (
           <Card>
             <CardHeader className="pb-4">
-              <CardTitle className="flex items-center gap-2 text-base"><Layers className="h-4 w-4 text-primary" />Entrada do módulo de Relatórios</CardTitle>
-              <CardDescription>Selecione primeiro o contexto de negócio e o relatório prioritário para seguir para filtros, preview e exportações.</CardDescription>
+              <CardTitle className="flex items-center gap-2 text-base"><Layers className="h-4 w-4 text-primary" />Selecione um Relatório</CardTitle>
+              <CardDescription>Escolha o contexto de negócio e o relatório desejado para acessar filtros, análises e exportações.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
               <div>
@@ -427,6 +457,27 @@ export default function Relatorios() {
               </div>
             </CardContent>
           </Card>
+          )}
+
+          {!!tipo && (
+          <>
+          <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => { setSearchParams({}); setTipo('' as TipoRelatorio); }}
+              className="gap-2"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              Voltar para Relatórios
+            </Button>
+            {selectedMeta && (
+              <span className="text-sm text-muted-foreground">
+                <selectedMeta.icon className="inline h-3.5 w-3.5 mr-1 text-primary" />
+                {selectedMeta.title}
+              </span>
+            )}
+          </div>
 
           <Card>
             <CardHeader className="pb-3">
@@ -434,7 +485,7 @@ export default function Relatorios() {
                 {selectedMeta && <selectedMeta.icon className="h-4 w-4 text-primary" />}
                 {selectedMeta?.title || 'Relatório'}
               </CardTitle>
-              <CardDescription>{selectedMeta?.objective || 'Após selecionar o relatório, ajuste filtros, analise KPIs, veja o gráfico e exporte os dados.'}</CardDescription>
+              <CardDescription>{selectedMeta?.objective || 'Ajuste filtros, analise KPIs, veja o gráfico e exporte os dados.'}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
@@ -470,6 +521,36 @@ export default function Relatorios() {
                     <div className="flex flex-wrap gap-2 ml-auto">
                       <Button variant="outline" size="sm" onClick={loadData} className="gap-1.5"><RefreshCcw className="h-3.5 w-3.5" />Atualizar</Button>
                       <Button variant="outline" size="sm" onClick={() => setPreviewOpen(true)} disabled={!resultado.rows.length} className="gap-1.5"><Eye className="h-3.5 w-3.5" />Visualizar</Button>
+                      {columns.length > 0 && (
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button variant="outline" size="sm" className="gap-1.5"><Columns className="h-3.5 w-3.5" />Colunas</Button>
+                          </PopoverTrigger>
+                          <PopoverContent align="end" className="w-64 p-3">
+                            <p className="text-xs font-semibold mb-2 text-muted-foreground uppercase tracking-wide">Personalizar colunas</p>
+                            <div className="space-y-1.5 max-h-60 overflow-y-auto">
+                              {columns.map((col) => (
+                                <label key={col.key} className="flex items-center gap-2 text-sm cursor-pointer">
+                                  <Checkbox
+                                    checked={!hiddenColumns.includes(col.key)}
+                                    onCheckedChange={(checked) => {
+                                      setHiddenColumns((prev) =>
+                                        checked ? prev.filter((k) => k !== col.key) : [...prev, col.key]
+                                      );
+                                    }}
+                                  />
+                                  {col.label}
+                                </label>
+                              ))}
+                            </div>
+                            {hiddenColumns.length > 0 && (
+                              <Button variant="ghost" size="sm" className="mt-2 w-full text-xs" onClick={() => setHiddenColumns([])}>
+                                Restaurar padrão
+                              </Button>
+                            )}
+                          </PopoverContent>
+                        </Popover>
+                      )}
                       <Button variant="outline" size="sm" onClick={handleExportPdf} className="gap-1.5"><FileText className="h-3.5 w-3.5" />PDF</Button>
                       <Button variant="outline" size="sm" onClick={handleExportXlsx} disabled={!resultado.rows.length} className="gap-1.5"><FileSpreadsheet className="h-3.5 w-3.5" />Excel</Button>
                       <Button size="sm" onClick={handleExportCsv} className="gap-1.5"><Download className="h-3.5 w-3.5" />CSV</Button>
@@ -604,7 +685,7 @@ export default function Relatorios() {
                     {!loading && !errorLoading && !isDreReport && (
                       <>
                         <DataTable
-                          columns={columns}
+                          columns={visibleColumns}
                           data={sortedRows}
                           loading={loading}
                           moduleKey={`relatorios-${tipo}`}
@@ -693,6 +774,8 @@ export default function Relatorios() {
               </div>
             </CardContent>
           </Card>
+          </>
+          )}
         </div>
       </ModulePage>
 
@@ -719,7 +802,7 @@ export default function Relatorios() {
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr className="bg-muted/50">
-                  {columns.map((col) => (
+                  {visibleColumns.map((col) => (
                     <th key={col.key} className="text-left px-3 py-2 font-semibold text-xs text-muted-foreground border-b">{col.label}</th>
                   ))}
                 </tr>
@@ -727,7 +810,7 @@ export default function Relatorios() {
               <tbody>
                 {(resultado.rows as Record<string, unknown>[]).map((row, ri) => (
                   <tr key={ri} className={ri % 2 === 0 ? 'bg-muted/20' : ''}>
-                    {columns.map((col) => (
+                    {visibleColumns.map((col) => (
                       <td key={col.key} className="px-3 py-1.5 border-b border-border/40 text-xs">
                         {formatCellValue(row[col.key], col.key, isQtyReport) as React.ReactNode}
                       </td>

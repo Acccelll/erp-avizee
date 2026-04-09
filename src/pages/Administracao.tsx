@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { Building2, Calendar, CheckCircle2, Globe, Image, Info, Loader2, Mail, MapPin, PenLine, Phone, Receipt, Reply, Send, Shield, Upload, User, Users, Wallet, XCircle } from 'lucide-react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
+import { Building2, Calendar, CheckCircle2, Database, Globe, Image, Info, Loader2, Mail, MapPin, PenLine, Phone, Receipt, Reply, Send, Shield, Upload, User, Users, Wallet, XCircle } from 'lucide-react';
 import { AppLayout } from '@/components/AppLayout';
 import { ModulePage } from '@/components/ModulePage';
 import { Button } from '@/components/ui/button';
@@ -79,11 +79,13 @@ const sideNavItems: SideNavItem[] = [
   { key: 'email', label: 'E-mails', icon: Mail },
   { key: 'fiscal', label: 'Parâmetros Fiscais', icon: Receipt },
   { key: 'financeiro', label: 'Parâmetros Financeiros', icon: Wallet },
+  { key: 'migracao', label: 'Migração de Dados', icon: Database },
   { key: 'auditoria', label: 'Auditoria', icon: Shield },
 ];
 
 export default function Administracao() {
   const { user, profile } = useAuth();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = searchParams.get('tab') || 'empresa';
   const [config, setConfig] = useState(defaultConfig);
@@ -186,6 +188,10 @@ export default function Administracao() {
   };
 
   const handleSectionChange = (key: string) => {
+    if (key === 'migracao') {
+      navigate('/migracao-dados');
+      return;
+    }
     setActiveSection(key);
     setSearchParams((current) => {
       const next = new URLSearchParams(current);
@@ -1273,7 +1279,7 @@ export default function Administracao() {
     }
   };
 
-  const showSaveButton = activeSection !== 'auditoria' && activeSection !== 'usuarios';
+  const showSaveButton = activeSection !== 'auditoria' && activeSection !== 'usuarios' && activeSection !== 'migracao';
 
   return (
     <AppLayout>
