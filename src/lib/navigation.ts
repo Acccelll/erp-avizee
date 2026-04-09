@@ -199,7 +199,7 @@ export const navSections: NavSection[] = [
         title: 'Gestão do sistema',
         items: [
           { title: 'Empresa', path: '/administracao?tab=empresa' },
-          { title: 'Usuários', path: '/administracao?tab=usuarios' },
+          { title: 'Usuários e Permissões', path: '/administracao?tab=usuarios' },
           { title: 'E-mails', path: '/administracao?tab=email' },
           { title: 'Parâmetros Fiscais', path: '/administracao?tab=fiscal' },
           { title: 'Parâmetros Financeiros', path: '/administracao?tab=financeiro' },
