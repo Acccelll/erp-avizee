@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MultiSelect, type MultiSelectOption } from "@/components/ui/MultiSelect";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -576,9 +577,20 @@ const Produtos = () => {
             </div>
           )}
 
+          <Tabs defaultValue="dados-gerais" className="w-full">
+            <TabsList className="mb-4 w-full justify-start overflow-x-auto">
+              <TabsTrigger value="dados-gerais" className="gap-1.5"><Package className="h-3.5 w-3.5" />Dados Gerais</TabsTrigger>
+              <TabsTrigger value="estoque" className="gap-1.5"><Archive className="h-3.5 w-3.5" />Estoque</TabsTrigger>
+              <TabsTrigger value="fiscal" className="gap-1.5"><FileText className="h-3.5 w-3.5" />Fiscal</TabsTrigger>
+              <TabsTrigger value="compras" className="gap-1.5"><ShoppingCart className="h-3.5 w-3.5" />Compras</TabsTrigger>
+              <TabsTrigger value="observacoes" className="gap-1.5"><AlignLeft className="h-3.5 w-3.5" />Obs.</TabsTrigger>
+            </TabsList>
+
+            {/* ── TAB: DADOS GERAIS ─────────────────────────── */}
+            <TabsContent value="dados-gerais" className="space-y-4 mt-0">
           {/* ── Identificação ──────────────────────────── */}
           <div className="space-y-3 pt-1">
-            <h3 className="font-semibold text-sm flex items-center gap-2 border-t pt-3">
+            <h3 className="font-semibold text-sm flex items-center gap-2">
               <Package className="w-4 h-4" /> Identificação
             </h3>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -669,10 +681,13 @@ const Produtos = () => {
               </div>
             </div>
           </div>
+            </TabsContent>
 
+            {/* ── TAB: ESTOQUE ─────────────────────────────── */}
+            <TabsContent value="estoque" className="space-y-4 mt-0">
           {/* ── Suprimentos e Logística ──────────────────────────── */}
           <div className="space-y-3">
-            <h3 className="font-semibold text-sm flex items-center gap-2 border-t pt-3">
+            <h3 className="font-semibold text-sm flex items-center gap-2">
               <Archive className="w-4 h-4" /> Suprimentos e Logística
             </h3>
             <div className="grid grid-cols-2 gap-4">
@@ -691,10 +706,13 @@ const Produtos = () => {
               </div>
             </div>
           </div>
+            </TabsContent>
 
+            {/* ── TAB: FISCAL ──────────────────────────────── */}
+            <TabsContent value="fiscal" className="space-y-4 mt-0">
           {/* ── Dados Fiscais ──────────────────────────── */}
           <div className="space-y-3">
-            <h3 className="font-semibold text-sm flex items-center gap-2 border-t pt-3">
+            <h3 className="font-semibold text-sm flex items-center gap-2">
               <FileText className="w-4 h-4" /> Dados Fiscais
               {fiscalCompleto && (
                 <span className="ml-1 text-xs text-emerald-600 font-normal flex items-center gap-1">
@@ -744,10 +762,13 @@ const Produtos = () => {
               </div>
             </div>
           </div>
+            </TabsContent>
 
+            {/* ── TAB: COMPRAS ─────────────────────────────── */}
+            <TabsContent value="compras" className="space-y-4 mt-0">
           {/* ── Compras / Fornecedores ──────────────────────────── */}
           <div className="space-y-3">
-            <div className="flex items-center justify-between border-t pt-3">
+            <div className="flex items-center justify-between">
               <h3 className="font-semibold text-sm flex items-center gap-2">
                 <ShoppingCart className="w-4 h-4" /> Compras / Fornecedores
               </h3>
@@ -845,10 +866,13 @@ const Produtos = () => {
             }
           </div>
           }
+            </TabsContent>
 
+            {/* ── TAB: OBSERVAÇÕES ─────────────────────────── */}
+            <TabsContent value="observacoes" className="space-y-4 mt-0">
           {/* ── Descrição / Observações ──────────────────────────── */}
           <div className="space-y-3">
-            <h3 className="font-semibold text-sm flex items-center gap-2 border-t pt-3">
+            <h3 className="font-semibold text-sm flex items-center gap-2">
               <AlignLeft className="w-4 h-4" /> Descrição / Observações
             </h3>
             <Textarea
@@ -858,6 +882,8 @@ const Produtos = () => {
               rows={3}
             />
           </div>
+            </TabsContent>
+          </Tabs>
 
           <div className="flex justify-end gap-2 pt-4 border-t">
             <Button type="button" variant="outline" onClick={() => setModalOpen(false)}>Cancelar</Button>
