@@ -118,8 +118,14 @@ export function AppSidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMo
     [currentRoute, visibleSections],
   );
 
+  // Administração has its own local sidebar navigation; suppress global expansion
+  // to avoid dual-navigation while the user is inside the module.
+  const isInsideAdminModule = location.pathname === '/administracao' ||
+    location.pathname.startsWith('/administracao/');
+
   const isSectionOpen = (key: string) => {
     if (collapsed) return false;
+    if (key === 'administracao' && isInsideAdminModule) return false;
     if (key in manualSections) return manualSections[key];
     return activeSectionKeys.includes(key);
   };
@@ -266,7 +272,11 @@ export function AppSidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMo
                             {moduleBadgeCount}
                           </span>
                         )}
-                        {isOpen ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
+                        {!(section.key === 'administracao' && isInsideAdminModule) && (
+                          isOpen
+                            ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                            : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                        )}
                       </>
                     )}
                     {collapsed && moduleBadgeCount > 0 && (
