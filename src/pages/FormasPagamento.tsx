@@ -186,7 +186,8 @@ export default function FormasPagamento() {
       chips.push({ key: "ativo", label: "Status", value: v, displayValue: v === "ativo" ? "Ativo" : "Inativo" })
     );
     tipoFilters.forEach((v) =>
-      chips.push({ key: "tipo", label: "Tipo", value: v, displayValue: tipoLabel[v] || v })
+      chips.push({ key: "tipo",
+      mobileCard: true, label: "Tipo", value: v, displayValue: tipoLabel[v] || v })
     );
     geraFinanceiroFilters.forEach((v) =>
       chips.push({ key: "gera_financeiro", label: "Gera Financeiro", value: v, displayValue: v === "sim" ? "Sim" : "Não" })
@@ -217,7 +218,8 @@ export default function FormasPagamento() {
 
   const columns = [
     {
-      key: "descricao", label: "Forma de Pagamento", sortable: true,
+      key: "descricao",
+      mobilePrimary: true, label: "Forma de Pagamento", sortable: true,
       render: (f: FormaPagamento) => {
         const Icon = tipoIcon[f.tipo];
         return (
@@ -235,7 +237,8 @@ export default function FormasPagamento() {
       ),
     },
     {
-      key: "prazo", label: "Prazo / Parcelas", sortable: true,
+      key: "prazo",
+      mobileCard: true, label: "Prazo / Parcelas", sortable: true,
       render: (f: FormaPagamento) => {
         const intervals = Array.isArray(f.intervalos_dias) && f.intervalos_dias.length > 0 ? f.intervalos_dias : null;
         if (intervals) {

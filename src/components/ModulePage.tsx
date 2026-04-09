@@ -16,9 +16,7 @@ interface ModulePageProps {
   filters?: ReactNode;
   toolbarExtra?: ReactNode;
   showToolbar?: boolean;
-  /** KPI cards to render above the toolbar */
   summaryCards?: ReactNode;
-  /** Actions shown on the right side of the header */
   headerActions?: ReactNode;
 }
 
@@ -43,16 +41,16 @@ export function ModulePage({
 
   return (
     <div>
-      {/* Page Header */}
-      <div className="page-header">
-        <div>
+      {/* Page Header — stacks on mobile */}
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
           <h1 className="page-title">{title}</h1>
           {subtitle && <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           {headerActions}
           {addLabel && (
-            <Button onClick={onAdd} className="gap-2">
+            <Button onClick={onAdd} className="h-11 gap-2 sm:h-9 w-full sm:w-auto">
               <Plus className="h-4 w-4" />
               {addLabel}
             </Button>
@@ -78,7 +76,7 @@ export function ModulePage({
                   value={searchValue ?? ""}
                   onChange={(event) => onSearchChange?.(event.target.value)}
                   placeholder={searchPlaceholder}
-                  className="pl-9 pr-8"
+                  className="pl-9 pr-8 h-11 sm:h-9"
                 />
                 {searchValue && (
                   <button

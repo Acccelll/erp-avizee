@@ -209,7 +209,8 @@ const Clientes = () => {
 
   const columns = [
   {
-    key: "nome_razao_social", label: "Nome / Razão Social", sortable: true,
+    key: "nome_razao_social",
+      mobilePrimary: true, label: "Nome / Razão Social", sortable: true,
     render: (c: Cliente) => (
       <div>
         <p className="font-medium leading-tight">{c.nome_razao_social}</p>
@@ -220,7 +221,8 @@ const Clientes = () => {
     ),
   },
   {
-    key: "cpf_cnpj", label: "CPF / CNPJ",
+    key: "cpf_cnpj",
+      mobileCard: true, label: "CPF / CNPJ",
     render: (c: Cliente) => <span className="font-mono text-xs">{c.cpf_cnpj || "—"}</span>,
   },
   {
@@ -232,7 +234,8 @@ const Clientes = () => {
     ),
   },
   {
-    key: "contato_principal", label: "Contato",
+    key: "contato_principal",
+      mobileCard: true, label: "Contato",
     render: (c: Cliente) => {
       const phone = c.celular || c.telefone;
       if (!phone && !c.email) return <span className="text-muted-foreground text-xs">—</span>;
@@ -254,7 +257,8 @@ const Clientes = () => {
     key: "grupo", label: "Grupo Econômico",
     render: (c: Cliente) => grupoNome(c.grupo_economico_id),
   },
-  { key: "ativo", label: "Status", render: (c: Cliente) => <StatusBadge status={c.ativo ? "Ativo" : "Inativo"} /> },
+  { key: "ativo",
+      mobileCard: true, label: "Status", render: (c: Cliente) => <StatusBadge status={c.ativo ? "Ativo" : "Inativo"} /> },
   ];
 
 

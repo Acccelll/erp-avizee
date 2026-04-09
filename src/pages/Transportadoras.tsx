@@ -215,7 +215,8 @@ export default function Transportadoras() {
 
   const columns = [
     {
-      key: "nome_razao_social", label: "Transportadora", sortable: true,
+      key: "nome_razao_social",
+      mobilePrimary: true, label: "Transportadora", sortable: true,
       render: (t: Transportadora) => (
         <div>
           <p className="font-medium leading-tight">{t.nome_razao_social}</p>
@@ -242,13 +243,15 @@ export default function Transportadoras() {
       },
     },
     {
-      key: "cidade", label: "Cidade / UF", sortable: true,
+      key: "cidade",
+      mobileCard: true, label: "Cidade / UF", sortable: true,
       render: (t: Transportadora) => t.cidade
         ? <span className="text-xs">{t.cidade}{t.uf ? `/${t.uf}` : ""}</span>
         : <span className="text-muted-foreground text-xs">—</span>,
     },
     {
-      key: "modalidade", label: "Modalidade",
+      key: "modalidade",
+      mobileCard: true, label: "Modalidade",
       render: (t: Transportadora) => {
         const label = modalidadeLabel[t.modalidade] || t.modalidade;
         if (!label) return <span className="text-muted-foreground text-xs">—</span>;
@@ -261,7 +264,8 @@ export default function Transportadoras() {
         ? <span className="font-mono text-xs font-medium">{t.prazo_medio}d</span>
         : <span className="text-muted-foreground text-xs">—</span>,
     },
-    { key: "ativo", label: "Status", render: (t: Transportadora) => <StatusBadge status={t.ativo ? "Ativo" : "Inativo"} /> },
+    { key: "ativo",
+      mobileCard: true, label: "Status", render: (t: Transportadora) => <StatusBadge status={t.ativo ? "Ativo" : "Inativo"} /> },
   ];
 
   const ativoOptions: MultiSelectOption[] = [

@@ -1,7 +1,7 @@
-import { Moon, Search, Settings, Sun, User } from 'lucide-react';
+import { Moon, Search, Settings, Sun, User, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from 'next-themes';
-import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
+import { Drawer, DrawerClose, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { mobileMenuSections, quickActions } from '@/lib/navigation';
@@ -33,7 +33,18 @@ export function MobileMenu({ open, onOpenChange, onOpenSearch }: MobileMenuProps
     <Drawer open={open} onOpenChange={onOpenChange}>
       <DrawerContent className="max-h-[88vh] rounded-t-[20px] px-0 md:hidden">
         <DrawerHeader className="px-4 pb-2 text-left">
-          <DrawerTitle>Menu</DrawerTitle>
+          <div className="flex items-center justify-between gap-2">
+            <DrawerTitle>Menu</DrawerTitle>
+            <DrawerClose asChild>
+              <button
+                type="button"
+                className="rounded-full p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                aria-label="Fechar menu"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </DrawerClose>
+          </div>
           <DrawerDescription>Navegue pelos módulos e atalhos do ERP AviZee.</DrawerDescription>
         </DrawerHeader>
 

@@ -536,7 +536,7 @@ export default function CotacoesCompra() {
     let pedidoId: string | null = null;
     try {
       const { data: novoPedido, error: erroCabecalho } = await supabase
-        .from("pedidos_compra" as any)
+        .from("pedidos_compra")
         .insert({
           numero: numeroPedido,
           fornecedor_id: fornecedorId,
@@ -555,13 +555,13 @@ export default function CotacoesCompra() {
 
       const itemsPayload = itensParaPedido.map((i) => ({ pedido_compra_id: pedidoId, ...i }));
       const { error: erroItens } = await supabase
-        .from("pedidos_compra_itens" as any)
+        .from("pedidos_compra_itens")
         .insert(itemsPayload);
 
       if (erroItens) {
         // Rollback: remove the orphan purchase order header
         const { error: erroRollback } = await supabase
-          .from("pedidos_compra" as any)
+          .from("pedidos_compra")
           .delete()
           .eq("id", pedidoId);
         if (erroRollback) {

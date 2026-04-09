@@ -205,11 +205,13 @@ const Orcamentos = () => {
 
   const columns = [
     {
-      key: "numero", label: "Nº Cotação", sortable: true,
+      key: "numero",
+      mobileCard: true, label: "Nº Cotação", sortable: true,
       render: (o: Orcamento) => <span className="font-mono text-xs font-semibold text-primary">{o.numero}</span>,
     },
     {
-      key: "cliente", label: "Cliente",
+      key: "cliente",
+      mobilePrimary: true, label: "Cliente",
       render: (o: Orcamento) => (
         <span className="font-medium text-sm">{o.clientes?.nome_razao_social || "—"}</span>
       ),
@@ -223,11 +225,13 @@ const Orcamentos = () => {
       render: (o: Orcamento) => <ValidadeBadge validade={o.validade} status={o.status} />,
     },
     {
-      key: "valor_total", label: "Total", sortable: true,
+      key: "valor_total",
+      mobileCard: true, label: "Total", sortable: true,
       render: (o: Orcamento) => <span className="font-semibold font-mono text-sm">{formatCurrency(Number(o.valor_total || 0))}</span>,
     },
     {
-      key: "status", label: "Status", sortable: true,
+      key: "status",
+      mobileCard: true, label: "Status", sortable: true,
       render: (o: Orcamento) => {
         const vs = getValidadeStatus(o.validade, o.status);
         const effectiveStatus = vs === "vencida" && o.status === "enviado" ? "expirado" : o.status;
