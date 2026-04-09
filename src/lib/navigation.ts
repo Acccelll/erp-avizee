@@ -40,6 +40,7 @@ export interface NavSection {
   icon: LucideIcon;
   /** When set, the section behaves as a direct link (no expand/collapse). */
   directPath?: string;
+  /** Sub-groups with leaf items. Leave empty (or omit) for direct-path sections. */
   items: NavSubgroup[];
 }
 

@@ -214,7 +214,10 @@ export function AppSidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMo
                     key={section.key}
                     type="button"
                     onClick={() => {
-                      if (collapsed) { onToggleCollapsed(); return; }
+                      if (collapsed) {
+                        onToggleCollapsed();
+                        return;
+                      }
                       handleNavClick(section.directPath!);
                     }}
                     aria-current={sectionActive ? 'page' : undefined}
@@ -238,7 +241,10 @@ export function AppSidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMo
                   <button
                     type="button"
                     onClick={() => {
-                      if (collapsed) { onToggleCollapsed(); return; }
+                      if (collapsed) {
+                        onToggleCollapsed();
+                        return;
+                      }
                       setManualSections((c) => ({ ...c, [section.key]: !isOpen }));
                     }}
                     aria-expanded={!collapsed && isOpen}
