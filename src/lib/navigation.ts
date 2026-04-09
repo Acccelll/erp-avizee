@@ -66,7 +66,7 @@ export const dashboardItem: NavLeafItem = {
 };
 
 export const quickActions: QuickAction[] = [
-  { id: 'nova-cotacao', title: 'Nova Cotação', description: 'Criar proposta comercial', path: '/orcamentos/novo', shortcut: '⌘N' },
+  { id: 'nova-cotacao', title: 'Novo Orçamento', description: 'Criar proposta comercial', path: '/orcamentos/novo', shortcut: '⌘N' },
   { id: 'novo-cliente', title: 'Novo Cliente', description: 'Cadastrar cliente rapidamente', path: '/clientes' },
   { id: 'novo-produto', title: 'Novo Produto', description: 'Abrir cadastro de produto', path: '/produtos' },
   { id: 'abrir-financeiro', title: 'Contas a Receber', description: 'Ir para o financeiro filtrado', path: '/financeiro?tipo=receber' },
@@ -100,7 +100,7 @@ export const navSections: NavSection[] = [
       {
         title: 'Pipeline de vendas',
         items: [
-          { title: 'Cotações', path: '/orcamentos', keywords: ['orcamentos', 'propostas', 'cotacoes'] },
+          { title: 'Orçamentos', path: '/orcamentos', keywords: ['orcamentos', 'propostas', 'cotacoes', 'cotações'] },
           { title: 'Pedidos', path: '/pedidos', keywords: ['pedidos', 'backlog', 'operacional', 'ordens', 'ov'] },
         ],
       },
@@ -251,7 +251,7 @@ export const headerIcons: Record<string, LucideIcon> = {
 const baseRouteLabels: Record<string, string> = {
   '/': 'Dashboard',
   '/cotacoes': 'Cotações',
-  '/orcamentos': 'Cotações',
+  '/orcamentos': 'Orçamentos',
   '/pedidos': 'Pedidos',
   '/ordens-venda': 'Pedidos',
   '/compras': 'Compras',
@@ -314,8 +314,8 @@ export function getRouteLabel(pathname: string) {
   if (exactMatch) return exactMatch.title;
   const match = flatNavItems.find((item) => item.path.split('?')[0] === pathname);
   if (match) return match.title;
-  if (pathname.startsWith('/orcamentos/')) return 'Cotação';
-  if (pathname.startsWith('/cotacoes/')) return 'Cotação';
+  if (pathname.startsWith('/orcamentos/')) return 'Orçamento';
+  if (pathname.startsWith('/cotacoes/')) return 'Orçamento';
   if (pathname.startsWith('/clientes/')) return 'Cliente';
   if (pathname.startsWith('/produtos/')) return 'Produto';
   if (pathname.startsWith('/fiscal')) return 'Fiscal';

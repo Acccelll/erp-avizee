@@ -23,6 +23,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MaskedInput } from "@/components/ui/MaskedInput";
 import { StatCard } from "@/components/StatCard";
 import { formatDate } from "@/lib/format";
@@ -367,11 +368,17 @@ export default function Transportadoras() {
             </div>
           )}
 
-          {/* ── BLOCO 1: IDENTIFICAÇÃO ── */}
-          <div className="flex items-center gap-2 pt-1 pb-3 border-b mb-4">
-            <Building2 className="w-4 h-4 text-primary/70" />
-            <h3 className="font-semibold text-sm">Identificação</h3>
-          </div>
+          <Tabs defaultValue="dados-gerais" className="w-full">
+            <TabsList className="mb-4 w-full justify-start overflow-x-auto">
+              <TabsTrigger value="dados-gerais" className="gap-1.5"><Building2 className="h-3.5 w-3.5" />Dados Gerais</TabsTrigger>
+              <TabsTrigger value="contatos" className="gap-1.5"><Phone className="h-3.5 w-3.5" />Contatos</TabsTrigger>
+              <TabsTrigger value="operacional" className="gap-1.5"><Truck className="h-3.5 w-3.5" />Operacional</TabsTrigger>
+              <TabsTrigger value="endereco" className="gap-1.5"><MapPin className="h-3.5 w-3.5" />Endereço</TabsTrigger>
+              <TabsTrigger value="observacoes" className="gap-1.5"><FileText className="h-3.5 w-3.5" />Obs.</TabsTrigger>
+            </TabsList>
+
+            {/* ── TAB: DADOS GERAIS ─────────────────────────── */}
+            <TabsContent value="dados-gerais" className="space-y-4 mt-0">
           <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6">
             <div className="col-span-2 space-y-2">
               <Label>CNPJ</Label>
@@ -412,12 +419,10 @@ export default function Transportadoras() {
               </div>
             </div>
           </div>
+            </TabsContent>
 
-          {/* ── BLOCO 2: CONTATO ── */}
-          <div className="flex items-center gap-2 pt-4 pb-3 border-b border-t mb-4">
-            <Phone className="w-4 h-4 text-primary/70" />
-            <h3 className="font-semibold text-sm">Contato</h3>
-          </div>
+            {/* ── TAB: CONTATOS ─────────────────────────────── */}
+            <TabsContent value="contatos" className="space-y-4 mt-0">
           <div className="mb-6 space-y-4">
             <div>
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">Referência de atendimento</p>
@@ -440,12 +445,10 @@ export default function Transportadoras() {
               </div>
             </div>
           </div>
+            </TabsContent>
 
-          {/* ── BLOCO 3: OPERAÇÃO LOGÍSTICA ── */}
-          <div className="flex items-center gap-2 pt-4 pb-3 border-b border-t mb-2">
-            <Truck className="w-4 h-4 text-primary/70" />
-            <h3 className="font-semibold text-sm">Operação Logística</h3>
-          </div>
+            {/* ── TAB: OPERACIONAL ──────────────────────────── */}
+            <TabsContent value="operacional" className="space-y-4 mt-0">
           <p className="text-xs text-muted-foreground mb-4">Define como a transportadora opera e o prazo médio de entrega. Esses dados são usados em pedidos, remessas e compras.</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <div className="space-y-2">
@@ -473,12 +476,10 @@ export default function Transportadoras() {
               <p className="text-xs text-muted-foreground leading-tight">Prazo médio informado pela transportadora. Usado como referência em remessas.</p>
             </div>
           </div>
+            </TabsContent>
 
-          {/* ── BLOCO 4: ENDEREÇO ── */}
-          <div className="flex items-center gap-2 pt-4 pb-3 border-b border-t mb-2">
-            <MapPin className="w-4 h-4 text-primary/70" />
-            <h3 className="font-semibold text-sm">Endereço</h3>
-          </div>
+            {/* ── TAB: ENDEREÇO ─────────────────────────────── */}
+            <TabsContent value="endereco" className="space-y-4 mt-0">
           <p className="text-xs text-muted-foreground mb-4">Informe o CEP para preenchimento automático do logradouro, bairro, cidade e UF.</p>
           <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6">
             <div className="col-span-2 space-y-2">
@@ -526,12 +527,10 @@ export default function Transportadoras() {
               <Input maxLength={2} value={form.uf} onChange={(e) => setForm({ ...form, uf: e.target.value.toUpperCase() })} className="uppercase" />
             </div>
           </div>
+            </TabsContent>
 
-          {/* ── BLOCO 5: OBSERVAÇÕES ── */}
-          <div className="flex items-center gap-2 pt-4 pb-3 border-b border-t mb-2">
-            <FileText className="w-4 h-4 text-primary/70" />
-            <h3 className="font-semibold text-sm">Observações</h3>
-          </div>
+            {/* ── TAB: OBSERVAÇÕES ──────────────────────────── */}
+            <TabsContent value="observacoes" className="space-y-4 mt-0">
           <p className="text-xs text-muted-foreground mb-4">Notas internas, operacionais e de atendimento sobre a transportadora.</p>
           <div className="mb-6">
             <Textarea
@@ -543,10 +542,10 @@ export default function Transportadoras() {
             />
           </div>
 
-          {/* ── BLOCO 6: USO NO SISTEMA (edit mode only) ── */}
+          {/* Uso no Sistema — edit mode only */}
           {mode === "edit" && (
             <>
-              <div className="flex items-center gap-2 pt-4 pb-3 border-b border-t mb-2">
+              <div className="flex items-center gap-2 pt-3 pb-2 border-t">
                 <Users className="w-4 h-4 text-primary/70" />
                 <h3 className="font-semibold text-sm">Uso no Sistema</h3>
                 <span className="ml-auto text-[10px] text-muted-foreground uppercase tracking-wider">apenas leitura</span>
@@ -578,6 +577,8 @@ export default function Transportadoras() {
               )}
             </>
           )}
+            </TabsContent>
+          </Tabs>
 
           {/* Rodapé */}
           <div className="flex items-center justify-between pt-3 border-t">

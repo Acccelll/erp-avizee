@@ -18,6 +18,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MultiSelect, type MultiSelectOption } from "@/components/ui/MultiSelect";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MaskedInput } from "@/components/ui/MaskedInput";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
@@ -384,8 +385,18 @@ const Fornecedores = () => {
             </div>
           )}
 
-          {/* ── BLOCO 1: IDENTIFICAÇÃO ─────────────────────────── */}
-          <div className="flex items-center gap-2 pt-1 pb-3 border-b mb-4">
+          <Tabs defaultValue="dados-gerais" className="w-full">
+            <TabsList className="mb-4 w-full justify-start overflow-x-auto">
+              <TabsTrigger value="dados-gerais" className="gap-1.5"><User2 className="h-3.5 w-3.5" />Dados Gerais</TabsTrigger>
+              <TabsTrigger value="contatos" className="gap-1.5"><Phone className="h-3.5 w-3.5" />Contatos</TabsTrigger>
+              <TabsTrigger value="endereco" className="gap-1.5"><MapPin className="h-3.5 w-3.5" />Endereço</TabsTrigger>
+              <TabsTrigger value="compras" className="gap-1.5"><ShoppingCart className="h-3.5 w-3.5" />Compras</TabsTrigger>
+              <TabsTrigger value="observacoes" className="gap-1.5"><Handshake className="h-3.5 w-3.5" />Obs.</TabsTrigger>
+            </TabsList>
+
+            {/* ── TAB: DADOS GERAIS ─────────────────────────── */}
+            <TabsContent value="dados-gerais" className="space-y-4 mt-0">
+          <div className="flex items-center gap-2 pb-2">
             <User2 className="w-4 h-4 text-primary/70" />
             <h3 className="font-semibold text-sm">Identificação</h3>
             {form.cpf_cnpj && form.nome_razao_social.length >= MIN_NOME_RAZAO_SOCIAL_LENGTH && (
@@ -497,12 +508,10 @@ const Fornecedores = () => {
               <Input value={form.nome_fantasia} onChange={(e) => updateForm({ nome_fantasia: e.target.value })} placeholder="Nome comercial (opcional)" />
             </div>
           </div>
+            </TabsContent>
 
-          {/* ── BLOCO 2: CONTATO ──────────────────────────────── */}
-          <div className="flex items-center gap-2 pt-4 pb-3 border-t border-b mb-4">
-            <Phone className="w-4 h-4 text-primary/70" />
-            <h3 className="font-semibold text-sm">Contato</h3>
-          </div>
+            {/* ── TAB: CONTATOS ─────────────────────────────── */}
+            <TabsContent value="contatos" className="space-y-4 mt-0">
           <div className="mb-6 space-y-4">
             <div>
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Referência de atendimento</p>
@@ -545,9 +554,76 @@ const Fornecedores = () => {
               </div>
             </div>
           </div>
+            </TabsContent>
 
-          {/* ── BLOCO 3: CONDIÇÕES DE COMPRA ──────────────────── */}
-          <div className="flex items-center gap-2 pt-4 pb-1 border-t">
+            {/* ── TAB: ENDEREÇO ─────────────────────────────── */}
+            <TabsContent value="endereco" className="space-y-4 mt-0">
+          <p className="text-xs text-muted-foreground mb-3">
+            Informe o CEP para preenchimento automático do logradouro, bairro, cidade e UF.
+          </p>
+          <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6">
+            <div className="col-span-2 md:col-span-2 space-y-1.5">
+              <Label>CEP</Label>
+              <div className="relative">
+                <MaskedInput
+                  mask="cep"
+                  value={form.cep}
+                  onChange={(v) => updateForm({ cep: v })}
+                  onBlur={async () => {
+                    const result = await buscarCep(form.cep);
+                    if (result) {
+                      updateForm({ logradouro: result.logradouro, bairro: result.bairro, cidade: result.localidade, uf: result.uf });
+                    }
+                  }}
+                  className={cepLoading ? "pr-8" : ""}
+                />
+                {cepLoading && (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                )}
+              </div>
+              {formErrors.cep && <p className="text-xs text-destructive">{formErrors.cep}</p>}
+            </div>
+            <div className="col-span-2 md:col-span-3 space-y-1.5">
+              <Label>Logradouro</Label>
+              <Input value={form.logradouro} onChange={(e) => updateForm({ logradouro: e.target.value })} placeholder="Rua, Av., Travessa..." />
+            </div>
+            <div className="col-span-2 md:col-span-1 space-y-1.5">
+              <Label>Número</Label>
+              <Input value={form.numero} onChange={(e) => updateForm({ numero: e.target.value })} placeholder="Nº ou S/N" />
+            </div>
+            <div className="col-span-2 md:col-span-3 space-y-1.5">
+              <Label>Complemento</Label>
+              <Input value={form.complemento} onChange={(e) => updateForm({ complemento: e.target.value })} placeholder="Sala, bloco, galpão..." />
+            </div>
+            <div className="col-span-2 md:col-span-3 space-y-1.5">
+              <Label>Bairro</Label>
+              <Input value={form.bairro} onChange={(e) => updateForm({ bairro: e.target.value })} />
+            </div>
+            <div className="col-span-2 md:col-span-3 space-y-1.5">
+              <Label>Cidade</Label>
+              <Input value={form.cidade} onChange={(e) => updateForm({ cidade: e.target.value })} />
+            </div>
+            <div className="col-span-1 md:col-span-1 space-y-1.5">
+              <Label>UF</Label>
+              <Input
+                maxLength={2}
+                placeholder="SP"
+                value={form.uf}
+                onChange={(e) => updateForm({ uf: e.target.value.toUpperCase() })}
+                className={formErrors.uf ? "border-destructive" : ""}
+              />
+              {formErrors.uf && <p className="text-xs text-destructive">{formErrors.uf}</p>}
+            </div>
+            <div className="col-span-1 md:col-span-2 space-y-1.5">
+              <Label>País</Label>
+              <Input value={form.pais} onChange={(e) => updateForm({ pais: e.target.value })} />
+            </div>
+          </div>
+            </TabsContent>
+
+            {/* ── TAB: COMPRAS ──────────────────────────────── */}
+            <TabsContent value="compras" className="space-y-4 mt-0">
+          <div className="flex items-center gap-2 pb-1">
             <ShoppingCart className="w-4 h-4 text-primary/70" />
             <h3 className="font-semibold text-sm">Condições de Compra</h3>
             <span className="ml-auto text-xs bg-blue-50 text-blue-600 border border-blue-200 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-800 rounded-full px-2 py-0.5 leading-none">
@@ -627,83 +703,10 @@ const Fornecedores = () => {
               </div>
             ) : null
           )}
+            </TabsContent>
 
-          {/* ── BLOCO 4: ENDEREÇO ─────────────────────────────── */}
-          <div className="flex items-center gap-2 pt-4 pb-1 border-t">
-            <MapPin className="w-4 h-4 text-primary/70" />
-            <h3 className="font-semibold text-sm">Endereço</h3>
-          </div>
-          <p className="text-xs text-muted-foreground mb-3">
-            Informe o CEP para preenchimento automático do logradouro, bairro, cidade e UF.
-          </p>
-          <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6">
-            {/* Busca por CEP */}
-            <div className="col-span-2 md:col-span-2 space-y-1.5">
-              <Label>CEP</Label>
-              <div className="relative">
-                <MaskedInput
-                  mask="cep"
-                  value={form.cep}
-                  onChange={(v) => updateForm({ cep: v })}
-                  onBlur={async () => {
-                    const result = await buscarCep(form.cep);
-                    if (result) {
-                      updateForm({ logradouro: result.logradouro, bairro: result.bairro, cidade: result.localidade, uf: result.uf });
-                    }
-                  }}
-                  className={cepLoading ? "pr-8" : ""}
-                />
-                {cepLoading && (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                )}
-              </div>
-              {formErrors.cep && <p className="text-xs text-destructive">{formErrors.cep}</p>}
-            </div>
-            {/* Logradouro + Número na mesma linha */}
-            <div className="col-span-2 md:col-span-3 space-y-1.5">
-              <Label>Logradouro</Label>
-              <Input value={form.logradouro} onChange={(e) => updateForm({ logradouro: e.target.value })} placeholder="Rua, Av., Travessa..." />
-            </div>
-            <div className="col-span-2 md:col-span-1 space-y-1.5">
-              <Label>Número</Label>
-              <Input value={form.numero} onChange={(e) => updateForm({ numero: e.target.value })} placeholder="Nº ou S/N" />
-            </div>
-            {/* Complemento + Bairro */}
-            <div className="col-span-2 md:col-span-3 space-y-1.5">
-              <Label>Complemento</Label>
-              <Input value={form.complemento} onChange={(e) => updateForm({ complemento: e.target.value })} placeholder="Sala, bloco, galpão..." />
-            </div>
-            <div className="col-span-2 md:col-span-3 space-y-1.5">
-              <Label>Bairro</Label>
-              <Input value={form.bairro} onChange={(e) => updateForm({ bairro: e.target.value })} />
-            </div>
-            {/* Localização: Cidade + UF + País */}
-            <div className="col-span-2 md:col-span-3 space-y-1.5">
-              <Label>Cidade</Label>
-              <Input value={form.cidade} onChange={(e) => updateForm({ cidade: e.target.value })} />
-            </div>
-            <div className="col-span-1 md:col-span-1 space-y-1.5">
-              <Label>UF</Label>
-              <Input
-                maxLength={2}
-                placeholder="SP"
-                value={form.uf}
-                onChange={(e) => updateForm({ uf: e.target.value.toUpperCase() })}
-                className={formErrors.uf ? "border-destructive" : ""}
-              />
-              {formErrors.uf && <p className="text-xs text-destructive">{formErrors.uf}</p>}
-            </div>
-            <div className="col-span-1 md:col-span-2 space-y-1.5">
-              <Label>País</Label>
-              <Input value={form.pais} onChange={(e) => updateForm({ pais: e.target.value })} />
-            </div>
-          </div>
-
-          {/* ── BLOCO 5: RELACIONAMENTO / OPERAÇÃO ────────────── */}
-          <div className="flex items-center gap-2 pt-4 pb-1 border-t">
-            <Handshake className="w-4 h-4 text-primary/70" />
-            <h3 className="font-semibold text-sm">Relacionamento / Operação</h3>
-          </div>
+            {/* ── TAB: OBSERVAÇÕES ──────────────────────────── */}
+            <TabsContent value="observacoes" className="space-y-4 mt-0">
           <p className="text-xs text-muted-foreground mb-3">
             Observações internas, comerciais e operacionais sobre o fornecedor. Visível apenas internamente.
             Use este campo para registrar condições especiais negociadas, restrições de fornecimento,
@@ -719,6 +722,8 @@ const Fornecedores = () => {
             />
             <p className="text-xs text-muted-foreground mt-1 text-right">{form.observacoes.length}/{MAX_OBSERVACOES_LENGTH}</p>
           </div>
+            </TabsContent>
+          </Tabs>
 
           {/* ── RODAPÉ ────────────────────────────────────────── */}
           <div className="flex items-center justify-end gap-2 pt-4 border-t">
