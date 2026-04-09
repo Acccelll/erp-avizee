@@ -398,7 +398,9 @@ const DashboardContent = () => {
 
       {/* ── Financeiro + Ações rápidas ── */}
       <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="lg:col-span-2">
+        {/* On mobile QuickActions appears first (order-1), FinanceiroBlock second (order-2).
+            On lg+ the visual order matches the DOM order via explicit lg:order-* */}
+        <div className="order-2 lg:order-1 lg:col-span-2">
           <FinanceiroBlock
             totalReceber={stats.totalReceber}
             totalPagar={stats.totalPagar}
@@ -408,7 +410,7 @@ const DashboardContent = () => {
             pagamentosHoje={vencimentosHoje.pagar}
           />
         </div>
-        <div>
+        <div className="order-1 lg:order-2">
           <QuickActions />
         </div>
       </div>

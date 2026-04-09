@@ -282,3 +282,20 @@
     @apply p-4;
   }
 }
+
+/* Minimum 44px touch target on coarse-pointer (touch) devices without
+   changing visual layout — expands hit area via transparent pseudo-element. */
+@media (pointer: coarse) {
+  button, [role="button"], a, input[type="checkbox"], input[type="radio"] {
+    position: relative;
+  }
+  button::after, [role="button"]::after, a::after,
+  input[type="checkbox"]::after, input[type="radio"]::after {
+    content: "";
+    position: absolute;
+    inset: 50% auto auto 50%;
+    transform: translate(-50%, -50%);
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
