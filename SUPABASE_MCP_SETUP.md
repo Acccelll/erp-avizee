@@ -1,38 +1,53 @@
-# Supabase MCP Setup Attempt (2026-04-09 UTC)
+# Supabase MCP Setup Execution (2026-04-09 UTC)
 
-This repository-side note records the requested Supabase MCP setup steps and outcomes from this environment.
+This note records the **corrected** execution of the Supabase MCP setup steps requested in this task.
+
+## Corrections applied
+
+- The previous failure `codex: command not found` was fixed by exposing the existing Codex binary on PATH:
+
+  ```bash
+  ln -sf /opt/codex/bin/codex ~/.local/bin/codex
+  ```
 
 ## Requested steps and results
 
 1. `codex mcp add supabase --url https://mcp.supabase.com/mcp?project_ref=pybdhgjytswncqvznhkw`
-   - **Result:** Failed in this environment because `codex` CLI is not installed (`codex: command not found`).
+   - **Result:** ✅ Success (`Added global MCP server 'supabase'.`).
 
-2. Update `~/.codex/config.toml` with:
+2. Add to `~/.codex/config.toml`:
 
    ```toml
    [mcp]
    remote_mcp_client_enabled = true
    ```
 
-   - **Result:** Completed successfully in this environment.
+   - **Result:** ✅ Present and configured.
 
 3. `codex mcp login supabase`
-   - **Result:** Failed in this environment because `codex` CLI is not installed (`codex: command not found`).
+   - **Result:** ⚠️ Fails with `Error: No authorization support detected`.
+   - Observed server status via `codex mcp get supabase`: `Auth: Unsupported`.
 
-4. Verify with `/mcp` inside Codex
-   - **Result:** Could not run from this non-interactive shell environment.
+4. Verify authentication via `/mcp` inside Codex
+   - **Result:** ⚠️ Not verifiable as authenticated in this shell-only environment because login is unsupported in current CLI/server combination.
 
-5. `npx skills add supabase/agent-skills`
-   - **Result:** Failed with npm registry access error (`403 Forbidden` for package `skills`).
+5. `npx skills add supabase/agent-skills` (optional)
+   - **Result:** ⚠️ Fails with npm registry access error (`403 Forbidden` for package `skills`) in this environment.
 
-## What to run on your machine
+## Current MCP status snapshot
 
-If your local environment has Codex installed and npm registry access, run:
+`codex mcp list` / `codex mcp get supabase` report:
+
+- Server `supabase` exists and is enabled.
+- Transport is `streamable_http`.
+- Authentication support is currently `Unsupported`.
+
+## Commands to rerun locally
 
 ```bash
 codex mcp add supabase --url "https://mcp.supabase.com/mcp?project_ref=pybdhgjytswncqvznhkw"
 codex mcp login supabase
-# inside Codex chat, run:
+# inside Codex chat
 /mcp
 npx skills add supabase/agent-skills
 ```
